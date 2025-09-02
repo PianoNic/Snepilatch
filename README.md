@@ -3,7 +3,7 @@
   <img src="https://raw.githubusercontent.com/Pianonic/snepilatch/main/assets/snepilatch_Logo.png" width="200" alt="SNEPILATCH Logo">
 </p>
 <p align="center">
-  <strong>An open-source, privacy-focused Spotify alternative frontend written in Flutter for Android.</strong>
+  <strong>An open-source, simplicity and Material UI 3 focused Spotify alternative frontend written in Flutter for Android.</strong>
   Experience your music your way.
 </p>
 <p align="center">
@@ -15,20 +15,21 @@
 
 ## 🚀 Features
 - **Intuitive UI**: Clean, modern interface built with Flutter, optimized for Android.
+- **Material 3 Design**: Modern and consistent UI/UX with Material You aesthetics.
+- **Simplicity**: A straightforward and uncluttered user experience.
 - **Music Browsing**: Easily navigate artists, albums, and playlists.
 - **Playback Control**: Seamless playback management with standard controls.
 - **Search Functionality**: Quickly find your favorite tracks, artists, or albums.
-- **Privacy-Focused**: Designed with user privacy in mind, minimal data collection.
 - **Open Source**: Full transparency and community-driven development.
 - **Android Native**: Optimized performance and experience on Android devices.
-
-<!-- ## 📸 Screenshots (Light and Darkmode)
+<!-- 
+## 📸 Screenshots (Light and Darkmode)
 <p align="center">
   <img src="/assets/snepilatch_home.png" width="400" alt="SNEPILATCH Home Screen"><br/><br/>
   <img src="/assets/snepilatch_player.png" width="400" alt="SNEPILATCH Music Player"><br/>
-</p> -->
+</p>
 
-<!-- ## 📦 Installation
+## 📦 Installation
 
 ### Option 1: Download the Latest APK
 The easiest way to get started is to download the latest `.apk` file from the [releases page](https://github.com/Pianonic/SNEPILATCH/releases) and install it on your Android device.
@@ -53,7 +54,29 @@ flutter pub get
 ```bash
 flutter build apk --release
 ```
-The generated APK will be located at `build/app/outputs/flutter-apk/app-release.apk`. Transfer this file to your Android device and install it. -->
+The generated APK will be located at `build/app/outputs/flutter-apk/app-release.apk`. Transfer this file to your Android device and install it.
+
+## 🛠️ Usage
+1. **Launch the App**: Open SNEPILATCH on your Android device.
+2. **Connect to Service**: (If required) Follow the on-screen instructions to connect to your preferred music service.
+3. **Explore Music**: Use the navigation to browse artists, albums, or playlists.
+4. **Play & Control**: Tap on a track to start playback and use the player controls for managing your music.
+
+## ⚙️ Technical Details
+
+### Development Stack
+- **Frontend**: Flutter (UI Framework)
+- **UI/UX**: Material Design 3 implementation for a modern look and feel.
+- **Language**: Dart
+- **Target Platform**: Android
+
+## 📋 Requirements
+- **For Building**:
+  - Flutter SDK (stable channel recommended)
+  - Android SDK (installed with Android Studio)
+  - A code editor like VS Code or Android Studio
+- **For Running**:
+  - Android device or emulator running Android 6.0 (Marshmallow) or higher. -->
 
 ## 📜 License
 This project is licensed under the MIT License.

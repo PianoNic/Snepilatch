@@ -3,7 +3,7 @@
   <img src="https://raw.githubusercontent.com/Pianonic/snepilatch/main/assets/snepilatch_Logo.png" width="200" alt="SNEPILATCH Logo">
 </p>
 <p align="center">
-  <strong>An open-source, simplicity and Material UI 3 focused Spotify alternative frontend written in Flutter for Android.</strong>
+  <strong>An open-source, simplicity focused Spotify alternative frontend written in Flutter for Android.</strong>
   Experience your music your way.
 </p>
 <p align="center">

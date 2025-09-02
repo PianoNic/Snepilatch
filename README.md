@@ -1,6 +1,6 @@
 # <p align="center">SNEPILATCH</p>
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Pianonic/snepilatch/main/assets/snepilatch_Logo_rounded.png" width="200" alt="SNEPILATCH Logo">
+  <img src="./assets/snepilatch_Logo_rounded.png" width="200" alt="SNEPILATCH Logo">
 </p>
 <p align="center">
   <strong>An open-source, simplicity focused Spotify alternative frontend written in Flutter for Android.</strong>

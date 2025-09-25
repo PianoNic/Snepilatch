@@ -1,0 +1,121 @@
+name: Build and Release Flutter Apps
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Setup release keystore
+        working-directory: ./snepilatch/android
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          echo "Setting up release keystore from secrets..."
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "Using existing keystore from secrets"
+            echo "$KEYSTORE_BASE64" | base64 -d > app-release.jks
+          else
+            echo "Generating new keystore (consider storing it as KEYSTORE_BASE64 secret)"
+            keytool -genkey -v -keystore app-release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias release \
+              -dname "CN=Snepilatch App, OU=Development, O=Snepilatch, L=Ruebliland, S=Aargau, C=CH" \
+              -storepass "$KEYSTORE_PASSWORD" -keypass "$KEY_PASSWORD" -noprompt
+          fi
+
+      - name: Create key.properties
+        working-directory: ./snepilatch/android
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          echo "Creating key.properties file..."
+          cat > key.properties << EOF
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=release
+          storeFile=../app-release.jks
+          EOF
+
+      - name: Get dependencies
+        working-directory: ./snepilatch
+        run: flutter pub get
+
+      - name: Generate app icons
+        working-directory: ./snepilatch
+        run: dart run flutter_launcher_icons || echo "No flutter_launcher_icons configured"
+
+      - name: Build Android APK
+        working-directory: ./snepilatch
+        env:
+          SENTRY_DSN: ${{ vars.SENTRY_URL }}
+        run: |
+          flutter build apk --release \
+            --build-name="${{ github.ref_name }}" \
+            --build-number="${{ github.run_number }}" \
+            --dart-define=SENTRY_DSN="$SENTRY_DSN" \
+            --dart-define=SENTRY_RELEASE="${{ github.ref_name }}" \
+            --dart-define=SENTRY_ENVIRONMENT="production"
+
+      - name: Build Android AAB (App Bundle)
+        working-directory: ./snepilatch
+        env:
+          SENTRY_DSN: ${{ vars.SENTRY_URL }}
+        run: |
+          flutter build appbundle --release \
+            --build-name="${{ github.ref_name }}" \
+            --build-number="${{ github.run_number }}" \
+            --dart-define=SENTRY_DSN="$SENTRY_DSN" \
+            --dart-define=SENTRY_RELEASE="${{ github.ref_name }}" \
+            --dart-define=SENTRY_ENVIRONMENT="production"
+
+      - name: Prepare artifacts
+        working-directory: ./snepilatch
+        run: |
+          mkdir -p artifacts
+          cp build/app/outputs/flutter-apk/app-release.apk artifacts/snepilatch-${{ github.ref_name }}.apk
+          cp build/app/outputs/bundle/release/app-release.aab artifacts/snepilatch-${{ github.ref_name }}.aab
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-build
+          path: snepilatch/artifacts/
+
+  upload-to-release:
+    needs: [build-android]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Upload Assets to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            android-build/snepilatch-${{ github.ref_name }}.apk
+            android-build/snepilatch-${{ github.ref_name }}.aab
+          append_body: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

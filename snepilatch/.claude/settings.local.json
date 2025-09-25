@@ -8,7 +8,9 @@
       "Bash(mkdir:*)",
       "Bash(flutter analyze:*)",
       "Read(//c/GithubProjects/schuly/schuly/**)",
-      "Read(//f/Coding/schuly/schuly/**)"
+      "Read(//f/Coding/schuly/schuly/**)",
+      "Read(//f/Coding/schuly/.github/workflows/**)",
+      "Read(//f/Coding/schuly/.github/**)"
     ],
     "deny": [],
     "ask": []

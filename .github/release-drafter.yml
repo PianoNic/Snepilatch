@@ -1,0 +1,75 @@
+# Release Drafter config for snepilatch
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+
+version-resolver:
+  major:
+    labels:
+      - 'major'
+      - 'breaking'
+  minor:
+    labels:
+      - 'feature'
+      - 'enhancement'
+      - 'minor'
+  patch:
+    labels:
+      - 'bug'
+      - 'bugfix'
+      - 'patch'
+      - 'hotfix'
+      - 'security'
+  default: patch
+
+categories:
+  - title: '🚀 Features'
+    labels:
+      - 'feature'
+  - title: '✨ Enhancements'
+    labels:
+      - 'enhancement'
+  - title: '🛠️ Refactors'
+    labels:
+      - 'refactor'
+  - title: '🐛 Bug Fixes'
+    labels:
+      - 'bug'
+
+change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
+change-title-escapes: '\<*_&`'
+
+no-changes-template: 'No changes in this release.'
+
+template: |
+  ## What's Changed
+
+  $CHANGES
+
+  **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
+
+exclude-labels:
+  - 'skip-changelog'
+  - 'dependencies'
+
+autolabeler:
+  - label: 'feature'
+    title:
+      - '/^feat(\(.+\))?\!?:.+/'
+  - label: 'bug'
+    title:
+      - '/^fix(\(.+\))?\!?:.+/'
+  - label: 'breaking'
+    title:
+      - '/^.+\!:.+/'
+  - label: 'documentation'
+    title:
+      - '/^docs(\(.+\))?\!?:.+/'
+    files:
+      - '*.md'
+      - 'docs/**/*'
+  - label: 'test'
+    title:
+      - '/^test(\(.+\))?\!?:.+/'
+    files:
+      - 'test/**/*'
+      - '**/*_test.dart'

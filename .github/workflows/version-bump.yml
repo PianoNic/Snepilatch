@@ -1,0 +1,96 @@
+name: Version Bump and Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+        - patch
+        - minor
+        - major
+      custom_version:
+        description: 'Custom version (optional, overrides version_type)'
+        required: false
+        type: string
+
+jobs:
+  bump-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install semver
+        run: npm install -g semver
+
+      - name: Get current version
+        id: current_version
+        working-directory: ./snepilatch
+        run: |
+          CURRENT_VERSION=$(grep '^version:' pubspec.yaml | cut -d' ' -f2 | cut -d'+' -f1)
+          echo "current=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Calculate new version
+        id: new_version
+        run: |
+          if [ -n "${{ github.event.inputs.custom_version }}" ]; then
+            NEW_VERSION="${{ github.event.inputs.custom_version }}"
+          else
+            NEW_VERSION=$(semver -i ${{ github.event.inputs.version_type }} ${{ steps.current_version.outputs.current }})
+          fi
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "New version will be: $NEW_VERSION"
+
+      - name: Update pubspec.yaml
+        working-directory: ./snepilatch
+        run: |
+          sed -i "s/^version: .*/version: ${{ steps.new_version.outputs.version }}+${{ github.run_number }}/" pubspec.yaml
+
+      - name: Commit version bump
+        run: |
+          git config --local user.email "79938743+Pianonic@users.noreply.github.com"
+          git config --local user.name "PianoNic"
+          git add snepilatch/pubspec.yaml
+          git commit -m "🔖 Bump version to ${{ steps.new_version.outputs.version }}"
+
+      - name: Create and push tag
+        run: |
+          git tag -a "v${{ steps.new_version.outputs.version }}" -m "Release v${{ steps.new_version.outputs.version }}"
+          git push origin main
+          git push origin "v${{ steps.new_version.outputs.version }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ steps.new_version.outputs.version }}"
+          name: "Snepilatch v${{ steps.new_version.outputs.version }}"
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          body: |
+            ## 🚀 Snepilatch v${{ steps.new_version.outputs.version }}
+
+            This release was automatically generated from the latest changes.
+
+            ### 📦 What's included:
+            - Android APK (for sideloading)
+            - Android AAB (for Google Play Store)
+
+            ### 📋 How to install:
+            **Android**: Download the APK file and install it on your device
+
+            **Build Number**: ${{ github.run_number }}
+            **Previous Version**: ${{ steps.current_version.outputs.current }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -32,6 +32,116 @@ class MyApp extends StatelessWidget {
   }
 }
 
+// Separate WebView widget that doesn't rebuild with SpotifyController
+class SpotifyWebViewWidget extends StatefulWidget {
+  final SpotifyController spotifyController;
+  const SpotifyWebViewWidget({super.key, required this.spotifyController});
+
+  @override
+  State<SpotifyWebViewWidget> createState() => _SpotifyWebViewWidgetState();
+}
+
+class _SpotifyWebViewWidgetState extends State<SpotifyWebViewWidget> {
+  @override
+  Widget build(BuildContext context) {
+    if (!Platform.isAndroid && !Platform.isIOS) {
+      return const SizedBox.shrink();
+    }
+
+    // Listen only to showWebView changes
+    return ValueListenableBuilder<bool>(
+      valueListenable: widget.spotifyController.showWebViewNotifier,
+      builder: (context, showWebView, child) {
+        return Positioned(
+          left: showWebView ? 0 : 0,
+          top: showWebView ? 0 : 0,
+          width: showWebView ? MediaQuery.of(context).size.width : 1,
+          height: showWebView ? MediaQuery.of(context).size.height : 1,
+          child: showWebView
+            ? Container(
+                color: Colors.white,
+                child: SafeArea(
+                  child: Column(
+                    children: [
+                      Container(
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.close),
+                              onPressed: () => widget.spotifyController.hideWebView(),
+                            ),
+                            ValueListenableBuilder<bool>(
+                              valueListenable: widget.spotifyController.isLoggedInNotifier,
+                              builder: (context, isLoggedIn, child) {
+                                return Text(
+                                  isLoggedIn ? 'Spotify Web' : 'Login to Spotify',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                );
+                              },
+                            ),
+                            const Spacer(),
+                            TextButton(
+                              onPressed: () => widget.spotifyController.hideWebView(),
+                              child: const Text('Done'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: InAppWebView(
+                          key: const Key('spotify_webview'),
+                          initialUrlRequest: URLRequest(
+                            url: WebUri('https://open.spotify.com')
+                          ),
+                          initialSettings: widget.spotifyController.getWebViewSettings(),
+                          onWebViewCreated: widget.spotifyController.onWebViewCreated,
+                          onLoadStop: widget.spotifyController.onLoadStop,
+                          shouldOverrideUrlLoading: widget.spotifyController.shouldOverrideUrlLoading,
+                          onPermissionRequest: widget.spotifyController.onPermissionRequest,
+                          onConsoleMessage: (controller, consoleMessage) {
+                            debugPrint('Console: ${consoleMessage.message}');
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : SizedBox(
+                width: 1,
+                height: 1,
+                child: InAppWebView(
+                  key: const Key('spotify_webview_hidden'),
+                  initialUrlRequest: URLRequest(
+                    url: WebUri('https://open.spotify.com')
+                  ),
+                  initialSettings: widget.spotifyController.getWebViewSettings(),
+                  onWebViewCreated: widget.spotifyController.onWebViewCreated,
+                  onLoadStop: widget.spotifyController.onLoadStop,
+                  shouldOverrideUrlLoading: widget.spotifyController.shouldOverrideUrlLoading,
+                  onPermissionRequest: widget.spotifyController.onPermissionRequest,
+                ),
+              ),
+        );
+      },
+    );
+  }
+}
+
 class MainScreen extends StatefulWidget {
   final SpotifyController spotifyController;
   const MainScreen({super.key, required this.spotifyController});
@@ -40,14 +150,29 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateMixin {
   int _selectedIndex = 0;
+  bool _isPlayerExpanded = false;
+  late AnimationController _playerAnimationController;
+  late Animation<double> _playerAnimation;
 
   late final List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
+    _playerAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _playerAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _playerAnimationController,
+      curve: Curves.easeInOut,
+    ));
+
     _pages = [
       HomePage(spotifyController: widget.spotifyController),
       SongsPage(spotifyController: widget.spotifyController),
@@ -57,103 +182,318 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   @override
+  void dispose() {
+    _playerAnimationController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: widget.spotifyController,
-      builder: (context, child) {
-        return Scaffold(
-          body: Stack(
-            children: [
-              // Main app content
-              IndexedStack(
+    return Scaffold(
+      body: Stack(
+        children: [
+          // Main app content with AnimatedBuilder only for pages
+          AnimatedBuilder(
+            animation: widget.spotifyController,
+            builder: (context, child) {
+              return IndexedStack(
                 index: _selectedIndex,
                 children: _pages,
-              ),
-              // Full screen WebView overlay - only show when needed
-              if (widget.spotifyController.showWebView && (Platform.isAndroid || Platform.isIOS))
-                Positioned.fill(
-                  child: Container(
-                    color: Colors.white,
-                    child: SafeArea(
-                      child: Column(
+              );
+            },
+          ),
+          // WebView - separate widget that doesn't rebuild with controller
+          SpotifyWebViewWidget(spotifyController: widget.spotifyController),
+          // Mini player at bottom when collapsed
+          AnimatedBuilder(
+            animation: widget.spotifyController,
+            builder: (context, child) {
+              if (widget.spotifyController.currentTrack != null && !widget.spotifyController.showWebView) {
+                return Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: GestureDetector(
+                    onVerticalDragEnd: (details) {
+                      if (details.velocity.pixelsPerSecond.dy < -300) {
+                        // Swipe up - expand
+                        setState(() {
+                          _isPlayerExpanded = true;
+                          _playerAnimationController.forward();
+                        });
+                      }
+                    },
+                    onTap: () {
+                      setState(() {
+                        _isPlayerExpanded = true;
+                        _playerAnimationController.forward();
+                      });
+                    },
+                    child: Container(
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surface,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 8,
+                            offset: const Offset(0, -2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
                         children: [
-                          Container(
-                            height: 56,
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.surface,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
+                          // Album art
+                          if (widget.spotifyController.currentAlbumArt != null)
+                            Container(
+                              width: 64,
+                              height: 64,
+                              decoration: BoxDecoration(
+                                image: DecorationImage(
+                                  image: NetworkImage(widget.spotifyController.currentAlbumArt!),
+                                  fit: BoxFit.cover,
                                 ),
-                              ],
+                              ),
                             ),
-                            child: Row(
+                          const SizedBox(width: 12),
+                          // Track info
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                IconButton(
-                                  icon: const Icon(Icons.close),
-                                  onPressed: () => widget.spotifyController.hideWebView(),
+                                Text(
+                                  widget.spotifyController.currentTrack ?? '',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                                 Text(
-                                  widget.spotifyController.isLoggedIn ? 'Spotify Web' : 'Login to Spotify',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w500,
+                                  widget.spotifyController.currentArtist ?? '',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Theme.of(context).colorScheme.secondary,
                                   ),
-                                ),
-                                const Spacer(),
-                                TextButton(
-                                  onPressed: () => widget.spotifyController.hideWebView(),
-                                  child: const Text('Done'),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ],
                             ),
                           ),
-                          Expanded(
-                            child: InAppWebView(
-                              initialUrlRequest: URLRequest(
-                                url: WebUri('https://open.spotify.com')
-                              ),
-                              initialSettings: widget.spotifyController.getWebViewSettings(),
-                              onWebViewCreated: widget.spotifyController.onWebViewCreated,
-                              onLoadStop: widget.spotifyController.onLoadStop,
-                              shouldOverrideUrlLoading: widget.spotifyController.shouldOverrideUrlLoading,
-                              onPermissionRequest: widget.spotifyController.onPermissionRequest,
-                              onConsoleMessage: (controller, consoleMessage) {
-                                debugPrint('Console: ${consoleMessage.message}');
-                              },
+                          // Play/pause button
+                          IconButton(
+                            icon: Icon(
+                              widget.spotifyController.isPlaying ? Icons.pause : Icons.play_arrow,
                             ),
+                            onPressed: () {
+                              if (widget.spotifyController.isPlaying) {
+                                widget.spotifyController.pause();
+                              } else {
+                                widget.spotifyController.play();
+                              }
+                            },
                           ),
+                          // Next button
+                          IconButton(
+                            icon: const Icon(Icons.skip_next),
+                            onPressed: () => widget.spotifyController.next(),
+                          ),
+                          const SizedBox(width: 8),
                         ],
                       ),
                     ),
                   ),
-                )
-              else if (Platform.isAndroid || Platform.isIOS)
-                // Hidden WebView for background operations when not showing full screen
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  child: SizedBox(
-                    height: 1,
-                    width: 1,
-                    child: InAppWebView(
-                      initialUrlRequest: URLRequest(
-                        url: WebUri('https://open.spotify.com')
-                      ),
-                      initialSettings: widget.spotifyController.getWebViewSettings(),
-                      onWebViewCreated: widget.spotifyController.onWebViewCreated,
-                      onLoadStop: widget.spotifyController.onLoadStop,
-                      shouldOverrideUrlLoading: widget.spotifyController.shouldOverrideUrlLoading,
-                      onPermissionRequest: widget.spotifyController.onPermissionRequest,
-                    ),
-                  ),
-                ),
-            ],
+                );
+              }
+              return const SizedBox.shrink();
+            },
           ),
-          bottomNavigationBar: widget.spotifyController.showWebView
-            ? null
+          // Expanded player
+              if (_isPlayerExpanded && widget.spotifyController.currentTrack != null)
+                AnimatedBuilder(
+                  animation: _playerAnimation,
+                  builder: (context, child) {
+                    return Positioned.fill(
+                      child: GestureDetector(
+                        onVerticalDragEnd: (details) {
+                          if (details.velocity.pixelsPerSecond.dy > 300) {
+                            // Swipe down - collapse
+                            setState(() {
+                              _isPlayerExpanded = false;
+                              _playerAnimationController.reverse();
+                            });
+                          }
+                        },
+                        child: Container(
+                          color: Colors.black.withOpacity(_playerAnimation.value * 0.95),
+                          child: SafeArea(
+                            child: Column(
+                              children: [
+                                // Handle bar
+                                Container(
+                                  margin: const EdgeInsets.only(top: 8, bottom: 16),
+                                  width: 40,
+                                  height: 4,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.3),
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                                // Close button
+                                Row(
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white),
+                                      onPressed: () {
+                                        setState(() {
+                                          _isPlayerExpanded = false;
+                                          _playerAnimationController.reverse();
+                                        });
+                                      },
+                                    ),
+                                  ],
+                                ),
+                                Expanded(
+                                  child: SingleChildScrollView(
+                                    padding: const EdgeInsets.all(24.0),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        // Album art
+                                        if (widget.spotifyController.currentAlbumArt != null)
+                                          Container(
+                                            width: MediaQuery.of(context).size.width * 0.8,
+                                            height: MediaQuery.of(context).size.width * 0.8,
+                                            decoration: BoxDecoration(
+                                              borderRadius: BorderRadius.circular(12),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.black.withOpacity(0.3),
+                                                  blurRadius: 20,
+                                                  offset: const Offset(0, 10),
+                                                ),
+                                              ],
+                                              image: DecorationImage(
+                                                image: NetworkImage(widget.spotifyController.currentAlbumArt!),
+                                                fit: BoxFit.cover,
+                                              ),
+                                            ),
+                                          ),
+                                        const SizedBox(height: 32),
+                                        // Track info
+                                        Text(
+                                          widget.spotifyController.currentTrack ?? '',
+                                          style: const TextStyle(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          widget.spotifyController.currentArtist ?? '',
+                                          style: const TextStyle(
+                                            fontSize: 18,
+                                            color: Colors.white70,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                        const SizedBox(height: 32),
+                                        // Controls
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            IconButton(
+                                              icon: Icon(
+                                                widget.spotifyController.shuffleMode == 'enhanced'
+                                                  ? Icons.shuffle_on_outlined
+                                                  : Icons.shuffle,
+                                                color: widget.spotifyController.shuffleMode == 'off'
+                                                  ? Colors.white54
+                                                  : widget.spotifyController.shuffleMode == 'normal'
+                                                    ? Colors.green
+                                                    : Colors.greenAccent,
+                                              ),
+                                              iconSize: 32,
+                                              onPressed: () => widget.spotifyController.toggleShuffle(),
+                                            ),
+                                            IconButton(
+                                              icon: const Icon(Icons.skip_previous, color: Colors.white),
+                                              iconSize: 48,
+                                              onPressed: () => widget.spotifyController.previous(),
+                                            ),
+                                            IconButton(
+                                              icon: Icon(
+                                                widget.spotifyController.isPlaying
+                                                  ? Icons.pause_circle_filled
+                                                  : Icons.play_circle_filled,
+                                                color: Colors.white,
+                                              ),
+                                              iconSize: 72,
+                                              onPressed: () {
+                                                if (widget.spotifyController.isPlaying) {
+                                                  widget.spotifyController.pause();
+                                                } else {
+                                                  widget.spotifyController.play();
+                                                }
+                                              },
+                                            ),
+                                            IconButton(
+                                              icon: const Icon(Icons.skip_next, color: Colors.white),
+                                              iconSize: 48,
+                                              onPressed: () => widget.spotifyController.next(),
+                                            ),
+                                            IconButton(
+                                              icon: Icon(
+                                                widget.spotifyController.repeatMode == 'one'
+                                                  ? Icons.repeat_one
+                                                  : Icons.repeat,
+                                                color: widget.spotifyController.repeatMode != 'off'
+                                                  ? Colors.green
+                                                  : Colors.white54,
+                                              ),
+                                              iconSize: 32,
+                                              onPressed: () => widget.spotifyController.toggleRepeat(),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 24),
+                                        // Like button
+                                        IconButton(
+                                          icon: Icon(
+                                            widget.spotifyController.isCurrentTrackLiked
+                                              ? Icons.favorite
+                                              : Icons.favorite_border,
+                                            color: widget.spotifyController.isCurrentTrackLiked
+                                              ? Colors.green
+                                              : Colors.white,
+                                          ),
+                                          iconSize: 32,
+                                          onPressed: () => widget.spotifyController.toggleLike(),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ],
+      ),
+      bottomNavigationBar: AnimatedBuilder(
+        animation: widget.spotifyController,
+        builder: (context, child) {
+          return widget.spotifyController.showWebView
+            ? const SizedBox.shrink()
             : NavigationBar(
                 selectedIndex: _selectedIndex,
                 onDestinationSelected: (int index) {
@@ -183,9 +523,9 @@ class _MainScreenState extends State<MainScreen> {
                     label: 'User',
                   ),
                 ],
-              ),
-        );
-      },
+              );
+        },
+      ),
     );
   }
 }
@@ -242,10 +582,53 @@ class HomePage extends StatelessWidget {
                   style: const TextStyle(fontSize: 16),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 16),
+                // Like button
+                IconButton(
+                  icon: Icon(
+                    spotifyController.isCurrentTrackLiked ? Icons.favorite : Icons.favorite_border,
+                    color: spotifyController.isCurrentTrackLiked ? Colors.green : null,
+                  ),
+                  iconSize: 32,
+                  onPressed: spotifyController.currentTrack != null ? () => spotifyController.toggleLike() : null,
+                ),
+                const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
+                    Column(
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            spotifyController.shuffleMode == 'enhanced'
+                              ? Icons.shuffle_on_outlined
+                              : Icons.shuffle,
+                          ),
+                          iconSize: 32,
+                          onPressed: () => spotifyController.toggleShuffle(),
+                          color: spotifyController.shuffleMode == 'off'
+                            ? Theme.of(context).colorScheme.secondary
+                            : spotifyController.shuffleMode == 'normal'
+                              ? Colors.green
+                              : Colors.greenAccent,
+                        ),
+                        Text(
+                          spotifyController.shuffleMode == 'enhanced'
+                            ? 'Enhanced'
+                            : spotifyController.shuffleMode == 'normal'
+                              ? 'On'
+                              : 'Off',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: spotifyController.shuffleMode == 'off'
+                              ? Theme.of(context).colorScheme.secondary
+                              : spotifyController.shuffleMode == 'normal'
+                                ? Colors.green
+                                : Colors.greenAccent,
+                          ),
+                        ),
+                      ],
+                    ),
                     IconButton(
                       icon: const Icon(Icons.skip_previous),
                       iconSize: 48,
@@ -269,6 +652,18 @@ class HomePage extends StatelessWidget {
                       icon: const Icon(Icons.skip_next),
                       iconSize: 48,
                       onPressed: () => spotifyController.next(),
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        spotifyController.repeatMode == 'one'
+                          ? Icons.repeat_one
+                          : Icons.repeat,
+                      ),
+                      iconSize: 32,
+                      onPressed: () => spotifyController.toggleRepeat(),
+                      color: spotifyController.repeatMode != 'off'
+                        ? Colors.green
+                        : Theme.of(context).colorScheme.secondary,
                     ),
                   ],
                 ),

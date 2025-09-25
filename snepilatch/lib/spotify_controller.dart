@@ -18,6 +18,10 @@ class SpotifyController extends ChangeNotifier {
   List<Map<String, String>> _songs = [];
   bool _isLoadingSongs = false;
 
+  // ValueNotifiers for specific UI updates
+  final ValueNotifier<bool> showWebViewNotifier = ValueNotifier<bool>(false);
+  final ValueNotifier<bool> isLoggedInNotifier = ValueNotifier<bool>(false);
+
   bool get isInitialized => _isInitialized;
   bool get isPlaying => _isPlaying;
   bool get isLoggedIn => _isLoggedIn;
@@ -31,8 +35,23 @@ class SpotifyController extends ChangeNotifier {
   List<Map<String, String>> get songs => _songs;
   bool get isLoadingSongs => _isLoadingSongs;
 
+  bool _isCurrentTrackLiked = false;
+  String _shuffleMode = 'off'; // 'off', 'normal', 'enhanced'
+  String _repeatMode = 'off'; // 'off', 'all', 'one'
+
+  bool get isCurrentTrackLiked => _isCurrentTrackLiked;
+  String get shuffleMode => _shuffleMode;
+  String get repeatMode => _repeatMode;
+
   SpotifyController() {
     _startPeriodicScraping();
+  }
+
+  @override
+  void dispose() {
+    showWebViewNotifier.dispose();
+    isLoggedInNotifier.dispose();
+    super.dispose();
   }
 
   InAppWebViewSettings getWebViewSettings() {
@@ -129,14 +148,57 @@ class SpotifyController extends ChangeNotifier {
           const albumArtElement = document.querySelector('[data-testid="now-playing-widget"] img') ||
                                  document.querySelector('[data-testid="cover-art-image"]');
 
+          // Check if current track is liked
+          const likeButton = document.querySelector('[data-testid="now-playing-widget"] button[aria-label*="Lieblingssongs"], [data-testid="now-playing-widget"] button[aria-label*="Playlist"], [data-testid="now-playing-widget"] button[aria-label*="favorite"], [data-testid="now-playing-widget"] button[aria-label*="like"]');
+          const isLiked = likeButton?.getAttribute('aria-checked') === 'true' || false;
+
+          // Check shuffle state - detect off, normal, or enhanced
+          const shuffleButton = document.querySelector('button[aria-label*="shuffle" i], button[aria-label*="Shuffle" i]');
+          let shuffleMode = 'off';
+
+          if (shuffleButton) {
+            const ariaLabel = shuffleButton.getAttribute('aria-label')?.toLowerCase() || '';
+
+            // Detect based on aria-label text patterns
+            // "deaktivieren" = deactivate (means it's currently ON)
+            // "aktivieren" = activate (means it's currently OFF or ready to upgrade)
+
+            if (ariaLabel.includes('smart shuffle') && ariaLabel.includes('deaktivieren')) {
+              // Smart Shuffle is ON (enhanced mode)
+              shuffleMode = 'enhanced';
+            } else if (!ariaLabel.includes('smart') && ariaLabel.includes('deaktivieren')) {
+              // Normal shuffle is ON
+              shuffleMode = 'normal';
+            } else if (ariaLabel.includes('smart shuffle') && ariaLabel.includes('aktivieren')) {
+              // Normal shuffle is ON, can activate Smart Shuffle
+              shuffleMode = 'normal';
+            } else if (!ariaLabel.includes('smart') && ariaLabel.includes('aktivieren')) {
+              // Shuffle is OFF
+              shuffleMode = 'off';
+            }
+          }
+
+          // Check repeat state
+          const repeatButton = document.querySelector('[data-testid="control-button-repeat"]');
+          const repeatAriaChecked = repeatButton?.getAttribute('aria-checked');
+          let repeatMode = 'off';
+          if (repeatAriaChecked === 'true') {
+            repeatMode = 'all';
+          } else if (repeatAriaChecked === 'mixed') {
+            repeatMode = 'one';
+          }
+
           return {
             isPlaying: isPlaying,
             track: trackElement?.textContent || '',
             artist: artistElement?.textContent || '',
-            albumArt: albumArtElement?.src || ''
+            albumArt: albumArtElement?.src || '',
+            isLiked: isLiked,
+            shuffleMode: shuffleMode,
+            repeatMode: repeatMode
           };
         } catch (e) {
-          return { isPlaying: false, track: '', artist: '', albumArt: '' };
+          return { isPlaying: false, track: '', artist: '', albumArt: '', isLiked: false, shuffleMode: 'off', repeatMode: 'off' };
         }
       }
 
@@ -258,20 +320,32 @@ class SpotifyController extends ChangeNotifier {
       final artistMatch = RegExp(r'"artist":"([^"]*)"').firstMatch(data);
       final isPlayingMatch = RegExp(r'"isPlaying":(\w+)').firstMatch(data);
       final albumArtMatch = RegExp(r'"albumArt":"([^"]*)"').firstMatch(data);
+      final isLikedMatch = RegExp(r'"isLiked":(\w+)').firstMatch(data);
+      final shuffleModeMatch = RegExp(r'"shuffleMode":"([^"]*)"').firstMatch(data);
+      final repeatModeMatch = RegExp(r'"repeatMode":"([^"]*)"').firstMatch(data);
 
       final newTrack = trackMatch?.group(1)?.trim() ?? '';
       final newArtist = artistMatch?.group(1)?.trim() ?? '';
       final newIsPlaying = isPlayingMatch?.group(1) == 'true';
       final newAlbumArt = albumArtMatch?.group(1)?.trim() ?? '';
+      final newIsLiked = isLikedMatch?.group(1) == 'true';
+      final newShuffleMode = shuffleModeMatch?.group(1)?.trim() ?? 'off';
+      final newRepeatMode = repeatModeMatch?.group(1)?.trim() ?? 'off';
 
       if (newTrack != _currentTrack ||
           newArtist != _currentArtist ||
           newIsPlaying != _isPlaying ||
-          newAlbumArt != _currentAlbumArt) {
+          newAlbumArt != _currentAlbumArt ||
+          newIsLiked != _isCurrentTrackLiked ||
+          newShuffleMode != _shuffleMode ||
+          newRepeatMode != _repeatMode) {
         _currentTrack = newTrack.isNotEmpty ? newTrack : null;
         _currentArtist = newArtist.isNotEmpty ? newArtist : null;
         _isPlaying = newIsPlaying;
         _currentAlbumArt = newAlbumArt.isNotEmpty ? newAlbumArt : null;
+        _isCurrentTrackLiked = newIsLiked;
+        _shuffleMode = newShuffleMode;
+        _repeatMode = newRepeatMode;
         notifyListeners();
       }
     } catch (e) {
@@ -317,6 +391,7 @@ class SpotifyController extends ChangeNotifier {
           newEmail != _userEmail ||
           newProfileImage != _userProfileImage) {
         _isLoggedIn = newIsLoggedIn;
+        isLoggedInNotifier.value = newIsLoggedIn;
         _username = newUsername.isNotEmpty ? newUsername : null;
         _userEmail = newEmail.isNotEmpty ? newEmail : null;
         _userProfileImage = newProfileImage.isNotEmpty ? newProfileImage : null;
@@ -329,54 +404,107 @@ class SpotifyController extends ChangeNotifier {
 
   Future<void> play() async {
     const String js = '''
-      const playButton = document.querySelector('[data-testid="control-button-playpause"]');
-      if (playButton && playButton.getAttribute('aria-label')?.includes('Play')) {
-        playButton.click();
-      }
+      (function() {
+        const playButton = document.querySelector('[data-testid="control-button-playpause"]');
+        if (playButton && playButton.getAttribute('aria-label')?.includes('Play')) {
+          playButton.click();
+        }
+      })();
     ''';
     await webViewController?.evaluateJavascript(source: js);
   }
 
   Future<void> pause() async {
     const String js = '''
-      const pauseButton = document.querySelector('[data-testid="control-button-playpause"]');
-      if (pauseButton && pauseButton.getAttribute('aria-label')?.includes('Pause')) {
-        pauseButton.click();
-      }
+      (function() {
+        const pauseButton = document.querySelector('[data-testid="control-button-playpause"]');
+        if (pauseButton && pauseButton.getAttribute('aria-label')?.includes('Pause')) {
+          pauseButton.click();
+        }
+      })();
     ''';
     await webViewController?.evaluateJavascript(source: js);
   }
 
   Future<void> next() async {
     const String js = '''
-      const nextButton = document.querySelector('[data-testid="control-button-skip-forward"]');
-      if (nextButton) nextButton.click();
+      (function() {
+        const nextButton = document.querySelector('[data-testid="control-button-skip-forward"]');
+        if (nextButton) nextButton.click();
+      })();
     ''';
     await webViewController?.evaluateJavascript(source: js);
   }
 
   Future<void> previous() async {
     const String js = '''
-      const prevButton = document.querySelector('[data-testid="control-button-skip-back"]');
-      if (prevButton) prevButton.click();
+      (function() {
+        const prevButton = document.querySelector('[data-testid="control-button-skip-back"]');
+        if (prevButton) prevButton.click();
+      })();
+    ''';
+    await webViewController?.evaluateJavascript(source: js);
+  }
+
+  Future<void> toggleShuffle() async {
+    const String js = '''
+      (function() {
+        // Find shuffle button by looking for button with shuffle-related aria-label
+        const buttons = document.querySelectorAll('button[aria-label]');
+        const shuffleButton = Array.from(buttons).find(button =>
+          button.getAttribute('aria-label')?.toLowerCase().includes('shuffle')
+        );
+        if (shuffleButton) {
+          shuffleButton.click();
+        }
+      })();
+    ''';
+    await webViewController?.evaluateJavascript(source: js);
+  }
+
+  Future<void> toggleRepeat() async {
+    const String js = '''
+      (function() {
+        const repeatButton = document.querySelector('[data-testid="control-button-repeat"]');
+        if (repeatButton) repeatButton.click();
+      })();
+    ''';
+    await webViewController?.evaluateJavascript(source: js);
+  }
+
+  Future<void> toggleLike() async {
+    const String js = '''
+      (function() {
+        // Find the like button in the now-playing widget
+        const likeButton = document.querySelector('[data-testid="now-playing-widget"] button[aria-label*="Lieblingssongs"]') ||
+                          document.querySelector('[data-testid="now-playing-widget"] button[aria-label*="Playlist"]') ||
+                          document.querySelector('[data-testid="now-playing-widget"] button[aria-label*="favorite"]') ||
+                          document.querySelector('[data-testid="now-playing-widget"] button[aria-label*="like"]') ||
+                          document.querySelector('[data-testid="now-playing-widget"] button[aria-checked]');
+        if (likeButton) {
+          likeButton.click();
+        }
+      })();
     ''';
     await webViewController?.evaluateJavascript(source: js);
   }
 
   Future<void> search(String query) async {
     final String js = '''
-      const searchButton = document.querySelector('[href="/search"]');
-      if (searchButton) {
-        searchButton.click();
-        setTimeout(() => {
-          const searchInput = document.querySelector('input[data-testid="search-input"]');
-          if (searchInput) {
-            searchInput.value = '$query';
-            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-            searchInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
-          }
-        }, 500);
-      }
+      (function() {
+        const searchButton = document.querySelector('[href="/search"]');
+        if (searchButton) {
+          searchButton.click();
+          setTimeout(() => {
+            const searchInput = document.querySelector('input[data-testid="search-input"]');
+            if (searchInput) {
+              searchInput.value = '$query';
+              searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+              searchInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+            }
+          }, 500);
+        }
+      })();
     ''';
     await webViewController?.evaluateJavascript(source: js);
   }
@@ -427,6 +555,7 @@ class SpotifyController extends ChangeNotifier {
 
   Future<void> navigateToLogin() async {
     _showWebView = true;
+    showWebViewNotifier.value = true;
     notifyListeners();
     await webViewController?.loadUrl(
       urlRequest: URLRequest(url: WebUri('https://accounts.spotify.com/login'))
@@ -441,11 +570,13 @@ class SpotifyController extends ChangeNotifier {
 
   void openWebView() {
     _showWebView = true;
+    showWebViewNotifier.value = true;
     notifyListeners();
   }
 
   void hideWebView() {
     _showWebView = false;
+    showWebViewNotifier.value = false;
     notifyListeners();
     if (!_isLoggedIn) {
       navigateToSpotify();
@@ -454,35 +585,39 @@ class SpotifyController extends ChangeNotifier {
 
   Future<void> logout() async {
     const String js = '''
-      const accountButton = document.querySelector('[data-testid="user-widget-link"]');
-      if (accountButton) {
-        accountButton.click();
-        setTimeout(() => {
-          const logoutButton = document.querySelector('[data-testid="user-widget-dropdown-logout"]');
-          if (logoutButton) logoutButton.click();
-        }, 500);
-      }
+      (function() {
+        const accountButton = document.querySelector('[data-testid="user-widget-link"]');
+        if (accountButton) {
+          accountButton.click();
+          setTimeout(() => {
+            const logoutButton = document.querySelector('[data-testid="user-widget-dropdown-logout"]');
+            if (logoutButton) logoutButton.click();
+          }, 500);
+        }
+      })();
     ''';
     await webViewController?.evaluateJavascript(source: js);
   }
 
   Future<void> playTrackAtIndex(int index) async {
     final String js = '''
-      const songs = document.querySelectorAll('[data-testid="tracklist-row"]');
-      if (songs[$index]) {
-        const playButton = songs[$index].querySelector('[data-testid="more-button"]');
-        if (playButton) {
-          songs[$index].click();
-          setTimeout(() => {
-            const doubleClick = new MouseEvent('dblclick', {
-              view: window,
-              bubbles: true,
-              cancelable: true
-            });
-            songs[$index].dispatchEvent(doubleClick);
-          }, 100);
+      (function() {
+        const songs = document.querySelectorAll('[data-testid="tracklist-row"]');
+        if (songs[$index]) {
+          const playButton = songs[$index].querySelector('[data-testid="more-button"]');
+          if (playButton) {
+            songs[$index].click();
+            setTimeout(() => {
+              const doubleClick = new MouseEvent('dblclick', {
+                view: window,
+                bubbles: true,
+                cancelable: true
+              });
+              songs[$index].dispatchEvent(doubleClick);
+            }, 100);
+          }
         }
-      }
+      })();
     ''';
     await webViewController?.evaluateJavascript(source: js);
   }

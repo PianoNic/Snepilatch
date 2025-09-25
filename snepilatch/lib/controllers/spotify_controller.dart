@@ -43,6 +43,7 @@ class SpotifyController extends ChangeNotifier {
         final percentage = position.inMilliseconds / store.durationMs.value;
         seekToPosition(percentage);
       };
+      handler.onToggleLikeCallback = toggleLike;
     }
   }
 
@@ -60,11 +61,12 @@ class SpotifyController extends ChangeNotifier {
         );
       }
 
-      // Update playback state
+      // Update playback state with like status
       handler.updatePlaybackState(
         isPlaying: newState.isPlaying,
         position: Duration(milliseconds: newState.progressMs),
         duration: Duration(milliseconds: newState.durationMs),
+        isLiked: newState.isCurrentTrackLiked,
       );
     }
   }

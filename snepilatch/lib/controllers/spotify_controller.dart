@@ -9,39 +9,12 @@ import '../models/search_result.dart';
 import '../services/webview_service.dart';
 import '../services/spotify_scraper_service.dart';
 import '../services/spotify_actions_service.dart';
+import '../stores/spotify_store.dart';
 
 class SpotifyController extends ChangeNotifier {
   final WebViewService _webViewService = WebViewService();
+  final SpotifyStore store = SpotifyStore();
   Timer? _scrapingTimer;
-
-  // State
-  bool _isInitialized = false;
-  PlaybackState _playbackState = PlaybackState();
-  User _user = User.guest();
-  List<Song> _songs = [];
-  bool _isLoadingSongs = false;
-  bool _showWebView = false;
-
-  // ValueNotifiers for specific UI updates
-  final ValueNotifier<bool> showWebViewNotifier = ValueNotifier<bool>(false);
-  final ValueNotifier<bool> isLoggedInNotifier = ValueNotifier<bool>(false);
-
-  // Getters
-  bool get isInitialized => _isInitialized;
-  bool get isPlaying => _playbackState.isPlaying;
-  bool get isLoggedIn => _user.isLoggedIn;
-  bool get showWebView => _showWebView;
-  String? get currentTrack => _playbackState.currentTrack;
-  String? get currentArtist => _playbackState.currentArtist;
-  String? get currentAlbumArt => _playbackState.currentAlbumArt;
-  String? get username => _user.username;
-  String? get userEmail => _user.email;
-  String? get userProfileImage => _user.profileImageUrl;
-  List<Song> get songs => _songs;
-  bool get isLoadingSongs => _isLoadingSongs;
-  bool get isCurrentTrackLiked => _playbackState.isCurrentTrackLiked;
-  String get shuffleMode => _playbackState.shuffleMode.value;
-  String get repeatMode => _playbackState.repeatMode.value;
 
   SpotifyController() {
     _startPeriodicScraping();
@@ -50,10 +23,30 @@ class SpotifyController extends ChangeNotifier {
   @override
   void dispose() {
     _scrapingTimer?.cancel();
-    showWebViewNotifier.dispose();
-    isLoggedInNotifier.dispose();
+    store.dispose();
     super.dispose();
   }
+
+  // Getters that delegate to store (for backward compatibility)
+  bool get isInitialized => store.isInitialized.value;
+  bool get isPlaying => store.isPlaying.value;
+  bool get isLoggedIn => store.isLoggedIn.value;
+  bool get showWebView => store.showWebView.value;
+  String? get currentTrack => store.currentTrack.value;
+  String? get currentArtist => store.currentArtist.value;
+  String? get currentAlbumArt => store.currentAlbumArt.value;
+  String? get username => store.username.value;
+  String? get userEmail => store.userEmail.value;
+  String? get userProfileImage => store.userProfileImage.value;
+  List<Song> get songs => store.songs.value;
+  bool get isLoadingSongs => store.isLoadingSongs.value;
+  bool get isCurrentTrackLiked => store.isCurrentTrackLiked.value;
+  String get shuffleMode => store.shuffleMode.value.value;
+  String get repeatMode => store.repeatMode.value.value;
+
+  // Direct access to notifiers for UI binding
+  ValueNotifier<bool> get showWebViewNotifier => store.showWebView;
+  ValueNotifier<bool> get isLoggedInNotifier => store.isLoggedIn;
 
   // WebView initialization methods
   InAppWebViewSettings getWebViewSettings() => _webViewService.getSettings();
@@ -65,11 +58,8 @@ class SpotifyController extends ChangeNotifier {
   Future<void> onLoadStop(InAppWebViewController controller, WebUri? url) async {
     debugPrint('Page finished loading: $url');
     await _injectJavaScript();
-    _isInitialized = true;
-    // Schedule notification for next frame to avoid setState during build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      notifyListeners();
-    });
+    store.isInitialized.value = true;
+    notifyListeners();
   }
 
   Future<NavigationActionPolicy> shouldOverrideUrlLoading(
@@ -87,13 +77,12 @@ class SpotifyController extends ChangeNotifier {
   }
 
   void _startPeriodicScraping() {
-    // Cancel any existing timer
     _scrapingTimer?.cancel();
 
-    // Wait before starting periodic scraping
+    // Start periodic scraping after initial delay
     Timer(const Duration(seconds: 2), () {
       _scrapingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-        if (_isInitialized && !_showWebView) {
+        if (store.isInitialized.value && !store.showWebView.value) {
           _scrapeCurrentInfo();
           _scrapeUserInfo();
         }
@@ -103,6 +92,9 @@ class SpotifyController extends ChangeNotifier {
 
   Future<void> _scrapeCurrentInfo() async {
     if (_webViewService.controller == null) return;
+
+    // Skip if user is actively controlling
+    if (store.isUserControlling.value) return;
 
     try {
       final result = await _webViewService.evaluateJavascriptWithResult(
@@ -115,28 +107,13 @@ class SpotifyController extends ChangeNotifier {
 
         if (cleanJson.contains('track')) {
           final newState = SpotifyScraperService.parsePlaybackInfo(cleanJson);
-          if (newState != null && _hasPlaybackStateChanged(newState)) {
-            _playbackState = newState;
-            // Schedule notification for next frame to avoid setState during build
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              notifyListeners();
-            });
-          }
+          store.updateFromScrapedData(newState);
+          notifyListeners();
         }
       }
     } catch (e) {
       debugPrint('Error scraping: $e');
     }
-  }
-
-  bool _hasPlaybackStateChanged(PlaybackState newState) {
-    return newState.currentTrack != _playbackState.currentTrack ||
-           newState.currentArtist != _playbackState.currentArtist ||
-           newState.isPlaying != _playbackState.isPlaying ||
-           newState.currentAlbumArt != _playbackState.currentAlbumArt ||
-           newState.isCurrentTrackLiked != _playbackState.isCurrentTrackLiked ||
-           newState.shuffleMode != _playbackState.shuffleMode ||
-           newState.repeatMode != _playbackState.repeatMode;
   }
 
   Future<void> _scrapeUserInfo() async {
@@ -153,14 +130,8 @@ class SpotifyController extends ChangeNotifier {
 
         if (cleanJson.contains('isLoggedIn')) {
           final newUser = SpotifyScraperService.parseUserInfo(cleanJson);
-          if (newUser != null && _hasUserChanged(newUser)) {
-            _user = newUser;
-            isLoggedInNotifier.value = newUser.isLoggedIn;
-            // Schedule notification for next frame to avoid setState during build
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              notifyListeners();
-            });
-          }
+          store.updateUserInfo(newUser);
+          notifyListeners();
         }
       }
     } catch (e) {
@@ -168,39 +139,52 @@ class SpotifyController extends ChangeNotifier {
     }
   }
 
-  bool _hasUserChanged(User newUser) {
-    return newUser.isLoggedIn != _user.isLoggedIn ||
-           newUser.username != _user.username ||
-           newUser.email != _user.email ||
-           newUser.profileImageUrl != _user.profileImageUrl;
-  }
-
-  // Playback control methods
+  // Playback control methods with optimistic updates
   Future<void> play() async {
+    store.setPlaying(true);
+    notifyListeners();
     await _webViewService.evaluateJavascript(SpotifyActionsService.playScript);
   }
 
   Future<void> pause() async {
+    store.setPlaying(false);
+    notifyListeners();
     await _webViewService.evaluateJavascript(SpotifyActionsService.pauseScript);
   }
 
   Future<void> next() async {
+    store.startUserControl();
     await _webViewService.evaluateJavascript(SpotifyActionsService.nextScript);
+    // Force scrape after delay to get new track info
+    Future.delayed(const Duration(seconds: 2), () {
+      _scrapeCurrentInfo();
+    });
   }
 
   Future<void> previous() async {
+    store.startUserControl();
     await _webViewService.evaluateJavascript(SpotifyActionsService.previousScript);
+    // Force scrape after delay to get new track info
+    Future.delayed(const Duration(seconds: 2), () {
+      _scrapeCurrentInfo();
+    });
   }
 
   Future<void> toggleShuffle() async {
+    store.toggleShuffle();
+    notifyListeners();
     await _webViewService.evaluateJavascript(SpotifyActionsService.toggleShuffleScript);
   }
 
   Future<void> toggleRepeat() async {
+    store.toggleRepeat();
+    notifyListeners();
     await _webViewService.evaluateJavascript(SpotifyActionsService.toggleRepeatScript);
   }
 
   Future<void> toggleLike() async {
+    store.toggleLike();
+    notifyListeners();
     await _webViewService.evaluateJavascript(SpotifyActionsService.toggleLikeScript);
   }
 
@@ -228,12 +212,8 @@ class SpotifyController extends ChangeNotifier {
 
   // Navigation methods
   Future<void> navigateToLogin() async {
-    _showWebView = true;
-    showWebViewNotifier.value = true;
-    // Schedule notification for next frame to avoid setState during build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      notifyListeners();
-    });
+    store.showWebView.value = true;
+    notifyListeners();
     await _webViewService.loadUrl('https://accounts.spotify.com/login');
   }
 
@@ -242,22 +222,14 @@ class SpotifyController extends ChangeNotifier {
   }
 
   void openWebView() {
-    _showWebView = true;
-    showWebViewNotifier.value = true;
-    // Schedule notification for next frame to avoid setState during build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      notifyListeners();
-    });
+    store.showWebView.value = true;
+    notifyListeners();
   }
 
   void hideWebView() {
-    _showWebView = false;
-    showWebViewNotifier.value = false;
-    // Schedule notification for next frame to avoid setState during build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      notifyListeners();
-    });
-    if (!_user.isLoggedIn) {
+    store.showWebView.value = false;
+    notifyListeners();
+    if (!store.isLoggedIn.value) {
       navigateToSpotify();
     }
   }
@@ -274,12 +246,9 @@ class SpotifyController extends ChangeNotifier {
   }
 
   Future<void> navigateToLikedSongs() async {
-    _isLoadingSongs = true;
-    _songs = [];
-    // Schedule notification for next frame to avoid setState during build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      notifyListeners();
-    });
+    store.isLoadingSongs.value = true;
+    store.songs.value = [];
+    notifyListeners();
 
     await _webViewService.loadUrl('https://open.spotify.com/collection/tracks');
 
@@ -297,23 +266,15 @@ class SpotifyController extends ChangeNotifier {
       );
 
       if (result != null && result != 'null' && result != '[]') {
-        _songs = SpotifyScraperService.parseSongs(result.toString())
-            .map((s) => s)
-            .toList();
+        store.songs.value = SpotifyScraperService.parseSongs(result.toString());
       }
 
-      _isLoadingSongs = false;
-      // Schedule notification for next frame to avoid setState during build
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        notifyListeners();
-      });
+      store.isLoadingSongs.value = false;
+      notifyListeners();
     } catch (e) {
       debugPrint('Error scraping songs: $e');
-      _isLoadingSongs = false;
-      // Schedule notification for next frame to avoid setState during build
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        notifyListeners();
-      });
+      store.isLoadingSongs.value = false;
+      notifyListeners();
     }
   }
 

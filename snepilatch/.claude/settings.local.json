@@ -4,7 +4,9 @@
       "Bash(flutter create:*)",
       "Bash(flutter pub:*)",
       "Bash(flutter clean:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(mkdir:*)",
+      "Bash(flutter analyze:*)"
     ],
     "deny": [],
     "ask": []

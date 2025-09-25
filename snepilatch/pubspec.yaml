@@ -36,6 +36,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   flutter_inappwebview: ^6.0.0
   palette_generator: ^0.3.3+4
+  audio_service: ^0.18.15
+  just_audio: ^0.9.40
 
 dev_dependencies:
   flutter_test:

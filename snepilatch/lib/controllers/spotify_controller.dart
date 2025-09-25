@@ -1,16 +1,19 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:audio_service/audio_service.dart';
 
 import '../models/song.dart';
-import '../models/playback_state.dart';
+import '../models/playback_state.dart' as app_models;
 import '../models/search_result.dart';
 import '../models/user.dart';
 import '../services/webview_service.dart';
 import '../services/spotify_scraper_service.dart';
 import '../services/spotify_actions_service.dart';
 import '../services/theme_service.dart';
+import '../services/audio_handler_service.dart';
 import '../stores/spotify_store.dart';
+import '../main.dart';
 
 class SpotifyController extends ChangeNotifier {
   final WebViewService _webViewService = WebViewService();
@@ -23,6 +26,47 @@ class SpotifyController extends ChangeNotifier {
   SpotifyController() {
     _startPeriodicScraping();
     _startProgressAnimation();
+    _setupAudioHandler();
+  }
+
+  void _setupAudioHandler() {
+    // Set up callbacks for the audio handler
+    if (audioHandler is SpotifyAudioHandler) {
+      final handler = audioHandler as SpotifyAudioHandler;
+
+      // Set callbacks
+      handler.onPlayCallback = play;
+      handler.onPauseCallback = pause;
+      handler.onNextCallback = next;
+      handler.onPreviousCallback = previous;
+      handler.onSeekCallback = (position) {
+        final percentage = position.inMilliseconds / store.durationMs.value;
+        seekToPosition(percentage);
+      };
+    }
+  }
+
+  void _updateAudioServiceMetadata(app_models.PlaybackState newState) {
+    if (audioHandler is SpotifyAudioHandler) {
+      final handler = audioHandler as SpotifyAudioHandler;
+
+      // Update media item
+      if (newState.currentTrack != null) {
+        handler.setMediaItem(
+          title: newState.currentTrack!,
+          artist: newState.currentArtist ?? 'Unknown Artist',
+          artUri: newState.currentAlbumArt,
+          duration: Duration(milliseconds: newState.durationMs),
+        );
+      }
+
+      // Update playback state
+      handler.updatePlaybackState(
+        isPlaying: newState.isPlaying,
+        position: Duration(milliseconds: newState.progressMs),
+        duration: Duration(milliseconds: newState.durationMs),
+      );
+    }
   }
 
   @override
@@ -148,7 +192,7 @@ class SpotifyController extends ChangeNotifier {
         'JSON.stringify(getUserInfo())'
       );
 
-      PlaybackState? newState;
+      app_models.PlaybackState? newState;
       User? newUser;
 
       // Parse playback info
@@ -179,6 +223,11 @@ class SpotifyController extends ChangeNotifier {
           debugPrint('🎨 [SpotifyController] Album art changed - updating theme');
           _lastAlbumArt = newState?.currentAlbumArt;
           themeService.updateThemeFromImageUrl(_lastAlbumArt);
+        }
+
+        // Update audio service metadata
+        if (newState != null) {
+          _updateAudioServiceMetadata(newState);
         }
 
         // Single notification for all updates

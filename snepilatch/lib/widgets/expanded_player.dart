@@ -103,8 +103,8 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> with TickerProviderStat
     )..layout(minWidth: 0, maxWidth: double.infinity);
 
     final textWidth = textPainter.width;
-    // Account for padding (24*2) and heart button (48) and some extra space
-    final availableWidth = MediaQuery.of(context).size.width - 120;
+    // Account for padding (72*2) for more spacing around text and heart button
+    final availableWidth = MediaQuery.of(context).size.width - 144;
 
     if (textWidth > availableWidth) {
       if (!_shouldScroll) {
@@ -383,85 +383,129 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> with TickerProviderStat
             children: [
               // Centered track title with scrolling animation
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 60.0), // Leave space for heart button
-                child: ClipRect(
-                  child: _shouldScroll
-                      ? LayoutBuilder(
-                          builder: (context, constraints) {
-                            return AnimatedBuilder(
-                              animation: _scrollController,
-                              builder: (context, child) {
-                                final textPainter = TextPainter(
-                                  text: TextSpan(
-                                    text: trackName,
-                                    style: const TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  maxLines: 1,
-                                  textDirection: TextDirection.ltr,
-                                )..layout();
-
-                                final textWidth = textPainter.width;
-                                final scrollExtent = textWidth + 100; // Add space between repeats
-
-                                // Calculate offset for scrolling effect
-                                final offset = _scrollController.value * scrollExtent;
-
-                                return ClipRect(
-                                  child: SingleChildScrollView(
-                                    scrollDirection: Axis.horizontal,
-                                    physics: const NeverScrollableScrollPhysics(),
-                                    child: Transform.translate(
-                                      offset: Offset(-offset, 0),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            trackName,
-                                            key: _textKey,
-                                            style: const TextStyle(
-                                              fontSize: 22,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.white,
-                                            ),
-                                            maxLines: 1,
-                                          ),
-                                          const SizedBox(width: 100),
-                                          Text(
-                                            trackName,
-                                            style: const TextStyle(
-                                              fontSize: 22,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.white,
-                                            ),
-                                            maxLines: 1,
-                                          ),
-                                          const SizedBox(width: 100), // Extra space for smooth loop
-                                        ],
+                padding: const EdgeInsets.symmetric(horizontal: 72.0), // More space for heart button
+                child: Stack(
+                  children: [
+                    // Main text content
+                    ClipRect(
+                      child: _shouldScroll
+                          ? LayoutBuilder(
+                              builder: (context, constraints) {
+                                return AnimatedBuilder(
+                                  animation: _scrollController,
+                                  builder: (context, child) {
+                                    final textPainter = TextPainter(
+                                      text: TextSpan(
+                                        text: trackName,
+                                        style: const TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
-                                    ),
-                                  ),
+                                      maxLines: 1,
+                                      textDirection: TextDirection.ltr,
+                                    )..layout();
+
+                                    final textWidth = textPainter.width;
+                                    final scrollExtent = textWidth + 100; // Add space between repeats
+
+                                    // Calculate offset for scrolling effect
+                                    final offset = _scrollController.value * scrollExtent;
+
+                                    return ClipRect(
+                                      child: SingleChildScrollView(
+                                        scrollDirection: Axis.horizontal,
+                                        physics: const NeverScrollableScrollPhysics(),
+                                        child: Transform.translate(
+                                          offset: Offset(-offset, 0),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                trackName,
+                                                key: _textKey,
+                                                style: const TextStyle(
+                                                  fontSize: 22,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white,
+                                                ),
+                                                maxLines: 1,
+                                              ),
+                                              const SizedBox(width: 100),
+                                              Text(
+                                                trackName,
+                                                style: const TextStyle(
+                                                  fontSize: 22,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white,
+                                                ),
+                                                maxLines: 1,
+                                              ),
+                                              const SizedBox(width: 100), // Extra space for smooth loop
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
                                 );
                               },
-                            );
-                          },
-                        )
-                      : Center(
-                          child: Text(
-                            trackName,
-                            key: _textKey,
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                            )
+                          : Center(
+                              child: Text(
+                                trackName,
+                                key: _textKey,
+                                style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                            textAlign: TextAlign.center,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                    ),
+                    // Fade effects on edges (only show when scrolling)
+                    if (_shouldScroll) ...[
+                      Positioned(
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        child: Container(
+                          width: 20,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                              colors: [
+                                Theme.of(context).colorScheme.surface,
+                                Theme.of(context).colorScheme.surface.withValues(alpha: 0),
+                              ],
+                            ),
                           ),
                         ),
+                      ),
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        bottom: 0,
+                        child: Container(
+                          width: 20,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.centerRight,
+                              end: Alignment.centerLeft,
+                              colors: [
+                                Theme.of(context).colorScheme.surface,
+                                Theme.of(context).colorScheme.surface.withValues(alpha: 0),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               // Like button positioned on the right

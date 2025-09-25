@@ -5,6 +5,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../models/song.dart';
 import '../models/playback_state.dart';
 import '../models/search_result.dart';
+import '../models/user.dart';
 import '../services/webview_service.dart';
 import '../services/spotify_scraper_service.dart';
 import '../services/spotify_actions_service.dart';
@@ -16,15 +17,18 @@ class SpotifyController extends ChangeNotifier {
   final SpotifyStore store = SpotifyStore();
   final ThemeService themeService = ThemeService();
   Timer? _scrapingTimer;
+  Timer? _progressTimer;
   String? _lastAlbumArt;
 
   SpotifyController() {
     _startPeriodicScraping();
+    _startProgressAnimation();
   }
 
   @override
   void dispose() {
     _scrapingTimer?.cancel();
+    _progressTimer?.cancel();
     store.dispose();
     themeService.dispose();
     super.dispose();
@@ -46,6 +50,11 @@ class SpotifyController extends ChangeNotifier {
   bool get isCurrentTrackLiked => store.isCurrentTrackLiked.value;
   String get shuffleMode => store.shuffleMode.value.value;
   String get repeatMode => store.repeatMode.value.value;
+  String get currentTime => store.currentTime.value;
+  String get duration => store.duration.value;
+  int get progressMs => store.progressMs.value;
+  int get durationMs => store.durationMs.value;
+  double get progressPercentage => durationMs > 0 ? (progressMs / durationMs).clamp(0.0, 1.0) : 0.0;
 
   // Get current theme hex color
   String? get currentThemeHex => themeService.currentHexColor;
@@ -62,10 +71,12 @@ class SpotifyController extends ChangeNotifier {
   }
 
   Future<void> onLoadStop(InAppWebViewController controller, WebUri? url) async {
-    debugPrint('Page finished loading: $url');
+    debugPrint('🌐 [SpotifyController] Page finished loading: $url');
+    debugPrint('💉 [SpotifyController] Injecting JavaScript scraping functions...');
     await _injectJavaScript();
     store.isInitialized.value = true;
-    // Defer notification to next frame to avoid calling during build
+    debugPrint('✅ [SpotifyController] WebView initialized and ready for scraping');
+    // Only defer this specific notification since it happens during build
     WidgetsBinding.instance.addPostFrameCallback((_) {
       notifyListeners();
     });
@@ -88,79 +99,96 @@ class SpotifyController extends ChangeNotifier {
   void _startPeriodicScraping() {
     _scrapingTimer?.cancel();
 
+    debugPrint('⏰ [SpotifyController] Starting periodic scraping in 2 seconds...');
+
     // Start periodic scraping after initial delay
     Timer(const Duration(seconds: 2), () {
+      debugPrint('✅ [SpotifyController] Periodic scraping started (every 1 second)');
       _scrapingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
         if (store.isInitialized.value && !store.showWebView.value) {
-          _scrapeCurrentInfo();
-          _scrapeUserInfo();
+          _scrapeAllInfo();
         }
       });
     });
   }
 
-  Future<void> _scrapeCurrentInfo() async {
+  void _startProgressAnimation() {
+    // Smooth progress updates every 100ms
+    _progressTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+      if (store.isPlaying.value && store.durationMs.value > 0) {
+        // Don't update if user is seeking
+        if (!store.isUserControlling.value) {
+          // Increment progress smoothly
+          final newProgress = store.progressMs.value + 100;
+          if (newProgress <= store.durationMs.value) {
+            store.updateProgressSmoothly(newProgress);
+            notifyListeners();
+          }
+        }
+      }
+    });
+  }
+
+  Future<void> _scrapeAllInfo() async {
     if (_webViewService.controller == null) return;
 
     // Skip if user is actively controlling
-    if (store.isUserControlling.value) return;
+    if (store.isUserControlling.value) {
+      debugPrint('🚫 [SpotifyController] Skipping scrape - user is controlling');
+      return;
+    }
 
     try {
-      final result = await _webViewService.evaluateJavascriptWithResult(
+      // Batch scrape all info at once
+      final playbackResult = await _webViewService.evaluateJavascriptWithResult(
         'JSON.stringify(getPlayingInfo())'
       );
 
-      if (result != null && result != 'null') {
-        final String jsonString = result.toString();
-        final cleanJson = jsonString.replaceAll(r'\"', '"');
-
-        if (cleanJson.contains('track')) {
-          final newState = SpotifyScraperService.parsePlaybackInfo(cleanJson);
-          store.updateFromScrapedData(newState);
-
-          // Update theme if album art changed
-          if (newState?.currentAlbumArt != null &&
-              newState?.currentAlbumArt != _lastAlbumArt) {
-            _lastAlbumArt = newState?.currentAlbumArt;
-            themeService.updateThemeFromImageUrl(_lastAlbumArt);
-          }
-
-          // Defer notification to avoid calling during build
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            notifyListeners();
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint('Error scraping: $e');
-    }
-  }
-
-  Future<void> _scrapeUserInfo() async {
-    if (_webViewService.controller == null) return;
-
-    try {
-      final result = await _webViewService.evaluateJavascriptWithResult(
+      final userResult = await _webViewService.evaluateJavascriptWithResult(
         'JSON.stringify(getUserInfo())'
       );
 
-      if (result != null && result != 'null') {
-        final String jsonString = result.toString();
-        final cleanJson = jsonString.replaceAll(r'\"', '"');
+      PlaybackState? newState;
+      User? newUser;
 
-        if (cleanJson.contains('isLoggedIn')) {
-          final newUser = SpotifyScraperService.parseUserInfo(cleanJson);
-          store.updateUserInfo(newUser);
-          // Defer notification to avoid calling during build
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            notifyListeners();
-          });
+      // Parse playback info
+      if (playbackResult != null && playbackResult != 'null') {
+        final String jsonString = playbackResult.toString();
+        final cleanJson = jsonString.replaceAll(r'\"', '"');
+        if (cleanJson.contains('track')) {
+          newState = SpotifyScraperService.parsePlaybackInfo(cleanJson);
         }
       }
+
+      // Parse user info
+      if (userResult != null && userResult != 'null') {
+        final String jsonString = userResult.toString();
+        final cleanJson = jsonString.replaceAll(r'\"', '"');
+        if (cleanJson.contains('isLoggedIn')) {
+          newUser = SpotifyScraperService.parseUserInfo(cleanJson);
+        }
+      }
+
+      // Update store with all values at once
+      if (newState != null || newUser != null) {
+        store.batchUpdate(newState, newUser);
+
+        // Update theme if album art changed
+        if (newState?.currentAlbumArt != null &&
+            newState?.currentAlbumArt != _lastAlbumArt) {
+          debugPrint('🎨 [SpotifyController] Album art changed - updating theme');
+          _lastAlbumArt = newState?.currentAlbumArt;
+          themeService.updateThemeFromImageUrl(_lastAlbumArt);
+        }
+
+        // Single notification for all updates
+        notifyListeners();
+      }
     } catch (e) {
-      debugPrint('Error scraping user info: $e');
+      debugPrint('❌ [SpotifyController] Error scraping: $e');
     }
   }
+
 
   // Playback control methods with optimistic updates
   Future<void> play() async {
@@ -184,7 +212,7 @@ class SpotifyController extends ChangeNotifier {
     await _webViewService.evaluateJavascript(SpotifyActionsService.nextScript);
     // Force scrape after delay to get new track info
     Future.delayed(const Duration(seconds: 2), () {
-      _scrapeCurrentInfo();
+      _scrapeAllInfo();
     });
   }
 
@@ -193,7 +221,7 @@ class SpotifyController extends ChangeNotifier {
     await _webViewService.evaluateJavascript(SpotifyActionsService.previousScript);
     // Force scrape after delay to get new track info
     Future.delayed(const Duration(seconds: 2), () {
-      _scrapeCurrentInfo();
+      _scrapeAllInfo();
     });
   }
 
@@ -219,6 +247,24 @@ class SpotifyController extends ChangeNotifier {
       notifyListeners();
     });
     await _webViewService.evaluateJavascript(SpotifyActionsService.toggleLikeScript);
+  }
+
+  Future<void> seekToPosition(double percentage) async {
+    store.startUserControl();
+
+    // Immediate optimistic update of progress
+    final newProgressMs = (store.durationMs.value * percentage).round();
+    store.updateProgressSmoothly(newProgressMs);
+    notifyListeners();
+
+    await _webViewService.evaluateJavascript(
+      SpotifyActionsService.seekToPositionScript(percentage)
+    );
+
+    // Force scrape after a delay to sync with actual position
+    Future.delayed(const Duration(milliseconds: 500), () {
+      _scrapeAllInfo();
+    });
   }
 
   // Search methods

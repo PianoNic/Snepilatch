@@ -6,6 +6,10 @@ class PlaybackState {
   final bool isCurrentTrackLiked;
   final ShuffleMode shuffleMode;
   final RepeatMode repeatMode;
+  final String? currentTime;
+  final String? duration;
+  final int progressMs;
+  final int durationMs;
 
   PlaybackState({
     this.isPlaying = false,
@@ -15,6 +19,10 @@ class PlaybackState {
     this.isCurrentTrackLiked = false,
     this.shuffleMode = ShuffleMode.off,
     this.repeatMode = RepeatMode.off,
+    this.currentTime,
+    this.duration,
+    this.progressMs = 0,
+    this.durationMs = 0,
   });
 
   PlaybackState copyWith({
@@ -25,6 +33,10 @@ class PlaybackState {
     bool? isCurrentTrackLiked,
     ShuffleMode? shuffleMode,
     RepeatMode? repeatMode,
+    String? currentTime,
+    String? duration,
+    int? progressMs,
+    int? durationMs,
   }) {
     return PlaybackState(
       isPlaying: isPlaying ?? this.isPlaying,
@@ -34,7 +46,16 @@ class PlaybackState {
       isCurrentTrackLiked: isCurrentTrackLiked ?? this.isCurrentTrackLiked,
       shuffleMode: shuffleMode ?? this.shuffleMode,
       repeatMode: repeatMode ?? this.repeatMode,
+      currentTime: currentTime ?? this.currentTime,
+      duration: duration ?? this.duration,
+      progressMs: progressMs ?? this.progressMs,
+      durationMs: durationMs ?? this.durationMs,
     );
+  }
+
+  double get progressPercentage {
+    if (durationMs == 0) return 0.0;
+    return (progressMs / durationMs).clamp(0.0, 1.0);
   }
 }
 

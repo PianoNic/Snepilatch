@@ -18,8 +18,118 @@ class ExpandedPlayer extends StatefulWidget {
   State<ExpandedPlayer> createState() => _ExpandedPlayerState();
 }
 
-class _ExpandedPlayerState extends State<ExpandedPlayer> {
+class _ExpandedPlayerState extends State<ExpandedPlayer> with TickerProviderStateMixin {
   double _dragOffset = 0;
+  double? _draggedProgress;
+  bool _isDraggingSlider = false;
+
+  // For text scrolling animation
+  late AnimationController _scrollController;
+  late Animation<double> _scrollAnimation;
+  bool _shouldScroll = false;
+  final GlobalKey _textKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = AnimationController(
+      duration: const Duration(seconds: 6),
+      vsync: this,
+    );
+
+    // Simple linear animation from 0 to 1
+    _scrollAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(_scrollController);
+
+    // Loop the animation
+    _scrollController.addStatusListener((status) {
+      if (status == AnimationStatus.completed && _shouldScroll) {
+        Future.delayed(const Duration(seconds: 2), () {
+          if (_shouldScroll && mounted) {
+            _scrollController.forward(from: 0);
+          }
+        });
+      }
+    });
+
+    // Check if text needs scrolling when track changes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkTextOverflow();
+    });
+
+    // Listen to track changes
+    widget.spotifyController.addListener(_onTrackChanged);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    widget.spotifyController.removeListener(_onTrackChanged);
+    super.dispose();
+  }
+
+  void _onTrackChanged() {
+    // Check if we need to scroll when track changes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkTextOverflow();
+    });
+  }
+
+  void _checkTextOverflow() {
+    if (!mounted) return;
+
+    final trackName = widget.spotifyController.currentTrack ?? '';
+    if (trackName.isEmpty || trackName == 'No track playing') {
+      setState(() {
+        _shouldScroll = false;
+      });
+      _scrollController.stop();
+      _scrollController.reset();
+      return;
+    }
+
+    final TextPainter textPainter = TextPainter(
+      text: TextSpan(
+        text: trackName,
+        style: const TextStyle(
+          fontSize: 22,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      maxLines: 1,
+      textDirection: TextDirection.ltr,
+    )..layout(minWidth: 0, maxWidth: double.infinity);
+
+    final textWidth = textPainter.width;
+    // Account for padding (24*2) and heart button (48) and some extra space
+    final availableWidth = MediaQuery.of(context).size.width - 120;
+
+    if (textWidth > availableWidth) {
+      if (!_shouldScroll) {
+        setState(() {
+          _shouldScroll = true;
+        });
+        // Reset and start animation after a delay
+        _scrollController.stop();
+        _scrollController.reset();
+        Future.delayed(const Duration(seconds: 2), () {
+          if (_shouldScroll && mounted) {
+            _scrollController.repeat();
+          }
+        });
+      }
+    } else {
+      if (_shouldScroll) {
+        setState(() {
+          _shouldScroll = false;
+        });
+        _scrollController.stop();
+        _scrollController.reset();
+      }
+    }
+  }
 
   void _handleDragUpdate(DragUpdateDetails details) {
     // Allow dragging down to close
@@ -47,7 +157,10 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> {
     final screenHeight = MediaQuery.of(context).size.height;
 
     return AnimatedBuilder(
-      animation: widget.animation,
+      animation: Listenable.merge([
+        widget.animation,
+        widget.spotifyController,
+      ]),
       builder: (context, child) {
         // Slide up from bottom animation
         final slideOffset = Offset(0, (1 - widget.animation.value) * screenHeight + _dragOffset);
@@ -258,40 +371,118 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> {
   }
 
   Widget _buildTrackInfo() {
+    final trackName = widget.spotifyController.currentTrack ?? 'No track playing';
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Expanded(
-              child: Text(
-                widget.spotifyController.currentTrack ?? 'No track playing',
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+        SizedBox(
+          height: 30,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Centered track title with scrolling animation
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 60.0), // Leave space for heart button
+                child: ClipRect(
+                  child: _shouldScroll
+                      ? LayoutBuilder(
+                          builder: (context, constraints) {
+                            return AnimatedBuilder(
+                              animation: _scrollController,
+                              builder: (context, child) {
+                                final textPainter = TextPainter(
+                                  text: TextSpan(
+                                    text: trackName,
+                                    style: const TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  maxLines: 1,
+                                  textDirection: TextDirection.ltr,
+                                )..layout();
+
+                                final textWidth = textPainter.width;
+                                final scrollExtent = textWidth + 100; // Add space between repeats
+
+                                // Calculate offset for scrolling effect
+                                final offset = _scrollController.value * scrollExtent;
+
+                                return ClipRect(
+                                  child: SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    physics: const NeverScrollableScrollPhysics(),
+                                    child: Transform.translate(
+                                      offset: Offset(-offset, 0),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            trackName,
+                                            key: _textKey,
+                                            style: const TextStyle(
+                                              fontSize: 22,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                            maxLines: 1,
+                                          ),
+                                          const SizedBox(width: 100),
+                                          Text(
+                                            trackName,
+                                            style: const TextStyle(
+                                              fontSize: 22,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                            maxLines: 1,
+                                          ),
+                                          const SizedBox(width: 100), // Extra space for smooth loop
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        )
+                      : Center(
+                          child: Text(
+                            trackName,
+                            key: _textKey,
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                 ),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              icon: Icon(
-                widget.spotifyController.isCurrentTrackLiked
-                  ? Icons.favorite
-                  : Icons.favorite_border,
-                color: widget.spotifyController.isCurrentTrackLiked
-                  ? Colors.green
-                  : Colors.white70,
+              // Like button positioned on the right
+              Positioned(
+                right: 24,
+                child: IconButton(
+                  icon: Icon(
+                    widget.spotifyController.isCurrentTrackLiked
+                      ? Icons.favorite
+                      : Icons.favorite_border,
+                    color: widget.spotifyController.isCurrentTrackLiked
+                      ? Colors.green
+                      : Colors.white70,
+                  ),
+                  iconSize: 26,
+                  onPressed: () => widget.spotifyController.toggleLike(),
+                  tooltip: widget.spotifyController.isCurrentTrackLiked ? 'Unlike' : 'Like',
+                ),
               ),
-              iconSize: 26,
-              onPressed: () => widget.spotifyController.toggleLike(),
-              tooltip: widget.spotifyController.isCurrentTrackLiked ? 'Unlike' : 'Like',
-            ),
-          ],
+            ],
+          ),
         ),
         Text(
           widget.spotifyController.currentArtist ?? 'Unknown artist',
@@ -308,23 +499,55 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> {
   }
 
   Widget _buildProgressBar(BuildContext context) {
+    final progress = _isDraggingSlider
+        ? (_draggedProgress ?? widget.spotifyController.progressPercentage)
+        : widget.spotifyController.progressPercentage;
+    final currentTime = widget.spotifyController.currentTime;
+    final duration = widget.spotifyController.duration;
+    final durationMs = widget.spotifyController.durationMs;
+
+    // Calculate dragged time if dragging
+    String displayTime = currentTime;
+    if (_isDraggingSlider && _draggedProgress != null) {
+      final draggedMs = (_draggedProgress! * durationMs).round();
+      final seconds = (draggedMs ~/ 1000) % 60;
+      final minutes = draggedMs ~/ 60000;
+      displayTime = '$minutes:${seconds.toString().padLeft(2, '0')}';
+    }
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Progress slider
+        // Interactive progress bar with slider
         SliderTheme(
           data: SliderTheme.of(context).copyWith(
             activeTrackColor: Colors.white,
             inactiveTrackColor: Colors.white24,
             thumbColor: Colors.white,
             thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-            trackHeight: 3,
+            trackHeight: 4,
             overlayColor: Colors.white.withValues(alpha: 0.2),
           ),
           child: Slider(
-            value: 0.3, // This would be connected to actual playback position
+            value: progress,
+            onChangeStart: (value) {
+              setState(() {
+                _isDraggingSlider = true;
+                _draggedProgress = value;
+              });
+            },
             onChanged: (value) {
-              // Handle seeking
+              setState(() {
+                _draggedProgress = value;
+              });
+            },
+            onChangeEnd: (value) {
+              // Actually seek when user releases
+              widget.spotifyController.seekToPosition(value);
+              setState(() {
+                _isDraggingSlider = false;
+                _draggedProgress = null;
+              });
             },
           ),
         ),
@@ -335,14 +558,14 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '1:23', // Current time
+                displayTime,
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.7),
                   fontSize: 12,
                 ),
               ),
               Text(
-                '3:45', // Total duration
+                duration,
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.7),
                   fontSize: 12,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../controllers/spotify_controller.dart';
+import '../widgets/theme_settings.dart';
 
 class UserPage extends StatelessWidget {
   final SpotifyController spotifyController;
@@ -8,7 +9,10 @@ class UserPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-        animation: spotifyController,
+        animation: Listenable.merge([
+          spotifyController,
+          spotifyController.themeService,
+        ]),
         builder: (context, child) {
           return SingleChildScrollView(
             child: Column(
@@ -19,11 +23,14 @@ class UserPage extends StatelessWidget {
                 _buildUserInfo(context),
                 const SizedBox(height: 24),
                 _buildActionButtons(context),
-                const SizedBox(height: 24),
+                const SizedBox(height: 32),
+                // Theme Settings Section
+                ThemeSettings(
+                  themeService: spotifyController.themeService,
+                ),
                 if (spotifyController.isLoggedIn) ...[
+                  const SizedBox(height: 16),
                   _buildStatistics(context),
-                  const SizedBox(height: 32),
-                  _buildLibrarySection(context),
                 ],
                 const SizedBox(height: 32),
               ],
@@ -155,44 +162,4 @@ class UserPage extends StatelessWidget {
     );
   }
 
-  Widget _buildLibrarySection(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Your Library',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          _buildLibraryTile(context, Icons.favorite, 'Liked Songs', '250 songs'),
-          _buildLibraryTile(context, Icons.playlist_play, 'Playlists', '12 playlists'),
-          _buildLibraryTile(context, Icons.download, 'Downloads', '150 songs'),
-          _buildLibraryTile(context, Icons.history, 'Recently Played', '30 songs'),
-          _buildLibraryTile(context, Icons.album, 'Albums', '45 albums'),
-          _buildLibraryTile(context, Icons.person, 'Following Artists', '89 artists'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLibraryTile(BuildContext context, IconData icon, String title, String subtitle) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: Icon(
-          icon,
-          color: Theme.of(context).colorScheme.primary,
-        ),
-        title: Text(title),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () {},
-      ),
-    );
-  }
 }

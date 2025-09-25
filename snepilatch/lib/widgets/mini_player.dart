@@ -68,33 +68,32 @@ class MiniPlayer extends StatelessWidget {
   }
 
   Widget _buildProgressBar(BuildContext context) {
-    return Container(
-      height: 2,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            flex: spotifyController.isPlaying ? 3 : 0,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Theme.of(context).colorScheme.primary,
-                    Theme.of(context).colorScheme.secondary,
-                  ],
-                ),
-              ),
+    final progress = spotifyController.progressPercentage;
+
+    return Stack(
+      children: [
+        // Background track
+        Container(
+          height: 2,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+          ),
+        ),
+        // Progress indicator
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 500),
+          height: 2,
+          width: MediaQuery.of(context).size.width * progress,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Theme.of(context).colorScheme.primary,
+                Theme.of(context).colorScheme.secondary,
+              ],
             ),
           ),
-          if (spotifyController.isPlaying)
-            Expanded(
-              flex: 7,
-              child: Container(),
-            ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -180,14 +179,28 @@ class MiniPlayer extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 2),
-        Text(
-          spotifyController.currentArtist ?? 'Unknown artist',
-          style: TextStyle(
-            fontSize: 12,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                spotifyController.currentArtist ?? 'Unknown artist',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '${spotifyController.currentTime} / ${spotifyController.duration}',
+              style: TextStyle(
+                fontSize: 10,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
         ),
       ],
     );

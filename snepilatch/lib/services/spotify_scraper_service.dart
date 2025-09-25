@@ -51,6 +51,21 @@ class SpotifyScraperService {
           repeatMode = 'one';
         }
 
+        // Get progress bar data
+        const positionElement = document.querySelector('[data-testid="playback-position"]');
+        const durationElement = document.querySelector('[data-testid="playback-duration"]');
+        const progressBarInput = document.querySelector('[data-testid="playback-progressbar"] input[type="range"]');
+
+        let currentTime = positionElement?.textContent || '0:00';
+        let duration = durationElement?.textContent || '0:00';
+        let progressMs = 0;
+        let durationMs = 0;
+
+        if (progressBarInput) {
+          progressMs = parseInt(progressBarInput.value) || 0;
+          durationMs = parseInt(progressBarInput.max) || 0;
+        }
+
         return {
           isPlaying: isPlaying,
           track: trackElement?.textContent || '',
@@ -58,7 +73,11 @@ class SpotifyScraperService {
           albumArt: albumArtElement?.src || '',
           isLiked: isLiked,
           shuffleMode: shuffleMode,
-          repeatMode: repeatMode
+          repeatMode: repeatMode,
+          currentTime: currentTime,
+          duration: duration,
+          progressMs: progressMs,
+          durationMs: durationMs
         };
       } catch (e) {
         return { isPlaying: false, track: '', artist: '', albumArt: '', isLiked: false, shuffleMode: 'off', repeatMode: 'off' };
@@ -158,6 +177,10 @@ class SpotifyScraperService {
       final isLikedMatch = RegExp(r'"isLiked":(\w+)').firstMatch(data);
       final shuffleModeMatch = RegExp(r'"shuffleMode":"([^"]*)"').firstMatch(data);
       final repeatModeMatch = RegExp(r'"repeatMode":"([^"]*)"').firstMatch(data);
+      final currentTimeMatch = RegExp(r'"currentTime":"([^"]*)"').firstMatch(data);
+      final durationMatch = RegExp(r'"duration":"([^"]*)"').firstMatch(data);
+      final progressMsMatch = RegExp(r'"progressMs":(\d+)').firstMatch(data);
+      final durationMsMatch = RegExp(r'"durationMs":(\d+)').firstMatch(data);
 
       final track = trackMatch?.group(1)?.trim();
       final artist = artistMatch?.group(1)?.trim();
@@ -166,6 +189,10 @@ class SpotifyScraperService {
       final isLiked = isLikedMatch?.group(1) == 'true';
       final shuffleMode = shuffleModeMatch?.group(1)?.trim() ?? 'off';
       final repeatMode = repeatModeMatch?.group(1)?.trim() ?? 'off';
+      final currentTime = currentTimeMatch?.group(1)?.trim() ?? '0:00';
+      final duration = durationMatch?.group(1)?.trim() ?? '0:00';
+      final progressMs = int.tryParse(progressMsMatch?.group(1) ?? '0') ?? 0;
+      final durationMs = int.tryParse(durationMsMatch?.group(1) ?? '0') ?? 0;
 
       // Convert to high quality image URL
       if (albumArt != null && albumArt.contains('ab67616d00004851')) {
@@ -180,6 +207,10 @@ class SpotifyScraperService {
         isCurrentTrackLiked: isLiked,
         shuffleMode: ShuffleModeExtension.fromString(shuffleMode),
         repeatMode: RepeatModeExtension.fromString(repeatMode),
+        currentTime: currentTime,
+        duration: duration,
+        progressMs: progressMs,
+        durationMs: durationMs,
       );
     } catch (e) {
       debugPrint('Error parsing playback info: $e');

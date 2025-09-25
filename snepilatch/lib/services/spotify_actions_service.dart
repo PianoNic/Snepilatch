@@ -66,6 +66,45 @@ class SpotifyActionsService {
     })();
   ''';
 
+  static String seekToPositionScript(double percentage) {
+    return '''
+      (function() {
+        // Find the progress bar input element
+        const progressInput = document.querySelector('[data-testid="playback-progressbar"] input[type="range"]');
+        if (progressInput) {
+          const max = parseInt(progressInput.max) || 0;
+          const newValue = Math.floor(max * ${percentage});
+
+          // Update the value
+          progressInput.value = newValue;
+
+          // Trigger input event to update the UI
+          progressInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+          // Trigger change event to actually seek
+          progressInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+          // Alternative: click on the progress bar itself
+          const progressBar = document.querySelector('[data-testid="playback-progressbar"]');
+          if (progressBar) {
+            const rect = progressBar.getBoundingClientRect();
+            const x = rect.left + (rect.width * ${percentage});
+            const y = rect.top + (rect.height / 2);
+
+            const clickEvent = new MouseEvent('click', {
+              view: window,
+              bubbles: true,
+              cancelable: true,
+              clientX: x,
+              clientY: y
+            });
+            progressBar.dispatchEvent(clickEvent);
+          }
+        }
+      })();
+    ''';
+  }
+
   static String searchScript(String query) {
     return '''
       (function() {

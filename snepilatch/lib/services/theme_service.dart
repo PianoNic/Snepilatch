@@ -6,11 +6,29 @@ class ThemeService extends ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.dark;
   PaletteGenerator? _currentPalette;
   String? _currentHexColor;
+  bool _useSongCoverColors = true; // Default to using song cover colors
 
   Color get seedColor => _seedColor;
   ThemeMode get themeMode => _themeMode;
   PaletteGenerator? get currentPalette => _currentPalette;
   String? get currentHexColor => _currentHexColor;
+  bool get useSongCoverColors => _useSongCoverColors;
+
+  // Predefined color options (like Schuly)
+  static const List<Color> predefinedColors = [
+    Colors.blue,
+    Colors.teal,
+    Colors.green,
+    Colors.pink,
+    Colors.orange,
+    Colors.indigo,
+    Colors.red,
+    Colors.amber,
+    Colors.purple,
+    Colors.deepPurple,
+    Colors.cyan,
+    Colors.lime,
+  ];
 
   // Helper method to convert Color to hex string (like in Schuly)
   String _colorToHexString(Color color) {
@@ -26,6 +44,9 @@ class ThemeService extends ChangeNotifier {
   }
 
   Future<void> updateThemeFromImageUrl(String? imageUrl) async {
+    // Only update if using song cover colors
+    if (!_useSongCoverColors) return;
+
     if (imageUrl == null || imageUrl.isEmpty) {
       _resetToDefaultTheme();
       return;
@@ -108,6 +129,23 @@ class ThemeService extends ChangeNotifier {
 
   void setThemeMode(ThemeMode mode) {
     _themeMode = mode;
+    notifyListeners();
+  }
+
+  void setSeedColor(Color color) {
+    _seedColor = color;
+    _currentHexColor = _colorToHexString(color);
+    _useSongCoverColors = false; // Disable song cover colors when manually selecting
+    notifyListeners();
+  }
+
+  void setUseSongCoverColors(bool value) {
+    _useSongCoverColors = value;
+    if (!value) {
+      // Reset to default color when disabling song cover colors
+      _seedColor = Colors.deepPurple;
+      _currentHexColor = _colorToHexString(_seedColor);
+    }
     notifyListeners();
   }
 }

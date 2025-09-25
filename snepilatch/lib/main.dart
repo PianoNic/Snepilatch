@@ -281,36 +281,173 @@ class HomePage extends StatelessWidget {
   }
 }
 
-class SongsPage extends StatelessWidget {
+class SongsPage extends StatefulWidget {
   final SpotifyController spotifyController;
   const SongsPage({super.key, required this.spotifyController});
+
+  @override
+  State<SongsPage> createState() => _SongsPageState();
+}
+
+class _SongsPageState extends State<SongsPage> {
+  final ScrollController _scrollController = ScrollController();
+  bool _hasNavigated = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Navigate to liked songs when tab becomes visible
+    if (!_hasNavigated && widget.spotifyController.isInitialized) {
+      _hasNavigated = true;
+      widget.spotifyController.navigateToLikedSongs();
+    }
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      // User scrolled near the bottom, load more songs
+      widget.spotifyController.loadMoreSongs();
+    }
+
+    // Sync scroll position with Spotify
+    widget.spotifyController.scrollSpotifyPage(_scrollController.position.pixels);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Songs'),
+        title: const Text('Liked Songs'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              widget.spotifyController.scrapeSongs();
+            },
+          ),
+        ],
       ),
-      body: ListView.builder(
-        itemCount: 10,
-        itemBuilder: (context, index) {
-          return ListTile(
-            leading: CircleAvatar(
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              child: const Icon(Icons.music_note, color: Colors.white),
-            ),
-            title: Text('Song ${index + 1}'),
-            subtitle: const Text('Artist Name'),
-            trailing: IconButton(
-              icon: const Icon(Icons.more_vert),
-              onPressed: () {},
-            ),
-            onTap: () {},
+      body: AnimatedBuilder(
+        animation: widget.spotifyController,
+        builder: (context, child) {
+          if (widget.spotifyController.isLoadingSongs && widget.spotifyController.songs.isEmpty) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+
+          if (widget.spotifyController.songs.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.music_note,
+                    size: 64,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'No songs found',
+                    style: TextStyle(fontSize: 18),
+                  ),
+                  const SizedBox(height: 8),
+                  ElevatedButton(
+                    onPressed: () => widget.spotifyController.navigateToLikedSongs(),
+                    child: const Text('Load Songs'),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return ListView.builder(
+            controller: _scrollController,
+            itemCount: widget.spotifyController.songs.length +
+                      (widget.spotifyController.isLoadingSongs ? 1 : 0),
+            itemBuilder: (context, index) {
+              if (index == widget.spotifyController.songs.length) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: CircularProgressIndicator(),
+                  ),
+                );
+              }
+
+              final song = widget.spotifyController.songs[index];
+              final imageUrl = song['image'];
+
+              return ListTile(
+                leading: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(4),
+                    color: Theme.of(context).colorScheme.primaryContainer,
+                  ),
+                  child: imageUrl != null && imageUrl.isNotEmpty
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Icon(Icons.music_note);
+                            },
+                          ),
+                        )
+                      : const Icon(Icons.music_note),
+                ),
+                title: Text(
+                  song['title'] ?? 'Unknown Song',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Text(
+                  '${song['artist'] ?? 'Unknown Artist'} • ${song['album'] ?? ''}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      song['duration'] ?? '',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.play_arrow),
+                      onPressed: () {
+                        final songIndex = int.tryParse(song['index'] ?? '0') ?? 0;
+                        widget.spotifyController.playTrackAtIndex(songIndex);
+                      },
+                    ),
+                  ],
+                ),
+                onTap: () {
+                  final songIndex = int.tryParse(song['index'] ?? '0') ?? 0;
+                  widget.spotifyController.playTrackAtIndex(songIndex);
+                },
+              );
+            },
           );
         },
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 }
 

@@ -15,6 +15,8 @@ class SpotifyController extends ChangeNotifier {
   String? _username;
   String? _userEmail;
   String? _userProfileImage;
+  List<Map<String, String>> _songs = [];
+  bool _isLoadingSongs = false;
 
   bool get isInitialized => _isInitialized;
   bool get isPlaying => _isPlaying;
@@ -26,6 +28,8 @@ class SpotifyController extends ChangeNotifier {
   String? get username => _username;
   String? get userEmail => _userEmail;
   String? get userProfileImage => _userProfileImage;
+  List<Map<String, String>> get songs => _songs;
+  bool get isLoadingSongs => _isLoadingSongs;
 
   SpotifyController() {
     _startPeriodicScraping();
@@ -481,5 +485,142 @@ class SpotifyController extends ChangeNotifier {
       }
     ''';
     await webViewController?.evaluateJavascript(source: js);
+  }
+
+  Future<void> navigateToLikedSongs() async {
+    _isLoadingSongs = true;
+    _songs = [];
+    notifyListeners();
+
+    await webViewController?.loadUrl(
+      urlRequest: URLRequest(url: WebUri('https://open.spotify.com/collection/tracks'))
+    );
+
+    // Wait for page to load
+    await Future.delayed(const Duration(seconds: 2));
+    await scrapeSongs();
+  }
+
+  Future<void> scrapeSongs() async {
+    if (webViewController == null) return;
+
+    const String js = '''
+      const songs = [];
+      const songRows = document.querySelectorAll('[data-testid="tracklist-row"]');
+
+      songRows.forEach((row, index) => {
+        const titleElement = row.querySelector('[data-testid="internal-track-link"] div');
+        const artistElement = row.querySelector('[data-testid="internal-track-link"]')?.parentElement?.nextElementSibling?.querySelector('a');
+        const albumElement = row.querySelector('[data-testid="internal-track-link"]')?.parentElement?.nextElementSibling?.nextElementSibling?.querySelector('a');
+        const imageElement = row.querySelector('img');
+        const durationElement = row.querySelector('[data-testid="track-duration"]');
+
+        if (titleElement) {
+          songs.push({
+            title: titleElement.textContent || '',
+            artist: artistElement?.textContent || '',
+            album: albumElement?.textContent || '',
+            image: imageElement?.src || '',
+            duration: durationElement?.textContent || '',
+            index: index
+          });
+        }
+      });
+
+      JSON.stringify(songs);
+    ''';
+
+    try {
+      final result = await webViewController!.evaluateJavascript(source: js);
+
+      if (result != null && result != 'null' && result != '[]') {
+        _parseSongs(result.toString());
+      }
+
+      _isLoadingSongs = false;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error scraping songs: $e');
+      _isLoadingSongs = false;
+      notifyListeners();
+    }
+  }
+
+  void _parseSongs(String jsonString) {
+    try {
+      // Clean the JSON string
+      String cleanJson = jsonString;
+      if (cleanJson.startsWith('"') && cleanJson.endsWith('"')) {
+        cleanJson = cleanJson.substring(1, cleanJson.length - 1);
+      }
+      cleanJson = cleanJson.replaceAll(r'\"', '"');
+      cleanJson = cleanJson.replaceAll(r'\\', r'\');
+
+      // Parse songs from JSON
+      final List<Map<String, String>> parsedSongs = [];
+      final matches = RegExp(r'\{[^}]+\}').allMatches(cleanJson);
+
+      for (final match in matches) {
+        final songData = match.group(0) ?? '';
+
+        final titleMatch = RegExp(r'"title":"([^"]*)"').firstMatch(songData);
+        final artistMatch = RegExp(r'"artist":"([^"]*)"').firstMatch(songData);
+        final albumMatch = RegExp(r'"album":"([^"]*)"').firstMatch(songData);
+        final imageMatch = RegExp(r'"image":"([^"]*)"').firstMatch(songData);
+        final durationMatch = RegExp(r'"duration":"([^"]*)"').firstMatch(songData);
+        final indexMatch = RegExp(r'"index":(\d+)').firstMatch(songData);
+
+        if (titleMatch != null) {
+          parsedSongs.add({
+            'title': titleMatch.group(1) ?? '',
+            'artist': artistMatch?.group(1) ?? '',
+            'album': albumMatch?.group(1) ?? '',
+            'image': imageMatch?.group(1)?.replaceAll(r'\/', '/') ?? '',
+            'duration': durationMatch?.group(1) ?? '',
+            'index': indexMatch?.group(1) ?? '0',
+          });
+        }
+      }
+
+      _songs = parsedSongs;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error parsing songs: $e');
+    }
+  }
+
+  Future<void> scrollSpotifyPage(double offset) async {
+    final String js = '''
+      (function() {
+        const mainView = document.querySelector('[data-testid="playlist-page"]') ||
+                         document.querySelector('.main-view-container__scroll-node') ||
+                         document.querySelector('[data-testid="track-list"]')?.parentElement;
+        if (mainView) {
+          mainView.scrollTop = $offset;
+        }
+      })();
+    ''';
+    await webViewController?.evaluateJavascript(source: js);
+  }
+
+  Future<void> loadMoreSongs() async {
+    // Scroll down to trigger lazy loading
+    final String js = '''
+      (function() {
+        const mainView = document.querySelector('[data-testid="playlist-page"]') ||
+                         document.querySelector('.main-view-container__scroll-node') ||
+                         document.querySelector('[data-testid="track-list"]')?.parentElement;
+        if (mainView) {
+          mainView.scrollTop = mainView.scrollHeight;
+        }
+      })();
+    ''';
+    await webViewController?.evaluateJavascript(source: js);
+
+    // Wait for new content to load
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    // Scrape again to get new songs
+    await scrapeSongs();
   }
 }

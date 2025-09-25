@@ -11,9 +11,14 @@ class SpotifyWebViewWidget extends StatefulWidget {
   State<SpotifyWebViewWidget> createState() => _SpotifyWebViewWidgetState();
 }
 
-class _SpotifyWebViewWidgetState extends State<SpotifyWebViewWidget> {
+class _SpotifyWebViewWidgetState extends State<SpotifyWebViewWidget> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   @override
   Widget build(BuildContext context) {
+    super.build(context);
+
     if (!Platform.isAndroid && !Platform.isIOS) {
       return const SizedBox.shrink();
     }
@@ -22,55 +27,58 @@ class _SpotifyWebViewWidgetState extends State<SpotifyWebViewWidget> {
     return ValueListenableBuilder<bool>(
       valueListenable: widget.spotifyController.showWebViewNotifier,
       builder: (context, showWebView, child) {
-        return Positioned(
-          left: showWebView ? 0 : 0,
-          top: showWebView ? 0 : 0,
-          width: showWebView ? MediaQuery.of(context).size.width : 1,
-          height: showWebView ? MediaQuery.of(context).size.height : 1,
-          child: showWebView
-            ? Container(
-                color: Colors.white,
-                child: SafeArea(
-                  child: Column(
-                    children: [
-                      _buildHeader(context),
-                      Expanded(
-                        child: InAppWebView(
-                          key: const Key('spotify_webview'),
-                          initialUrlRequest: URLRequest(
-                            url: WebUri('https://open.spotify.com')
-                          ),
-                          initialSettings: widget.spotifyController.getWebViewSettings(),
-                          onWebViewCreated: widget.spotifyController.onWebViewCreated,
-                          onLoadStop: widget.spotifyController.onLoadStop,
-                          shouldOverrideUrlLoading: widget.spotifyController.shouldOverrideUrlLoading,
-                          onPermissionRequest: widget.spotifyController.onPermissionRequest,
-                          onConsoleMessage: (controller, consoleMessage) {
-                            debugPrint('Console: ${consoleMessage.message}');
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            : SizedBox(
+        return Stack(
+          children: [
+            // Hidden WebView for background operations
+            if (!showWebView)
+              Positioned(
+                left: 0,
+                top: 0,
                 width: 1,
                 height: 1,
-                child: InAppWebView(
-                  key: const Key('spotify_webview_hidden'),
-                  initialUrlRequest: URLRequest(
-                    url: WebUri('https://open.spotify.com')
+                child: IgnorePointer(
+                  child: Opacity(
+                    opacity: 0,
+                    child: child!,
                   ),
-                  initialSettings: widget.spotifyController.getWebViewSettings(),
-                  onWebViewCreated: widget.spotifyController.onWebViewCreated,
-                  onLoadStop: widget.spotifyController.onLoadStop,
-                  shouldOverrideUrlLoading: widget.spotifyController.shouldOverrideUrlLoading,
-                  onPermissionRequest: widget.spotifyController.onPermissionRequest,
                 ),
               ),
+            // Visible WebView when showing
+            if (showWebView)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.white,
+                  child: SafeArea(
+                    child: Column(
+                      children: [
+                        _buildHeader(context),
+                        Expanded(
+                          child: child!,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
         );
       },
+      child: InAppWebView(
+        key: const Key('spotify_webview'),
+        initialUrlRequest: URLRequest(
+          url: WebUri('https://open.spotify.com')
+        ),
+        initialSettings: widget.spotifyController.getWebViewSettings(),
+        onWebViewCreated: widget.spotifyController.onWebViewCreated,
+        onLoadStop: widget.spotifyController.onLoadStop,
+        shouldOverrideUrlLoading: widget.spotifyController.shouldOverrideUrlLoading,
+        onPermissionRequest: widget.spotifyController.onPermissionRequest,
+        onConsoleMessage: (controller, consoleMessage) {
+          if (widget.spotifyController.showWebView) {
+            debugPrint('Console: ${consoleMessage.message}');
+          }
+        },
+      ),
     );
   }
 

@@ -12,6 +12,7 @@ import '../services/spotify_actions_service.dart';
 
 class SpotifyController extends ChangeNotifier {
   final WebViewService _webViewService = WebViewService();
+  Timer? _scrapingTimer;
 
   // State
   bool _isInitialized = false;
@@ -48,6 +49,7 @@ class SpotifyController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _scrapingTimer?.cancel();
     showWebViewNotifier.dispose();
     isLoggedInNotifier.dispose();
     super.dispose();
@@ -85,9 +87,13 @@ class SpotifyController extends ChangeNotifier {
   }
 
   void _startPeriodicScraping() {
+    // Cancel any existing timer
+    _scrapingTimer?.cancel();
+
+    // Wait before starting periodic scraping
     Timer(const Duration(seconds: 2), () {
-      Timer.periodic(const Duration(seconds: 1), (timer) {
-        if (_isInitialized) {
+      _scrapingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (_isInitialized && !_showWebView) {
           _scrapeCurrentInfo();
           _scrapeUserInfo();
         }

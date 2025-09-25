@@ -19,6 +19,7 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateMixin {
   int _selectedIndex = 0;
   bool _isPlayerExpanded = false;
+  bool _isAnimating = false; // Prevent multiple animations
   late AnimationController _playerAnimationController;
   late Animation<double> _playerAnimation;
 
@@ -54,16 +55,29 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
   }
 
   void _expandPlayer() {
+    // Prevent multiple simultaneous animations
+    if (_isAnimating) return;
+
+    _isAnimating = true;
     setState(() {
       _isPlayerExpanded = true;
-      _playerAnimationController.forward();
+    });
+
+    _playerAnimationController.forward().then((_) {
+      _isAnimating = false;
     });
   }
 
   void _collapsePlayer() {
-    setState(() {
-      _isPlayerExpanded = false;
-      _playerAnimationController.reverse();
+    // Prevent multiple simultaneous animations
+    if (_isAnimating) return;
+
+    _isAnimating = true;
+    _playerAnimationController.reverse().then((_) {
+      setState(() {
+        _isPlayerExpanded = false;
+        _isAnimating = false;
+      });
     });
   }
 
@@ -83,11 +97,10 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
       'Profile',
     ];
 
-    return Scaffold(
-      body: Stack(
-        children: [
-          // Main app content with AnimatedSwitcher
-          Column(
+    return Stack(
+      children: [
+        Scaffold(
+          body: Column(
             children: [
               // Schuly-style app bar
               if (!widget.spotifyController.showWebView)
@@ -168,53 +181,25 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                   ),
                 ),
               ),
+              // Mini player at bottom above navigation
+              if (!_isPlayerExpanded)
+                AnimatedBuilder(
+                  animation: widget.spotifyController,
+                  builder: (context, child) {
+                    if (widget.spotifyController.currentTrack != null &&
+                        !widget.spotifyController.showWebView) {
+                      return MiniPlayer(
+                        spotifyController: widget.spotifyController,
+                        onTap: _expandPlayer,
+                        onVerticalDragUp: _expandPlayer,
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
             ],
           ),
-          // WebView - separate widget that doesn't rebuild with controller
-          SpotifyWebViewWidget(spotifyController: widget.spotifyController),
-          // Mini player at bottom when collapsed
-          AnimatedBuilder(
-            animation: widget.spotifyController,
-            builder: (context, child) {
-              if (widget.spotifyController.currentTrack != null &&
-                  !widget.spotifyController.showWebView) {
-                return Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: MiniPlayer(
-                    spotifyController: widget.spotifyController,
-                    onTap: _expandPlayer,
-                    onVerticalDragUp: _expandPlayer,
-                  ),
-                );
-              }
-              return const SizedBox.shrink();
-            },
-          ),
-          // Expanded player with background overlay
-          if (_isPlayerExpanded && widget.spotifyController.currentTrack != null) ...[
-            // Background overlay that fades in
-            AnimatedBuilder(
-              animation: _playerAnimation,
-              builder: (context, child) {
-                return IgnorePointer(
-                  child: Container(
-                    color: Colors.black.withValues(alpha: _playerAnimation.value * 0.5),
-                  ),
-                );
-              },
-            ),
-            // The actual player
-            ExpandedPlayer(
-              spotifyController: widget.spotifyController,
-              animation: _playerAnimation,
-              onClose: _collapsePlayer,
-            ),
-          ],
-        ],
-      ),
-      bottomNavigationBar: AnimatedBuilder(
+          bottomNavigationBar: AnimatedBuilder(
         animation: widget.spotifyController,
         builder: (context, child) {
           if (widget.spotifyController.showWebView) {
@@ -270,6 +255,30 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
           );
         },
       ),
+        ),
+        // WebView - separate widget that doesn't rebuild with controller
+        SpotifyWebViewWidget(spotifyController: widget.spotifyController),
+        // Expanded player with background overlay - OUTSIDE Scaffold to cover everything
+        if (_isPlayerExpanded && widget.spotifyController.currentTrack != null) ...[
+          // Background overlay that fades in
+          AnimatedBuilder(
+            animation: _playerAnimation,
+            builder: (context, child) {
+              return IgnorePointer(
+                child: Container(
+                  color: Colors.black.withValues(alpha: _playerAnimation.value * 0.95),
+                ),
+              );
+            },
+          ),
+          // The actual player
+          ExpandedPlayer(
+            spotifyController: widget.spotifyController,
+            animation: _playerAnimation,
+            onClose: _collapsePlayer,
+          ),
+        ],
+      ],
     );
   }
 

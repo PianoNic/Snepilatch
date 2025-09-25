@@ -19,18 +19,11 @@ class ExpandedPlayer extends StatefulWidget {
 }
 
 class _ExpandedPlayerState extends State<ExpandedPlayer> {
-  final ScrollController _scrollController = ScrollController();
   double _dragOffset = 0;
 
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
   void _handleDragUpdate(DragUpdateDetails details) {
-    // Only allow dragging down when scrolled to the top
-    if (_scrollController.hasClients && _scrollController.offset <= 0) {
+    // Allow dragging down to close
+    if (details.delta.dy > 0) {
       setState(() {
         _dragOffset = (_dragOffset + details.delta.dy).clamp(0, double.infinity);
       });
@@ -62,65 +55,59 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> {
         return Positioned.fill(
           child: Transform.translate(
             offset: slideOffset,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.95),
-                    Colors.black.withValues(alpha: 0.98),
-                  ],
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.95),
+                      Colors.black.withValues(alpha: 0.98),
+                    ],
+                  ),
                 ),
-              ),
-              child: SafeArea(
-                child: Column(
-                  children: [
-                    // Draggable header
-                    GestureDetector(
-                      onVerticalDragUpdate: _handleDragUpdate,
-                      onVerticalDragEnd: _handleDragEnd,
-                      child: _buildHeader(context),
-                    ),
-                    // Scrollable content
-                    Expanded(
-                      child: NotificationListener<ScrollNotification>(
-                        onNotification: (notification) {
-                          // Allow drag to close only when scrolled to top
-                          if (notification is OverscrollNotification &&
-                              notification.overscroll < 0) {
-                            // User is trying to scroll up beyond the top
-                            if (notification.dragDetails != null) {
-                              _handleDragUpdate(notification.dragDetails!);
-                            }
-                          }
-                          return false;
-                        },
-                        child: SingleChildScrollView(
-                          controller: _scrollController,
-                          physics: const AlwaysScrollableScrollPhysics(),
+                child: SafeArea(
+                  child: GestureDetector(
+                    onVerticalDragUpdate: _handleDragUpdate,
+                    onVerticalDragEnd: _handleDragEnd,
+                    child: Column(
+                    children: [
+                      // Draggable header with handle bar
+                      _buildHeader(context),
+                      // Content - no scrolling, everything fits on one page
+                      Expanded(
+                        child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 24.0),
                           child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const SizedBox(height: 20),
-                              _buildAlbumArt(context),
-                              const SizedBox(height: 40),
+                              // Album art
+                              Expanded(
+                                flex: 5,
+                                child: Center(
+                                  child: _buildAlbumArt(context),
+                                ),
+                              ),
+                              // Track info
                               _buildTrackInfo(),
-                              const SizedBox(height: 32),
+                              const SizedBox(height: 20),
+                              // Progress bar
                               _buildProgressBar(context),
-                              const SizedBox(height: 32),
+                              const SizedBox(height: 24),
+                              // Main controls
                               _buildMainControls(),
-                              const SizedBox(height: 100), // Extra space at bottom
+                              const SizedBox(height: 40),
                             ],
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
+          ),
           ),
         );
       },
@@ -130,11 +117,12 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> {
   Widget _buildHeader(BuildContext context) {
     return Container(
       color: Colors.transparent,
+      padding: const EdgeInsets.only(top: 8, bottom: 8),
       child: Column(
         children: [
-          // Handle bar
+          // Handle bar for dragging
           Container(
-            margin: const EdgeInsets.only(top: 8, bottom: 8),
+            margin: const EdgeInsets.only(bottom: 8),
             width: 40,
             height: 4,
             decoration: BoxDecoration(
@@ -142,16 +130,12 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          // Header with close button and menu
+          // Header with title and menu (no arrow button)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Row(
               children: [
-                IconButton(
-                  icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 32),
-                  onPressed: widget.onClose,
-                  tooltip: 'Minimize',
-                ),
+                const SizedBox(width: 48), // Balance the layout
                 const Spacer(),
                 Text(
                   'NOW PLAYING',
@@ -211,11 +195,15 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> {
       return _buildPlaceholderArt(context);
     }
 
+    // Responsive size based on screen height
+    final screenHeight = MediaQuery.of(context).size.height;
+    final size = screenHeight * 0.35; // Smaller to fit everything on screen
+
     return Hero(
       tag: 'album_art',
       child: Container(
-        width: MediaQuery.of(context).size.width * 0.75,
-        height: MediaQuery.of(context).size.width * 0.75,
+        width: size,
+        height: size,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
@@ -244,9 +232,12 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> {
   }
 
   Widget _buildPlaceholderArt(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final size = screenHeight * 0.35;
+
     return Container(
-      width: MediaQuery.of(context).size.width * 0.75,
-      height: MediaQuery.of(context).size.width * 0.75,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         gradient: LinearGradient(
@@ -268,6 +259,7 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> {
 
   Widget _buildTrackInfo() {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -276,12 +268,12 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> {
               child: Text(
                 widget.spotifyController.currentTrack ?? 'No track playing',
                 style: const TextStyle(
-                  fontSize: 24,
+                  fontSize: 22,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
                 textAlign: TextAlign.center,
-                maxLines: 2,
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -295,20 +287,21 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> {
                   ? Colors.green
                   : Colors.white70,
               ),
-              iconSize: 28,
+              iconSize: 26,
               onPressed: () => widget.spotifyController.toggleLike(),
               tooltip: widget.spotifyController.isCurrentTrackLiked ? 'Unlike' : 'Like',
             ),
           ],
         ),
-        const SizedBox(height: 8),
         Text(
           widget.spotifyController.currentArtist ?? 'Unknown artist',
           style: const TextStyle(
-            fontSize: 18,
+            fontSize: 16,
             color: Colors.white70,
           ),
           textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
       ],
     );
@@ -316,6 +309,7 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> {
 
   Widget _buildProgressBar(BuildContext context) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         // Progress slider
         SliderTheme(
@@ -380,19 +374,19 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> {
                 ? Colors.green
                 : Colors.greenAccent,
           ),
-          iconSize: 28,
+          iconSize: 24,
           onPressed: () => widget.spotifyController.toggleShuffle(),
           tooltip: 'Shuffle: ${shuffleMode.value}',
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: 20),
         // Previous button
         IconButton(
           icon: const Icon(Icons.skip_previous, color: Colors.white),
-          iconSize: 36,
+          iconSize: 32,
           onPressed: () => widget.spotifyController.previous(),
           tooltip: 'Previous',
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: 20),
         // Play/pause button
         Container(
           decoration: BoxDecoration(
@@ -417,7 +411,7 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> {
                 key: ValueKey(widget.spotifyController.isPlaying),
               ),
             ),
-            iconSize: 40,
+            iconSize: 36,
             onPressed: () {
               if (widget.spotifyController.isPlaying) {
                 widget.spotifyController.pause();
@@ -428,15 +422,15 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> {
             tooltip: widget.spotifyController.isPlaying ? 'Pause' : 'Play',
           ),
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: 20),
         // Next button
         IconButton(
           icon: const Icon(Icons.skip_next, color: Colors.white),
-          iconSize: 36,
+          iconSize: 32,
           onPressed: () => widget.spotifyController.next(),
           tooltip: 'Next',
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: 20),
         // Repeat button
         IconButton(
           icon: Icon(
@@ -447,7 +441,7 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> {
               ? Colors.green
               : Colors.white38,
           ),
-          iconSize: 28,
+          iconSize: 24,
           onPressed: () => widget.spotifyController.toggleRepeat(),
           tooltip: 'Repeat: ${repeatMode.value}',
         ),

@@ -1,6 +1,6 @@
 import 'dart:io';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 class WebViewService {
   InAppWebViewController? controller;
@@ -75,16 +75,36 @@ class WebViewService {
   }
 
   Future<void> evaluateJavascript(String source) async {
-    await controller?.evaluateJavascript(source: source);
+    try {
+      if (controller != null) {
+        await controller!.evaluateJavascript(source: source);
+      }
+    } catch (e) {
+      debugPrint('Error evaluating JavaScript: $e');
+    }
   }
 
   Future<dynamic> evaluateJavascriptWithResult(String source) async {
-    return await controller?.evaluateJavascript(source: source);
+    try {
+      if (controller != null) {
+        return await controller!.evaluateJavascript(source: source);
+      }
+    } catch (e) {
+      debugPrint('Error evaluating JavaScript with result: $e');
+      return null;
+    }
+    return null;
   }
 
   Future<void> loadUrl(String url) async {
-    await controller?.loadUrl(
-      urlRequest: URLRequest(url: WebUri(url))
-    );
+    try {
+      if (controller != null) {
+        await controller!.loadUrl(
+          urlRequest: URLRequest(url: WebUri(url))
+        );
+      }
+    } catch (e) {
+      debugPrint('Error loading URL: $e');
+    }
   }
 }

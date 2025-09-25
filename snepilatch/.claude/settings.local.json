@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter create:*)",
+      "Bash(flutter pub:*)",
+      "Bash(flutter clean:*)",
+      "WebSearch"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

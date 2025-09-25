@@ -6,7 +6,8 @@
       "Bash(flutter clean:*)",
       "WebSearch",
       "Bash(mkdir:*)",
-      "Bash(flutter analyze:*)"
+      "Bash(flutter analyze:*)",
+      "Read(//c/GithubProjects/schuly/schuly/**)"
     ],
     "deny": [],
     "ask": []

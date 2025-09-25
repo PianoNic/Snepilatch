@@ -28,7 +28,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
   void initState() {
     super.initState();
     _playerAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 400),
       vsync: this,
     );
     _playerAnimation = Tween<double>(
@@ -36,7 +36,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
       end: 1.0,
     ).animate(CurvedAnimation(
       parent: _playerAnimationController,
-      curve: Curves.easeInOut,
+      curve: Curves.easeOutCubic,
     ));
 
     _pages = [
@@ -67,20 +67,108 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     });
   }
 
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Page titles for the header
+    final List<String> pageTitles = [
+      'Home',
+      'Library',
+      'Search',
+      'Profile',
+    ];
+
     return Scaffold(
       body: Stack(
         children: [
-          // Main app content with AnimatedBuilder only for pages
-          AnimatedBuilder(
-            animation: widget.spotifyController,
-            builder: (context, child) {
-              return IndexedStack(
-                index: _selectedIndex,
-                children: _pages,
-              );
-            },
+          // Main app content with AnimatedSwitcher
+          Column(
+            children: [
+              // Schuly-style app bar
+              if (!widget.spotifyController.showWebView)
+                AppBar(
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  title: Text(
+                    pageTitles[_selectedIndex],
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.normal,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                  actions: _buildAppBarActions(),
+                ),
+              // Offline mode indicator (like Schuly)
+              AnimatedBuilder(
+                animation: widget.spotifyController,
+                builder: (context, child) {
+                  if (!widget.spotifyController.isLoggedIn) {
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withValues(alpha: 0.1),
+                        border: Border(
+                          bottom: BorderSide(
+                            color: Colors.orange.withValues(alpha: 0.3),
+                            width: 1,
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            size: 16,
+                            color: Colors.orange[700],
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Login to Spotify to start',
+                            style: TextStyle(
+                              color: Colors.orange[700],
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  switchInCurve: Curves.easeIn,
+                  switchOutCurve: Curves.easeOut,
+                  transitionBuilder: (Widget child, Animation<double> animation) {
+                    return FadeTransition(
+                      opacity: animation,
+                      child: child,
+                    );
+                  },
+                  layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
+                    return Stack(
+                      children: <Widget>[
+                        ...previousChildren,
+                        if (currentChild != null) currentChild,
+                      ],
+                    );
+                  },
+                  child: Container(
+                    key: ValueKey(_selectedIndex),
+                    child: _pages[_selectedIndex],
+                  ),
+                ),
+              ),
+            ],
           ),
           // WebView - separate widget that doesn't rebuild with controller
           SpotifyWebViewWidget(spotifyController: widget.spotifyController),
@@ -104,52 +192,121 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
               return const SizedBox.shrink();
             },
           ),
-          // Expanded player
-          if (_isPlayerExpanded && widget.spotifyController.currentTrack != null)
+          // Expanded player with background overlay
+          if (_isPlayerExpanded && widget.spotifyController.currentTrack != null) ...[
+            // Background overlay that fades in
+            AnimatedBuilder(
+              animation: _playerAnimation,
+              builder: (context, child) {
+                return IgnorePointer(
+                  child: Container(
+                    color: Colors.black.withValues(alpha: _playerAnimation.value * 0.5),
+                  ),
+                );
+              },
+            ),
+            // The actual player
             ExpandedPlayer(
               spotifyController: widget.spotifyController,
               animation: _playerAnimation,
               onClose: _collapsePlayer,
             ),
+          ],
         ],
       ),
       bottomNavigationBar: AnimatedBuilder(
         animation: widget.spotifyController,
         builder: (context, child) {
-          return widget.spotifyController.showWebView
-            ? const SizedBox.shrink()
-            : NavigationBar(
-                selectedIndex: _selectedIndex,
-                onDestinationSelected: (int index) {
-                  setState(() {
-                    _selectedIndex = index;
-                  });
-                },
-                destinations: const [
-                  NavigationDestination(
-                    icon: Icon(Icons.home_outlined),
-                    selectedIcon: Icon(Icons.home),
-                    label: 'Home',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.music_note_outlined),
-                    selectedIcon: Icon(Icons.music_note),
-                    label: 'Songs',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.search_outlined),
-                    selectedIcon: Icon(Icons.search),
-                    label: 'Search',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.person_outline),
-                    selectedIcon: Icon(Icons.person),
-                    label: 'User',
-                  ),
-                ],
-              );
+          if (widget.spotifyController.showWebView) {
+            return const SizedBox.shrink();
+          }
+
+          // Using NavigationBar with Material 3 style (like Schuly)
+          final primaryColor = Theme.of(context).colorScheme.primary;
+
+          return NavigationBar(
+            selectedIndex: _selectedIndex,
+            onDestinationSelected: _onItemTapped,
+            animationDuration: const Duration(milliseconds: 300),
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            surfaceTintColor: Colors.transparent,
+            indicatorColor: primaryColor.withValues(alpha: 0.15),
+            height: 65, // Slightly taller for better touch targets
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+            destinations: [
+              NavigationDestination(
+                icon: Icon(
+                  Icons.home_outlined,
+                  color: _selectedIndex == 0 ? primaryColor : Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                selectedIcon: Icon(Icons.home, color: primaryColor),
+                label: 'Home',
+              ),
+              NavigationDestination(
+                icon: Icon(
+                  Icons.library_music_outlined,
+                  color: _selectedIndex == 1 ? primaryColor : Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                selectedIcon: Icon(Icons.library_music, color: primaryColor),
+                label: 'Library',
+              ),
+              NavigationDestination(
+                icon: Icon(
+                  Icons.search_outlined,
+                  color: _selectedIndex == 2 ? primaryColor : Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                selectedIcon: Icon(Icons.search, color: primaryColor),
+                label: 'Search',
+              ),
+              NavigationDestination(
+                icon: Icon(
+                  Icons.person_outline,
+                  color: _selectedIndex == 3 ? primaryColor : Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                selectedIcon: Icon(Icons.person, color: primaryColor),
+                label: 'Profile',
+              ),
+            ],
+          );
         },
       ),
     );
+  }
+
+  List<Widget>? _buildAppBarActions() {
+    // Different actions for different pages (like Schuly)
+    switch (_selectedIndex) {
+      case 0: // Home page
+        return null;
+      case 1: // Songs/Library page
+        return [
+          IconButton(
+            onPressed: () {
+              widget.spotifyController.navigateToLikedSongs();
+            },
+            icon: Icon(
+              Icons.refresh,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+            tooltip: 'Refresh',
+          ),
+        ];
+      case 3: // Profile page
+        return [
+          IconButton(
+            onPressed: () {
+              // Settings
+              widget.spotifyController.openWebView();
+            },
+            icon: Icon(
+              Icons.settings_outlined,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+            tooltip: 'Settings',
+          ),
+        ];
+      default:
+        return null;
+    }
   }
 }

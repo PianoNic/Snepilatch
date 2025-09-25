@@ -7,18 +7,7 @@ class UserPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profile'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {},
-          ),
-        ],
-      ),
-      body: AnimatedBuilder(
+    return AnimatedBuilder(
         animation: spotifyController,
         builder: (context, child) {
           return SingleChildScrollView(
@@ -41,8 +30,7 @@ class UserPage extends StatelessWidget {
             ),
           );
         },
-      ),
-    );
+      );
   }
 
   Widget _buildProfileAvatar(BuildContext context) {

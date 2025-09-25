@@ -64,7 +64,10 @@ class SpotifyController extends ChangeNotifier {
     debugPrint('Page finished loading: $url');
     await _injectJavaScript();
     _isInitialized = true;
-    notifyListeners();
+    // Schedule notification for next frame to avoid setState during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+    });
   }
 
   Future<NavigationActionPolicy> shouldOverrideUrlLoading(
@@ -108,7 +111,10 @@ class SpotifyController extends ChangeNotifier {
           final newState = SpotifyScraperService.parsePlaybackInfo(cleanJson);
           if (newState != null && _hasPlaybackStateChanged(newState)) {
             _playbackState = newState;
-            notifyListeners();
+            // Schedule notification for next frame to avoid setState during build
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              notifyListeners();
+            });
           }
         }
       }
@@ -144,7 +150,10 @@ class SpotifyController extends ChangeNotifier {
           if (newUser != null && _hasUserChanged(newUser)) {
             _user = newUser;
             isLoggedInNotifier.value = newUser.isLoggedIn;
-            notifyListeners();
+            // Schedule notification for next frame to avoid setState during build
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              notifyListeners();
+            });
           }
         }
       }
@@ -215,7 +224,10 @@ class SpotifyController extends ChangeNotifier {
   Future<void> navigateToLogin() async {
     _showWebView = true;
     showWebViewNotifier.value = true;
-    notifyListeners();
+    // Schedule notification for next frame to avoid setState during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+    });
     await _webViewService.loadUrl('https://accounts.spotify.com/login');
   }
 
@@ -226,13 +238,19 @@ class SpotifyController extends ChangeNotifier {
   void openWebView() {
     _showWebView = true;
     showWebViewNotifier.value = true;
-    notifyListeners();
+    // Schedule notification for next frame to avoid setState during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+    });
   }
 
   void hideWebView() {
     _showWebView = false;
     showWebViewNotifier.value = false;
-    notifyListeners();
+    // Schedule notification for next frame to avoid setState during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+    });
     if (!_user.isLoggedIn) {
       navigateToSpotify();
     }
@@ -252,7 +270,10 @@ class SpotifyController extends ChangeNotifier {
   Future<void> navigateToLikedSongs() async {
     _isLoadingSongs = true;
     _songs = [];
-    notifyListeners();
+    // Schedule notification for next frame to avoid setState during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+    });
 
     await _webViewService.loadUrl('https://open.spotify.com/collection/tracks');
 
@@ -276,11 +297,17 @@ class SpotifyController extends ChangeNotifier {
       }
 
       _isLoadingSongs = false;
-      notifyListeners();
+      // Schedule notification for next frame to avoid setState during build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+      });
     } catch (e) {
       debugPrint('Error scraping songs: $e');
       _isLoadingSongs = false;
-      notifyListeners();
+      // Schedule notification for next frame to avoid setState during build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+      });
     }
   }
 

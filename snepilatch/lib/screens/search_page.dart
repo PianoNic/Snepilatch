@@ -32,21 +32,15 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Search'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-      ),
-      body: Column(
-        children: [
-          _buildSearchBar(),
-          Expanded(
-            child: _searchResults.isEmpty
-                ? _buildEmptyState(context)
-                : _buildSearchResults(),
-          ),
-        ],
-      ),
+    return Column(
+      children: [
+        _buildSearchBar(),
+        Expanded(
+          child: _searchResults.isEmpty
+              ? _buildEmptyState(context)
+              : _buildSearchResults(),
+        ),
+      ],
     );
   }
 

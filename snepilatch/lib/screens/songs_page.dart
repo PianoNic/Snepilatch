@@ -42,20 +42,7 @@ class _SongsPageState extends State<SongsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Liked Songs'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              widget.spotifyController.scrapeSongs();
-            },
-          ),
-        ],
-      ),
-      body: AnimatedBuilder(
+    return AnimatedBuilder(
         animation: widget.spotifyController,
         builder: (context, child) {
           if (widget.spotifyController.isLoadingSongs && widget.spotifyController.songs.isEmpty) {
@@ -70,8 +57,7 @@ class _SongsPageState extends State<SongsPage> {
 
           return _buildSongsList();
         },
-      ),
-    );
+      );
   }
 
   Widget _buildEmptyState(BuildContext context) {

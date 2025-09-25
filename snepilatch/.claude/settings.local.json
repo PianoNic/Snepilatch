@@ -10,7 +10,9 @@
       "Read(//c/GithubProjects/schuly/schuly/**)",
       "Read(//f/Coding/schuly/schuly/**)",
       "Read(//f/Coding/schuly/.github/workflows/**)",
-      "Read(//f/Coding/schuly/.github/**)"
+      "Read(//f/Coding/schuly/.github/**)",
+      "Bash(cat:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []

@@ -63,8 +63,8 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.black.withValues(alpha: 0.95),
-                      Colors.black.withValues(alpha: 0.98),
+                      Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
+                      Theme.of(context).colorScheme.surface,
                     ],
                   ),
                 ),

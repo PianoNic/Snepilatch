@@ -184,7 +184,7 @@ class MiniPlayer extends StatelessWidget {
           spotifyController.currentArtist ?? 'Unknown artist',
           style: TextStyle(
             fontSize: 12,
-            color: Theme.of(context).colorScheme.secondary,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,

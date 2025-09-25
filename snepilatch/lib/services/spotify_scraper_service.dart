@@ -162,10 +162,15 @@ class SpotifyScraperService {
       final track = trackMatch?.group(1)?.trim();
       final artist = artistMatch?.group(1)?.trim();
       final isPlaying = isPlayingMatch?.group(1) == 'true';
-      final albumArt = albumArtMatch?.group(1)?.trim();
+      var albumArt = albumArtMatch?.group(1)?.trim();
       final isLiked = isLikedMatch?.group(1) == 'true';
       final shuffleMode = shuffleModeMatch?.group(1)?.trim() ?? 'off';
       final repeatMode = repeatModeMatch?.group(1)?.trim() ?? 'off';
+
+      // Convert to high quality image URL
+      if (albumArt != null && albumArt.contains('ab67616d00004851')) {
+        albumArt = albumArt.replaceAll('ab67616d00004851', 'ab67616d00001e02');
+      }
 
       return PlaybackState(
         currentTrack: track?.isNotEmpty == true ? track : null,
@@ -193,7 +198,12 @@ class SpotifyScraperService {
       final isLoggedIn = isLoggedInMatch?.group(1) == 'true';
       final username = usernameMatch?.group(1)?.trim();
       final email = emailMatch?.group(1)?.trim();
-      final profileImage = profileImageMatch?.group(1)?.trim();
+      var profileImage = profileImageMatch?.group(1)?.trim();
+
+      // Convert to high quality image URL if it's a Spotify CDN image
+      if (profileImage != null && profileImage.contains('ab67616d00004851')) {
+        profileImage = profileImage.replaceAll('ab67616d00004851', 'ab67616d00001e02');
+      }
 
       return User(
         isLoggedIn: isLoggedIn,
@@ -233,11 +243,17 @@ class SpotifyScraperService {
         final indexMatch = RegExp(r'"index":(\d+)').firstMatch(songData);
 
         if (titleMatch != null) {
+          var imageUrl = imageMatch?.group(1)?.replaceAll(r'\/', '/');
+          // Convert to high quality image URL
+          if (imageUrl != null && imageUrl.contains('ab67616d00004851')) {
+            imageUrl = imageUrl.replaceAll('ab67616d00004851', 'ab67616d00001e02');
+          }
+
           songs.add(Song(
             title: titleMatch.group(1) ?? '',
             artist: artistMatch?.group(1) ?? '',
             album: albumMatch?.group(1) ?? '',
-            imageUrl: imageMatch?.group(1)?.replaceAll(r'\/', '/'),
+            imageUrl: imageUrl,
             duration: durationMatch?.group(1),
             index: int.tryParse(indexMatch?.group(1) ?? '0') ?? 0,
           ));

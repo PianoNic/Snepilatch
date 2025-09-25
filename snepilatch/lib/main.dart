@@ -21,13 +21,18 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Snepilatch',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      home: MainScreen(spotifyController: spotifyController),
+    return AnimatedBuilder(
+      animation: spotifyController.themeService,
+      builder: (context, _) {
+        return MaterialApp(
+          title: 'Snepilatch',
+          theme: spotifyController.themeService.lightTheme(),
+          darkTheme: spotifyController.themeService.darkTheme(),
+          themeMode: spotifyController.themeService.themeMode,
+          home: MainScreen(spotifyController: spotifyController),
+          debugShowCheckedModeBanner: false,
+        );
+      },
     );
   }
 }

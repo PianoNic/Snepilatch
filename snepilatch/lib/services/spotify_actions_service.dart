@@ -73,7 +73,7 @@ class SpotifyActionsService {
         const progressInput = document.querySelector('[data-testid="playback-progressbar"] input[type="range"]');
         if (progressInput) {
           const max = parseInt(progressInput.max) || 0;
-          const newValue = Math.floor(max * ${percentage});
+          const newValue = Math.floor(max * $percentage);
 
           // Update the value
           progressInput.value = newValue;
@@ -88,7 +88,7 @@ class SpotifyActionsService {
           const progressBar = document.querySelector('[data-testid="playback-progressbar"]');
           if (progressBar) {
             const rect = progressBar.getBoundingClientRect();
-            const x = rect.left + (rect.width * ${percentage});
+            const x = rect.left + (rect.width * $percentage);
             const y = rect.top + (rect.height / 2);
 
             const clickEvent = new MouseEvent('click', {

@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import 'package:audio_service/audio_service.dart';
 
 import '../models/song.dart';
 import '../models/playback_state.dart' as app_models;

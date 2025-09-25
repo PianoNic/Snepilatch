@@ -25,7 +25,6 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> with TickerProviderStat
 
   // For text scrolling animation
   late AnimationController _scrollController;
-  late Animation<double> _scrollAnimation;
   bool _shouldScroll = false;
   final GlobalKey _textKey = GlobalKey();
 
@@ -36,12 +35,6 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> with TickerProviderStat
       duration: const Duration(seconds: 6),
       vsync: this,
     );
-
-    // Simple linear animation from 0 to 1
-    _scrollAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(_scrollController);
 
     // Loop the animation
     _scrollController.addStatusListener((status) {

@@ -32,6 +32,7 @@ class HomePage extends StatelessWidget {
   Widget _buildWelcomeCard(BuildContext context) {
     final username = spotifyController.username ?? 'Guest';
     final isLoggedIn = spotifyController.isLoggedIn;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Card(
       elevation: 4,
@@ -43,10 +44,15 @@ class HomePage extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Theme.of(context).colorScheme.primary,
-              Theme.of(context).colorScheme.secondary,
-            ],
+            colors: isDarkMode
+                ? [
+                    Theme.of(context).colorScheme.primaryContainer,
+                    Theme.of(context).colorScheme.secondaryContainer,
+                  ]
+                : [
+                    Theme.of(context).colorScheme.primary,
+                    Theme.of(context).colorScheme.secondary,
+                  ],
           ),
         ),
         child: Column(
@@ -54,18 +60,22 @@ class HomePage extends StatelessWidget {
           children: [
             Text(
               isLoggedIn ? 'Welcome back,' : 'Welcome to Snepilatch',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
-                color: Colors.white70,
+                color: isDarkMode
+                    ? Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.8)
+                    : Colors.white70,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               isLoggedIn ? username : 'Your Spotify Controller',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: isDarkMode
+                    ? Theme.of(context).colorScheme.onPrimaryContainer
+                    : Colors.white,
               ),
             ),
             const SizedBox(height: 8),
@@ -75,9 +85,11 @@ class HomePage extends StatelessWidget {
                       ? 'Now playing: ${spotifyController.currentTrack}'
                       : 'No music playing'
                   : 'Login to start controlling Spotify',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: Colors.white70,
+                color: isDarkMode
+                    ? Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.8)
+                    : Colors.white70,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

@@ -18,7 +18,7 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateMixin {
   int _selectedIndex = 0;
   bool _isPlayerExpanded = false;
-  bool _isAnimating = false; // Prevent multiple animations
+  bool _isAnimating = false;
   late AnimationController _playerAnimationController;
   late Animation<double> _playerAnimation;
 
@@ -54,23 +54,18 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
   }
 
   void _expandPlayer() {
-    // Prevent multiple simultaneous animations
     if (_isAnimating) return;
-
     _isAnimating = true;
     setState(() {
       _isPlayerExpanded = true;
     });
-
     _playerAnimationController.forward().then((_) {
       _isAnimating = false;
     });
   }
 
   void _collapsePlayer() {
-    // Prevent multiple simultaneous animations
     if (_isAnimating) return;
-
     _isAnimating = true;
     _playerAnimationController.reverse().then((_) {
       setState(() {
@@ -278,7 +273,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
         },
       ),
         ),
-        // Expanded player with background overlay - OUTSIDE Scaffold to cover everything
+        // Expanded player with background overlay
         if (_isPlayerExpanded && widget.spotifyController.currentTrack != null) ...[
           // Background overlay that fades in
           AnimatedBuilder(

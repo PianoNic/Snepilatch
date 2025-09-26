@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:audio_service/audio_service.dart';
 import 'controllers/spotify_controller.dart';
 import 'screens/main_screen.dart';
+import 'pages/loading_screen.dart';
 import 'services/audio_handler_service.dart';
 import 'widgets/app_update_dialog.dart';
+import 'widgets/spotify_webview.dart';
 
 late AudioHandler audioHandler;
 
@@ -40,21 +42,41 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  final SpotifyController spotifyController = SpotifyController();
+  late final SpotifyController spotifyController;
+  bool _showLoadingScreen = true;
 
   @override
   void initState() {
     super.initState();
+    spotifyController = SpotifyController();
+    spotifyController.onLogout = _handleLogout;
     _checkForUpdates();
+  }
+
+  void _handleLogout() {
+    setState(() {
+      _showLoadingScreen = true;
+    });
   }
 
   void _checkForUpdates() {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await Future.delayed(const Duration(seconds: 2));
-      if (mounted) {
-        await AppUpdateDialog.showIfAvailable(context);
+      // Wait for loading to complete before checking updates
+      if (!_showLoadingScreen) {
+        await Future.delayed(const Duration(seconds: 2));
+        if (mounted) {
+          await AppUpdateDialog.showIfAvailable(context);
+        }
       }
     });
+  }
+
+  void _onLoadingComplete() {
+    setState(() {
+      _showLoadingScreen = false;
+    });
+    // Check for updates after loading complete
+    _checkForUpdates();
   }
 
   @override
@@ -67,7 +89,19 @@ class _MyAppState extends State<MyApp> {
           theme: spotifyController.themeService.lightTheme(),
           darkTheme: spotifyController.themeService.darkTheme(),
           themeMode: spotifyController.themeService.themeMode,
-          home: MainScreen(spotifyController: spotifyController),
+          home: Stack(
+            children: [
+              // Show the appropriate screen
+              _showLoadingScreen
+                  ? LoadingScreen(
+                      spotifyController: spotifyController,
+                      onComplete: _onLoadingComplete,
+                    )
+                  : MainScreen(spotifyController: spotifyController),
+              // WebView is always present, initialized early for scraping
+              SpotifyWebViewWidget(spotifyController: spotifyController),
+            ],
+          ),
           debugShowCheckedModeBanner: false,
           navigatorKey: GlobalKey<NavigatorState>(),
         );

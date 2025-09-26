@@ -21,6 +21,7 @@ class SpotifyController extends ChangeNotifier {
   Timer? _scrapingTimer;
   Timer? _progressTimer;
   String? _lastAlbumArt;
+  VoidCallback? onLogout;
 
   SpotifyController() {
     _startPeriodicScraping();
@@ -345,7 +346,8 @@ class SpotifyController extends ChangeNotifier {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       notifyListeners();
     });
-    await _webViewService.loadUrl('https://accounts.spotify.com/login');
+    // Navigate to Spotify login with redirect back to open.spotify.com
+    await _webViewService.loadUrl('https://accounts.spotify.com/login?continue=https%3A%2F%2Fopen.spotify.com');
   }
 
   Future<void> navigateToSpotify() async {
@@ -370,7 +372,17 @@ class SpotifyController extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    // Clear user data from store
+    store.clearUserData();
+
+    // Execute logout script in WebView
     await _webViewService.evaluateJavascript(SpotifyActionsService.logoutScript);
+
+    // Navigate back to Spotify home
+    await navigateToSpotify();
+
+    // Trigger logout callback to show loading screen
+    onLogout?.call();
   }
 
   // Track methods

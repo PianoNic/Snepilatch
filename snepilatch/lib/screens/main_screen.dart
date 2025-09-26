@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../controllers/spotify_controller.dart';
-import '../widgets/spotify_webview.dart';
 import '../widgets/mini_player.dart';
 import '../widgets/expanded_player.dart';
 import 'home_page.dart';
@@ -279,8 +278,6 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
         },
       ),
         ),
-        // WebView - separate widget that doesn't rebuild with controller
-        SpotifyWebViewWidget(spotifyController: widget.spotifyController),
         // Expanded player with background overlay - OUTSIDE Scaffold to cover everything
         if (_isPlayerExpanded && widget.spotifyController.currentTrack != null) ...[
           // Background overlay that fades in

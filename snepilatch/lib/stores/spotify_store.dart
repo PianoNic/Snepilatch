@@ -210,6 +210,37 @@ class SpotifyStore {
     durationMs: durationMs.value,
   );
 
+  /// Clear user data on logout
+  void clearUserData() {
+    debugPrint('🚪 [SpotifyStore] Clearing user data on logout');
+
+    // Clear user info
+    isLoggedIn.value = false;
+    username.value = null;
+    userEmail.value = null;
+    userProfileImage.value = null;
+
+    // Clear playback state
+    isPlaying.value = false;
+    currentTrack.value = null;
+    currentArtist.value = null;
+    currentAlbumArt.value = null;
+    isCurrentTrackLiked.value = false;
+    shuffleMode.value = ShuffleMode.off;
+    repeatMode.value = RepeatMode.off;
+    currentTime.value = '0:00';
+    duration.value = '0:00';
+    progressMs.value = 0;
+    durationMs.value = 0;
+
+    // Clear songs
+    songs.value = [];
+    isLoadingSongs.value = false;
+
+    // Hide WebView
+    showWebView.value = false;
+  }
+
   /// Dispose all notifiers
   void dispose() {
     isPlaying.dispose();

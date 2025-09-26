@@ -23,62 +23,111 @@ class _SpotifyWebViewWidgetState extends State<SpotifyWebViewWidget> with Automa
       return const SizedBox.shrink();
     }
 
-    // Listen only to showWebView changes
-    return ValueListenableBuilder<bool>(
-      valueListenable: widget.spotifyController.showWebViewNotifier,
-      builder: (context, showWebView, child) {
-        return Stack(
-          children: [
-            // Hidden WebView for background operations
-            if (!showWebView)
-              Positioned(
-                left: 0,
-                top: 0,
-                width: 1,
-                height: 1,
-                child: IgnorePointer(
-                  child: Opacity(
-                    opacity: 0,
-                    child: child!,
-                  ),
-                ),
-              ),
-            // Visible WebView when showing
-            if (showWebView)
-              Positioned.fill(
-                child: Container(
-                  color: Colors.white,
-                  child: SafeArea(
-                    child: Column(
-                      children: [
-                        _buildHeader(context),
-                        Expanded(
-                          child: child!,
-                        ),
-                      ],
+    // Listen to both showWebView and debugWebViewVisible changes
+    return AnimatedBuilder(
+      animation: widget.spotifyController,
+      builder: (context, _) {
+        final showWebView = widget.spotifyController.showWebView;
+        final debugVisible = widget.spotifyController.debugWebViewVisible;
+
+        return ValueListenableBuilder<bool>(
+          valueListenable: widget.spotifyController.showWebViewNotifier,
+          builder: (context, _, child) {
+            return Stack(
+              children: [
+                // Hidden WebView for background operations
+                // Make it larger so scrolling works properly
+                if (!showWebView && !debugVisible)
+                  Positioned(
+                    left: -1000, // Move off-screen instead of making tiny
+                    top: 0,
+                    width: 400,
+                    height: 800,
+                    child: IgnorePointer(
+                      child: Opacity(
+                        opacity: 0,
+                        child: child!,
+                      ),
                     ),
                   ),
-                ),
-              ),
-          ],
+                // Debug view - show WebView continuously when debug mode is enabled
+                if (!showWebView && debugVisible)
+                  Positioned(
+                    bottom: 100,
+                    left: 20,
+                    right: 20,
+                    height: MediaQuery.of(context).size.height * 0.3,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.green, width: 3),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Stack(
+                          children: [
+                            child!,
+                            Positioned(
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              child: Container(
+                                color: Colors.green.withOpacity(0.8),
+                                padding: const EdgeInsets.all(4),
+                                child: const Text(
+                                  'DEBUG: WebView',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                // Visible WebView when showing
+                if (showWebView)
+                  Positioned.fill(
+                    child: Container(
+                      color: Colors.white,
+                      child: SafeArea(
+                        child: Column(
+                          children: [
+                            _buildHeader(context),
+                            Expanded(
+                              child: child!,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+          child: InAppWebView(
+            key: const Key('spotify_webview'),
+            initialUrlRequest: URLRequest(
+              url: WebUri('https://open.spotify.com')
+            ),
+            initialSettings: widget.spotifyController.getWebViewSettings(),
+            onWebViewCreated: widget.spotifyController.onWebViewCreated,
+            onLoadStop: widget.spotifyController.onLoadStop,
+            shouldOverrideUrlLoading: widget.spotifyController.shouldOverrideUrlLoading,
+            onPermissionRequest: widget.spotifyController.onPermissionRequest,
+            onConsoleMessage: (controller, consoleMessage) {
+              if (widget.spotifyController.showWebView || widget.spotifyController.debugWebViewVisible) {
+                debugPrint('Console: ${consoleMessage.message}');
+              }
+            },
+          ),
         );
       },
-      child: InAppWebView(
-        key: const Key('spotify_webview'),
-        initialUrlRequest: URLRequest(
-          url: WebUri('https://open.spotify.com')
-        ),
-        initialSettings: widget.spotifyController.getWebViewSettings(),
-        onWebViewCreated: widget.spotifyController.onWebViewCreated,
-        onLoadStop: widget.spotifyController.onLoadStop,
-        shouldOverrideUrlLoading: widget.spotifyController.shouldOverrideUrlLoading,
-        onPermissionRequest: widget.spotifyController.onPermissionRequest,
-        onConsoleMessage: (controller, consoleMessage) {
-          if (widget.spotifyController.showWebView) {
-            debugPrint('Console: ${consoleMessage.message}');
-          }
-        },
-      ),
     );
   }
 

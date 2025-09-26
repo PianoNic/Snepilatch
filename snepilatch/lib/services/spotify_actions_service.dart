@@ -125,16 +125,18 @@ class SpotifyActionsService {
   }
 
   static const String searchResultsScript = '''
-    const results = [];
-    const songs = document.querySelectorAll('[data-testid="tracklist-row"]');
-    songs.forEach((song, index) => {
-      if (index < 10) {
-        const title = song.querySelector('[data-testid="internal-track-link"] div')?.textContent || '';
-        const artist = song.querySelector('[data-testid="internal-track-link"] + div a')?.textContent || '';
-        results.push({ title, artist });
-      }
-    });
-    JSON.stringify(results);
+    (function() {
+      const results = [];
+      const songs = document.querySelectorAll('[data-testid="tracklist-row"]');
+      songs.forEach((song, index) => {
+        if (index < 10) {
+          const title = song.querySelector('[data-testid="internal-track-link"] div')?.textContent || '';
+          const artist = song.querySelector('[data-testid="internal-track-link"] + div a')?.textContent || '';
+          results.push({ title, artist });
+        }
+      });
+      return JSON.stringify(results);
+    })();
   ''';
 
   static const String logoutScript = '''
@@ -173,37 +175,39 @@ class SpotifyActionsService {
   }
 
   static const String scrapeSongsScript = '''
-    const songs = [];
-    const songRows = document.querySelectorAll('[data-testid="tracklist-row"]');
+    (function() {
+      const songs = [];
+      const songRows = document.querySelectorAll('[data-testid="tracklist-row"]');
 
-    songRows.forEach((row, index) => {
-      const titleElement = row.querySelector('[data-testid="internal-track-link"] div');
-      const artistElement = row.querySelector('[data-testid="internal-track-link"]')?.parentElement?.nextElementSibling?.querySelector('a');
-      const albumElement = row.querySelector('[data-testid="internal-track-link"]')?.parentElement?.nextElementSibling?.nextElementSibling?.querySelector('a');
-      const imageElement = row.querySelector('img');
-      const durationElement = row.querySelector('[data-testid="track-duration"]');
+      songRows.forEach((row, index) => {
+        const titleElement = row.querySelector('[data-testid="internal-track-link"] div');
+        const artistElement = row.querySelector('[data-testid="internal-track-link"]')?.parentElement?.nextElementSibling?.querySelector('a');
+        const albumElement = row.querySelector('[data-testid="internal-track-link"]')?.parentElement?.nextElementSibling?.nextElementSibling?.querySelector('a');
+        const imageElement = row.querySelector('img');
+        const durationElement = row.querySelector('[data-testid="track-duration"]');
 
-      if (titleElement) {
-        songs.push({
-          title: titleElement.textContent || '',
-          artist: artistElement?.textContent || '',
-          album: albumElement?.textContent || '',
-          image: imageElement?.src || '',
-          duration: durationElement?.textContent || '',
-          index: index
-        });
-      }
-    });
+        if (titleElement) {
+          songs.push({
+            title: titleElement.textContent || '',
+            artist: artistElement?.textContent || '',
+            album: albumElement?.textContent || '',
+            image: imageElement?.src || '',
+            duration: durationElement?.textContent || '',
+            index: index
+          });
+        }
+      });
 
-    JSON.stringify(songs);
+      return JSON.stringify(songs);
+    })();
   ''';
 
   static String scrollSpotifyPageScript(double offset) {
     return '''
       (function() {
-        const mainView = document.querySelector('[data-testid="playlist-page"]') ||
+        const mainView = document.querySelector('#main') ||
                          document.querySelector('.main-view-container__scroll-node') ||
-                         document.querySelector('[data-testid="track-list"]')?.parentElement;
+                         document.querySelector('[data-testid="playlist-page"]');
         if (mainView) {
           mainView.scrollTop = $offset;
         }
@@ -211,14 +215,302 @@ class SpotifyActionsService {
     ''';
   }
 
-  static const String loadMoreSongsScript = '''
+  static const String initPlaylistControllerScript = '''
+    // Spotify Playlist Controller
     (function() {
-      const mainView = document.querySelector('[data-testid="playlist-page"]') ||
-                       document.querySelector('.main-view-container__scroll-node') ||
-                       document.querySelector('[data-testid="track-list"]')?.parentElement;
-      if (mainView) {
-        mainView.scrollTop = mainView.scrollHeight;
+        class SpotifyPlaylistController {
+            constructor() {
+                this.tracks = new Map();
+                this.isLoading = false;
+                this.lastScrollPosition = 0;
+                console.log('SpotifyPlaylistController initialized');
+
+                // Do initial scan
+                this._scanCurrentTracks();
+            }
+
+            // Scan and add tracks currently in DOM
+            _scanCurrentTracks() {
+                const trackRows = document.querySelectorAll('[data-testid="tracklist-row"]');
+                let newCount = 0;
+
+                trackRows.forEach((row) => {
+                    try {
+                        // Get track position
+                        const positionEl = row.querySelector('[aria-colindex="1"] span');
+                        const position = positionEl ? parseInt(positionEl.textContent.trim()) : null;
+
+                        // Get track link for unique ID
+                        const trackLink = row.querySelector('a[data-testid="internal-track-link"]');
+                        const trackUrl = trackLink ? trackLink.href : null;
+                        const title = trackLink ? trackLink.textContent.trim() : null;
+
+                        if (!trackUrl || !title) return;
+
+                        // Skip if we already have this track
+                        if (this.tracks.has(trackUrl)) return;
+
+                        // Get cover
+                        const coverImg = row.querySelector('img[src*="i.scdn.co/image"]');
+                        const coverUrl = coverImg ? coverImg.src : null;
+
+                        // Get artists
+                        const artistLinks = row.querySelectorAll('a[href*="/artist/"]');
+                        const artists = Array.from(artistLinks).map(link => link.textContent.trim());
+
+                        // Get album
+                        const albumLink = row.querySelector('a[href*="/album/"]');
+                        const album = albumLink ? albumLink.textContent.trim() : null;
+
+                        // Get duration
+                        const durationEl = row.querySelector('[data-testid="track-duration"]');
+                        const duration = durationEl ? durationEl.textContent.trim() : null;
+
+                        // Store track with position as key for ordering
+                        this.tracks.set(trackUrl, {
+                            position: position || this.tracks.size + 1,
+                            title: title,
+                            artists: artists,
+                            album: album || 'Unknown Album',
+                            duration: duration,
+                            coverUrl: coverUrl,
+                            trackUrl: trackUrl
+                        });
+
+                        newCount++;
+                    } catch (err) {
+                        console.error('Error parsing track:', err);
+                    }
+                });
+
+                return newCount;
+            }
+
+            // Load more tracks by scrolling down
+            async loadMore() {
+                if (this.isLoading) {
+                    console.log('Already loading...');
+                    return { success: false, message: 'Already loading' };
+                }
+
+                this.isLoading = true;
+                const initialCount = this.tracks.size;
+
+                try {
+                    // Find the last track row
+                    const trackRows = document.querySelectorAll('[data-testid="tracklist-row"]');
+                    if (trackRows.length === 0) {
+                        return { success: false, message: 'No tracks found in DOM' };
+                    }
+
+                    const lastTrack = trackRows[trackRows.length - 1];
+
+                    // Scroll to last track
+                    lastTrack.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+                    // Wait for new content
+                    await this._waitForNewContent();
+
+                    // Scan for new tracks
+                    const newTracks = this._scanCurrentTracks();
+
+                    const result = {
+                        success: true,
+                        previousCount: initialCount,
+                        currentCount: this.tracks.size,
+                        newTracks: this.tracks.size - initialCount,
+                        totalLoaded: this.tracks.size
+                    };
+
+                    console.log('Loaded ' + result.newTracks + ' new tracks. Total: ' + result.totalLoaded);
+                    return result;
+
+                } finally {
+                    this.isLoading = false;
+                }
+            }
+
+            // Wait for new content to load
+            _waitForNewContent(timeout = 2000) {
+                return new Promise((resolve) => {
+                    const startTime = Date.now();
+                    const checkInterval = 100;
+
+                    const check = () => {
+                        const currentRows = document.querySelectorAll('[data-testid="tracklist-row"]').length;
+
+                        if (Date.now() - startTime > timeout) {
+                            resolve();
+                            return;
+                        }
+
+                        // Check again
+                        setTimeout(check, checkInterval);
+                    };
+
+                    // Start checking after initial delay for scroll animation
+                    setTimeout(check, 500);
+                });
+            }
+
+            // Get all tracks collected so far
+            get() {
+                const trackArray = Array.from(this.tracks.values())
+                    .sort((a, b) => (a.position || 999) - (b.position || 999))
+                    .map((track, index) => ({
+                        index: index + 1,
+                        position: track.position,
+                        title: track.title,
+                        artists: track.artists,
+                        album: track.album,
+                        duration: track.duration,
+                        coverUrl: track.coverUrl
+                    }));
+
+                return {
+                    tracks: trackArray,
+                    count: trackArray.length
+                };
+            }
+
+            // Clear all collected data and rescan
+            reset() {
+                this.tracks.clear();
+                this._scanCurrentTracks();
+                const count = this.tracks.size;
+                console.log('Reset complete. Found ' + count + ' tracks in current view.');
+                return { count };
+            }
+
+            // Get info about current state
+            getInfo() {
+                const visibleTracks = document.querySelectorAll('[data-testid="tracklist-row"]').length;
+                return {
+                    totalCollected: this.tracks.size,
+                    visibleInDOM: visibleTracks,
+                    isLoading: this.isLoading,
+                    firstTrack: this.get().tracks[0],
+                    lastTrack: this.get().tracks[this.tracks.size - 1]
+                };
+            }
+        }
+
+        // Create or reset controller
+        if (!window.PlaylistController) {
+            window.PlaylistController = new SpotifyPlaylistController();
+            window.pc = window.PlaylistController; // Short alias
+        } else {
+            window.PlaylistController.reset();
+        }
+
+        return true;
+    })();
+  ''';
+
+  static const String loadMoreSongsScript = '''
+    (async function() {
+        if (!window.PlaylistController) {
+            console.error('PlaylistController not initialized');
+            return JSON.stringify({ success: false, message: 'Controller not initialized' });
+        }
+
+        // Force reset if stuck for too long
+        if (window.PlaylistController.isLoading) {
+            if (!window.PlaylistController._loadingStartTime) {
+                window.PlaylistController._loadingStartTime = Date.now();
+            } else if (Date.now() - window.PlaylistController._loadingStartTime > 5000) {
+                console.log('Force resetting stuck loading state after 5 seconds');
+                window.PlaylistController.isLoading = false;
+                window.PlaylistController._loadingStartTime = null;
+            }
+        }
+
+        const result = await window.PlaylistController.loadMore();
+        if (result.success) {
+            window.PlaylistController._loadingStartTime = null;
+        }
+        return JSON.stringify(result);
+    })();
+  ''';
+
+  static const String getLoadedTracksScript = '''
+    (function() {
+        if (!window.PlaylistController) {
+            return JSON.stringify({ tracks: [], count: 0 });
+        }
+
+        return JSON.stringify(window.PlaylistController.get());
+    })();
+  ''';
+
+  static const String debugScrollScript = '''
+    (function() {
+      const tracks = document.querySelectorAll('[data-testid="tracklist-row"]');
+      const mainContainer = document.querySelector('#main');
+      const info = {
+        tracksInDOM: tracks.length,
+        mainContainerExists: !!mainContainer,
+        mainScrollTop: mainContainer ? mainContainer.scrollTop : 0,
+        mainScrollHeight: mainContainer ? mainContainer.scrollHeight : 0,
+        controllerLoading: window.PlaylistController ? window.PlaylistController.isLoading : 'no controller',
+        tracksLoaded: window.PlaylistController ? window.PlaylistController.tracks.size : 0
+      };
+      console.log('Debug info:', JSON.stringify(info));
+      return JSON.stringify(info);
+    })();
+  ''';
+
+  static const String resetLoadingStateScript = '''
+    (function() {
+      if (window.PlaylistController) {
+        window.PlaylistController.isLoading = false;
+        window.PlaylistController._lastLoadingTime = null;
+        console.log('Reset loading state');
+        return true;
       }
+      return false;
+    })();
+  ''';
+
+  static const String openLikedSongsScript = '''
+    (function() {
+      // Find the Liked Songs element by various methods
+      let likedSongsElement = null;
+
+      // Method 1: Find by aria-labelledby
+      likedSongsElement = document.querySelector('[aria-labelledby="listrow-title-spotify:collection:tracks"]');
+
+      // Method 2: Find by the liked songs image
+      if (!likedSongsElement) {
+        const likedSongsImage = document.querySelector('img[src*="liked-songs-64.png"], img[src*="liked-songs-300.png"], img[src*="liked-songs-640.png"]');
+        if (likedSongsImage) {
+          likedSongsElement = likedSongsImage.closest('a, [role="gridcell"], div[data-testid]');
+        }
+      }
+
+      // Method 3: Find by link href
+      if (!likedSongsElement) {
+        likedSongsElement = document.querySelector('a[href="/collection/tracks"]');
+      }
+
+      // Method 4: Find by text content
+      if (!likedSongsElement) {
+        const elements = document.querySelectorAll('a, div[role="gridcell"]');
+        for (const el of elements) {
+          if (el.textContent && (el.textContent.includes('Lieblingssongs') || el.textContent.includes('Liked Songs'))) {
+            likedSongsElement = el;
+            break;
+          }
+        }
+      }
+
+      if (likedSongsElement) {
+        // Click the element to navigate to liked songs
+        likedSongsElement.click();
+        return true;
+      }
+
+      return false;
     })();
   ''';
 }

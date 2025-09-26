@@ -106,6 +106,26 @@ class _SongsPageState extends State<SongsPage> {
     );
   }
 
+  String _buildSubtitle(Song song) {
+    final parts = <String>[];
+
+    if (song.artist != null && song.artist!.isNotEmpty) {
+      parts.add(song.artist!);
+    }
+
+    if (song.album != null && song.album!.isNotEmpty) {
+      parts.add(song.album!);
+    }
+
+    // If we have both artist and album, join with bullet
+    // If only one, return it alone
+    // If neither, return a default text
+    if (parts.isEmpty) {
+      return 'Unknown Artist';
+    }
+    return parts.join(' • ');
+  }
+
   Widget _buildSongTile(BuildContext context, Song song) {
     return ListTile(
       leading: _buildAlbumArt(context, song.imageUrl),
@@ -115,7 +135,7 @@ class _SongsPageState extends State<SongsPage> {
         overflow: TextOverflow.ellipsis,
       ),
       subtitle: Text(
-        '${song.artist} • ${song.album}',
+        _buildSubtitle(song),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),

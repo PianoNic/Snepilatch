@@ -81,24 +81,16 @@ class _UserPageState extends State<UserPage> {
           return SingleChildScrollView(
             child: Column(
               children: [
-                const SizedBox(height: 24),
-                _buildProfileAvatar(context),
                 const SizedBox(height: 16),
-                _buildUserInfo(context),
-                const SizedBox(height: 24),
-                _buildActionButtons(context),
-                const SizedBox(height: 32),
+                // Profile section
+                _buildProfileSection(context),
                 // Theme Settings Section
                 ThemeSettings(
                   themeService: widget.spotifyController.themeService,
                 ),
-                const SizedBox(height: 16),
+                // Update Section
                 _buildUpdateSection(context),
-                if (widget.spotifyController.isLoggedIn) ...[
-                  const SizedBox(height: 16),
-                  _buildStatistics(context),
-                ],
-                const SizedBox(height: 32),
+                const SizedBox(height: 16),
               ],
             ),
           );
@@ -106,53 +98,78 @@ class _UserPageState extends State<UserPage> {
       );
   }
 
-  Widget _buildProfileAvatar(BuildContext context) {
-    return CircleAvatar(
-      radius: 60,
-      backgroundColor: Theme.of(context).colorScheme.primary,
-      backgroundImage: widget.spotifyController.userProfileImage != null
-          ? NetworkImage(widget.spotifyController.userProfileImage!)
-          : null,
-      child: widget.spotifyController.userProfileImage == null
-          ? Icon(
-              widget.spotifyController.isLoggedIn ? Icons.account_circle : Icons.person,
-              size: 60,
-              color: Colors.white,
-            )
-          : null,
-    );
-  }
-
-  Widget _buildUserInfo(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          widget.spotifyController.isLoggedIn
-            ? (widget.spotifyController.username ?? 'Spotify User')
-            : 'Not Logged In',
-          style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
+  Widget _buildProfileSection(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.all(16),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Profile',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 40,
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  backgroundImage: widget.spotifyController.userProfileImage != null
+                      ? NetworkImage(widget.spotifyController.userProfileImage!)
+                      : null,
+                  child: widget.spotifyController.userProfileImage == null
+                      ? Icon(
+                          widget.spotifyController.isLoggedIn ? Icons.account_circle : Icons.person,
+                          size: 40,
+                          color: Colors.white,
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.spotifyController.isLoggedIn
+                          ? (widget.spotifyController.username ?? 'Spotify User')
+                          : 'Not Logged In',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.spotifyController.isLoggedIn
+                          ? 'Connected to Spotify'
+                          : 'Sign in to access your music',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 16),
+            _buildActionButtons(context),
+          ],
         ),
-        const SizedBox(height: 4),
-        Text(
-          widget.spotifyController.isLoggedIn
-            ? 'Connected to Spotify'
-            : 'Sign in to access your music',
-          style: TextStyle(
-            fontSize: 16,
-            color: Colors.grey[600],
-          ),
-        ),
-      ],
+      ),
     );
   }
 
   Widget _buildActionButtons(BuildContext context) {
     if (!widget.spotifyController.isLoggedIn) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32.0),
+      return SizedBox(
+        width: double.infinity,
         child: ElevatedButton.icon(
           onPressed: () => widget.spotifyController.navigateToLogin(),
           icon: const Icon(Icons.login),
@@ -166,11 +183,11 @@ class _UserPageState extends State<UserPage> {
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32.0),
-      child: Column(
-        children: [
-          ElevatedButton.icon(
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
             onPressed: () => widget.spotifyController.openWebView(),
             icon: const Icon(Icons.open_in_browser),
             label: const Text('Open Spotify Web'),
@@ -180,8 +197,11 @@ class _UserPageState extends State<UserPage> {
               foregroundColor: Colors.white,
             ),
           ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
             onPressed: () => widget.spotifyController.logout(),
             icon: const Icon(Icons.logout),
             label: const Text('Logout'),
@@ -190,98 +210,68 @@ class _UserPageState extends State<UserPage> {
               foregroundColor: Colors.red,
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatistics(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        _buildStatCard(context, '256', 'Songs'),
-        _buildStatCard(context, '12', 'Playlists'),
-        _buildStatCard(context, '48', 'Following'),
-      ],
-    );
-  }
-
-  Widget _buildStatCard(BuildContext context, String count, String label) {
-    return Column(
-      children: [
-        Text(
-          count,
-          style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey[600],
-          ),
         ),
       ],
     );
   }
 
   Widget _buildUpdateSection(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 32.0),
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'App Version',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    return Card(
+      margin: const EdgeInsets.all(16),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'App Updates',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Version',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _appVersion.isEmpty ? 'Loading...' : 'v$_appVersion',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                    const SizedBox(height: 4),
+                    Text(
+                      _appVersion.isEmpty ? 'Loading...' : 'v$_appVersion',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              ElevatedButton.icon(
-                onPressed: _isCheckingUpdate ? null : _checkForUpdates,
-                icon: _isCheckingUpdate
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
-                    : const Icon(Icons.system_update, size: 18),
-                label: Text(_isCheckingUpdate ? 'Checking...' : 'Check for Updates'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  ],
                 ),
-              ),
-            ],
-          ),
-        ],
+                ElevatedButton.icon(
+                  onPressed: _isCheckingUpdate ? null : _checkForUpdates,
+                  icon: _isCheckingUpdate
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Icon(Icons.system_update, size: 18),
+                  label: Text(_isCheckingUpdate ? 'Checking...' : 'Check for Updates'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

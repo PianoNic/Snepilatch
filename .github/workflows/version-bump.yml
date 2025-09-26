@@ -85,7 +85,6 @@ jobs:
 
             ### 📦 What's included:
             - Android APK (for sideloading)
-            - Android AAB (for Google Play Store)
 
             ### 📋 How to install:
             **Android**: Download the APK file and install it on your device

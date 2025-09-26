@@ -12,7 +12,11 @@
       "Read(//f/Coding/schuly/.github/workflows/**)",
       "Read(//f/Coding/schuly/.github/**)",
       "Bash(cat:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Read(//f/Coding/schuly/**)",
+      "Bash(dart run flutter_launcher_icons:*)",
+      "Bash(flutter build:*)",
+      "Read(//f/Coding/Snepilatch/**)"
     ],
     "deny": [],
     "ask": []

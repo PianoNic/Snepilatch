@@ -4,6 +4,7 @@ import 'package:audio_service/audio_service.dart';
 import 'controllers/spotify_controller.dart';
 import 'screens/main_screen.dart';
 import 'services/audio_handler_service.dart';
+import 'widgets/app_update_dialog.dart';
 
 late AudioHandler audioHandler;
 
@@ -28,13 +29,33 @@ void main() async {
     ),
   );
 
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
-  MyApp({super.key});
+class MyApp extends StatefulWidget {
+  const MyApp({super.key});
 
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
   final SpotifyController spotifyController = SpotifyController();
+
+  @override
+  void initState() {
+    super.initState();
+    _checkForUpdates();
+  }
+
+  void _checkForUpdates() {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await Future.delayed(const Duration(seconds: 2));
+      if (mounted) {
+        await AppUpdateDialog.showIfAvailable(context);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +69,7 @@ class MyApp extends StatelessWidget {
           themeMode: spotifyController.themeService.themeMode,
           home: MainScreen(spotifyController: spotifyController),
           debugShowCheckedModeBanner: false,
+          navigatorKey: GlobalKey<NavigatorState>(),
         );
       },
     );

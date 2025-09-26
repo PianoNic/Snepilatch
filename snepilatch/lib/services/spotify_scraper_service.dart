@@ -232,8 +232,16 @@ class SpotifyScraperService {
       var profileImage = profileImageMatch?.group(1)?.trim();
 
       // Convert to high quality image URL if it's a Spotify CDN image
-      if (profileImage != null && profileImage.contains('ab67616d00004851')) {
-        profileImage = profileImage.replaceAll('ab67616d00004851', 'ab67616d00001e02');
+      if (profileImage != null) {
+        // Handle album art format
+        if (profileImage.contains('ab67616d00004851')) {
+          profileImage = profileImage.replaceAll('ab67616d00004851', 'ab67616d00001e02');
+        }
+        // Handle profile picture format - convert to high-res
+        // ab67757000003b82 -> ab6775700000ee85 for high-res profile images
+        if (profileImage.contains('ab67757000003b82')) {
+          profileImage = profileImage.replaceAll('ab67757000003b82', 'ab6775700000ee85');
+        }
       }
 
       return User(

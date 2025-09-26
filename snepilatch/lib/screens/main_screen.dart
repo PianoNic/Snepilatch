@@ -244,11 +244,34 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                 label: 'Search',
               ),
               NavigationDestination(
-                icon: Icon(
-                  Icons.person_outline,
-                  color: _selectedIndex == 3 ? primaryColor : Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-                selectedIcon: Icon(Icons.person, color: primaryColor),
+                icon: widget.spotifyController.isLoggedIn &&
+                      widget.spotifyController.userProfileImage != null
+                    ? CircleAvatar(
+                        radius: 12,
+                        backgroundImage: NetworkImage(widget.spotifyController.userProfileImage!),
+                        backgroundColor: _selectedIndex == 3 ? primaryColor : Theme.of(context).colorScheme.onSurfaceVariant,
+                      )
+                    : Icon(
+                        Icons.person_outline,
+                        color: _selectedIndex == 3 ? primaryColor : Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                selectedIcon: widget.spotifyController.isLoggedIn &&
+                             widget.spotifyController.userProfileImage != null
+                    ? Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: primaryColor,
+                            width: 2,
+                          ),
+                        ),
+                        child: CircleAvatar(
+                          radius: 12,
+                          backgroundImage: NetworkImage(widget.spotifyController.userProfileImage!),
+                          backgroundColor: primaryColor,
+                        ),
+                      )
+                    : Icon(Icons.person, color: primaryColor),
                 label: 'Profile',
               ),
             ],

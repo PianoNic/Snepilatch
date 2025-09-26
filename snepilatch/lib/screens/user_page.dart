@@ -3,6 +3,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../controllers/spotify_controller.dart';
 import '../widgets/theme_settings.dart';
 import '../widgets/app_update_dialog.dart';
+import '../pages/release_notes_page.dart';
 import '../services/update_service.dart';
 
 class UserPage extends StatefulWidget {
@@ -230,27 +231,31 @@ class _UserPageState extends State<UserPage> {
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Version',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Version',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _appVersion.isEmpty ? 'Loading...' : 'v$_appVersion',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                      const SizedBox(height: 4),
+                      Text(
+                        _appVersion.isEmpty ? 'Loading...' : 'v$_appVersion',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 ElevatedButton.icon(
                   onPressed: _isCheckingUpdate ? null : _checkForUpdates,
                   icon: _isCheckingUpdate
@@ -263,12 +268,30 @@ class _UserPageState extends State<UserPage> {
                           ),
                         )
                       : const Icon(Icons.system_update, size: 18),
-                  label: Text(_isCheckingUpdate ? 'Checking...' : 'Check for Updates'),
+                  label: Text(_isCheckingUpdate ? 'Checking...' : 'Updates'),
                   style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const ReleaseNotesPage(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.notes, size: 18),
+                label: const Text('Release Notes'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
+              ),
             ),
           ],
         ),

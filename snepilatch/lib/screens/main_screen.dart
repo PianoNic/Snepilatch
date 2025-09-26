@@ -324,19 +324,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
           ),
         ];
       case 3: // Profile page
-        return [
-          IconButton(
-            onPressed: () {
-              // Settings
-              widget.spotifyController.openWebView();
-            },
-            icon: Icon(
-              Icons.settings_outlined,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-            tooltip: 'Settings',
-          ),
-        ];
+        return null;
       default:
         return null;
     }

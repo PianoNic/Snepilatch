@@ -63,7 +63,7 @@ jobs:
 
       - name: Generate app icons
         working-directory: ./snepilatch
-        run: dart run flutter_launcher_icons || echo "No flutter_launcher_icons configured"
+        run: dart run flutter_launcher_icons -f flutter_launcher_icons-prod.yaml
 
       - name: Build Android APK
         working-directory: ./snepilatch
@@ -71,6 +71,7 @@ jobs:
           SENTRY_DSN: ${{ vars.SENTRY_URL }}
         run: |
           flutter build apk --release \
+            --flavor prod \
             --build-name="${{ github.ref_name }}" \
             --build-number="${{ github.run_number }}" \
             --dart-define=SENTRY_DSN="$SENTRY_DSN" \
@@ -81,7 +82,7 @@ jobs:
         working-directory: ./snepilatch
         run: |
           mkdir -p artifacts
-          cp build/app/outputs/flutter-apk/app-release.apk artifacts/snepilatch-${{ github.ref_name }}.apk
+          cp build/app/outputs/flutter-apk/app-prod-release.apk artifacts/snepilatch-${{ github.ref_name }}.apk
 
       - name: Upload Android artifacts
         uses: actions/upload-artifact@v4

@@ -21,6 +21,9 @@ class SpotifyController extends ChangeNotifier {
   Timer? _scrapingTimer;
   Timer? _progressTimer;
   String? _lastAlbumArt;
+  String? _lastNotifiedTrack;
+  String? _lastNotifiedArtist;
+  bool? _lastNotifiedIsPlaying;
   VoidCallback? onLogout;
 
   SpotifyController() {
@@ -51,7 +54,30 @@ class SpotifyController extends ChangeNotifier {
     if (audioHandler is SpotifyAudioHandler) {
       final handler = audioHandler as SpotifyAudioHandler;
 
-      // Update media item
+      // Only update notification if there are significant changes
+      bool shouldUpdateNotification = false;
+
+      // Check if track info changed (ignore null values)
+      if (newState.currentTrack != null &&
+          (newState.currentTrack != _lastNotifiedTrack ||
+           newState.currentArtist != _lastNotifiedArtist)) {
+        shouldUpdateNotification = true;
+        _lastNotifiedTrack = newState.currentTrack;
+        _lastNotifiedArtist = newState.currentArtist;
+      }
+
+      // Check if playing state changed
+      if (newState.isPlaying != _lastNotifiedIsPlaying) {
+        shouldUpdateNotification = true;
+        _lastNotifiedIsPlaying = newState.isPlaying;
+      }
+
+      // Only update if there are changes
+      if (!shouldUpdateNotification) {
+        return;
+      }
+
+      // Update media item only if we have valid track info
       if (newState.currentTrack != null) {
         handler.setMediaItem(
           title: newState.currentTrack!,
@@ -59,15 +85,15 @@ class SpotifyController extends ChangeNotifier {
           artUri: newState.currentAlbumArt,
           duration: Duration(milliseconds: newState.durationMs),
         );
-      }
 
-      // Update playback state with like status
-      handler.updatePlaybackState(
-        isPlaying: newState.isPlaying,
-        position: Duration(milliseconds: newState.progressMs),
-        duration: Duration(milliseconds: newState.durationMs),
-        isLiked: newState.isCurrentTrackLiked,
-      );
+        // Update playback state with like status
+        handler.updatePlaybackState(
+          isPlaying: newState.isPlaying,
+          position: Duration(milliseconds: newState.progressMs),
+          duration: Duration(milliseconds: newState.durationMs),
+          isLiked: newState.isCurrentTrackLiked,
+        );
+      }
     }
   }
 

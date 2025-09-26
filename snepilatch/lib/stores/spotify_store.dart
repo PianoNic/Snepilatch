@@ -64,17 +64,27 @@ class SpotifyStore {
           debugPrint('  ▶️ Playing: $isPlaying → ${newState.isPlaying}');
           isPlaying.value = newState.isPlaying;
         }
+        // Don't update track to null if we already have a track (prevents UI flicker)
         if (currentTrack.value != newState.currentTrack) {
-          debugPrint('  🎵 Track: "${currentTrack.value}" → "${newState.currentTrack}"');
-          currentTrack.value = newState.currentTrack;
+          // Only update if new value is not null OR if current value is null
+          if (newState.currentTrack != null || currentTrack.value == null) {
+            debugPrint('  🎵 Track: "${currentTrack.value}" → "${newState.currentTrack}"');
+            currentTrack.value = newState.currentTrack;
+          }
         }
         if (currentArtist.value != newState.currentArtist) {
-          debugPrint('  🎤 Artist: "${currentArtist.value}" → "${newState.currentArtist}"');
-          currentArtist.value = newState.currentArtist;
+          // Only update if new value is not null OR if current value is null
+          if (newState.currentArtist != null || currentArtist.value == null) {
+            debugPrint('  🎤 Artist: "${currentArtist.value}" → "${newState.currentArtist}"');
+            currentArtist.value = newState.currentArtist;
+          }
         }
         if (currentAlbumArt.value != newState.currentAlbumArt) {
-          debugPrint('  🖼️ Album Art updated');
-          currentAlbumArt.value = newState.currentAlbumArt;
+          // Only update if new value is not null OR if current value is null
+          if (newState.currentAlbumArt != null || currentAlbumArt.value == null) {
+            debugPrint('  🖼️ Album Art updated');
+            currentAlbumArt.value = newState.currentAlbumArt;
+          }
         }
         if (isCurrentTrackLiked.value != newState.isCurrentTrackLiked) {
           debugPrint('  ❤️ Liked: $isCurrentTrackLiked → ${newState.isCurrentTrackLiked}');

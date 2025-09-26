@@ -36,5 +36,8 @@
 This project is licensed under the MIT License.
 See the [LICENSE](https://github.com/Pianonic/snepilatch/blob/main/LICENSE) file for more details.
 
+## Discord Support
+https://discord.gg/NJxKMSNYRG
+
 ---
 <p align="center">Made with ❤️ by <a href="https://github.com/Pianonic">Pianonic</a></p>

@@ -36,7 +36,7 @@
 This project is licensed under the MIT License.
 See the [LICENSE](https://github.com/Pianonic/snepilatch/blob/main/LICENSE) file for more details.
 
-## Discord Support
+## Discord Server
 https://discord.gg/NJxKMSNYRG
 
 ---

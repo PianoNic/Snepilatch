@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Read(//d/Schuly/**)",
+      "Bash(flutter pub:*)",
+      "Bash(flutter analyze:*)"
     ],
     "deny": [],
     "ask": []

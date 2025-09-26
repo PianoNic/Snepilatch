@@ -22,6 +22,8 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> with TickerProviderStat
   double _dragOffset = 0;
   double? _draggedProgress;
   bool _isDraggingSlider = false;
+  late AnimationController _snapBackController;
+  late Animation<double> _snapBackAnimation;
 
   // For text scrolling animation
   late AnimationController _scrollController;
@@ -35,6 +37,25 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> with TickerProviderStat
       duration: const Duration(seconds: 6),
       vsync: this,
     );
+
+    _snapBackController = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+
+    _snapBackAnimation = Tween<double>(
+      begin: 0,
+      end: 0,
+    ).animate(CurvedAnimation(
+      parent: _snapBackController,
+      curve: Curves.easeOut,
+    ));
+
+    _snapBackAnimation.addListener(() {
+      setState(() {
+        _dragOffset = _snapBackAnimation.value;
+      });
+    });
 
     // Loop the animation
     _scrollController.addStatusListener((status) {
@@ -59,6 +80,7 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> with TickerProviderStat
   @override
   void dispose() {
     _scrollController.dispose();
+    _snapBackController.dispose();
     widget.spotifyController.removeListener(_onTrackChanged);
     super.dispose();
   }
@@ -124,24 +146,38 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> with TickerProviderStat
     }
   }
 
+
   void _handleDragUpdate(DragUpdateDetails details) {
-    // Allow dragging down to close
-    if (details.delta.dy > 0) {
-      setState(() {
-        _dragOffset = (_dragOffset + details.delta.dy).clamp(0, double.infinity);
-      });
-    }
+    setState(() {
+      double newOffset = _dragOffset + details.delta.dy;
+
+      // Apply elastic resistance when dragging up (negative values)
+      if (newOffset < 0) {
+        // Reduce the drag effect when going up - elastic resistance
+        newOffset = newOffset * 0.3;
+        // Clamp to prevent excessive overdrag
+        newOffset = newOffset.clamp(-50, 0);
+      }
+
+      _dragOffset = newOffset;
+    });
   }
 
   void _handleDragEnd(DragEndDetails details) {
     if (_dragOffset > 100 || details.velocity.pixelsPerSecond.dy > 300) {
-      // Close if dragged far enough or with enough velocity
+      // Close if dragged down far enough or with enough velocity
       widget.onClose();
     } else {
-      // Snap back
-      setState(() {
-        _dragOffset = 0;
-      });
+      // Animate snap back to original position
+      _snapBackAnimation = Tween<double>(
+        begin: _dragOffset,
+        end: 0,
+      ).animate(CurvedAnimation(
+        parent: _snapBackController,
+        curve: Curves.elasticOut,
+      ));
+
+      _snapBackController.forward(from: 0);
     }
   }
 
@@ -155,7 +191,7 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> with TickerProviderStat
         widget.spotifyController,
       ]),
       builder: (context, child) {
-        // Slide up from bottom animation
+        // Slide up from bottom animation with drag offset
         final slideOffset = Offset(0, (1 - widget.animation.value) * screenHeight + _dragOffset);
 
         return Positioned.fill(
@@ -179,7 +215,7 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> with TickerProviderStat
                     onVerticalDragUpdate: _handleDragUpdate,
                     onVerticalDragEnd: _handleDragEnd,
                     child: Column(
-                    children: [
+                      children: [
                       // Draggable header with handle bar
                       _buildHeader(context),
                       // Content - no scrolling, everything fits on one page
@@ -214,8 +250,8 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> with TickerProviderStat
               ),
             ),
           ),
-          ),
-        );
+        ),
+      );
       },
     );
   }

@@ -23,6 +23,15 @@
 - **Open Source**: Full transparency and community-driven development.
 - **Android Native**: Optimized performance and experience on Android devices.
 
+## 📱 Screenshots
+
+<p align="center">
+  <img src="./assets/screenshot_home.PNG" width="200" alt="Home Screen">
+  <img src="./assets/screenshot_player.PNG" width="200" alt="Music Player">
+  <img src="./assets/screenshot_search.PNG" width="200" alt="Search">
+  <img src="./assets/screenshot_library.PNG" width="200" alt="Library">
+</p>
+
 ## 📜 License
 This project is licensed under the MIT License.
 See the [LICENSE](https://github.com/Pianonic/snepilatch/blob/main/LICENSE) file for more details.

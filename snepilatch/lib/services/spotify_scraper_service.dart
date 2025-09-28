@@ -4,14 +4,16 @@ import '../models/playback_state.dart';
 import '../models/user.dart';
 import '../models/song.dart';
 import '../models/search_result.dart';
+import '../models/homepage_item.dart';
 
 class SpotifyScraperService {
-  // JavaScript functions are loaded from assets/js/spotify-scraper.js
+  // JavaScript functions are loaded from assets/js/spotify-scraper.js and spotify-homepage.js
   // Functions injected into window:
   // - window.getPlayingInfo() - Returns playback state as JSON
   // - window.getUserInfo() - Returns user info as JSON
   // - window.getSongs() - Returns song list as JSON
   // - window.getSearchResults() - Returns search results as JSON
+  // - window.getHomepageSections() - Returns homepage sections as JSON
 
   // Parse playback info from JavaScript response using proper JSON
   static PlaybackState? parsePlaybackInfo(String jsonString) {
@@ -65,6 +67,17 @@ class SpotifyScraperService {
       }).toList();
     } catch (e) {
       debugPrint('Error parsing search results: $e');
+      return [];
+    }
+  }
+
+  // Parse homepage sections from JavaScript response using proper JSON
+  static List<HomepageSection> parseHomepageSections(String jsonString) {
+    try {
+      final List<dynamic> jsonList = jsonDecode(jsonString);
+      return jsonList.map((json) => HomepageSection.fromJson(json)).toList();
+    } catch (e) {
+      debugPrint('Error parsing homepage sections: $e');
       return [];
     }
   }

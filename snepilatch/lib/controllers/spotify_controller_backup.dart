@@ -7,7 +7,6 @@ import '../models/song.dart';
 import '../models/playback_state.dart' as app_models;
 import '../models/search_result.dart';
 import '../models/user.dart';
-import '../models/homepage_item.dart';
 import '../services/webview_service.dart';
 import '../services/spotify_scraper_service.dart';
 import '../services/spotify_actions_service.dart';
@@ -130,7 +129,6 @@ class SpotifyController extends ChangeNotifier {
   bool get isLoadingSongs => store.isLoadingSongs.value;
   bool get isCurrentTrackLiked => store.isCurrentTrackLiked.value;
   bool get debugWebViewVisible => _debugWebViewVisible;
-  List<HomepageSection> get homepageSections => store.homepageSections.value;
   String get shuffleMode => store.shuffleMode.value.value;
   String get repeatMode => store.repeatMode.value.value;
   String get currentTime => store.currentTime.value;
@@ -280,13 +278,8 @@ class SpotifyController extends ChangeNotifier {
         'window.getUserInfo()'
       );
 
-      final homepageResult = await _webViewService.runJavascriptWithResult(
-        'window.getHomepageSections ? window.getHomepageSections() : "[]"'
-      );
-
       app_models.PlaybackState? newState;
       User? newUser;
-      List<HomepageSection>? newHomepageSections;
 
       // Parse playback info using proper JSON parsing
       if (playbackResult != null && playbackResult != 'null') {
@@ -298,15 +291,6 @@ class SpotifyController extends ChangeNotifier {
       if (userResult != null && userResult != 'null') {
         final String jsonString = userResult.toString();
         newUser = SpotifyScraperService.parseUserInfo(jsonString);
-      }
-
-      // Parse homepage sections
-      if (homepageResult != null && homepageResult != 'null' && homepageResult != '[]') {
-        final String jsonString = homepageResult.toString();
-        newHomepageSections = SpotifyScraperService.parseHomepageSections(jsonString);
-        if (newHomepageSections != null && newHomepageSections.isNotEmpty) {
-          store.homepageSections.value = newHomepageSections;
-        }
       }
 
       // Update store with all values at once
@@ -827,45 +811,6 @@ class SpotifyController extends ChangeNotifier {
       // After scrolling, update tracks if new ones are loaded
       await Future.delayed(const Duration(milliseconds: 800));
       await updateTracksFromController();
-    }
-  }
-
-  // Homepage item methods
-  Future<void> playHomepageItem(String itemId, String itemType) async {
-    debugPrint('🎵 Playing homepage item: $itemId (type: $itemType)');
-
-    // Escape quotes in itemId to prevent JavaScript errors
-    final escapedItemId = itemId.replaceAll('"', '\\"').replaceAll("'", "\\'");
-    final escapedItemType = itemType.replaceAll('"', '\\"').replaceAll("'", "\\'");
-
-    final result = await _webViewService.runJavascriptWithResult(
-      'window.playHomepageItem && window.playHomepageItem("$escapedItemId", "$escapedItemType")'
-    );
-
-    if (result == 'true' || result == true) {
-      debugPrint('✅ Successfully triggered play for homepage item');
-      // Force scrape after a short delay to get updated playback info
-      Future.delayed(const Duration(milliseconds: 1000), () {
-        _scrapeAllInfo();
-      });
-    } else {
-      debugPrint('⚠️ Failed to play homepage item');
-    }
-  }
-
-  Future<void> navigateToHomepageItem(String href) async {
-    debugPrint('🔗 Navigating to homepage item: $href');
-
-    final result = await _webViewService.runJavascriptWithResult(
-      'window.navigateToHomepageItem && window.navigateToHomepageItem("$href")'
-    );
-
-    if (result == 'true' || result == true) {
-      debugPrint('✅ Successfully navigated to homepage item');
-      // Give time for navigation to complete
-      await Future.delayed(const Duration(milliseconds: 1000));
-    } else {
-      debugPrint('⚠️ Failed to navigate to homepage item');
     }
   }
 

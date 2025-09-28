@@ -357,7 +357,7 @@ class SpotifyController extends ChangeNotifier {
       if (homepageResult != null && homepageResult != 'null' && homepageResult != '[]') {
         final String jsonString = homepageResult.toString();
         newHomepageSections = SpotifyScraperService.parseHomepageSections(jsonString);
-        if (newHomepageSections != null && newHomepageSections.isNotEmpty) {
+        if (newHomepageSections.isNotEmpty) {
           store.homepageSections.value = newHomepageSections;
         }
       }

@@ -12,7 +12,6 @@ class SongsPage extends StatefulWidget {
 
 class _SongsPageState extends State<SongsPage> {
   final ScrollController _scrollController = ScrollController();
-  bool _hasNavigated = false;
   DateTime? _lastSyncTime;
   double _lastSyncPercentage = 0;
 
@@ -20,16 +19,6 @@ class _SongsPageState extends State<SongsPage> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Navigate to liked songs when tab becomes visible
-    if (!_hasNavigated && widget.spotifyController.isInitialized) {
-      _hasNavigated = true;
-      widget.spotifyController.navigateToLikedSongs();
-    }
   }
 
   void _onScroll() {
@@ -218,6 +207,10 @@ class _SongsPageState extends State<SongsPage> {
               child: Image.network(
                 imageUrl,
                 fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return const Icon(Icons.music_note, size: 24);
+                },
                 errorBuilder: (context, error, stackTrace) {
                   return const Icon(Icons.music_note);
                 },

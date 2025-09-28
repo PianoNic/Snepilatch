@@ -15,6 +15,24 @@ class _SearchPageState extends State<SearchPage> {
   List<SearchResult> _searchResults = [];
   bool _isSearching = false;
 
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  void _onSearchChanged() {
+    final query = _searchController.text;
+    if (query.isNotEmpty) {
+      // Debounce search to avoid too many requests
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (_searchController.text == query) {
+          _performSearch(query);
+        }
+      });
+    }
+  }
+
   Future<void> _performSearch(String query) async {
     if (query.isEmpty) return;
 
@@ -22,6 +40,10 @@ class _SearchPageState extends State<SearchPage> {
       _isSearching = true;
     });
 
+    // First, type in the Spotify search box
+    await widget.spotifyController.typeInSearchBox(query);
+
+    // Then get the results
     final results = await widget.spotifyController.searchAndGetResults(query);
 
     setState(() {
@@ -98,20 +120,71 @@ class _SearchPageState extends State<SearchPage> {
       itemBuilder: (context, index) {
         final result = _searchResults[index];
         return ListTile(
-          leading: CircleAvatar(
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            child: const Icon(Icons.music_note, color: Colors.white),
+          leading: _buildAlbumArt(context, result.imageUrl),
+          title: Text(
+            result.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          title: Text(result.title),
-          subtitle: Text(result.artist),
-          trailing: IconButton(
-            icon: const Icon(Icons.play_arrow),
-            onPressed: () => widget.spotifyController.playTrackAtIndex(result.index),
+          subtitle: Text(
+            result.artist,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          onTap: () => widget.spotifyController.playTrackAtIndex(result.index),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (result.duration != null && result.duration!.isNotEmpty)
+                Text(
+                  result.duration!,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              IconButton(
+                icon: const Icon(Icons.play_arrow),
+                onPressed: () => _playSearchResult(result.index),
+              ),
+            ],
+          ),
+          onTap: () => _playSearchResult(result.index),
         );
       },
     );
+  }
+
+  Widget _buildAlbumArt(BuildContext context, String? imageUrl) {
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(4),
+        color: Theme.of(context).colorScheme.primaryContainer,
+      ),
+      child: imageUrl != null && imageUrl.isNotEmpty
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                headers: const {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                  'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+                  'Referer': 'https://open.spotify.com/',
+                },
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return const Icon(Icons.music_note, size: 24);
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  return const Icon(Icons.music_note);
+                },
+              ),
+            )
+          : const Icon(Icons.music_note),
+    );
+  }
+
+  Future<void> _playSearchResult(int index) async {
+    await widget.spotifyController.playSearchResultAtIndex(index);
   }
 
   @override

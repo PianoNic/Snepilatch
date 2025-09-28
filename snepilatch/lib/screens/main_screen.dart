@@ -79,6 +79,16 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     setState(() {
       _selectedIndex = index;
     });
+
+    // Handle navigation for specific tabs
+    switch (index) {
+      case 1: // Songs/Library page
+        widget.spotifyController.navigateToLikedSongs();
+        break;
+      case 2: // Search page
+        widget.spotifyController.navigateToSearchPage();
+        break;
+    }
   }
 
   @override

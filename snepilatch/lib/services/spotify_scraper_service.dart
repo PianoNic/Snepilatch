@@ -47,11 +47,22 @@ class SpotifyScraperService {
   static List<SearchResult> parseSearchResults(String jsonString) {
     try {
       final List<dynamic> jsonList = jsonDecode(jsonString);
-      return jsonList.map((json) => SearchResult(
-        title: json['title'] ?? '',
-        artist: json['artist'] ?? '',
-        index: json['index'] ?? 0,
-      )).toList();
+      return jsonList.map((json) {
+        // Convert low-quality image to high-quality like the Song model does
+        String? imageUrl = json['imageUrl']?.toString() ?? json['image']?.toString();
+        if (imageUrl != null && imageUrl.contains('ab67616d00004851')) {
+          imageUrl = imageUrl.replaceAll('ab67616d00004851', 'ab67616d00001e02');
+        }
+
+        return SearchResult(
+          title: json['title'] ?? '',
+          artist: json['artist'] ?? '',
+          album: json['album'],
+          imageUrl: imageUrl,
+          duration: json['duration']?.toString(),
+          index: json['index'] ?? 0,
+        );
+      }).toList();
     } catch (e) {
       debugPrint('Error parsing search results: $e');
       return [];

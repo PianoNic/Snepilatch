@@ -116,21 +116,138 @@
         return false;
     };
 
-    // Inject search function into window
-    window.spotifySearch = function(query) {
-        const searchButton = document.querySelector('[href="/search"]');
-        if (searchButton) {
-            searchButton.click();
-            setTimeout(() => {
-                const searchInput = document.querySelector('input[data-testid="search-input"]');
-                if (searchInput) {
-                    searchInput.value = query;
-                    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    searchInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
-                }
-            }, 500);
+    // Inject navigation to search page
+    window.spotifyNavigateToSearch = function() {
+        const currentUrl = window.location.href;
+        console.log('Current URL: ' + currentUrl);
+
+        // Check if we're already on the search page
+        if (currentUrl.includes('/search')) {
+            console.log('Already on Search page');
             return true;
         }
+
+        // Method 1: Try to use Spotify's internal navigation via history API
+        try {
+            // Use Spotify's SPA navigation
+            const history = window.history;
+            const searchUrl = 'https://open.spotify.com/search';
+
+            // Push state without reload
+            history.pushState({}, '', searchUrl);
+
+            // Trigger a popstate event to let Spotify's router handle it
+            const popstateEvent = new PopStateEvent('popstate', { state: {} });
+            window.dispatchEvent(popstateEvent);
+
+            console.log('Triggered SPA navigation to Search');
+
+            // Give it a moment to see if it works
+            setTimeout(() => {
+                // Check if we're still not on the page, then try clicking
+                if (!window.location.href.includes('/search')) {
+                    tryClickSearchNavigation();
+                }
+            }, 500);
+
+            return 'spa_navigation';
+        } catch (err) {
+            console.log('SPA navigation failed, trying click method');
+        }
+
+        // Fallback - try SPA navigation even if main method failed
+        function tryClickSearchNavigation() {
+            // Method 1: Direct search link with SPA approach
+            const searchLink = document.querySelector('a[href="/search"]');
+            if (searchLink) {
+                console.log('Found search link, using SPA navigation fallback');
+                try {
+                    const history = window.history;
+                    const searchUrl = 'https://open.spotify.com/search';
+                    history.pushState({}, '', searchUrl);
+                    const popstateEvent = new PopStateEvent('popstate', { state: {} });
+                    window.dispatchEvent(popstateEvent);
+                    return true;
+                } catch (e) {
+                    console.log('SPA fallback failed, clicking as last resort');
+                    searchLink.click();
+                    return true;
+                }
+            }
+
+            // Method 2: Try the browse button (when already on search page) - click only
+            const browseButton = document.querySelector('button[data-testid="browse-button"]');
+            if (browseButton) {
+                browseButton.click();
+                console.log('Clicked browse button');
+                return true;
+            }
+
+            // Method 3: Find search in navigation by icon or aria-label - click only
+            const navSearchButton = document.querySelector('nav button[aria-label*="Search"], nav button[aria-label*="search"], nav button[aria-label*="Suche"]');
+            if (navSearchButton) {
+                navSearchButton.click();
+                console.log('Clicked nav search button as last resort');
+                return true;
+            }
+
+            console.log('Could not find search navigation element');
+            return false;
+        }
+
+        return tryClickSearchNavigation();
+    };
+
+    // Inject search function into window
+    window.spotifySearch = function(query) {
+        // Wait for search page to load if needed
+        const checkAndSearch = () => {
+            const searchInput = document.querySelector('input[data-testid="search-input"]');
+            if (searchInput) {
+                // Clear existing value
+                searchInput.value = '';
+                searchInput.focus();
+
+                // Type the query
+                searchInput.value = query;
+
+                // Trigger input event
+                const inputEvent = new Event('input', { bubbles: true });
+                searchInput.dispatchEvent(inputEvent);
+
+                // Also trigger change event
+                const changeEvent = new Event('change', { bubbles: true });
+                searchInput.dispatchEvent(changeEvent);
+
+                // Optionally trigger Enter key
+                setTimeout(() => {
+                    const enterEvent = new KeyboardEvent('keydown', {
+                        key: 'Enter',
+                        keyCode: 13,
+                        bubbles: true
+                    });
+                    searchInput.dispatchEvent(enterEvent);
+                }, 100);
+
+                console.log('Search query entered: ' + query);
+                return true;
+            }
+            return false;
+        };
+
+        // Try immediately
+        if (checkAndSearch()) {
+            return true;
+        }
+
+        // If not found, navigate to search first
+        if (window.spotifyNavigateToSearch()) {
+            setTimeout(() => {
+                checkAndSearch();
+            }, 1000);
+            return true;
+        }
+
         return false;
     };
 
@@ -203,42 +320,115 @@
 
     // Inject open liked songs function into window
     window.spotifyOpenLikedSongs = function() {
-        // Find the Liked Songs element by various methods
-        let likedSongsElement = null;
+        const currentUrl = window.location.href;
+        console.log('Current URL: ' + currentUrl);
 
-        // Method 1: Find by aria-labelledby
-        likedSongsElement = document.querySelector('[aria-labelledby="listrow-title-spotify:collection:tracks"]');
-
-        // Method 2: Find by the liked songs image
-        if (!likedSongsElement) {
-            const likedSongsImage = document.querySelector('img[src*="liked-songs-64.png"], img[src*="liked-songs-300.png"], img[src*="liked-songs-640.png"]');
-            if (likedSongsImage) {
-                likedSongsElement = likedSongsImage.closest('a, [role="gridcell"], div[data-testid]');
-            }
-        }
-
-        // Method 3: Find by link href
-        if (!likedSongsElement) {
-            likedSongsElement = document.querySelector('a[href="/collection/tracks"]');
-        }
-
-        // Method 4: Find by text content
-        if (!likedSongsElement) {
-            const elements = document.querySelectorAll('a, div[role="gridcell"]');
-            for (const el of elements) {
-                if (el.textContent && (el.textContent.includes('Lieblingssongs') || el.textContent.includes('Liked Songs'))) {
-                    likedSongsElement = el;
-                    break;
-                }
-            }
-        }
-
-        if (likedSongsElement) {
-            likedSongsElement.click();
+        // Check if we're already on the liked songs page
+        if (currentUrl.includes('/collection/tracks')) {
+            console.log('Already on Liked Songs page');
             return true;
         }
 
-        return false;
+        // Method 1: Try to use Spotify's internal navigation via history API
+        try {
+            // Use Spotify's SPA navigation
+            const history = window.history;
+            const likedSongsUrl = 'https://open.spotify.com/collection/tracks';
+
+            // Push state without reload
+            history.pushState({}, '', likedSongsUrl);
+
+            // Trigger a popstate event to let Spotify's router handle it
+            const popstateEvent = new PopStateEvent('popstate', { state: {} });
+            window.dispatchEvent(popstateEvent);
+
+            console.log('Triggered SPA navigation to Liked Songs');
+
+            // Give it a moment to see if it works
+            setTimeout(() => {
+                // Check if we're still not on the page, then try clicking
+                if (!window.location.href.includes('/collection/tracks')) {
+                    tryClickNavigation();
+                }
+            }, 500);
+
+            return 'spa_navigation';
+        } catch (err) {
+            console.log('SPA navigation failed, trying click method');
+        }
+
+        // Fallback - use SPA navigation for library/liked songs
+        function tryClickNavigation() {
+            // First ensure we're on library page using SPA navigation
+            if (!currentUrl.includes('/collection')) {
+                const libraryLink = document.querySelector('a[href="/collection/playlists"], a[href="/collection"], nav a[aria-label*="library"], nav a[aria-label*="Library"], nav a[aria-label*="Bibliothek"]');
+                if (libraryLink) {
+                    console.log('Navigating to library first using SPA...');
+                    try {
+                        const history = window.history;
+                        const libraryUrl = 'https://open.spotify.com/collection/playlists';
+                        history.pushState({}, '', libraryUrl);
+                        const popstateEvent = new PopStateEvent('popstate', { state: {} });
+                        window.dispatchEvent(popstateEvent);
+
+                        // After navigating to library, schedule navigation to liked songs
+                        setTimeout(() => {
+                            const likedSongsUrl = 'https://open.spotify.com/collection/tracks';
+                            history.pushState({}, '', likedSongsUrl);
+                            window.dispatchEvent(new PopStateEvent('popstate', { state: {} }));
+                        }, 500);
+
+                        return 'navigating_to_library';
+                    } catch (e) {
+                        console.log('SPA navigation to library failed, using click as last resort');
+                        libraryLink.click();
+                        return 'navigating_to_library';
+                    }
+                }
+            }
+
+            // If we're already on library page, navigate directly to liked songs
+            try {
+                console.log('Navigating directly to Liked Songs using SPA...');
+                const history = window.history;
+                const likedSongsUrl = 'https://open.spotify.com/collection/tracks';
+                history.pushState({}, '', likedSongsUrl);
+                const popstateEvent = new PopStateEvent('popstate', { state: {} });
+                window.dispatchEvent(popstateEvent);
+                return true;
+            } catch (e) {
+                console.log('Direct SPA navigation failed, trying element click as last resort');
+
+                // Last resort: Find and click the Liked Songs element
+                let likedSongsElement = null;
+
+                // Method 1: Direct link
+                likedSongsElement = document.querySelector('a[href="/collection/tracks"]');
+
+                // Method 2: Find by aria-labelledby
+                if (!likedSongsElement) {
+                    likedSongsElement = document.querySelector('[aria-labelledby="listrow-title-spotify:collection:tracks"]');
+                }
+
+                // Method 3: Find the row with the liked songs image
+                if (!likedSongsElement) {
+                    const likedSongsRow = document.querySelector('div[role="row"][aria-labelledby*="spotify:collection:tracks"]');
+                    if (likedSongsRow) {
+                        likedSongsElement = likedSongsRow.querySelector('div[role="button"], a[href="/collection/tracks"]') || likedSongsRow;
+                    }
+                }
+
+                if (likedSongsElement) {
+                    console.log('Found Liked Songs element, clicking as last resort...');
+                    likedSongsElement.click();
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        return tryClickNavigation();
     };
 
     console.log('Spotify action functions injected into window');

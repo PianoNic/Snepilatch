@@ -3,6 +3,7 @@ class SearchResult {
   final String artist;
   final String? album;
   final String? imageUrl;
+  final String? duration;
   final int index;
 
   SearchResult({
@@ -10,16 +11,18 @@ class SearchResult {
     required this.artist,
     this.album,
     this.imageUrl,
+    this.duration,
     required this.index,
   });
 
-  factory SearchResult.fromMap(Map<String, String> map, int index) {
+  factory SearchResult.fromMap(Map<String, dynamic> map, int index) {
     return SearchResult(
-      title: map['title'] ?? '',
-      artist: map['artist'] ?? '',
-      album: map['album'],
-      imageUrl: map['image'],
-      index: index,
+      title: map['title']?.toString() ?? '',
+      artist: map['artist']?.toString() ?? '',
+      album: map['album']?.toString(),
+      imageUrl: map['imageUrl']?.toString() ?? map['image']?.toString(),
+      duration: map['duration']?.toString(),
+      index: map['index'] ?? index,
     );
   }
 }

@@ -35,7 +35,7 @@ class SpotifyController extends ChangeNotifier {
     debugPrint('🚀 [SpotifyController] Constructor called');
     _injectionMonitor = InjectionMonitorService(_webViewService);
     _startPeriodicScraping();
-    _startProgressAnimation();
+    // Progress animation removed - using scraped values only
     _setupAudioHandler();
   }
 
@@ -166,8 +166,6 @@ class SpotifyController extends ChangeNotifier {
       debugPrint('✅ [SpotifyController] Functions already present, skipping injection');
     }
 
-    final urlString = url?.toString() ?? '';
-
     // Add small delay to ensure JavaScript is fully executed
     await Future.delayed(const Duration(milliseconds: 500));
 
@@ -243,8 +241,8 @@ class SpotifyController extends ChangeNotifier {
     _scrapingTimer?.cancel();
     _scrapingTimer = null;
 
-    debugPrint('✅ [SpotifyController] Starting periodic scraping (every 1 second)');
-    _scrapingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    debugPrint('✅ [SpotifyController] Starting periodic scraping (every 500ms)');
+    _scrapingTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
       if (store.isInitialized.value && !store.showWebView.value) {
         _scrapeAllInfo();
       }
@@ -252,20 +250,7 @@ class SpotifyController extends ChangeNotifier {
   }
 
   void _startProgressAnimation() {
-    // Smooth progress updates every 100ms
-    _progressTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
-      if (store.isPlaying.value && store.durationMs.value > 0) {
-        // Don't update if user is seeking
-        if (!store.isUserControlling.value) {
-          // Increment progress smoothly
-          final newProgress = store.progressMs.value + 100;
-          if (newProgress <= store.durationMs.value) {
-            store.updateProgressSmoothly(newProgress);
-            notifyListeners();
-          }
-        }
-      }
-    });
+    // Removed - using scraped values only
   }
 
   Future<void> _scrapeAllInfo() async {

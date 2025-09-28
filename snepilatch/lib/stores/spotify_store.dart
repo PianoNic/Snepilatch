@@ -36,7 +36,7 @@ class SpotifyStore {
   final ValueNotifier<bool> isUserControlling = ValueNotifier(false);
   DateTime? _lastUserAction;
   DateTime? _lastScrapedTime;
-  int _lastScrapedProgressMs = 0;
+  final int _lastScrapedProgressMs = 0;
 
   /// Batch update all values at once (once per second)
   void batchUpdate(PlaybackState? newState, User? newUser) {

@@ -87,7 +87,7 @@ class _SpotifyWebViewWidgetState extends State<SpotifyWebViewWidget> with Automa
     return Material(
       color: Theme.of(context).colorScheme.surface,
       elevation: 4,
-      child: Container(
+      child: SizedBox(
         height: 56,
         child: Row(
           children: [

@@ -99,8 +99,12 @@ class UpdateService {
       final latestParts = cleanLatest.split('.').map((s) => int.tryParse(s) ?? 0).toList();
 
       // Ensure we have at least 3 parts for comparison
-      while (currentParts.length < 3) currentParts.add(0);
-      while (latestParts.length < 3) latestParts.add(0);
+      while (currentParts.length < 3) {
+        currentParts.add(0);
+      }
+      while (latestParts.length < 3) {
+        latestParts.add(0);
+      }
 
       for (var i = 0; i < 3; i++) {
         if (latestParts[i] > currentParts[i]) {

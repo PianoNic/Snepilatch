@@ -149,23 +149,43 @@
     };
 
     // Inject play track at index function into window
-    window.spotifyPlayTrackAtIndex = function(index) {
-        const songs = document.querySelectorAll('[data-testid="tracklist-row"]');
-        if (songs[index]) {
-            const playButton = songs[index].querySelector('[data-testid="more-button"]');
-            if (playButton) {
-                songs[index].click();
-                setTimeout(() => {
-                    const doubleClick = new MouseEvent('dblclick', {
-                        view: window,
-                        bubbles: true,
-                        cancelable: true
-                    });
-                    songs[index].dispatchEvent(doubleClick);
-                }, 100);
+    window.spotifyPlayTrackAtIndex = function(trackNumber) {
+        // Find track by its actual position number (not array index)
+        const trackRows = document.querySelectorAll('[data-testid="tracklist-row"]');
+        let targetRow = null;
+
+        for (const row of trackRows) {
+            const positionEl = row.querySelector('[aria-colindex="1"] span');
+            if (positionEl) {
+                const position = parseInt(positionEl.textContent.trim());
+                if (position === trackNumber) {
+                    targetRow = row;
+                    break;
+                }
             }
+        }
+
+        if (targetRow) {
+            // Try to find and click the play button first
+            const playButton = targetRow.querySelector('button[aria-label*="abspielen"], button[aria-label*="play"], button[aria-label*="Play"]');
+            if (playButton) {
+                playButton.click();
+                console.log('Clicked play button for track #' + trackNumber);
+                return true;
+            }
+
+            // Fallback: double-click the row to play
+            const doubleClick = new MouseEvent('dblclick', {
+                view: window,
+                bubbles: true,
+                cancelable: true
+            });
+            targetRow.dispatchEvent(doubleClick);
+            console.log('Double-clicked track #' + trackNumber);
             return true;
         }
+
+        console.log('Track #' + trackNumber + ' not found in DOM');
         return false;
     };
 

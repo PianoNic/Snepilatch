@@ -140,6 +140,9 @@ class SpotifyController extends ChangeNotifier {
   // Get current theme hex color
   String? get currentThemeHex => themeService.currentHexColor;
 
+  // WebView flash opacity control
+  final ValueNotifier<double> webViewOpacity = ValueNotifier(0.0);
+
   // Direct access to notifiers for UI binding
   ValueNotifier<bool> get showWebViewNotifier => store.showWebView;
   ValueNotifier<bool> get isLoggedInNotifier => store.isLoggedIn;
@@ -452,6 +455,19 @@ class SpotifyController extends ChangeNotifier {
     }
   }
 
+  Future<void> _flashWebView() async {
+    debugPrint('✨ Flashing WebView to show library loaded');
+
+    // Animate opacity from 0.0 to 1.0
+    webViewOpacity.value = 1.0;
+
+    // Wait for 800ms to let user see the library
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    // Fade back to 0.0
+    webViewOpacity.value = 0.0;
+  }
+
   void setDebugWebViewVisible(bool value) {
     _debugWebViewVisible = value;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -475,9 +491,39 @@ class SpotifyController extends ChangeNotifier {
 
   // Track methods
   Future<void> playTrackAtIndex(int index) async {
-    await _webViewService.runJavascript(
-      SpotifyActionsService.playTrackAtIndexScript(index)
-    );
+    debugPrint('🎵 Attempting to play track #$index');
+
+    // Try multiple times to find and play the track
+    int attempts = 0;
+    const maxAttempts = 5;
+
+    while (attempts < maxAttempts) {
+      // Scroll to the track
+      await syncScrollToTrackIndex(index);
+
+      // Wait for scroll and DOM update
+      await Future.delayed(Duration(milliseconds: attempts == 0 ? 300 : 600));
+
+      // Try to play the track
+      final result = await _webViewService.runJavascriptWithResult(
+        SpotifyActionsService.playTrackAtIndexScript(index)
+      );
+
+      // Check if successful
+      if (result == 'true') {
+        debugPrint('✅ Successfully played track #$index on attempt ${attempts + 1}');
+        break;
+      }
+
+      attempts++;
+      if (attempts < maxAttempts) {
+        debugPrint('⚠️ Track #$index not found, retrying... (attempt ${attempts + 1}/$maxAttempts)');
+        // Wait a bit before retrying
+        await Future.delayed(const Duration(milliseconds: 500));
+      } else {
+        debugPrint('❌ Failed to play track #$index after $maxAttempts attempts');
+      }
+    }
   }
 
   Future<void> navigateToLikedSongs() async {
@@ -547,22 +593,62 @@ class SpotifyController extends ChangeNotifier {
     // PlaylistController is already initialized when scripts are loaded
     debugPrint('✅ PlaylistController already initialized from loaded scripts');
 
-    // Small delay to ensure DOM is ready
+    // Wait longer for Spotify to load the tracks in DOM
+    await Future.delayed(const Duration(seconds: 2));
+
+    // Force a rescan of current tracks in DOM using window function
+    await _webViewService.runJavascript(
+      'window.PlaylistController && window.PlaylistController.reset()'
+    );
+
+    // Small additional delay
     await Future.delayed(const Duration(milliseconds: 500));
 
-    // Get initial batch of tracks using pc.get()
-    await updateTracksFromController();
+    // Get initial batch of tracks with flash on first load
+    await updateTracksFromController(isInitialLoad: true);
+
+    // If we got initial tracks, try to load more immediately
+    if (store.songs.value.isNotEmpty) {
+      debugPrint('📚 Got ${store.songs.value.length} initial tracks, loading more...');
+      await loadMoreSongs();
+    }
   }
 
-  Future<void> updateTracksFromController() async {
+  Future<void> updateTracksFromController({bool isInitialLoad = false}) async {
     try {
       final result = await _webViewService.runJavascriptWithResult(
         SpotifyActionsService.getLoadedTracksScript
       );
 
+      debugPrint('📚 PlaylistController result: $result');
+
       if (result != null && result != 'null') {
         final data = jsonDecode(result.toString());
-        final tracks = data['tracks'] as List;
+
+        if (data == null) {
+          debugPrint('⚠️ Parsed data is null');
+          store.isLoadingSongs.value = false;
+          return;
+        }
+
+        final tracks = data['tracks'] as List?;
+        if (tracks == null || tracks.isEmpty) {
+          debugPrint('⚠️ No tracks found in data. Checking DOM...');
+
+          // Try to debug what's in the DOM
+          final domCheck = await _webViewService.runJavascriptWithResult('''
+            JSON.stringify({
+              trackRows: document.querySelectorAll('[data-testid="tracklist-row"]').length,
+              url: window.location.href,
+              hasController: !!window.PlaylistController,
+              tracksInController: window.PlaylistController ? window.PlaylistController.tracks.size : 0
+            })
+          ''');
+          debugPrint('🔍 DOM Check: $domCheck');
+
+          store.isLoadingSongs.value = false;
+          return;
+        }
 
         store.songs.value = tracks.map((track) => Song(
           index: track['position'] ?? track['index'] ?? 0,
@@ -573,14 +659,24 @@ class SpotifyController extends ChangeNotifier {
           duration: track['duration'],
         )).toList();
 
-        debugPrint('Updated songs: ${store.songs.value.length} tracks');
+        debugPrint('✅ Updated songs: ${store.songs.value.length} tracks');
+
+        // Flash the WebView briefly ONLY on initial library load
+        if (isInitialLoad && store.songs.value.isNotEmpty) {
+          await _flashWebView();
+        }
+
         store.isLoadingSongs.value = false;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           notifyListeners();
         });
+      } else {
+        debugPrint('⚠️ Result is null or "null"');
+        store.isLoadingSongs.value = false;
       }
-    } catch (e) {
-      debugPrint('Error updating tracks from controller: $e');
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error updating tracks from controller: $e');
+      debugPrint('Stack trace: $stackTrace');
       store.isLoadingSongs.value = false;
     }
   }
@@ -633,6 +729,36 @@ class SpotifyController extends ChangeNotifier {
     );
   }
 
+  Future<void> syncScrollWithWebView(double scrollPercentage) async {
+    // Sync scroll position with WebView
+    final result = await _webViewService.runJavascriptWithResult(
+      'window.syncScrollToPosition($scrollPercentage)'
+    );
+
+    if (result != null) {
+      debugPrint('📜 Sync scroll result: $result');
+
+      // After scrolling, update tracks if new ones are loaded
+      await Future.delayed(const Duration(milliseconds: 500));
+      await updateTracksFromController();
+    }
+  }
+
+  Future<void> syncScrollToTrackIndex(int trackIndex) async {
+    // Scroll to a specific track by its index number
+    final result = await _webViewService.runJavascriptWithResult(
+      'window.scrollToTrackByIndex($trackIndex)'
+    );
+
+    if (result != null) {
+      debugPrint('📜 Scrolled to track #$trackIndex: $result');
+
+      // After scrolling, update tracks if new ones are loaded
+      await Future.delayed(const Duration(milliseconds: 800));
+      await updateTracksFromController();
+    }
+  }
+
   Future<void> loadMoreSongs() async {
     // Prevent multiple simultaneous load requests
     if (store.isLoadingSongs.value) return;
@@ -646,17 +772,41 @@ class SpotifyController extends ChangeNotifier {
         store.isLoadingSongs.value = true;
         final previousCount = store.songs.value.length;
 
-        // Use PlaylistController to load more tracks
-        await _webViewService.runJavascriptWithResult(
-          SpotifyActionsService.loadMoreSongsScript
+        // Get the last loaded track position
+        final lastTrackPosition = store.songs.value.isNotEmpty
+            ? store.songs.value.last.index
+            : 0;
+
+        debugPrint('📜 Scrolling to track #$lastTrackPosition to load more...');
+
+        // Call the window function to scroll
+        final scrollResult = await _webViewService.runJavascriptWithResult(
+          'window.scrollToLoadMore($lastTrackPosition)'
         );
+
+        if (scrollResult != null) {
+          debugPrint('📜 Scroll result: $scrollResult');
+        }
+
+        // Wait for Spotify to load new tracks
+        await Future.delayed(const Duration(seconds: 2));
+
+        // Force rescan after scroll using window function
+        await _webViewService.runJavascript(
+          'window.PlaylistController && window.PlaylistController._scanCurrentTracks()'
+        );
+
+        // Wait a bit more for DOM updates
+        await Future.delayed(const Duration(milliseconds: 500));
 
         // Update tracks from the controller
         await updateTracksFromController();
 
         final newCount = store.songs.value.length;
         if (newCount > previousCount) {
-          debugPrint('Loaded ${newCount - previousCount} new songs (total: $newCount)');
+          debugPrint('✅ Loaded ${newCount - previousCount} new songs (total: $newCount)');
+        } else {
+          debugPrint('⚠️ No new songs loaded. May have reached the end.');
         }
 
         // Always reset loading state

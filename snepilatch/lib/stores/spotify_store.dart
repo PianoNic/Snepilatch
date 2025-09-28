@@ -35,6 +35,8 @@ class SpotifyStore {
   // Control state - tracks if user is controlling playback
   final ValueNotifier<bool> isUserControlling = ValueNotifier(false);
   DateTime? _lastUserAction;
+  DateTime? _lastScrapedTime;
+  int _lastScrapedProgressMs = 0;
 
   /// Batch update all values at once (once per second)
   void batchUpdate(PlaybackState? newState, User? newUser) {
@@ -98,19 +100,20 @@ class SpotifyStore {
           debugPrint('  🔁 Repeat: ${repeatMode.value} → ${newState.repeatMode}');
           repeatMode.value = newState.repeatMode;
         }
-        // Update time from scraping (will be overridden by smooth updates)
-        if (currentTime.value != newState.currentTime) {
-          currentTime.value = newState.currentTime ?? '0:00';
-        }
+        // Update duration (this shouldn't jump around)
         if (duration.value != newState.duration) {
           duration.value = newState.duration ?? '0:00';
         }
-        // Only update progress from scraping if significantly different (>1 second)
-        if ((progressMs.value - newState.progressMs).abs() > 1000) {
-          progressMs.value = newState.progressMs;
-        }
         if (durationMs.value != newState.durationMs) {
           durationMs.value = newState.durationMs;
+        }
+
+        // Update progress and time from scraped values
+        if (!isUserControlling.value) {
+          // Update both progress and time display from scraped values
+          // The progress bar will interpolate smoothly between these updates
+          progressMs.value = newState.progressMs;
+          currentTime.value = newState.currentTime ?? '0:00';
         }
       }
     }
@@ -136,8 +139,9 @@ class SpotifyStore {
     }
   }
 
-  /// Update progress smoothly for animation
+  /// Update progress smoothly for animation (now just updates directly)
   void updateProgressSmoothly(int newProgressMs) {
+    // Direct update from scraped values only
     progressMs.value = newProgressMs;
     // Update time display
     final seconds = (newProgressMs ~/ 1000) % 60;

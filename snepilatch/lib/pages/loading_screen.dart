@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../controllers/spotify_controller.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class LoadingScreen extends StatefulWidget {
   final SpotifyController spotifyController;
@@ -19,10 +20,25 @@ class _LoadingScreenState extends State<LoadingScreen> {
   String _currentStepText = '';
   bool _hasStartedInit = false;
   bool _showLoginButton = false;
+  String _appVersion = '1.0.0';
 
   @override
   void initState() {
     super.initState();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() {
+          _appVersion = info.version;
+        });
+      }
+    } catch (e) {
+      // Keep default version
+    }
   }
 
   @override
@@ -48,51 +64,49 @@ class _LoadingScreenState extends State<LoadingScreen> {
     }
 
     // Wait for app initialization
-    await Future.delayed(const Duration(seconds: 1));
+    await Future.delayed(const Duration(milliseconds: 500));
     if (!mounted) return;
 
     // Step 2: Start monitoring for Spotify data
     if (mounted) {
       setState(() {
-        _currentStepText = 'Connecting to Spotify...';
+        _currentStepText = 'Checking login status...';
       });
     }
 
-    // Wait for WebView to initialize and scraping to start (2-3 seconds based on logs)
-    await Future.delayed(const Duration(seconds: 3));
+    // Wait for WebView to initialize and quick login check (1-2 seconds)
+    await Future.delayed(const Duration(milliseconds: 1500));
     if (!mounted) return;
 
+    // Step 3: Check login status from controller
+    // The controller's quick login check should have run by now
+    final isLoggedIn = widget.spotifyController.isLoggedIn;
+
+    if (!isLoggedIn) {
+      // User is not logged in, show login button immediately
+      setState(() {
+        _currentStepText = 'Please log in to Spotify';
+        _showLoginButton = true;
+      });
+      return;
+    }
+
+    // User is logged in, continue loading
     if (mounted) {
       setState(() {
         _currentStepText = 'Loading your music...';
       });
     }
 
-    // Step 3: Monitor for useful data for up to 30 seconds
-    const maxWaitTime = 30; // seconds
-    const checkInterval = 500; // milliseconds
-    final maxChecks = (maxWaitTime * 1000) ~/ checkInterval;
-
-    bool hasUsefulData = false;
-    int checks = 0;
-
-    while (checks < maxChecks && mounted && !hasUsefulData) {
-      // Check if we have any useful data from scraping
-      hasUsefulData = _hasUsefulData();
-
-      if (!hasUsefulData) {
-        await Future.delayed(const Duration(milliseconds: checkInterval));
-        checks++;
-      }
-    }
-
+    // Wait a bit more for data to load
+    await Future.delayed(const Duration(seconds: 1));
     if (!mounted) return;
 
-    // Step 4: After waiting, check what we have
+    // Check if we have user data
     final hasUserProfile = _hasUsefulData();
 
-    // If no user profile data after 30 seconds, assume user needs to log in
     if (!hasUserProfile) {
+      // Still no data, might need login
       setState(() {
         _currentStepText = 'Please log in to Spotify';
         _showLoginButton = true;
@@ -231,7 +245,7 @@ class _LoadingScreenState extends State<LoadingScreen> {
                     // Version at bottom
                     const SizedBox(height: 80),
                     Text(
-                      'Version 1.0.0',
+                      'Version $_appVersion',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant
                             .withValues(alpha: 0.5),

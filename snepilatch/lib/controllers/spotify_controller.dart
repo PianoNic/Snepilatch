@@ -161,6 +161,12 @@ class SpotifyController extends ChangeNotifier {
   Future<void> onLoadStop(InAppWebViewController controller, WebUri? url) async {
     debugPrint('🌐 [SpotifyController] Page finished loading: $url');
 
+    // Skip injection and checks if we're on the login page
+    if (url != null && url.toString().contains('accounts.spotify.com')) {
+      debugPrint('🔐 On login page, skipping injection and checks');
+      return;
+    }
+
     // Check if functions are already present
     final alreadyInjected = await _injectionMonitor.areFunctionsInjected();
 
@@ -227,9 +233,49 @@ class SpotifyController extends ChangeNotifier {
         ).join(', ')
       ''');
       debugPrint('📋 Available functions: $functionsCheck');
+
+      // Quick login status check
+      await _checkLoginStatusQuick();
     } catch (e, stackTrace) {
       debugPrint('❌ Error injecting JavaScript: $e');
       debugPrint('Stack trace: $stackTrace');
+    }
+  }
+
+  Future<void> _checkLoginStatusQuick() async {
+    try {
+      final loginStatus = await _webViewService.runJavascriptWithResult(
+        'window.checkLoginStatus ? window.checkLoginStatus() : false'
+      );
+
+      final isLoggedIn = loginStatus == 'true' || loginStatus == true;
+      debugPrint('🔐 Quick login check: ${isLoggedIn ? "Logged In" : "Not Logged In"}');
+
+      // Update store immediately
+      store.isLoggedIn.value = isLoggedIn;
+
+      // Notify listeners to update UI immediately
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+      });
+
+      // If on login page and user is logged in, navigate back to home
+      final currentUrl = await _webViewService.controller?.getUrl();
+      if (isLoggedIn && currentUrl != null && currentUrl.toString().contains('accounts.spotify.com')) {
+        debugPrint('✅ Login completed, navigating back to Spotify...');
+        await _webViewService.controller?.loadUrl(
+          urlRequest: URLRequest(url: WebUri('https://open.spotify.com'))
+        );
+      }
+
+      // If not logged in and on Spotify main page, update UI to show login prompt
+      if (!isLoggedIn && currentUrl != null && !currentUrl.toString().contains('accounts.spotify.com')) {
+        debugPrint('📍 User needs to log in - showing login prompt');
+        // Make sure homepage sections are empty so loading doesn't appear
+        store.homepageSections.value = [];
+      }
+    } catch (e) {
+      debugPrint('Error in quick login check: $e');
     }
   }
 
@@ -268,6 +314,13 @@ class SpotifyController extends ChangeNotifier {
     if (!functionsPresent) {
       debugPrint('⚠️ [SpotifyController] Functions missing during scrape, monitor will reinject');
       return; // Skip this scrape, let monitor handle reinjection
+    }
+
+    // Check if we're on login page and need to monitor for completion
+    final currentUrl = await _webViewService.controller?.getUrl();
+    if (currentUrl != null && currentUrl.toString().contains('accounts.spotify.com')) {
+      await _monitorLoginCompletion();
+      return; // Skip normal scraping on login page
     }
 
     try {
@@ -475,15 +528,86 @@ class SpotifyController extends ChangeNotifier {
     );
   }
 
+  // Monitor login completion when on login page
+  Future<void> _monitorLoginCompletion() async {
+    try {
+      // Check if login is successful by looking for absence of login button
+      final loginStatus = await _webViewService.runJavascriptWithResult(
+        'window.checkLoginStatus ? window.checkLoginStatus() : false'
+      );
+
+      if (loginStatus == 'true' || loginStatus == true) {
+        debugPrint('✅ Login successful! Redirecting to Spotify...');
+        store.isLoggedIn.value = true;
+
+        // Navigate back to Spotify
+        await _webViewService.controller?.loadUrl(
+          urlRequest: URLRequest(url: WebUri('https://open.spotify.com'))
+        );
+
+        // Hide WebView after successful login
+        await Future.delayed(const Duration(seconds: 2));
+        store.showWebView.value = false;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          notifyListeners();
+        });
+      }
+    } catch (e) {
+      debugPrint('Error monitoring login: $e');
+    }
+  }
+
   // Navigation methods
   Future<void> navigateToLogin() async {
-    // Just show the WebView, don't reload
+    debugPrint('🔐 Navigating to login page...');
+
+    // Show the WebView first
     store.showWebView.value = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       notifyListeners();
     });
-    // REMOVED: Don't reload URL - WebView should stay on current page
-    debugPrint('Login: Showing WebView without reloading');
+
+    // Wait a moment for WebView to be visible and ready
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    // Check if controller is ready
+    if (_webViewService.controller == null) {
+      debugPrint('⚠️ WebView controller not ready, waiting...');
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
+    // Navigate to login page
+    const loginUrl = 'https://accounts.spotify.com/v2/login';
+    debugPrint('📍 Loading URL: $loginUrl');
+
+    // Try JavaScript navigation first (more reliable)
+    final jsNavResult = await _webViewService.runJavascriptWithResult(
+      'window.location.href = "$loginUrl"; true;'
+    );
+
+    debugPrint('JS navigation result: $jsNavResult');
+
+    // If JS navigation didn't work, try loadUrl
+    if (jsNavResult != 'true' && jsNavResult != true) {
+      debugPrint('JS navigation may have failed, trying loadUrl...');
+      await _webViewService.controller?.loadUrl(
+        urlRequest: URLRequest(url: WebUri(loginUrl))
+      );
+    }
+
+    // Wait and check if we actually navigated
+    await Future.delayed(const Duration(milliseconds: 500));
+    final currentUrl = await _webViewService.controller?.getUrl();
+    debugPrint('Current URL after navigation attempt: $currentUrl');
+
+    if (currentUrl != null && !currentUrl.toString().contains('accounts.spotify.com')) {
+      debugPrint('⚠️ Navigation failed, forcing navigation with loadUrl');
+      await _webViewService.controller?.loadUrl(
+        urlRequest: URLRequest(url: WebUri(loginUrl))
+      );
+    }
+
+    debugPrint('Login: Navigation complete');
   }
 
   Future<void> navigateToSpotify() async {

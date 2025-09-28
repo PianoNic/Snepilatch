@@ -2,6 +2,30 @@
 // These functions scrape data from the Spotify web player
 
 (function() {
+    // Quick login status check - returns true if logged in
+    window.checkLoginStatus = function() {
+        try {
+            // Check if login button exists
+            const loginButton = document.querySelector('[data-testid="login-button"]');
+
+            // If login button exists, user is NOT logged in
+            if (loginButton) {
+                console.log('Login button found - user is NOT logged in');
+                return false;
+            }
+
+            // Also check for user menu button as positive confirmation
+            const userButton = document.querySelector('[data-testid="user-widget-link"], button[aria-label*="User" i], button[aria-label*="Profile" i]');
+
+            // User is logged in if login button doesn't exist AND we have some indication of a user
+            const isLoggedIn = !loginButton && (userButton !== null || document.cookie.includes('sp_'));
+            console.log('Login status check:', isLoggedIn ? 'Logged in' : 'Not logged in');
+            return isLoggedIn;
+        } catch (e) {
+            console.error('Error checking login status:', e);
+            return false;
+        }
+    };
     // Inject getPlayingInfo into window
     window.getPlayingInfo = function() {
         try {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../controllers/spotify_controller.dart';
+import '../widgets/homepage_section_widget.dart';
 
 class HomePage extends StatelessWidget {
   final SpotifyController spotifyController;
@@ -10,18 +11,79 @@ class HomePage extends StatelessWidget {
     return AnimatedBuilder(
         animation: spotifyController,
         builder: (context, child) {
+          final homepageSections = spotifyController.homepageSections;
+          final isLoggedIn = spotifyController.isLoggedIn;
+
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.only(top: 16.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildWelcomeCard(context),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: _buildWelcomeCard(context),
+                ),
                 const SizedBox(height: 24),
-                _buildQuickActions(context),
-                const SizedBox(height: 24),
-                _buildRecentActivity(context),
-                const SizedBox(height: 24),
-                _buildStats(context),
+                if (!isLoggedIn)
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          const Icon(
+                            Icons.login,
+                            size: 64,
+                            color: Colors.grey,
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Please log in to Spotify',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Log in to see your personalized content',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else if (homepageSections.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          const CircularProgressIndicator(),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Loading your content...',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  ...homepageSections.map((section) =>
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 24.0),
+                      child: HomepageSectionWidget(
+                        section: section,
+                        controller: spotifyController,
+                      ),
+                    ),
+                  ),
               ],
             ),
           );
@@ -100,271 +162,4 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _buildQuickActions(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Quick Actions',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 12),
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 1.5,
-          children: [
-            _buildActionCard(
-              context,
-              icon: Icons.favorite,
-              title: 'Liked Songs',
-              subtitle: '${spotifyController.songs.length} songs',
-              color: Colors.red,
-              onTap: () {
-                // Navigate to liked songs would be handled by the main screen navigation
-              },
-            ),
-            _buildActionCard(
-              context,
-              icon: Icons.search,
-              title: 'Search',
-              subtitle: 'Find music',
-              color: Colors.blue,
-              onTap: () {
-                // Navigate to search would be handled by the main screen navigation
-              },
-            ),
-            _buildActionCard(
-              context,
-              icon: Icons.playlist_play,
-              title: 'Playlists',
-              subtitle: 'Browse playlists',
-              color: Colors.green,
-              onTap: () {
-                spotifyController.openWebView();
-              },
-            ),
-            _buildActionCard(
-              context,
-              icon: Icons.explore,
-              title: 'Discover',
-              subtitle: 'New music',
-              color: Colors.purple,
-              onTap: () {
-                spotifyController.openWebView();
-              },
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActionCard(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return Card(
-      elevation: 2,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, color: color, size: 28),
-              const SizedBox(height: 6),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              Text(
-                subtitle,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Theme.of(context).colorScheme.secondary,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRecentActivity(BuildContext context) {
-    if (!spotifyController.isLoggedIn || spotifyController.currentTrack == null) {
-      return const SizedBox.shrink();
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Currently Playing',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Card(
-          child: ListTile(
-            leading: spotifyController.currentAlbumArt != null
-                ? Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      image: DecorationImage(
-                        image: NetworkImage(spotifyController.currentAlbumArt!),
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  )
-                : Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      color: Theme.of(context).colorScheme.primaryContainer,
-                    ),
-                    child: const Icon(Icons.music_note),
-                  ),
-            title: Text(
-              spotifyController.currentTrack ?? 'No track',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            subtitle: Text(
-              spotifyController.currentArtist ?? '',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            trailing: Icon(
-              spotifyController.isPlaying ? Icons.volume_up : Icons.volume_mute,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStats(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Your Stats',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildStatCard(
-                context,
-                icon: Icons.music_note,
-                value: '${spotifyController.songs.length}',
-                label: 'Liked Songs',
-                color: Colors.orange,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildStatCard(
-                context,
-                icon: Icons.account_circle,
-                value: spotifyController.isLoggedIn ? 'Online' : 'Offline',
-                label: 'Status',
-                color: spotifyController.isLoggedIn ? Colors.green : Colors.grey,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildStatCard(
-                context,
-                icon: Icons.shuffle,
-                value: spotifyController.shuffleMode,
-                label: 'Shuffle',
-                color: Colors.blue,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildStatCard(
-                context,
-                icon: Icons.repeat,
-                value: spotifyController.repeatMode,
-                label: 'Repeat',
-                color: Colors.purple,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatCard(
-    BuildContext context, {
-    required IconData icon,
-    required String value,
-    required String label,
-    required Color color,
-  }) {
-    return Card(
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.secondary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

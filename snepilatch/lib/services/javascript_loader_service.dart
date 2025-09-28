@@ -8,6 +8,7 @@ class JavaScriptLoaderService {
   static const String scraperScriptPath = 'assets/js/spotify-scraper.js';
   static const String actionsScriptPath = 'assets/js/spotify-actions.js';
   static const String playlistControllerScriptPath = 'assets/js/spotify-playlist-controller.js';
+  static const String homepageScriptPath = 'assets/js/spotify-homepage.js';
 
   /// Load JavaScript content from an asset file
   static Future<String> loadJavaScript(String assetPath) async {
@@ -44,12 +45,18 @@ class JavaScriptLoaderService {
     return loadJavaScript(playlistControllerScriptPath);
   }
 
+  /// Load the Homepage JavaScript
+  static Future<String> loadHomepageScript() async {
+    return loadJavaScript(homepageScriptPath);
+  }
+
   /// Load all JavaScript files and return combined content
   static Future<String> loadAllScripts() async {
     final List<String> scripts = await Future.wait([
       loadScraperScript(),
       loadActionsScript(),
       loadPlaylistControllerScript(),
+      loadHomepageScript(),
     ]);
 
     return scripts.where((script) => script.isNotEmpty).join('\n\n');
@@ -66,6 +73,7 @@ class JavaScriptLoaderService {
         window.getUserInfo = function() { return JSON.stringify({}); };
         window.getSongs = function() { return JSON.stringify([]); };
         window.getSearchResults = function() { return JSON.stringify([]); };
+        window.getHomepageSections = function() { return JSON.stringify([]); };
         console.warn('JavaScript files not loaded, using fallback functions');
       ''';
     }
@@ -79,7 +87,8 @@ class JavaScriptLoaderService {
         getPlayingInfo: typeof window.getPlayingInfo,
         getUserInfo: typeof window.getUserInfo,
         getSongs: typeof window.getSongs,
-        getSearchResults: typeof window.getSearchResults
+        getSearchResults: typeof window.getSearchResults,
+        getHomepageSections: typeof window.getHomepageSections
       };
       console.log('Function status after injection:', JSON.stringify(functionCheck));
     ''';

@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import '../models/playback_state.dart';
 import '../models/user.dart';
 import '../models/song.dart';
-import '../models/homepage_item.dart';
 
 /// Reactive store for Spotify state using ValueNotifiers (similar to Angular Signals)
 class SpotifyStore {
@@ -28,9 +27,6 @@ class SpotifyStore {
   // Songs state
   final ValueNotifier<List<Song>> songs = ValueNotifier([]);
   final ValueNotifier<bool> isLoadingSongs = ValueNotifier(false);
-
-  // Homepage sections
-  final ValueNotifier<List<HomepageSection>> homepageSections = ValueNotifier([]);
 
   // UI state
   final ValueNotifier<bool> showWebView = ValueNotifier(false);
@@ -255,9 +251,6 @@ class SpotifyStore {
     songs.value = [];
     isLoadingSongs.value = false;
 
-    // Clear homepage sections
-    homepageSections.value = [];
-
     // Hide WebView
     showWebView.value = false;
   }
@@ -281,7 +274,6 @@ class SpotifyStore {
     userProfileImage.dispose();
     songs.dispose();
     isLoadingSongs.dispose();
-    homepageSections.dispose();
     showWebView.dispose();
     isInitialized.dispose();
     isUserControlling.dispose();

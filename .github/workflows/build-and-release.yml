@@ -54,7 +54,7 @@ jobs:
           storePassword=$KEYSTORE_PASSWORD
           keyPassword=$KEY_PASSWORD
           keyAlias=release
-          storeFile=../app-release.jks
+          storeFile=app-release.jks
           EOF
 
       - name: Get dependencies

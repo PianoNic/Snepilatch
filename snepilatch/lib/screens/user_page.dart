@@ -254,7 +254,7 @@ class _UserPageState extends State<UserPage> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        _appVersion.isEmpty ? 'Loading...' : 'v$_appVersion',
+                        _appVersion.isEmpty ? 'Loading...' : (_appVersion.startsWith('v') ? _appVersion : 'v$_appVersion'),
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,

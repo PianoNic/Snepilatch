@@ -252,10 +252,6 @@ class SpotifyController extends ChangeNotifier {
     });
   }
 
-  void _startProgressAnimation() {
-    // Removed - using scraped values only
-  }
-
   Future<void> _scrapeAllInfo() async {
     if (_webViewService.controller == null) return;
 
@@ -401,25 +397,66 @@ class SpotifyController extends ChangeNotifier {
   }
 
   // Search methods
+  Future<void> navigateToSearchPage() async {
+    debugPrint('🔍 Navigating to search page...');
+
+    try {
+      final result = await _webViewService.runJavascriptWithResult(
+        'window.spotifyNavigateToSearch()'
+      );
+
+      debugPrint('🔍 Search navigation result: $result');
+
+      if (result == '"spa_navigation"') {
+        debugPrint('🚀 Using SPA navigation to Search (no page reload)');
+        await Future.delayed(const Duration(milliseconds: 800));
+      } else if (result == 'true' || result == true) {
+        debugPrint('✅ Successfully navigated to Search page');
+        await Future.delayed(const Duration(milliseconds: 800));
+      } else {
+        debugPrint('⚠️ Could not navigate to Search page');
+        await Future.delayed(const Duration(milliseconds: 1000));
+      }
+    } catch (e) {
+      debugPrint('❌ Error navigating to search: $e');
+      await Future.delayed(const Duration(milliseconds: 1000));
+    }
+  }
+
+  Future<void> typeInSearchBox(String query) async {
+    debugPrint('🔍 Typing in search box: $query');
+    await _webViewService.runJavascript(
+      'window.spotifySearch(${jsonEncode(query)})'
+    );
+  }
+
   Future<void> search(String query) async {
     await _webViewService.runJavascript(SpotifyActionsService.searchScript(query));
   }
 
   Future<List<SearchResult>> searchAndGetResults(String query) async {
-    await search(query);
+    // Type in the search box instead of using the old method
+    await typeInSearchBox(query);
     await Future.delayed(const Duration(seconds: 2));
 
     try {
       final result = await _webViewService.runJavascriptWithResult(
-        SpotifyActionsService.searchResultsScript
+        'window.getSearchResults ? window.getSearchResults() : "[]"'
       );
-      if (result != null && result != 'null') {
+      if (result != null && result != 'null' && result != '[]') {
         return SpotifyScraperService.parseSearchResults(result.toString());
       }
     } catch (e) {
       debugPrint('Error getting search results: $e');
     }
     return [];
+  }
+
+  Future<void> playSearchResultAtIndex(int index) async {
+    debugPrint('🎵 Playing search result #$index');
+    await _webViewService.runJavascript(
+      'window.playSearchResult && window.playSearchResult($index)'
+    );
   }
 
   // Navigation methods
@@ -551,32 +588,50 @@ class SpotifyController extends ChangeNotifier {
     }
 
     try {
-      debugPrint('🔍 Attempting to click on Liked Songs element...');
+      debugPrint('🔍 Attempting to navigate to Liked Songs...');
 
       // Click on the Liked Songs element
       final result = await _webViewService.runJavascriptWithResult(
         SpotifyActionsService.openLikedSongsScript
       );
 
-      debugPrint('🔍 Click result: $result');
+      debugPrint('🔍 Navigation result: $result');
 
-      if (result == true || result == 'true') {
-        debugPrint('✅ Successfully clicked Liked Songs element, waiting for navigation...');
-
-        // Wait for the page to load
+      // Check the result and handle accordingly
+      if (result == '"spa_navigation"') {
+        debugPrint('🚀 Using SPA navigation (no page reload)');
+        await Future.delayed(const Duration(milliseconds: 1000));
+      } else if (result == '"navigating_to_library"') {
+        debugPrint('📚 Navigating to library page first...');
         await Future.delayed(const Duration(seconds: 2));
 
-        // Initialize the PlaylistController and get initial batch
-        await initializePlaylistController();
+        // Try again to click on Liked Songs
+        final retryResult = await _webViewService.runJavascriptWithResult(
+          SpotifyActionsService.openLikedSongsScript
+        );
+
+        debugPrint('🔍 Retry result: $retryResult');
+
+        if (retryResult == 'true' || retryResult == true || retryResult == '"spa_navigation"') {
+          debugPrint('✅ Successfully navigated to Liked Songs!');
+        } else {
+          debugPrint('⚠️ Still could not find Liked Songs element');
+        }
+      } else if (result == true || result == 'true') {
+        debugPrint('✅ Successfully clicked Liked Songs element!');
       } else {
-        debugPrint('⚠️ Could not find Liked Songs element to click, result: $result');
-        // Fallback to direct navigation if clicking fails
-        await _navigateToLikedSongsOldMethod();
+        debugPrint('⚠️ Could not find Liked Songs element, result: $result');
       }
+
+      // Wait for navigation to complete
+      await Future.delayed(const Duration(seconds: 2));
+
+      // Initialize the PlaylistController and get initial batch
+      await initializePlaylistController();
     } catch (e) {
       debugPrint('❌ Error opening liked songs: $e');
-      // Fallback to the old method if the new one fails
-      await _navigateToLikedSongsOldMethod();
+      // Try to initialize anyway
+      await initializePlaylistController();
     }
   }
 
@@ -650,14 +705,14 @@ class SpotifyController extends ChangeNotifier {
           return;
         }
 
-        store.songs.value = tracks.map((track) => Song(
-          index: track['position'] ?? track['index'] ?? 0,
-          title: track['title'] ?? '',
-          artist: (track['artists'] as List?)?.join(', ') ?? '',
-          album: track['album'] ?? '',
-          imageUrl: track['coverUrl'],
-          duration: track['duration'],
-        )).toList();
+        store.songs.value = tracks.map((track) => Song.fromJson({
+          'index': track['position'] ?? track['index'] ?? 0,
+          'title': track['title'] ?? '',
+          'artist': (track['artists'] as List?)?.join(', ') ?? '',
+          'album': track['album'] ?? '',
+          'image': track['coverUrl'],
+          'duration': track['duration'],
+        })).toList();
 
         debugPrint('✅ Updated songs: ${store.songs.value.length} tracks');
 

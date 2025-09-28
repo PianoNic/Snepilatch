@@ -201,18 +201,73 @@
     window.getSearchResults = function() {
         try {
             const results = [];
-            const songs = document.querySelectorAll('[data-testid="tracklist-row"]');
-            songs.forEach((song, index) => {
-                if (index < 10) {
-                    const title = song.querySelector('[data-testid="internal-track-link"] div')?.textContent || '';
-                    const artist = song.querySelector('[data-testid="internal-track-link"] + div a')?.textContent || '';
-                    results.push({ title, artist, index });
+
+            // Find all search result track rows
+            const trackRows = document.querySelectorAll('[data-testid="search-tracks-result"] [data-testid="tracklist-row"], [data-testid="track-list"] [data-testid="tracklist-row"]');
+
+            trackRows.forEach((row, index) => {
+                if (index < 20) { // Limit to first 20 results
+                    try {
+                        // Get title and track link
+                        const titleLink = row.querySelector('a[href*="/track/"]');
+                        const title = titleLink ? titleLink.textContent.trim() : '';
+
+                        // Get artist
+                        const artistLink = row.querySelector('a[href*="/artist/"]');
+                        const artist = artistLink ? artistLink.textContent.trim() : 'Unknown Artist';
+
+                        // Get album art - same as PlaylistController
+                        const albumArt = row.querySelector('img[src*="i.scdn.co/image"]');
+                        const imageUrl = albumArt ? albumArt.src : null;
+
+                        // Get duration
+                        const durationEl = row.querySelector('.Q4mk1oUBywa1PuZZZ0Mr') ||
+                                         row.querySelector('[data-encore-id="text"]:last-child');
+                        const duration = durationEl ? durationEl.textContent.trim() : '';
+
+                        if (title) {
+                            results.push({
+                                index: index + 1, // 1-based index for display
+                                title: title,
+                                artist: artist,
+                                imageUrl: imageUrl,
+                                duration: duration
+                            });
+                        }
+                    } catch (err) {
+                        console.error('Error parsing search result:', err);
+                    }
                 }
             });
+
+            console.log('Found ' + results.length + ' search results');
             return JSON.stringify(results);
         } catch (e) {
+            console.error('Error getting search results:', e);
             return JSON.stringify([]);
         }
+    };
+
+    // Function to play a search result
+    window.playSearchResult = function(index) {
+        const trackRows = document.querySelectorAll('[data-testid="search-tracks-result"] [data-testid="tracklist-row"], [data-testid="track-list"] [data-testid="tracklist-row"]');
+
+        if (trackRows[index - 1]) { // Convert to 0-based index
+            const playButton = trackRows[index - 1].querySelector('button[aria-label*="abspielen"], button[aria-label*="play"], button[aria-label*="Play"]');
+            if (playButton) {
+                playButton.click();
+                return true;
+            }
+
+            // Fallback: double-click the row
+            trackRows[index - 1].dispatchEvent(new MouseEvent('dblclick', {
+                view: window,
+                bubbles: true,
+                cancelable: true
+            }));
+            return true;
+        }
+        return false;
     };
 
     console.log('Spotify scraper functions injected into window');

@@ -50,27 +50,30 @@ class _SpotifyWebViewWidgetState extends State<SpotifyWebViewWidget> with Automa
           children: [
             // Always render WebView but position it off-screen when hidden
             Positioned(
-              left: showWebView ? 0 : -1000,
+              left: showWebView ? 0 : 500,
               top: 0,
               width: showWebView ? MediaQuery.of(context).size.width : 400,
               height: showWebView ? MediaQuery.of(context).size.height : 800,
               child: IgnorePointer(
                 ignoring: !showWebView,
-                child: Opacity(
-                  opacity: showWebView ? 1.0 : 0.0,
-                  child: showWebView
-                    ? Container(
-                        color: Colors.white,
-                        child: SafeArea(
-                          child: Column(
-                            children: [
-                              _buildHeader(context),
-                              Expanded(child: webView),
-                            ],
+                child: ValueListenableBuilder<double>(
+                  valueListenable: widget.spotifyController.webViewOpacity,
+                  builder: (context, opacity, child) => Opacity(
+                    opacity: showWebView ? 1.0 : opacity,
+                    child: showWebView
+                      ? Container(
+                          color: Colors.white,
+                          child: SafeArea(
+                            child: Column(
+                              children: [
+                                _buildHeader(context),
+                                Expanded(child: webView),
+                              ],
+                            ),
                           ),
-                        ),
-                      )
-                    : webView,
+                        )
+                      : webView,
+                  ),
                 ),
               ),
             ),

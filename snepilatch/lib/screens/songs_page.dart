@@ -13,6 +13,8 @@ class SongsPage extends StatefulWidget {
 class _SongsPageState extends State<SongsPage> {
   final ScrollController _scrollController = ScrollController();
   bool _hasNavigated = false;
+  DateTime? _lastSyncTime;
+  double _lastSyncPercentage = 0;
 
   @override
   void initState() {
@@ -31,13 +33,54 @@ class _SongsPageState extends State<SongsPage> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
-      // User scrolled near the bottom, load more songs
-      widget.spotifyController.loadMoreSongs();
+    final position = _scrollController.position;
+
+    // Calculate which track index is currently visible at the middle of the viewport
+    // Assuming each list item is approximately 72 pixels high (ListTile default)
+    const itemHeight = 72.0;
+    final visibleMiddleIndex = ((position.pixels + position.viewportDimension / 2) / itemHeight).floor();
+
+    // Track the last synced index
+    final now = DateTime.now();
+    final lastIndex = _lastSyncPercentage.toInt(); // Repurpose to store last synced index
+    final indexDifference = (visibleMiddleIndex - lastIndex).abs();
+
+    // More responsive syncing logic
+    bool shouldSync = false;
+
+    if (_lastSyncTime == null) {
+      // First scroll - always sync
+      shouldSync = true;
+    } else {
+      final timeSinceLastSync = now.difference(_lastSyncTime!).inMilliseconds;
+
+      // Fast scrolling: sync immediately if moved 10+ items
+      if (indexDifference >= 10) {
+        shouldSync = true;
+      }
+      // Medium scrolling: sync after 800ms if moved 5+ items
+      else if (indexDifference >= 5 && timeSinceLastSync > 800) {
+        shouldSync = true;
+      }
+      // Slow scrolling: sync after 1.5s if moved 3+ items
+      else if (indexDifference >= 3 && timeSinceLastSync > 1500) {
+        shouldSync = true;
+      }
     }
 
-    // Sync scroll position with Spotify
-    widget.spotifyController.scrollSpotifyPage(_scrollController.position.pixels);
+    if (shouldSync && visibleMiddleIndex > 5) { // Start syncing after seeing 5 items
+      _lastSyncTime = now;
+      _lastSyncPercentage = visibleMiddleIndex.toDouble(); // Store as double for compatibility
+
+      // Tell WebView to scroll to show track at this index
+      // Use middle index for both up and down scrolling
+      widget.spotifyController.syncScrollToTrackIndex(visibleMiddleIndex);
+    }
+
+    // Load more songs when near bottom (kept as backup)
+    if (position.pixels >= position.maxScrollExtent - 200) {
+      widget.spotifyController.loadMoreSongs();
+    }
   }
 
   @override

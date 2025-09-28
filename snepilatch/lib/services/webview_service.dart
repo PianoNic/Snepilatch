@@ -42,15 +42,24 @@ class WebViewService {
 
     if (uri != null) {
       String url = uri.toString();
+      debugPrint('🔗 Navigation request to: $url');
+
       // Prevent redirects to app store or mobile app
       if (url.contains('apps.apple.com') ||
           url.contains('play.google.com') ||
           url.contains('spotify://')) {
-        debugPrint('Blocked navigation to: $url');
+        debugPrint('❌ Blocked navigation to: $url');
         return NavigationActionPolicy.CANCEL;
+      }
+
+      // Allow navigation to login page
+      if (url.contains('accounts.spotify.com')) {
+        debugPrint('✅ Allowing navigation to login page');
+        return NavigationActionPolicy.ALLOW;
       }
     }
 
+    debugPrint('✅ Allowing navigation');
     return NavigationActionPolicy.ALLOW;
   }
 

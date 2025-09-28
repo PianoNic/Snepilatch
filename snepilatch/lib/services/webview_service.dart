@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
@@ -6,15 +5,7 @@ class WebViewService {
   InAppWebViewController? controller;
 
   InAppWebViewSettings getSettings() {
-    String userAgent = '';
-
-    if (Platform.isAndroid) {
-      userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36';
-    } else if (Platform.isIOS) {
-      userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15';
-    } else {
-      userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36';
-    }
+    String userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 OPR/122.0.0.0';
 
     return InAppWebViewSettings(
       userAgent: userAgent,
@@ -74,37 +65,25 @@ class WebViewService {
     );
   }
 
-  Future<void> evaluateJavascript(String source) async {
+  Future<void> runJavascript(String source) async {
     try {
       if (controller != null) {
         await controller!.evaluateJavascript(source: source);
       }
     } catch (e) {
-      debugPrint('Error evaluating JavaScript: $e');
+      debugPrint('Error running JavaScript: $e');
     }
   }
 
-  Future<dynamic> evaluateJavascriptWithResult(String source) async {
+  Future<dynamic> runJavascriptWithResult(String source) async {
     try {
       if (controller != null) {
         return await controller!.evaluateJavascript(source: source);
       }
     } catch (e) {
-      debugPrint('Error evaluating JavaScript with result: $e');
+      debugPrint('Error running JavaScript with result: $e');
       return null;
     }
     return null;
-  }
-
-  Future<void> loadUrl(String url) async {
-    try {
-      if (controller != null) {
-        await controller!.loadUrl(
-          urlRequest: URLRequest(url: WebUri(url))
-        );
-      }
-    } catch (e) {
-      debugPrint('Error loading URL: $e');
-    }
   }
 }

@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
 import '../services/update_service.dart';
 import '../services/storage_service.dart';
 
@@ -185,16 +184,10 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
                   color: theme.colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Markdown(
-                  data: widget.updateInfo.releaseNotes,
-                  shrinkWrap: true,
-                  physics: const ScrollPhysics(),
-                  styleSheet: MarkdownStyleSheet(
-                    p: theme.textTheme.bodyMedium,
-                    h1: theme.textTheme.titleLarge,
-                    h2: theme.textTheme.titleMedium,
-                    h3: theme.textTheme.titleSmall,
-                    listBullet: theme.textTheme.bodyMedium,
+                child: SingleChildScrollView(
+                  child: Text(
+                    widget.updateInfo.releaseNotes,
+                    style: theme.textTheme.bodyMedium,
                   ),
                 ),
               ),

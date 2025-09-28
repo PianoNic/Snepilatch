@@ -1,0 +1,220 @@
+// Spotify Scraper Functions
+// These functions scrape data from the Spotify web player
+
+(function() {
+    // Inject getPlayingInfo into window
+    window.getPlayingInfo = function() {
+        try {
+            const playButton = document.querySelector('[data-testid="control-button-playpause"]');
+            const isPlaying = playButton.getAttribute('aria-label').includes('Pause');
+
+            const trackElement = document.querySelector('[data-testid="context-item-info-title"]');
+            const artistElement = document.querySelector('[data-testid="context-item-info-artist"]');
+            const albumArtElement = document.querySelector('[data-testid="cover-art-image"]');
+
+            // Check if current track is liked
+            const likeButton = document.querySelector('[data-testid="now-playing-widget"] button[aria-label*="Lieblingssongs"], [data-testid="now-playing-widget"] button[aria-label*="Playlist"], [data-testid="now-playing-widget"] button[aria-label*="favorite"], [data-testid="now-playing-widget"] button[aria-label*="like"]');
+            const isLiked = likeButton?.getAttribute('aria-checked') === 'true' || false;
+
+            // Check shuffle state - detect off, normal, or enhanced
+            const shuffleButton = document.querySelector('button[aria-label*="shuffle" i], button[aria-label*="Shuffle" i]');
+            let shuffleMode = 'off';
+
+            if (shuffleButton) {
+                const ariaLabel = shuffleButton.getAttribute('aria-label')?.toLowerCase() || '';
+
+                if (ariaLabel.includes('smart shuffle') && ariaLabel.includes('deaktivieren')) {
+                    shuffleMode = 'enhanced';
+                } else if (!ariaLabel.includes('smart') && ariaLabel.includes('deaktivieren')) {
+                    shuffleMode = 'normal';
+                } else if (ariaLabel.includes('smart shuffle') && ariaLabel.includes('aktivieren')) {
+                    shuffleMode = 'normal';
+                } else if (!ariaLabel.includes('smart') && ariaLabel.includes('aktivieren')) {
+                    shuffleMode = 'off';
+                }
+            }
+
+            // Check repeat state
+            const repeatButton = document.querySelector('[data-testid="control-button-repeat"]');
+            const repeatAriaChecked = repeatButton?.getAttribute('aria-checked');
+            let repeatMode = 'off';
+            if (repeatAriaChecked === 'true') {
+                repeatMode = 'all';
+            } else if (repeatAriaChecked === 'mixed') {
+                repeatMode = 'one';
+            }
+
+            // Get progress bar data
+            const positionElement = document.querySelector('[data-testid="playback-position"]');
+            const durationElement = document.querySelector('[data-testid="playback-duration"]');
+            const progressBarInput = document.querySelector('[data-testid="playback-progressbar"] input[type="range"]');
+
+            let currentTime = positionElement?.textContent || '0:00';
+            let duration = durationElement?.textContent || '0:00';
+            let progressMs = 0;
+            let durationMs = 0;
+
+            if (progressBarInput) {
+                progressMs = parseInt(progressBarInput.value) || 0;
+                durationMs = parseInt(progressBarInput.max) || 0;
+            }
+
+            return JSON.stringify({
+                isPlaying: isPlaying,
+                track: trackElement?.textContent || '',
+                artist: artistElement?.textContent || '',
+                albumArt: albumArtElement?.src || '',
+                isLiked: isLiked,
+                shuffleMode: shuffleMode,
+                repeatMode: repeatMode,
+                currentTime: currentTime,
+                duration: duration,
+                progressMs: progressMs,
+                durationMs: durationMs
+            });
+        } catch (e) {
+            return JSON.stringify({
+                isPlaying: false,
+                track: '',
+                artist: '',
+                albumArt: '',
+                isLiked: false,
+                shuffleMode: 'off',
+                repeatMode: 'off'
+            });
+        }
+    };
+
+    // Inject getUserInfo into window
+    window.getUserInfo = function() {
+        try {
+            // Check if user is logged in
+            const loginButton = document.querySelector('[data-testid="login-button"]');
+            const signupButton = document.querySelector('[data-testid="signup-button"]');
+
+            if (loginButton || signupButton) {
+                return JSON.stringify({
+                    isLoggedIn: false,
+                    username: '',
+                    email: '',
+                    profileImage: ''
+                });
+            }
+
+            let username = '';
+            let profileImage = '';
+
+            // Get username and profile image from user widget button - primary method
+            const userButton = document.querySelector('[data-testid="user-widget-link"]');
+            if (userButton) {
+                // Try aria-label first (most reliable)
+                username = userButton.getAttribute('aria-label')?.trim() || '';
+
+                // If not in aria-label, try text content
+                if (!username) {
+                    username = userButton.textContent?.trim() || '';
+                }
+
+                // Get profile image from img element inside the button
+                const imgElement = userButton.querySelector('img');
+                if (imgElement) {
+                    profileImage = imgElement.getAttribute('src') || '';
+
+                    // Also check for username in img alt text if not found yet
+                    if (!username) {
+                        username = imgElement.getAttribute('alt')?.trim() || '';
+                    }
+                }
+            }
+
+            // Fallback methods if primary doesn't work
+            if (!username) {
+                const profileLink = document.querySelector('[href*="/user/"]');
+                if (profileLink) {
+                    username = profileLink.textContent?.trim() || '';
+                }
+            }
+
+            if (!username) {
+                const userMenuButton = document.querySelector('[data-testid="user-menu-button"]');
+                if (userMenuButton) {
+                    username = userMenuButton.getAttribute('aria-label')?.replace('User menu for', '').trim() || '';
+                }
+            }
+
+            // Try to get username from the page title or other elements
+            if (!username) {
+                const profileName = document.querySelector('h1')?.textContent;
+                if (profileName && !profileName.includes('Spotify')) {
+                    username = profileName;
+                }
+            }
+
+            return JSON.stringify({
+                isLoggedIn: true,
+                username: username || 'Spotify User',
+                email: '',
+                profileImage: profileImage || ''
+            });
+        } catch (e) {
+            return JSON.stringify({
+                isLoggedIn: false,
+                username: '',
+                email: '',
+                profileImage: ''
+            });
+        }
+    };
+
+    // Inject getSongs into window
+    window.getSongs = function() {
+        try {
+            const songs = [];
+            const songRows = document.querySelectorAll('[data-testid="tracklist-row"]');
+
+            songRows.forEach((row, index) => {
+                const titleElement = row.querySelector('[data-testid="internal-track-link"] div');
+                const artistElement = row.querySelector('[data-testid="internal-track-link"]')?.parentElement?.nextElementSibling?.querySelector('a');
+                const albumElement = row.querySelector('[data-testid="internal-track-link"]')?.parentElement?.nextElementSibling?.nextElementSibling?.querySelector('a');
+                const imageElement = row.querySelector('img');
+                const durationElement = row.querySelector('[data-testid="track-duration"]');
+
+                if (titleElement) {
+                    songs.push({
+                        title: titleElement.textContent || '',
+                        artist: artistElement?.textContent || '',
+                        album: albumElement?.textContent || '',
+                        image: imageElement?.src || '',
+                        duration: durationElement?.textContent || '',
+                        index: index
+                    });
+                }
+            });
+
+            return JSON.stringify(songs);
+        } catch (e) {
+            return JSON.stringify([]);
+        }
+    };
+
+    // Inject getSearchResults into window
+    window.getSearchResults = function() {
+        try {
+            const results = [];
+            const songs = document.querySelectorAll('[data-testid="tracklist-row"]');
+            songs.forEach((song, index) => {
+                if (index < 10) {
+                    const title = song.querySelector('[data-testid="internal-track-link"] div')?.textContent || '';
+                    const artist = song.querySelector('[data-testid="internal-track-link"] + div a')?.textContent || '';
+                    results.push({ title, artist, index });
+                }
+            });
+            return JSON.stringify(results);
+        } catch (e) {
+            return JSON.stringify([]);
+        }
+    };
+
+    console.log('Spotify scraper functions injected into window');
+    return true;
+})();

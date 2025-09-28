@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class PlaybackState {
   final bool isPlaying;
   final String? currentTrack;
@@ -56,6 +58,51 @@ class PlaybackState {
   double get progressPercentage {
     if (durationMs == 0) return 0.0;
     return (progressMs / durationMs).clamp(0.0, 1.0);
+  }
+
+  Map<String, dynamic> toJson() => {
+        'isPlaying': isPlaying,
+        'track': currentTrack,
+        'artist': currentArtist,
+        'albumArt': currentAlbumArt,
+        'isLiked': isCurrentTrackLiked,
+        'shuffleMode': shuffleMode.value,
+        'repeatMode': repeatMode.value,
+        'currentTime': currentTime,
+        'duration': duration,
+        'progressMs': progressMs,
+        'durationMs': durationMs,
+      };
+
+  factory PlaybackState.fromJson(Map<String, dynamic> json) {
+    // Convert to high quality image URL
+    String? albumArt = json['albumArt'];
+    if (albumArt != null && albumArt.contains('ab67616d00004851')) {
+      albumArt = albumArt.replaceAll('ab67616d00004851', 'ab67616d00001e02');
+    }
+
+    return PlaybackState(
+      isPlaying: json['isPlaying'] ?? false,
+      currentTrack: json['track']?.toString().isNotEmpty == true ? json['track'] : null,
+      currentArtist: json['artist']?.toString().isNotEmpty == true ? json['artist'] : null,
+      currentAlbumArt: albumArt?.isNotEmpty == true ? albumArt : null,
+      isCurrentTrackLiked: json['isLiked'] ?? false,
+      shuffleMode: ShuffleModeExtension.fromString(json['shuffleMode'] ?? 'off'),
+      repeatMode: RepeatModeExtension.fromString(json['repeatMode'] ?? 'off'),
+      currentTime: json['currentTime'] ?? '0:00',
+      duration: json['duration'] ?? '0:00',
+      progressMs: json['progressMs'] ?? 0,
+      durationMs: json['durationMs'] ?? 0,
+    );
+  }
+
+  static PlaybackState? fromJsonString(String jsonString) {
+    try {
+      final json = jsonDecode(jsonString);
+      return PlaybackState.fromJson(json);
+    } catch (e) {
+      return null;
+    }
   }
 }
 

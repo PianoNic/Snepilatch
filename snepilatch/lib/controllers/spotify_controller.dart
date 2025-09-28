@@ -10,6 +10,8 @@ import '../models/user.dart';
 import '../services/webview_service.dart';
 import '../services/spotify_scraper_service.dart';
 import '../services/spotify_actions_service.dart';
+import '../services/javascript_loader_service.dart';
+import '../services/injection_monitor_service.dart';
 import '../services/theme_service.dart';
 import '../services/audio_handler_service.dart';
 import '../stores/spotify_store.dart';
@@ -19,9 +21,9 @@ class SpotifyController extends ChangeNotifier {
   final WebViewService _webViewService = WebViewService();
   final SpotifyStore store = SpotifyStore();
   final ThemeService themeService = ThemeService();
+  late final InjectionMonitorService _injectionMonitor;
   Timer? _scrapingTimer;
   Timer? _progressTimer;
-  Timer? _urlDebugTimer;
   String? _lastAlbumArt;
   String? _lastNotifiedTrack;
   String? _lastNotifiedArtist;
@@ -30,6 +32,8 @@ class SpotifyController extends ChangeNotifier {
   bool _debugWebViewVisible = false;
 
   SpotifyController() {
+    debugPrint('🚀 [SpotifyController] Constructor called');
+    _injectionMonitor = InjectionMonitorService(_webViewService);
     _startPeriodicScraping();
     _startProgressAnimation();
     _setupAudioHandler();
@@ -104,7 +108,7 @@ class SpotifyController extends ChangeNotifier {
   void dispose() {
     _scrapingTimer?.cancel();
     _progressTimer?.cancel();
-    _urlDebugTimer?.cancel();
+    _injectionMonitor.dispose();
     store.dispose();
     themeService.dispose();
     super.dispose();
@@ -145,14 +149,34 @@ class SpotifyController extends ChangeNotifier {
 
   void onWebViewCreated(InAppWebViewController controller) {
     _webViewService.setController(controller);
+    // Start monitoring for JavaScript injection
+    _injectionMonitor.startMonitoring();
   }
 
   Future<void> onLoadStop(InAppWebViewController controller, WebUri? url) async {
     debugPrint('🌐 [SpotifyController] Page finished loading: $url');
-    debugPrint('💉 [SpotifyController] Injecting JavaScript scraping functions...');
-    await _injectJavaScript();
+
+    // Check if functions are already present
+    final alreadyInjected = await _injectionMonitor.areFunctionsInjected();
+
+    if (!alreadyInjected) {
+      debugPrint('💉 [SpotifyController] Functions not found, injecting JavaScript...');
+      await _injectJavaScript();
+    } else {
+      debugPrint('✅ [SpotifyController] Functions already present, skipping injection');
+    }
+
+    final urlString = url?.toString() ?? '';
+
+    // Add small delay to ensure JavaScript is fully executed
+    await Future.delayed(const Duration(milliseconds: 500));
+
     store.isInitialized.value = true;
     debugPrint('✅ [SpotifyController] WebView initialized and ready for scraping');
+
+    // Start periodic scraping now that JavaScript is injected
+    _startPeriodicScrapingActual();
+
     // Only defer this specific notification since it happens during build
     WidgetsBinding.instance.addPostFrameCallback((_) {
       notifyListeners();
@@ -170,35 +194,59 @@ class SpotifyController extends ChangeNotifier {
   }
 
   Future<void> _injectJavaScript() async {
-    await _webViewService.evaluateJavascript(SpotifyScraperService.initScript);
+    try {
+      // First test basic JavaScript execution
+      final basicTest = await _webViewService.runJavascriptWithResult('1 + 1');
+      debugPrint('🧪 Basic JS test (1+1): $basicTest');
+
+      // Load all JavaScript from files and inject into WebView
+      final scripts = await JavaScriptLoaderService.getScriptsForInjection();
+      debugPrint('📝 JavaScript loaded, length: ${scripts.length} characters');
+
+      await _webViewService.runJavascript(scripts);
+      debugPrint('✅ JavaScript injected successfully from files');
+
+      // Wait a moment for JavaScript to execute
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // Verify functions exist
+      final testResult = await _webViewService.runJavascriptWithResult(
+        'typeof window.getPlayingInfo'
+      );
+      debugPrint('🔍 window.getPlayingInfo type: $testResult');
+
+      // List all functions on window object starting with 'get' or 'spotify'
+      final functionsCheck = await _webViewService.runJavascriptWithResult('''
+        Object.keys(window).filter(key =>
+          key.startsWith('get') ||
+          key.startsWith('spotify') ||
+          key === 'PlaylistController'
+        ).join(', ')
+      ''');
+      debugPrint('📋 Available functions: $functionsCheck');
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error injecting JavaScript: $e');
+      debugPrint('Stack trace: $stackTrace');
+    }
   }
 
   void _startPeriodicScraping() {
+    // Cancel any existing timer
     _scrapingTimer?.cancel();
+    _scrapingTimer = null;
 
-    debugPrint('⏰ [SpotifyController] Starting periodic scraping in 2 seconds...');
+    debugPrint('⏰ [SpotifyController] Periodic scraping will start after WebView initialization...');
+  }
 
-    // Start periodic scraping after initial delay
-    Timer(const Duration(seconds: 2), () {
-      debugPrint('✅ [SpotifyController] Periodic scraping started (every 1 second)');
-      _scrapingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-        if (store.isInitialized.value && !store.showWebView.value) {
-          _scrapeAllInfo();
-        }
-      });
-    });
+  void _startPeriodicScrapingActual() {
+    // Cancel any existing timer
+    _scrapingTimer?.cancel();
+    _scrapingTimer = null;
 
-    // Debug: Print current URL every second
-    _urlDebugTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
-      if (_webViewService.controller != null) {
-        try {
-          final url = await _webViewService.controller!.getUrl();
-          if (url != null) {
-            debugPrint('🔗 WebView URL: ${url.toString()}');
-          }
-        } catch (e) {
-          // Ignore errors
-        }
+    debugPrint('✅ [SpotifyController] Starting periodic scraping (every 1 second)');
+    _scrapingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (store.isInitialized.value && !store.showWebView.value) {
+        _scrapeAllInfo();
       }
     });
   }
@@ -229,35 +277,36 @@ class SpotifyController extends ChangeNotifier {
       return;
     }
 
+    // Quick check if functions are still present before scraping
+    final functionsPresent = await _injectionMonitor.areFunctionsInjected();
+    if (!functionsPresent) {
+      debugPrint('⚠️ [SpotifyController] Functions missing during scrape, monitor will reinject');
+      return; // Skip this scrape, let monitor handle reinjection
+    }
+
     try {
-      // Batch scrape all info at once
-      final playbackResult = await _webViewService.evaluateJavascriptWithResult(
-        'JSON.stringify(getPlayingInfo())'
+      // Batch scrape all info at once - functions return JSON strings
+      final playbackResult = await _webViewService.runJavascriptWithResult(
+        'window.getPlayingInfo()'
       );
 
-      final userResult = await _webViewService.evaluateJavascriptWithResult(
-        'JSON.stringify(getUserInfo())'
+      final userResult = await _webViewService.runJavascriptWithResult(
+        'window.getUserInfo()'
       );
 
       app_models.PlaybackState? newState;
       User? newUser;
 
-      // Parse playback info
+      // Parse playback info using proper JSON parsing
       if (playbackResult != null && playbackResult != 'null') {
         final String jsonString = playbackResult.toString();
-        final cleanJson = jsonString.replaceAll(r'\"', '"');
-        if (cleanJson.contains('track')) {
-          newState = SpotifyScraperService.parsePlaybackInfo(cleanJson);
-        }
+        newState = SpotifyScraperService.parsePlaybackInfo(jsonString);
       }
 
-      // Parse user info
+      // Parse user info using proper JSON parsing
       if (userResult != null && userResult != 'null') {
         final String jsonString = userResult.toString();
-        final cleanJson = jsonString.replaceAll(r'\"', '"');
-        if (cleanJson.contains('isLoggedIn')) {
-          newUser = SpotifyScraperService.parseUserInfo(cleanJson);
-        }
+        newUser = SpotifyScraperService.parseUserInfo(jsonString);
       }
 
       // Update store with all values at once
@@ -292,7 +341,7 @@ class SpotifyController extends ChangeNotifier {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       notifyListeners();
     });
-    await _webViewService.evaluateJavascript(SpotifyActionsService.playScript);
+    await _webViewService.runJavascript(SpotifyActionsService.playScript);
   }
 
   Future<void> pause() async {
@@ -300,12 +349,12 @@ class SpotifyController extends ChangeNotifier {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       notifyListeners();
     });
-    await _webViewService.evaluateJavascript(SpotifyActionsService.pauseScript);
+    await _webViewService.runJavascript(SpotifyActionsService.pauseScript);
   }
 
   Future<void> next() async {
     store.startUserControl();
-    await _webViewService.evaluateJavascript(SpotifyActionsService.nextScript);
+    await _webViewService.runJavascript(SpotifyActionsService.nextScript);
     // Force scrape after delay to get new track info
     Future.delayed(const Duration(seconds: 2), () {
       _scrapeAllInfo();
@@ -314,7 +363,7 @@ class SpotifyController extends ChangeNotifier {
 
   Future<void> previous() async {
     store.startUserControl();
-    await _webViewService.evaluateJavascript(SpotifyActionsService.previousScript);
+    await _webViewService.runJavascript(SpotifyActionsService.previousScript);
     // Force scrape after delay to get new track info
     Future.delayed(const Duration(seconds: 2), () {
       _scrapeAllInfo();
@@ -326,7 +375,7 @@ class SpotifyController extends ChangeNotifier {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       notifyListeners();
     });
-    await _webViewService.evaluateJavascript(SpotifyActionsService.toggleShuffleScript);
+    await _webViewService.runJavascript(SpotifyActionsService.toggleShuffleScript);
   }
 
   Future<void> toggleRepeat() async {
@@ -334,7 +383,7 @@ class SpotifyController extends ChangeNotifier {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       notifyListeners();
     });
-    await _webViewService.evaluateJavascript(SpotifyActionsService.toggleRepeatScript);
+    await _webViewService.runJavascript(SpotifyActionsService.toggleRepeatScript);
   }
 
   Future<void> toggleLike() async {
@@ -342,7 +391,7 @@ class SpotifyController extends ChangeNotifier {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       notifyListeners();
     });
-    await _webViewService.evaluateJavascript(SpotifyActionsService.toggleLikeScript);
+    await _webViewService.runJavascript(SpotifyActionsService.toggleLikeScript);
   }
 
   Future<void> seekToPosition(double percentage) async {
@@ -353,7 +402,7 @@ class SpotifyController extends ChangeNotifier {
     store.updateProgressSmoothly(newProgressMs);
     notifyListeners();
 
-    await _webViewService.evaluateJavascript(
+    await _webViewService.runJavascript(
       SpotifyActionsService.seekToPositionScript(percentage)
     );
 
@@ -365,7 +414,7 @@ class SpotifyController extends ChangeNotifier {
 
   // Search methods
   Future<void> search(String query) async {
-    await _webViewService.evaluateJavascript(SpotifyActionsService.searchScript(query));
+    await _webViewService.runJavascript(SpotifyActionsService.searchScript(query));
   }
 
   Future<List<SearchResult>> searchAndGetResults(String query) async {
@@ -373,7 +422,7 @@ class SpotifyController extends ChangeNotifier {
     await Future.delayed(const Duration(seconds: 2));
 
     try {
-      final result = await _webViewService.evaluateJavascriptWithResult(
+      final result = await _webViewService.runJavascriptWithResult(
         SpotifyActionsService.searchResultsScript
       );
       if (result != null && result != 'null') {
@@ -430,7 +479,7 @@ class SpotifyController extends ChangeNotifier {
     store.clearUserData();
 
     // Execute logout script in WebView
-    await _webViewService.evaluateJavascript(SpotifyActionsService.logoutScript);
+    await _webViewService.runJavascript(SpotifyActionsService.logoutScript);
 
     // Navigate back to Spotify home
     await navigateToSpotify();
@@ -441,7 +490,7 @@ class SpotifyController extends ChangeNotifier {
 
   // Track methods
   Future<void> playTrackAtIndex(int index) async {
-    await _webViewService.evaluateJavascript(
+    await _webViewService.runJavascript(
       SpotifyActionsService.playTrackAtIndexScript(index)
     );
   }
@@ -474,7 +523,7 @@ class SpotifyController extends ChangeNotifier {
       debugPrint('🔍 Attempting to click on Liked Songs element...');
 
       // Click on the Liked Songs element
-      final result = await _webViewService.evaluateJavascriptWithResult(
+      final result = await _webViewService.runJavascriptWithResult(
         SpotifyActionsService.openLikedSongsScript
       );
 
@@ -510,10 +559,8 @@ class SpotifyController extends ChangeNotifier {
   }
 
   Future<void> initializePlaylistController() async {
-    // Initialize the PlaylistController
-    await _webViewService.evaluateJavascript(
-      SpotifyActionsService.initPlaylistControllerScript
-    );
+    // PlaylistController is already initialized when scripts are loaded
+    debugPrint('✅ PlaylistController already initialized from loaded scripts');
 
     // Small delay to ensure DOM is ready
     await Future.delayed(const Duration(milliseconds: 500));
@@ -524,7 +571,7 @@ class SpotifyController extends ChangeNotifier {
 
   Future<void> updateTracksFromController() async {
     try {
-      final result = await _webViewService.evaluateJavascriptWithResult(
+      final result = await _webViewService.runJavascriptWithResult(
         SpotifyActionsService.getLoadedTracksScript
       );
 
@@ -557,7 +604,7 @@ class SpotifyController extends ChangeNotifier {
     if (_webViewService.controller == null) return;
 
     try {
-      final result = await _webViewService.evaluateJavascriptWithResult(
+      final result = await _webViewService.runJavascriptWithResult(
         SpotifyActionsService.scrapeSongsScript
       );
 
@@ -596,7 +643,7 @@ class SpotifyController extends ChangeNotifier {
   }
 
   Future<void> scrollSpotifyPage(double offset) async {
-    await _webViewService.evaluateJavascript(
+    await _webViewService.runJavascript(
       SpotifyActionsService.scrollSpotifyPageScript(offset)
     );
   }
@@ -606,7 +653,7 @@ class SpotifyController extends ChangeNotifier {
     if (store.isLoadingSongs.value) return;
 
     try {
-      final currentUrl = await _webViewService.evaluateJavascriptWithResult(
+      final currentUrl = await _webViewService.runJavascriptWithResult(
         'window.location.href'
       );
 
@@ -615,7 +662,7 @@ class SpotifyController extends ChangeNotifier {
         final previousCount = store.songs.value.length;
 
         // Use PlaylistController to load more tracks
-        await _webViewService.evaluateJavascriptWithResult(
+        await _webViewService.runJavascriptWithResult(
           SpotifyActionsService.loadMoreSongsScript
         );
 

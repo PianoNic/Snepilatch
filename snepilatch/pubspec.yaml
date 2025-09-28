@@ -74,6 +74,7 @@ flutter:
   assets:
     - assets/snepilatch_Logo.png
     - assets/snepilatch_Logo_dev.png
+    - assets/js/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

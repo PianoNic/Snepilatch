@@ -89,8 +89,6 @@ class _UserPageState extends State<UserPage> {
                 ThemeSettings(
                   themeService: widget.spotifyController.themeService,
                 ),
-                // Debug Section
-                _buildDebugSection(context),
                 // Update Section
                 _buildUpdateSection(context),
                 const SizedBox(height: 16),
@@ -179,8 +177,12 @@ class _UserPageState extends State<UserPage> {
           label: const Text('Login to Spotify'),
           style: ElevatedButton.styleFrom(
             minimumSize: const Size(double.infinity, 48),
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            foregroundColor: Colors.white,
+            backgroundColor: Theme.of(context).brightness == Brightness.dark
+                ? Theme.of(context).colorScheme.primaryContainer
+                : Theme.of(context).colorScheme.primary,
+            foregroundColor: Theme.of(context).brightness == Brightness.dark
+                ? Theme.of(context).colorScheme.onPrimaryContainer
+                : Colors.white,
           ),
         ),
       );
@@ -196,8 +198,12 @@ class _UserPageState extends State<UserPage> {
             label: const Text('Open Spotify Web'),
             style: ElevatedButton.styleFrom(
               minimumSize: const Size(double.infinity, 48),
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Colors.white,
+              backgroundColor: Theme.of(context).brightness == Brightness.dark
+                  ? Theme.of(context).colorScheme.primaryContainer
+                  : Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).brightness == Brightness.dark
+                  ? Theme.of(context).colorScheme.onPrimaryContainer
+                  : Colors.white,
             ),
           ),
         ),
@@ -215,34 +221,6 @@ class _UserPageState extends State<UserPage> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildDebugSection(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.all(16),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Debug Tools',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 16),
-            SwitchListTile(
-              title: const Text('Show WebView Debug'),
-              subtitle: const Text('Display WebView overlay for debugging'),
-              value: widget.spotifyController.debugWebViewVisible,
-              onChanged: (bool value) {
-                widget.spotifyController.setDebugWebViewVisible(value);
-              },
-              activeColor: Theme.of(context).colorScheme.primary,
-            ),
-          ],
-        ),
-      ),
     );
   }
 

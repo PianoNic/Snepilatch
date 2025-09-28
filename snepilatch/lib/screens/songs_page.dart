@@ -109,12 +109,12 @@ class _SongsPageState extends State<SongsPage> {
   String _buildSubtitle(Song song) {
     final parts = <String>[];
 
-    if (song.artist != null && song.artist!.isNotEmpty) {
-      parts.add(song.artist!);
+    if (song.artist.isNotEmpty) {
+      parts.add(song.artist);
     }
 
-    if (song.album != null && song.album!.isNotEmpty) {
-      parts.add(song.album!);
+    if (song.album.isNotEmpty) {
+      parts.add(song.album);
     }
 
     // If we have both artist and album, join with bullet

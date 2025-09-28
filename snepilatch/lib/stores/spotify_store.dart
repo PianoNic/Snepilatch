@@ -160,10 +160,10 @@ class SpotifyStore {
     isUserControlling.value = true;
     _lastUserAction = DateTime.now();
 
-    // Auto-release control after 5 seconds
-    Future.delayed(const Duration(seconds: 5), () {
+    // Auto-release control after 2 seconds
+    Future.delayed(const Duration(seconds: 2), () {
       if (_lastUserAction != null &&
-          DateTime.now().difference(_lastUserAction!).inSeconds >= 5) {
+          DateTime.now().difference(_lastUserAction!).inSeconds >= 2) {
         isUserControlling.value = false;
       }
     });

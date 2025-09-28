@@ -77,22 +77,42 @@ class UpdateService {
 
   static bool _isNewerVersion(String current, String latest) {
     try {
-      final currentParts = current.split('.').map(int.parse).toList();
-      final latestParts = latest.split('.').map(int.parse).toList();
+      // Handle development versions
+      if (current.toLowerCase().contains('dev') ||
+          current.toLowerCase().contains('alpha') ||
+          current.toLowerCase().contains('beta')) {
+        debugPrint('Development version detected: $current. Showing updates.');
+        return true; // Always show updates for development versions
+      }
+
+      // Clean version strings - remove any non-numeric characters except dots
+      final cleanCurrent = current.replaceAll(RegExp(r'[^0-9.]'), '');
+      final cleanLatest = latest.replaceAll(RegExp(r'[^0-9.]'), '');
+
+      // Handle empty or invalid versions
+      if (cleanCurrent.isEmpty || cleanLatest.isEmpty) {
+        debugPrint('Invalid version format - current: $current, latest: $latest');
+        return false;
+      }
+
+      final currentParts = cleanCurrent.split('.').map((s) => int.tryParse(s) ?? 0).toList();
+      final latestParts = cleanLatest.split('.').map((s) => int.tryParse(s) ?? 0).toList();
+
+      // Ensure we have at least 3 parts for comparison
+      while (currentParts.length < 3) currentParts.add(0);
+      while (latestParts.length < 3) latestParts.add(0);
 
       for (var i = 0; i < 3; i++) {
-        final currentPart = i < currentParts.length ? currentParts[i] : 0;
-        final latestPart = i < latestParts.length ? latestParts[i] : 0;
-
-        if (latestPart > currentPart) {
+        if (latestParts[i] > currentParts[i]) {
           return true;
-        } else if (latestPart < currentPart) {
+        } else if (latestParts[i] < currentParts[i]) {
           return false;
         }
       }
       return false;
     } catch (e) {
       debugPrint('Error comparing versions: $e');
+      debugPrint('Current version: $current, Latest version: $latest');
       return false;
     }
   }

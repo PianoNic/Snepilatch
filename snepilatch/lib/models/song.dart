@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class Song {
   final String title;
   final String artist;
@@ -35,5 +37,40 @@ class Song {
       if (duration != null) 'duration': duration!,
       'index': index.toString(),
     };
+  }
+
+  Map<String, dynamic> toJson() => {
+        'title': title,
+        'artist': artist,
+        'album': album,
+        'image': imageUrl,
+        'duration': duration,
+        'index': index,
+      };
+
+  factory Song.fromJson(Map<String, dynamic> json) {
+    // Convert to high quality image URL
+    String? imageUrl = json['image'];
+    if (imageUrl != null && imageUrl.contains('ab67616d00004851')) {
+      imageUrl = imageUrl.replaceAll('ab67616d00004851', 'ab67616d00001e02');
+    }
+
+    return Song(
+      title: json['title'] ?? 'Unknown Song',
+      artist: json['artist'] ?? 'Unknown Artist',
+      album: json['album'] ?? '',
+      imageUrl: imageUrl,
+      duration: json['duration'],
+      index: json['index'] ?? 0,
+    );
+  }
+
+  static List<Song> fromJsonList(String jsonString) {
+    try {
+      final List<dynamic> jsonList = jsonDecode(jsonString);
+      return jsonList.map((json) => Song.fromJson(json)).toList();
+    } catch (e) {
+      return [];
+    }
   }
 }

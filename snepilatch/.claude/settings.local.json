@@ -17,7 +17,8 @@
       "Bash(dart run flutter_launcher_icons:*)",
       "Bash(flutter build:*)",
       "Read(//f/Coding/Snepilatch/**)",
-      "Bash(flutter run:*)"
+      "Bash(flutter run:*)",
+      "Bash(flutter:*)"
     ],
     "deny": [],
     "ask": []

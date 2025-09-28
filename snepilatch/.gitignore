@@ -116,3 +116,12 @@ coverage_badge.svg
 # Local History for Visual Studio Code
 .history/
 .ionide/
+
+# Keystore files - NEVER commit these!
+/android/key.properties
+/android/app/*.keystore
+/android/app/*.jks
+/android/*.keystore
+/android/*.jks
+*.keystore
+*.jks

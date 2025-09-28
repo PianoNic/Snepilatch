@@ -18,7 +18,8 @@
       "Bash(flutter build:*)",
       "Read(//f/Coding/Snepilatch/**)",
       "Bash(flutter run:*)",
-      "Bash(flutter:*)"
+      "Bash(flutter:*)",
+      "Bash(chmod:*)"
     ],
     "deny": [],
     "ask": []

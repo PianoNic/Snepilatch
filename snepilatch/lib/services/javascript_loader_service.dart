@@ -9,6 +9,7 @@ class JavaScriptLoaderService {
   static const String actionsScriptPath = 'assets/js/spotify-actions.js';
   static const String playlistControllerScriptPath = 'assets/js/spotify-playlist-controller.js';
   static const String homepageScriptPath = 'assets/js/spotify-homepage.js';
+  static const String adBlockerScriptPath = 'assets/js/spotify-adblocker.js';
 
   /// Load JavaScript content from an asset file
   static Future<String> loadJavaScript(String assetPath) async {
@@ -50,6 +51,11 @@ class JavaScriptLoaderService {
     return loadJavaScript(homepageScriptPath);
   }
 
+  /// Load the AdBlocker JavaScript
+  static Future<String> loadAdBlockerScript() async {
+    return loadJavaScript(adBlockerScriptPath);
+  }
+
   /// Load all JavaScript files and return combined content
   static Future<String> loadAllScripts() async {
     final List<String> scripts = await Future.wait([
@@ -57,6 +63,7 @@ class JavaScriptLoaderService {
       loadActionsScript(),
       loadPlaylistControllerScript(),
       loadHomepageScript(),
+      loadAdBlockerScript(),
     ]);
 
     return scripts.where((script) => script.isNotEmpty).join('\n\n');

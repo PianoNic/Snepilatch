@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../controllers/spotify_controller.dart';
 import '../models/playback_state.dart';
+import 'video_frame_display.dart';
 
 class ExpandedPlayer extends StatefulWidget {
   final SpotifyController spotifyController;
@@ -199,59 +200,71 @@ class _ExpandedPlayerState extends State<ExpandedPlayer> with TickerProviderStat
             offset: slideOffset,
             child: Material(
               color: Colors.transparent,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
-                      Theme.of(context).colorScheme.surface,
-                    ],
+              child: Stack(
+                children: [
+                  // Video frame background
+                  VideoFrameDisplay(
+                    spotifyController: widget.spotifyController,
+                    opacity: 0.5,
+                    blurAmount: 30.0,
                   ),
-                ),
-                child: SafeArea(
-                  child: GestureDetector(
-                    onVerticalDragUpdate: _handleDragUpdate,
-                    onVerticalDragEnd: _handleDragEnd,
-                    child: Column(
-                      children: [
-                      // Draggable header with handle bar
-                      _buildHeader(context),
-                      // Content - no scrolling, everything fits on one page
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                          child: Column(
-                            children: [
-                              // Album art
-                              Expanded(
-                                flex: 5,
-                                child: Center(
-                                  child: _buildAlbumArt(context),
+                  // Content on top of video
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Theme.of(context).colorScheme.surface.withValues(alpha: 0.0),
+                          Theme.of(context).colorScheme.surface.withValues(alpha: 0.0),
+                        ],
+                      ),
+                    ),
+                    child: SafeArea(
+                      child: GestureDetector(
+                        onVerticalDragUpdate: _handleDragUpdate,
+                        onVerticalDragEnd: _handleDragEnd,
+                        child: Column(
+                          children: [
+                            // Draggable header with handle bar
+                            _buildHeader(context),
+                            // Content - no scrolling, everything fits on one page
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                                child: Column(
+                                  children: [
+                                    // Album art
+                                    Expanded(
+                                      flex: 5,
+                                      child: Center(
+                                        child: _buildAlbumArt(context),
+                                      ),
+                                    ),
+                                    // Track info
+                                    _buildTrackInfo(),
+                                    const SizedBox(height: 20),
+                                    // Progress bar
+                                    _buildProgressBar(context),
+                                    const SizedBox(height: 24),
+                                    // Main controls
+                                    _buildMainControls(),
+                                    const SizedBox(height: 40),
+                                  ],
                                 ),
                               ),
-                              // Track info
-                              _buildTrackInfo(),
-                              const SizedBox(height: 20),
-                              // Progress bar
-                              _buildProgressBar(context),
-                              const SizedBox(height: 24),
-                              // Main controls
-                              _buildMainControls(),
-                              const SizedBox(height: 40),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
           ),
-        ),
-      );
+        );
+
       },
     );
   }

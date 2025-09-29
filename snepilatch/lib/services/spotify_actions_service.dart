@@ -47,4 +47,11 @@ class SpotifyActionsService {
   static const String getLoadedTracksScript = 'window.getLoadedTracks();';
   static const String debugScrollScript = 'window.debugScrollInfo();';
   static const String resetLoadingStateScript = 'window.resetLoadingState();';
+
+  // Now Playing View scripts
+  static const String openNPVScript = 'window.spotifyToggleNPV && window.spotifyToggleNPV(true);';
+  static const String closeNPVScript = 'window.spotifyToggleNPV && window.spotifyToggleNPV(false);';
+  static const String toggleNPVScript = 'window.spotifyToggleNPV && window.spotifyToggleNPV();';
+  static const String checkNPVStateScript = 'window.isNPVOpen ? window.isNPVOpen() : false;';
+  static const String ensureNPVForVideoScript = 'window.ensureNPVOpenForVideo && window.ensureNPVOpenForVideo();';
 }

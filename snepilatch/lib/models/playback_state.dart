@@ -12,8 +12,10 @@ class PlaybackState {
   final String? duration;
   final int progressMs;
   final int durationMs;
+  final String? videoUrl;
+  final String? videoThumbnail;
 
-  PlaybackState({
+  const PlaybackState({
     this.isPlaying = false,
     this.currentTrack,
     this.currentArtist,
@@ -25,6 +27,8 @@ class PlaybackState {
     this.duration,
     this.progressMs = 0,
     this.durationMs = 0,
+    this.videoUrl,
+    this.videoThumbnail,
   });
 
   PlaybackState copyWith({
@@ -39,6 +43,8 @@ class PlaybackState {
     String? duration,
     int? progressMs,
     int? durationMs,
+    String? videoUrl,
+    String? videoThumbnail,
   }) {
     return PlaybackState(
       isPlaying: isPlaying ?? this.isPlaying,
@@ -52,6 +58,8 @@ class PlaybackState {
       duration: duration ?? this.duration,
       progressMs: progressMs ?? this.progressMs,
       durationMs: durationMs ?? this.durationMs,
+      videoUrl: videoUrl ?? this.videoUrl,
+      videoThumbnail: videoThumbnail ?? this.videoThumbnail,
     );
   }
 
@@ -72,6 +80,8 @@ class PlaybackState {
         'duration': duration,
         'progressMs': progressMs,
         'durationMs': durationMs,
+        'videoUrl': videoUrl,
+        'videoThumbnail': videoThumbnail,
       };
 
   factory PlaybackState.fromJson(Map<String, dynamic> json) {
@@ -93,6 +103,8 @@ class PlaybackState {
       duration: json['duration'] ?? '0:00',
       progressMs: json['progressMs'] ?? 0,
       durationMs: json['durationMs'] ?? 0,
+      videoUrl: json['videoUrl'],
+      videoThumbnail: json['videoThumbnail'],
     );
   }
 

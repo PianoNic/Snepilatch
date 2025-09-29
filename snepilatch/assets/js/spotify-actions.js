@@ -198,6 +198,45 @@
         return tryClickSearchNavigation();
     };
 
+    // Inject Now Playing View toggle function into window
+    window.spotifyToggleNPV = function(forceOpen) {
+        const npvButton = document.querySelector('[data-testid="control-button-npv"]');
+        if (npvButton) {
+            const isActive = npvButton.getAttribute('data-active') === 'true';
+
+            // If forceOpen is true, only click if not already active
+            if (forceOpen && !isActive) {
+                npvButton.click();
+                console.log('Now Playing View opened');
+                return true;
+            }
+            // If forceOpen is false, only click if active
+            else if (forceOpen === false && isActive) {
+                npvButton.click();
+                console.log('Now Playing View closed');
+                return true;
+            }
+            // If no forceOpen specified, toggle
+            else if (forceOpen === undefined) {
+                npvButton.click();
+                console.log('Now Playing View toggled');
+                return true;
+            }
+
+            return false;
+        }
+        return false;
+    };
+
+    // Inject function to check NPV state
+    window.isNPVOpen = function() {
+        const npvButton = document.querySelector('[data-testid="control-button-npv"]');
+        if (npvButton) {
+            return npvButton.getAttribute('data-active') === 'true';
+        }
+        return false;
+    };
+
     // Inject search function into window
     window.spotifySearch = function(query) {
         // Wait for search page to load if needed

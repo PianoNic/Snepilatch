@@ -10,7 +10,7 @@
 
             // If login button exists, user is NOT logged in
             if (loginButton) {
-                console.log('Login button found - user is NOT logged in');
+                // Login button found - user is NOT logged in
                 return false;
             }
 
@@ -19,7 +19,7 @@
 
             // User is logged in if login button doesn't exist AND we have some indication of a user
             const isLoggedIn = !loginButton && (userButton !== null || document.cookie.includes('sp_'));
-            console.log('Login status check:', isLoggedIn ? 'Logged in' : 'Not logged in');
+            // Login status check
             return isLoggedIn;
         } catch (e) {
             console.error('Error checking login status:', e);
@@ -83,6 +83,30 @@
                 durationMs = parseInt(progressBarInput.max) || 0;
             }
 
+            // Check for video in Now Playing View
+            let videoUrl = null;
+            let videoThumbnail = null;
+
+            // Trigger video check if track changed
+            const currentTrackTitle = trackElement?.textContent || '';
+            if (window.lastTrackTitle && window.lastTrackTitle !== currentTrackTitle && currentTrackTitle) {
+                console.log('🎵 Track changed in scraper, checking for video...');
+                if (window.checkForVideoCanvas) {
+                    window.checkForVideoCanvas();
+                }
+            }
+            window.lastTrackTitle = currentTrackTitle;
+
+            // Get latest video frame if available
+            if (window.latestVideoData && window.latestVideoData.success) {
+                videoThumbnail = window.latestVideoData.frame;
+                // Don't log every time, just when we first get it
+                if (!window.hasLoggedVideoCapture) {
+                    console.log('🖼️ Video frame available for Flutter');
+                    window.hasLoggedVideoCapture = true;
+                }
+            }
+
             return JSON.stringify({
                 isPlaying: isPlaying,
                 track: trackElement?.textContent || '',
@@ -94,7 +118,9 @@
                 currentTime: currentTime,
                 duration: duration,
                 progressMs: progressMs,
-                durationMs: durationMs
+                durationMs: durationMs,
+                videoUrl: videoUrl,
+                videoThumbnail: videoThumbnail
             });
         } catch (e) {
             return JSON.stringify({

@@ -18,6 +18,9 @@ class SpotifyStore {
   final ValueNotifier<String> duration = ValueNotifier('0:00');
   final ValueNotifier<int> progressMs = ValueNotifier(0);
   final ValueNotifier<int> durationMs = ValueNotifier(0);
+  final ValueNotifier<String?> videoUrl = ValueNotifier(null);
+  final ValueNotifier<String?> videoThumbnail = ValueNotifier(null);
+  final ValueNotifier<Map<String, dynamic>?> videoData = ValueNotifier(null);
 
   // User state signals
   final ValueNotifier<bool> isLoggedIn = ValueNotifier(false);
@@ -64,6 +67,14 @@ class SpotifyStore {
           debugPrint('  🖼️ Album Art updated');
           currentAlbumArt.value = newState.currentAlbumArt;
         }
+        if (videoUrl.value != newState.videoUrl) {
+          debugPrint('  🎬 Video URL updated');
+          videoUrl.value = newState.videoUrl;
+        }
+        if (videoThumbnail.value != newState.videoThumbnail) {
+          // Don't log thumbnail changes as they happen frequently
+          videoThumbnail.value = newState.videoThumbnail;
+        }
       } else {
         // Update all fields if user is not controlling
         if (isPlaying.value != newState.isPlaying) {
@@ -91,6 +102,15 @@ class SpotifyStore {
             debugPrint('  🖼️ Album Art updated');
             currentAlbumArt.value = newState.currentAlbumArt;
           }
+        }
+        if (videoUrl.value != newState.videoUrl) {
+          // Always update video URL even if it's null (track might not have video)
+          debugPrint('  🎬 Video URL updated');
+          videoUrl.value = newState.videoUrl;
+        }
+        if (videoThumbnail.value != newState.videoThumbnail) {
+          // Don't log thumbnail changes as they happen frequently
+          videoThumbnail.value = newState.videoThumbnail;
         }
         if (isCurrentTrackLiked.value != newState.isCurrentTrackLiked) {
           debugPrint('  ❤️ Liked: $isCurrentTrackLiked → ${newState.isCurrentTrackLiked}');

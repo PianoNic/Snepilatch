@@ -208,6 +208,9 @@ class SpotifyController extends ChangeNotifier {
       final basicTest = await _webViewService.runJavascriptWithResult('1 + 1');
       debugPrint('🧪 Basic JS test (1+1): $basicTest');
 
+      // Clear cache to load updated scripts
+      JavaScriptLoaderService.clearCache();
+
       // Load all JavaScript from files and inject into WebView
       final scripts = await JavaScriptLoaderService.getScriptsForInjection();
       debugPrint('📝 JavaScript loaded, length: ${scripts.length} characters');
@@ -229,7 +232,10 @@ class SpotifyController extends ChangeNotifier {
         Object.keys(window).filter(key =>
           key.startsWith('get') ||
           key.startsWith('spotify') ||
-          key === 'PlaylistController'
+          key === 'PlaylistController' ||
+          key === 'extractSpotifyVideo' ||
+          key === 'checkForVideoCanvas' ||
+          key === 'toggleNPV'
         ).join(', ')
       ''');
       debugPrint('📋 Available functions: $functionsCheck');
@@ -337,9 +343,15 @@ class SpotifyController extends ChangeNotifier {
         'window.getHomepageSections ? window.getHomepageSections() : "[]"'
       );
 
+      // Check for video data
+      final videoDataResult = await _webViewService.runJavascriptWithResult(
+        'window.latestVideoData ? JSON.stringify(window.latestVideoData) : null'
+      );
+
       app_models.PlaybackState? newState;
       User? newUser;
       List<HomepageSection>? newHomepageSections;
+      Map<String, dynamic>? newVideoData;
 
       // Parse playback info using proper JSON parsing
       if (playbackResult != null && playbackResult != 'null') {
@@ -360,6 +372,22 @@ class SpotifyController extends ChangeNotifier {
         if (newHomepageSections.isNotEmpty) {
           store.homepageSections.value = newHomepageSections;
         }
+      }
+
+      // Parse video data if available
+      if (videoDataResult != null && videoDataResult != 'null') {
+        try {
+          newVideoData = jsonDecode(videoDataResult.toString());
+          if (newVideoData != null && newVideoData['success'] == true) {
+            debugPrint('🎥 Video data available: ${newVideoData['sizeMB']} MB');
+            // Store video data for the Base64VideoPlayer to use
+            store.videoData.value = newVideoData;
+          }
+        } catch (e) {
+          debugPrint('Error parsing video data: $e');
+        }
+      } else {
+        debugPrint('🎥 Checking for video data: $videoDataResult');
       }
 
       // Update store with all values at once
@@ -632,17 +660,71 @@ class SpotifyController extends ChangeNotifier {
     }
   }
 
-  Future<void> _flashWebView() async {
-    debugPrint('✨ Flashing WebView to show library loaded');
+  Future<void> _flashWebView({int durationMs = 800}) async {
+    debugPrint('✨ Flashing WebView for ${durationMs}ms');
 
     // Animate opacity from 0.0 to 1.0
     webViewOpacity.value = 1.0;
 
-    // Wait for 800ms to let user see the library
-    await Future.delayed(const Duration(milliseconds: 800));
+    // Wait for specified duration
+    await Future.delayed(Duration(milliseconds: durationMs));
 
     // Fade back to 0.0
     webViewOpacity.value = 0.0;
+  }
+
+  Future<void> _flashWebViewForVideo() async {
+    debugPrint('🎬 Flashing WebView for video capture');
+
+    // Show with partial opacity for longer duration
+    webViewOpacity.value = 0.7;
+
+    // Keep visible for 1.5 seconds for video operations
+    await Future.delayed(const Duration(milliseconds: 1500));
+
+    // Fade back out
+    webViewOpacity.value = 0.0;
+  }
+
+  // JavaScript execution helpers
+  Future<void> runJavaScript(String script) async {
+    await _webViewService.runJavascript(script);
+  }
+
+  Future<dynamic> runJavaScriptWithResult(String script) async {
+    return await _webViewService.runJavascriptWithResult(script);
+  }
+
+  // Now Playing View management
+  Future<void> ensureNPVOpenForVideo() async {
+    try {
+      final result = await _webViewService.runJavascriptWithResult(
+        SpotifyActionsService.ensureNPVForVideoScript
+      );
+      if (result == true || result == 'true') {
+        debugPrint('📹 NPV opened for video canvas');
+      }
+    } catch (e) {
+      debugPrint('Error ensuring NPV for video: $e');
+    }
+  }
+
+  Future<void> openNPV() async {
+    try {
+      await _webViewService.runJavascript(SpotifyActionsService.openNPVScript);
+      debugPrint('📹 NPV opened');
+    } catch (e) {
+      debugPrint('Error opening NPV: $e');
+    }
+  }
+
+  Future<void> closeNPV() async {
+    try {
+      await _webViewService.runJavascript(SpotifyActionsService.closeNPVScript);
+      debugPrint('📹 NPV closed');
+    } catch (e) {
+      debugPrint('Error closing NPV: $e');
+    }
   }
 
   void setDebugWebViewVisible(bool value) {
@@ -664,6 +746,38 @@ class SpotifyController extends ChangeNotifier {
 
     // Trigger logout callback to show loading screen
     onLogout?.call();
+  }
+
+  /// Test playing a track with video canvas
+  Future<void> playTrackWithVideo() async {
+    if (_webViewService.controller == null) return;
+
+    try {
+      debugPrint('🎬 Testing video track playback...');
+
+      // Flash the WebView to help with video detection
+      await _flashWebViewForVideo();
+
+      // Call the JavaScript function to search and play a track with video
+      await _webViewService.runJavascript('window.playTrackWithVideo && window.playTrackWithVideo()');
+
+      // Wait a moment for the track to load and search to complete
+      await Future.delayed(const Duration(seconds: 6));
+
+      // Flash again with longer duration to ensure NPV opens and video loads
+      await _flashWebViewForVideo();
+
+      // Force check for video
+      await _webViewService.runJavascript('window.forceCheckVideo && window.forceCheckVideo()');
+
+      // One more flash to capture the video frame
+      await Future.delayed(const Duration(seconds: 2));
+      await _flashWebView(durationMs: 1200);
+
+      debugPrint('🎬 Video test completed. Check console for results.');
+    } catch (e) {
+      debugPrint('❌ Error testing video: $e');
+    }
   }
 
   // Track methods

@@ -28,8 +28,8 @@
 <p align="center">
   <img src="./assets/screenshot_home.PNG" width="200" alt="Home">
   <img src="./assets/screenshot_player.PNG" width="200" alt="Player">
-  <img src="./assets/screenshot_search.PNG" width="200" alt="Search">
   <img src="./assets/screenshot_library.PNG" width="200" alt="Library">
+  <img src="./assets/screenshot_search.PNG" width="200" alt="Search">
 </p>
 
 ## Installation

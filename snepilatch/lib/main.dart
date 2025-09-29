@@ -58,9 +58,14 @@ class _MyAppState extends State<MyApp> {
       // Wait for loading to complete before checking updates
       if (!_showLoadingScreen) {
         await Future.delayed(const Duration(seconds: 2));
+
+        // Check if State is still mounted after async gap
+        if (!mounted) return;
+
         // Use navigator context which has MaterialLocalizations
         final navContext = _navigatorKey.currentContext;
-        if (mounted && navContext != null) {
+        if (navContext != null) {
+          // ignore: use_build_context_synchronously
           await AppUpdateDialog.showIfAvailable(navContext);
         }
       }

@@ -35,8 +35,6 @@ class SpotifyStore {
   // Control state - tracks if user is controlling playback
   final ValueNotifier<bool> isUserControlling = ValueNotifier(false);
   DateTime? _lastUserAction;
-  DateTime? _lastScrapedTime;
-  final int _lastScrapedProgressMs = 0;
 
   /// Batch update all values at once (once per second)
   void batchUpdate(PlaybackState? newState, User? newUser) {

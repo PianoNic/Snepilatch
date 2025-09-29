@@ -635,14 +635,6 @@ class SpotifyController extends ChangeNotifier {
     }
   }
 
-  Future<void> _navigateToLikedSongsOldMethod() async {
-    // REMOVED: Don't reload URL - must use click navigation
-    debugPrint('Fallback navigation disabled - using click navigation only');
-    await Future.delayed(const Duration(seconds: 2));
-
-    // Initialize the PlaylistController and get initial batch
-    await initializePlaylistController();
-  }
 
   Future<void> initializePlaylistController() async {
     // PlaylistController is already initialized when scripts are loaded

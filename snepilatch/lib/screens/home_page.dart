@@ -125,7 +125,7 @@ class HomePage extends StatelessWidget {
               style: TextStyle(
                 fontSize: 18,
                 color: isDarkMode
-                    ? Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.8)
+                    ? Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.8)
                     : Colors.white70,
               ),
             ),
@@ -150,7 +150,7 @@ class HomePage extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14,
                 color: isDarkMode
-                    ? Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.8)
+                    ? Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.8)
                     : Colors.white70,
               ),
               maxLines: 1,

@@ -26,7 +26,7 @@ jobs:
           cache: true
 
       - name: Setup release keystore
-        working-directory: ./snepilatch/android
+        working-directory: ./snepilatch/android/app
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}

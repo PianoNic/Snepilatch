@@ -16,13 +16,11 @@
 ## Features
 - Clean, intuitive interface
 - Homepage with music discovery
-- Library for organizing your music
-- Browse artists, albums, and playlists
+- Library to see your favorites
+- Browse songs
 - Full playback controls
-- Quick search functionality
 - Material Design aesthetics
 - Automatic updates
-- Open source & transparent
 
 ## Screenshots
 <p align="center">

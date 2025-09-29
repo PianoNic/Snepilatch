@@ -38,7 +38,7 @@ jobs:
             echo "$KEYSTORE_BASE64" | base64 -d > app-release.jks
           else
             echo "Generating new keystore (consider storing it as KEYSTORE_BASE64 secret)"
-            keytool -genkey -v -keystore app-release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias release \
+            keytool -genkey -v -keystore app-release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias snepilatch \
               -dname "CN=Snepilatch App, OU=Development, O=Snepilatch, L=Ruebliland, S=Aargau, C=CH" \
               -storepass "$KEYSTORE_PASSWORD" -keypass "$KEY_PASSWORD" -noprompt
           fi
@@ -53,7 +53,7 @@ jobs:
           cat > key.properties << EOF
           storePassword=$KEYSTORE_PASSWORD
           keyPassword=$KEY_PASSWORD
-          keyAlias=release
+          keyAlias=snepilatch
           storeFile=app-release.jks
           EOF
 

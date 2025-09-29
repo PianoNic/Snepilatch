@@ -4,7 +4,8 @@
       "Bash(dir:*)",
       "Read(//d/Schuly/**)",
       "Bash(flutter pub:*)",
-      "Bash(flutter analyze:*)"
+      "Bash(flutter analyze:*)",
+      "Bash(flutter clean:*)"
     ],
     "deny": [],
     "ask": []

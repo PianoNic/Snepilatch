@@ -4,7 +4,7 @@
 </p>
 
 <p align="center">
-  <strong>An open-source music streaming frontend for Android.</strong>
+  <strong>An simplicity focused open-source music streaming frontend for Android</strong>
 </p>
 
 <p align="center">

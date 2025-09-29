@@ -8,6 +8,7 @@ import '../models/playback_state.dart' as app_models;
 import '../models/search_result.dart';
 import '../models/user.dart';
 import '../models/homepage_item.dart';
+import '../services/webview_audio_streamer.dart';
 import '../services/webview_service.dart';
 import '../services/spotify_scraper_service.dart';
 import '../services/spotify_actions_service.dart';
@@ -122,6 +123,7 @@ class SpotifyController extends ChangeNotifier {
   bool get showWebView => store.showWebView.value;
   String? get currentTrack => store.currentTrack.value;
   String? get currentArtist => store.currentArtist.value;
+  WebViewService get webViewService => _webViewService;
   String? get currentAlbumArt => store.currentAlbumArt.value;
   String? get username => store.username.value;
   String? get userEmail => store.userEmail.value;
@@ -180,11 +182,24 @@ class SpotifyController extends ChangeNotifier {
     // Add small delay to ensure JavaScript is fully executed
     await Future.delayed(const Duration(milliseconds: 500));
 
-    store.isInitialized.value = true;
-    debugPrint('✅ [SpotifyController] WebView initialized and ready for scraping');
+    // Inject audio streaming script
 
-    // Start periodic scraping now that JavaScript is injected
-    _startPeriodicScrapingActual();
+    try {
+      WebViewAudioStreamer.instance.injectAudioScript(controller);
+    } catch (e) {
+      debugPrint('⚠️ Failed to inject audio streaming: $e');
+    }
+
+    // Only start scraping if not already initialized
+    if (!store.isInitialized.value) {
+      store.isInitialized.value = true;
+      debugPrint('✅ [SpotifyController] WebView initialized and ready for scraping');
+
+      // Start periodic scraping now that JavaScript is injected
+      _startPeriodicScrapingActual();
+    } else {
+      debugPrint('ℹ️ [SpotifyController] Already initialized, skipping duplicate initialization');
+    }
 
     // Only defer this specific notification since it happens during build
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -531,26 +546,32 @@ class SpotifyController extends ChangeNotifier {
   // Monitor login completion when on login page
   Future<void> _monitorLoginCompletion() async {
     try {
-      // Check if login is successful by looking for absence of login button
+      // Skip login monitoring on accounts.spotify.com - let user complete login manually
+      final currentUrl = await _webViewService.controller?.getUrl();
+      if (currentUrl != null && currentUrl.toString().contains('accounts.spotify.com')) {
+        // Don't auto-detect login on the accounts page
+        // The user will be redirected automatically after successful login
+        debugPrint('📍 User is on login page - waiting for manual login completion');
+        return;
+      }
+
+      // Only check login status on the main Spotify page
       final loginStatus = await _webViewService.runJavascriptWithResult(
         'window.checkLoginStatus ? window.checkLoginStatus() : false'
       );
 
       if (loginStatus == 'true' || loginStatus == true) {
-        debugPrint('✅ Login successful! Redirecting to Spotify...');
+        debugPrint('✅ Login successful! User is logged in.');
         store.isLoggedIn.value = true;
 
-        // Navigate back to Spotify
-        await _webViewService.controller?.loadUrl(
-          urlRequest: URLRequest(url: WebUri('https://open.spotify.com'))
-        );
-
-        // Hide WebView after successful login
-        await Future.delayed(const Duration(seconds: 2));
-        store.showWebView.value = false;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          notifyListeners();
-        });
+        // Hide WebView if we're showing it for login
+        if (store.showWebView.value) {
+          await Future.delayed(const Duration(seconds: 1));
+          store.showWebView.value = false;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            notifyListeners();
+          });
+        }
       }
     } catch (e) {
       debugPrint('Error monitoring login: $e');
@@ -560,6 +581,9 @@ class SpotifyController extends ChangeNotifier {
   // Navigation methods
   Future<void> navigateToLogin() async {
     debugPrint('🔐 Navigating to login page...');
+
+    // Clear JavaScript cache for fresh injection
+    JavaScriptLoaderService.clearCache();
 
     // Show the WebView first
     store.showWebView.value = true;
@@ -595,17 +619,8 @@ class SpotifyController extends ChangeNotifier {
       );
     }
 
-    // Wait and check if we actually navigated
-    await Future.delayed(const Duration(milliseconds: 500));
-    final currentUrl = await _webViewService.controller?.getUrl();
-    debugPrint('Current URL after navigation attempt: $currentUrl');
-
-    if (currentUrl != null && !currentUrl.toString().contains('accounts.spotify.com')) {
-      debugPrint('⚠️ Navigation failed, forcing navigation with loadUrl');
-      await _webViewService.controller?.loadUrl(
-        urlRequest: URLRequest(url: WebUri(loginUrl))
-      );
-    }
+    // Don't check if navigation succeeded - let WebView handle redirects naturally
+    // The login page will redirect properly on its own
 
     debugPrint('Login: Navigation complete');
   }
@@ -630,6 +645,17 @@ class SpotifyController extends ChangeNotifier {
     if (!store.isLoggedIn.value) {
       navigateToSpotify();
     }
+  }
+  Future<void> refreshWebView() async {
+    debugPrint('🔄 [SpotifyController] Refreshing WebView...');
+
+    // Clear JavaScript cache to ensure fresh injection
+    JavaScriptLoaderService.clearCache();
+
+    // Reload the current page
+    await _webViewService.controller?.reload();
+
+    debugPrint('✅ [SpotifyController] WebView refreshed');
   }
 
   Future<void> _flashWebView() async {

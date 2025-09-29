@@ -46,6 +46,9 @@ dependencies:
   http: ^1.2.2
   flutter_secure_storage: ^9.2.4
   flutter_markdown: ^0.7.4
+  shelf: ^1.4.0
+  shelf_web_socket: ^1.0.0
+  web_socket_channel: ^2.4.0
 
 dev_dependencies:
   flutter_test:

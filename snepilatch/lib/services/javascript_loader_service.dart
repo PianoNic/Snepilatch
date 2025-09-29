@@ -63,7 +63,7 @@ class JavaScriptLoaderService {
       loadActionsScript(),
       loadPlaylistControllerScript(),
       loadHomepageScript(),
-      loadAdBlockerScript(),
+      // loadAdBlockerScript(), // Commented out - causing black screen issues
     ]);
 
     return scripts.where((script) => script.isNotEmpty).join('\n\n');

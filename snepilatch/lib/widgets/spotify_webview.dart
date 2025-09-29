@@ -108,12 +108,17 @@ class _SpotifyWebViewWidgetState extends State<SpotifyWebViewWidget> with Automa
             },
           ),
           const Spacer(),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () => widget.spotifyController.refreshWebView(),
+            tooltip: 'Refresh page',
+          ),
           TextButton(
             onPressed: () => widget.spotifyController.hideWebView(),
             child: const Text('Done'),
           ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }

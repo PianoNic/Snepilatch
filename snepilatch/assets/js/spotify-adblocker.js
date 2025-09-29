@@ -351,8 +351,8 @@
             .WiPggcPDzbwGxoxwLWFf,
             [class*="AdBanner"],
 
-            /* Hide popups and overlays */
-            body > div:not(#main):not([class*="spotify"]):not([class*="Root"]),
+            /* Hide popups and overlays - removed to prevent login page issues */
+            /* body > div:not(#main):not([class*="spotify"]):not([class*="Root"]), */
 
             /* Hide video ads */
             video[class*="ad"],
@@ -384,8 +384,22 @@
         log('Injected ad blocker styles');
     };
 
+    // Check if we're on the login page
+    const isLoginPage = () => {
+        const url = window.location.href;
+        return url.includes('accounts.spotify.com') ||
+               url.includes('/login') ||
+               url.includes('/authenticate');
+    };
+
     // Main initialization
     const initAdBlocker = async () => {
+        // Don't run on login pages
+        if (isLoginPage()) {
+            log('Skipping AdBlocker on login page');
+            return;
+        }
+
         log('Initializing Spotify AdBlocker');
 
         // Inject styles immediately
@@ -399,6 +413,9 @@
 
         // Set up periodic checks
         setInterval(() => {
+            // Double-check we're not on login page
+            if (isLoginPage()) return;
+
             if (config.hideVisualAds) {
                 removeAdElements();
             }
@@ -409,6 +426,9 @@
 
         // Set up mutation observer for dynamic content
         const observer = new MutationObserver(() => {
+            // Double-check we're not on login page
+            if (isLoginPage()) return;
+
             if (config.hideVisualAds) {
                 removeAdElements();
             }
@@ -431,11 +451,21 @@
         log('AdBlocker initialized successfully');
     };
 
+    // Start initialization with delay to ensure page is loaded
+    const startAdBlocker = () => {
+        // Wait a bit to ensure we can detect the page type
+        setTimeout(() => {
+            if (!isLoginPage()) {
+                initAdBlocker();
+            }
+        }, 1000);
+    };
+
     // Start initialization
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initAdBlocker);
+        document.addEventListener('DOMContentLoaded', startAdBlocker);
     } else {
-        initAdBlocker();
+        startAdBlocker();
     }
 
     // Public API for external control
@@ -632,8 +662,11 @@
         }
     });
 
-    // Block script tags
-    const observer = new MutationObserver((mutations) => {
+    // Block script tags (but not on login pages)
+    const scriptObserver = new MutationObserver((mutations) => {
+        // Skip on login pages
+        if (window.location.href.includes('accounts.spotify.com')) return;
+
         mutations.forEach((mutation) => {
             mutation.addedNodes.forEach((node) => {
                 if (node.tagName === 'SCRIPT') {
@@ -655,10 +688,13 @@
         });
     });
 
-    observer.observe(document.documentElement, {
-        childList: true,
-        subtree: true
-    });
+    // Only start observing if not on login page
+    if (!window.location.href.includes('accounts.spotify.com')) {
+        scriptObserver.observe(document.documentElement, {
+            childList: true,
+            subtree: true
+        });
+    }
 
     // Override console methods to strip Sentry
     ['log', 'error', 'warn', 'info', 'debug'].forEach(method => {

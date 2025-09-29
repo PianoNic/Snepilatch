@@ -17,8 +17,14 @@
             // Also check for user menu button as positive confirmation
             const userButton = document.querySelector('[data-testid="user-widget-link"], button[aria-label*="User" i], button[aria-label*="Profile" i]');
 
-            // User is logged in if login button doesn't exist AND we have some indication of a user
-            const isLoggedIn = !loginButton && (userButton !== null || document.cookie.includes('sp_'));
+            // Check if we're on the accounts login page
+            const isOnLoginPage = window.location.hostname.includes('accounts.spotify.com');
+
+            // User is logged in if:
+            // 1. We're NOT on the login page AND
+            // 2. Login button doesn't exist AND
+            // 3. We have a user button (don't rely on cookies alone)
+            const isLoggedIn = !isOnLoginPage && !loginButton && userButton !== null;
             console.log('Login status check:', isLoggedIn ? 'Logged in' : 'Not logged in');
             return isLoggedIn;
         } catch (e) {

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../controllers/spotify_controller.dart';
 import '../widgets/theme_settings.dart';
 import '../widgets/app_update_dialog.dart';
 import '../pages/release_notes_page.dart';
 import '../services/update_service.dart';
+import '../services/webview_audio_streamer.dart';
 
 class UserPage extends StatefulWidget {
   final SpotifyController spotifyController;
@@ -17,11 +19,16 @@ class UserPage extends StatefulWidget {
 class _UserPageState extends State<UserPage> {
   String _appVersion = '';
   bool _isCheckingUpdate = false;
+  Timer? _audioStatusTimer;
 
   @override
   void initState() {
     super.initState();
     _loadAppVersion();
+    // Update audio status every second
+    _audioStatusTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   Future<void> _loadAppVersion() async {
@@ -29,6 +36,12 @@ class _UserPageState extends State<UserPage> {
     setState(() {
       _appVersion = packageInfo.version;
     });
+  }
+
+  @override
+  void dispose() {
+    _audioStatusTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _checkForUpdates() async {
@@ -91,6 +104,8 @@ class _UserPageState extends State<UserPage> {
                 ),
                 // Update Section
                 _buildUpdateSection(context),
+                // Audio Streaming Status Section
+                _buildAudioStatusSection(context),
                 const SizedBox(height: 16),
               ],
             ),
@@ -300,6 +315,100 @@ class _UserPageState extends State<UserPage> {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAudioStatusSection(BuildContext context) {
+    final audioStreamer = WebViewAudioStreamer.instance;
+    final isConnected = audioStreamer.isConnected;
+    final status = audioStreamer.status;
+    final bytesReceived = audioStreamer.bytesReceived;
+    final packetsReceived = audioStreamer.packetsReceived;
+
+    return Card(
+      margin: const EdgeInsets.all(16),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  isConnected ? Icons.wifi_tethering : Icons.wifi_tethering_off,
+                  color: isConnected ? Colors.green : Colors.grey,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Audio Streaming',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isConnected ? Colors.green : Colors.red,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  status,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
+            if (isConnected) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Packets: $packetsReceived',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              Text(
+                'Data: ${(bytesReceived / 1024).toStringAsFixed(2)} KB',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+            const Divider(height: 24),
+            Text(
+              'How to test audio routing:',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '1. Play music in Spotify WebView\n'
+              '2. Check if status shows "Streaming"\n'
+              '3. Open Wavelet or other EQ app\n'
+              '4. Wavelet should detect Snepilatch audio\n'
+              '5. Audio plays through Flutter, not Chrome',
+              style: TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () {
+                // Force re-inject audio script
+                final controller = widget.spotifyController.webViewService.controller;
+                if (controller != null) {
+                  WebViewAudioStreamer.instance.injectAudioScript(controller);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Audio script re-injected'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Re-inject Audio Script'),
             ),
           ],
         ),

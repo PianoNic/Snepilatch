@@ -476,5 +476,258 @@
         });
     };
 
-    console.log('Spotify AdBlocker loaded and ready');
+    // ===============================
+    // SENTRY BLOCKER SECTION
+    // ===============================
+
+    console.log('🛡️ Initializing Complete Sentry Blocker...');
+
+    // Block all Sentry-related global objects
+    const sentryObjects = [
+        'Sentry', '__SENTRY__', '__sentry__', '__sentry_browser_bundle__',
+        'Raven', '__raven__', 'SentryReplay', '__sentryReplaySession__',
+        '__SENTRY_RELEASE__', '__SENTRY_DSN__', '__sentryEvents__'
+    ];
+
+    sentryObjects.forEach(obj => {
+        // Block existing objects
+        if (window[obj]) {
+            delete window[obj];
+            console.log(`🚫 Deleted existing ${obj}`);
+        }
+
+        // Prevent future assignments
+        Object.defineProperty(window, obj, {
+            get: () => {
+                console.log(`🚫 Blocked access to ${obj}`);
+                return undefined;
+            },
+            set: (value) => {
+                console.log(`🚫 Blocked assignment to ${obj}`);
+                return false;
+            },
+            configurable: false,
+            enumerable: false
+        });
+    });
+
+    // Block Sentry methods if they try to attach to other objects
+    const blockSentryMethods = (obj) => {
+        if (!obj) return;
+
+        const sentryMethods = [
+            'init', 'captureException', 'captureMessage', 'captureEvent',
+            'configureScope', 'withScope', 'setUser', 'setTag', 'setContext',
+            'addBreadcrumb', 'setExtra', 'setLevel', 'setTransaction',
+            'startTransaction', 'getCurrentHub', 'getHubFromCarrier'
+        ];
+
+        sentryMethods.forEach(method => {
+            if (obj[method]) {
+                obj[method] = () => {
+                    console.log(`🚫 Blocked Sentry.${method}()`);
+                    return undefined;
+                };
+            }
+        });
+    };
+
+    // Override Error constructor to prevent Sentry from hooking into it
+    const OriginalError = window.Error;
+    window.Error = function(...args) {
+        const error = new OriginalError(...args);
+        // Remove any Sentry properties that might be added
+        Object.keys(error).forEach(key => {
+            if (key.toLowerCase().includes('sentry')) {
+                delete error[key];
+            }
+        });
+        return error;
+    };
+    window.Error.prototype = OriginalError.prototype;
+
+    // Block all Sentry network requests
+    const sentryPatterns = [
+        'sentry.io',
+        'ingest.sentry',
+        'sentry-cdn.com',
+        'ravenjs.com',
+        '/api/[0-9]+/envelope/',
+        '/api/[0-9]+/store/',
+        'sentry_key=',
+        'sentry_version=',
+        'sentry-trace',
+        'sentry_client='
+    ];
+
+    const isSentryRequest = (url) => {
+        const urlStr = (url || '').toString().toLowerCase();
+        return sentryPatterns.some(pattern => {
+            if (pattern.includes('[0-9]+')) {
+                const regex = new RegExp(pattern.replace(/\[0-9\]\+/g, '\\d+'));
+                return regex.test(urlStr);
+            }
+            return urlStr.includes(pattern);
+        });
+    };
+
+    // Block fetch
+    const originalFetch = window.fetch;
+    window.fetch = function(url, ...args) {
+        if (isSentryRequest(url)) {
+            console.log('🚫 Blocked Sentry fetch:', url.toString().substring(0, 80));
+            return Promise.reject(new Error('Sentry blocked'));
+        }
+        return originalFetch.call(this, url, ...args);
+    };
+
+    // Block XHR
+    const XHROpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+        this._sentryBlocked = isSentryRequest(url);
+        if (this._sentryBlocked) {
+            console.log('🚫 Blocked Sentry XHR:', url.toString().substring(0, 80));
+        }
+        return XHROpen.call(this, method, url, ...rest);
+    };
+
+    const XHRSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.send = function(data) {
+        if (this._sentryBlocked) return;
+
+        // Also check if the data being sent contains Sentry info
+        try {
+            const dataStr = (data || '').toString();
+            if (dataStr.includes('sentry_client') || dataStr.includes('exception')) {
+                console.log('🚫 Blocked Sentry data in XHR payload');
+                return;
+            }
+        } catch (e) {}
+
+        return XHRSend.apply(this, arguments);
+    };
+
+    // Block SendBeacon
+    if (navigator.sendBeacon) {
+        const originalBeacon = navigator.sendBeacon;
+        navigator.sendBeacon = function(url) {
+            if (isSentryRequest(url)) {
+                console.log('🚫 Blocked Sentry beacon:', url.toString().substring(0, 80));
+                return false;
+            }
+            return originalBeacon.apply(this, arguments);
+        };
+    }
+
+    // Block WebSocket
+    const OriginalWebSocket = window.WebSocket;
+    window.WebSocket = new Proxy(OriginalWebSocket, {
+        construct(target, args) {
+            const url = args[0];
+            if (isSentryRequest(url)) {
+                console.log('🚫 Blocked Sentry WebSocket:', url);
+                throw new Error('Sentry WebSocket blocked');
+            }
+            return new target(...args);
+        }
+    });
+
+    // Block script tags
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            mutation.addedNodes.forEach((node) => {
+                if (node.tagName === 'SCRIPT') {
+                    // Check src
+                    if (node.src && isSentryRequest(node.src)) {
+                        node.remove();
+                        console.log('🚫 Removed Sentry script tag');
+                    }
+                    // Check inline script content
+                    if (node.textContent &&
+                        (node.textContent.includes('Sentry') ||
+                         node.textContent.includes('raven') ||
+                         node.textContent.includes('sentry'))) {
+                        node.textContent = '// Sentry blocked';
+                        console.log('🚫 Neutralized inline Sentry script');
+                    }
+                }
+            });
+        });
+    });
+
+    observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true
+    });
+
+    // Override console methods to strip Sentry
+    ['log', 'error', 'warn', 'info', 'debug'].forEach(method => {
+        const original = console[method];
+        console[method] = function(...args) {
+            // Filter out Sentry-related logs
+            const argsStr = args.join(' ').toLowerCase();
+            if (argsStr.includes('sentry') || argsStr.includes('raven')) {
+                return;
+            }
+            return original.apply(console, args);
+        };
+    });
+
+    // Block localStorage/sessionStorage Sentry data
+    const blockSentryStorage = () => {
+        const storages = [localStorage, sessionStorage];
+        storages.forEach(storage => {
+            try {
+                Object.keys(storage).forEach(key => {
+                    if (key.toLowerCase().includes('sentry') ||
+                        key.toLowerCase().includes('raven')) {
+                        storage.removeItem(key);
+                        console.log(`🚫 Removed Sentry data from storage: ${key}`);
+                    }
+                });
+            } catch (e) {}
+        });
+    };
+
+    // Clean storage immediately and periodically
+    blockSentryStorage();
+    setInterval(blockSentryStorage, 5000);
+
+    // Override addEventListener to prevent Sentry error handlers
+    const originalAddEventListener = window.addEventListener;
+    window.addEventListener = function(type, listener, ...args) {
+        if (type === 'error' || type === 'unhandledrejection') {
+            const listenerStr = listener.toString();
+            if (listenerStr.includes('Sentry') || listenerStr.includes('raven')) {
+                console.log(`🚫 Blocked Sentry ${type} event listener`);
+                return;
+            }
+        }
+        return originalAddEventListener.call(this, type, listener, ...args);
+    };
+
+    // Block performance observer (Sentry uses this for monitoring)
+    if (window.PerformanceObserver) {
+        const OriginalPerfObserver = window.PerformanceObserver;
+        window.PerformanceObserver = new Proxy(OriginalPerfObserver, {
+            construct(target, args) {
+                const callback = args[0];
+                if (callback && callback.toString().includes('sentry')) {
+                    console.log('🚫 Blocked Sentry PerformanceObserver');
+                    return {
+                        observe: () => {},
+                        disconnect: () => {},
+                        takeRecords: () => []
+                    };
+                }
+                return new target(...args);
+            }
+        });
+    }
+
+    console.log('✅ Complete Sentry Blocker Active');
+    console.log('🚫 Blocking: All Sentry initialization, objects, network requests, and monitoring');
+
+    // Final status message
+    console.log('Spotify AdBlocker & Sentry Blocker loaded and ready');
 })();

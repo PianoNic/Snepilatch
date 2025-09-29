@@ -8,9 +8,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Pianonic/snepilatch"><img src="https://badgetrack.pianonic.ch/badge?tag=snepilatch&label=visits&color=5eead4&style=flat" alt="visits" /></a>
-  <a href="https://github.com/Pianonic/snepilatch/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Pianonic/snepilatch?color=5eead4&label=License"/></a>
-  <a href="https://github.com/Pianonic/snepilatch/releases"><img src="https://img.shields.io/github/v/release/Pianonic/snepilatch?include_prereleases&color=5eead4&label=Latest%20Release"/></a>
+  <a href="https://github.com/Pianonic/snepilatch"><img src="https://badgetrack.pianonic.ch/badge?tag=snepilatch&label=visits&color=4f3a96&style=flat" alt="visits" /></a>
+  <a href="https://github.com/Pianonic/snepilatch/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Pianonic/snepilatch?color=1e424c&label=License"/></a>
+  <a href="https://github.com/Pianonic/snepilatch/releases"><img src="https://img.shields.io/github/v/release/Pianonic/snepilatch?include_prereleases&color=0c9b4d&label=Latest%20Release"/></a>
 </p>
 
 ## Features

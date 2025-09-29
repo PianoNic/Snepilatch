@@ -40,5 +40,6 @@ Join our [Discord Server](https://discord.gg/NJxKMSNYRG)
 
 ## License
 MIT License - See [LICENSE](https://github.com/Pianonic/snepilatch/blob/main/LICENSE) file for details.
+
 ---
 <p align="center">Made with ❤️ by <a href="https://github.com/Pianonic">Pianonic</a></p>

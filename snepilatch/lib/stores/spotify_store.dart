@@ -4,6 +4,7 @@ import '../models/user.dart';
 import '../models/song.dart';
 import '../models/homepage_item.dart';
 import '../models/homepage_shortcut.dart';
+import '../models/library_item.dart';
 
 /// Reactive store for Spotify state using ValueNotifiers (similar to Angular Signals)
 class SpotifyStore {
@@ -29,6 +30,10 @@ class SpotifyStore {
   // Songs state
   final ValueNotifier<List<Song>> songs = ValueNotifier([]);
   final ValueNotifier<bool> isLoadingSongs = ValueNotifier(false);
+
+  // Library state
+  final ValueNotifier<List<LibraryItem>> libraryItems = ValueNotifier([]);
+  final ValueNotifier<bool> isLoadingLibrary = ValueNotifier(false);
 
   // Homepage state
   final ValueNotifier<List<HomepageSection>> homepageSections = ValueNotifier([]);
@@ -255,6 +260,10 @@ class SpotifyStore {
     songs.value = [];
     isLoadingSongs.value = false;
 
+    // Clear library
+    libraryItems.value = [];
+    isLoadingLibrary.value = false;
+
     // Clear homepage data
     homepageSections.value = [];
     homepageShortcuts.value = [];
@@ -282,6 +291,8 @@ class SpotifyStore {
     userProfileImage.dispose();
     songs.dispose();
     isLoadingSongs.dispose();
+    libraryItems.dispose();
+    isLoadingLibrary.dispose();
     homepageSections.dispose();
     homepageShortcuts.dispose();
     showWebView.dispose();

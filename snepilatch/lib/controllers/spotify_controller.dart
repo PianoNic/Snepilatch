@@ -9,6 +9,7 @@ import '../models/search_result.dart';
 import '../models/user.dart';
 import '../models/homepage_item.dart';
 import '../models/homepage_shortcut.dart';
+import '../models/library_item.dart';
 import '../services/webview_service.dart';
 import '../services/spotify_scraper_service.dart';
 import '../services/spotify_actions_service.dart';
@@ -129,6 +130,8 @@ class SpotifyController extends ChangeNotifier {
   String? get userProfileImage => store.userProfileImage.value;
   List<Song> get songs => store.songs.value;
   bool get isLoadingSongs => store.isLoadingSongs.value;
+  List<LibraryItem> get libraryItems => store.libraryItems.value;
+  bool get isLoadingLibrary => store.isLoadingLibrary.value;
   bool get isCurrentTrackLiked => store.isCurrentTrackLiked.value;
   bool get debugWebViewVisible => _debugWebViewVisible;
   List<HomepageSection> get homepageSections => store.homepageSections.value;
@@ -722,8 +725,8 @@ class SpotifyController extends ChangeNotifier {
     // Animate opacity from 0.0 to 1.0
     webViewOpacity.value = 1.0;
 
-    // Wait for 800ms to let user see the library
-    await Future.delayed(const Duration(milliseconds: 800));
+    // Wait for 3 seconds to let Spotify render the library content
+    await Future.delayed(const Duration(seconds: 3));
 
     // Fade back to 0.0
     webViewOpacity.value = 0.0;
@@ -1125,6 +1128,179 @@ class SpotifyController extends ChangeNotifier {
     } catch (e) {
       debugPrint('Error loading more songs: $e');
       store.isLoadingSongs.value = false;
+    }
+  }
+
+  // Library methods
+  Future<void> navigateToLibrary() async {
+    debugPrint('📚 Loading library items from sidebar...');
+
+    // Library items are in the sidebar, no navigation needed
+    // Just initialize the controller to start scraping
+    await initializeLibraryController();
+  }
+
+  Future<void> initializeLibraryController() async {
+    debugPrint('📚 [Library] Initializing...');
+
+    store.isLoadingLibrary.value = true;
+    store.libraryItems.value = [];
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+    });
+
+    // Flash WebView to make sidebar visible for Spotify to render content
+    await _flashWebView();
+
+    // First, ensure sidebar is expanded (this waits internally if needed)
+    final expandResult = await _webViewService.runJavascriptWithResult(
+      'window.ensureSidebarExpanded && window.ensureSidebarExpanded()'
+    );
+    debugPrint('📚 [Library] Expand result: $expandResult');
+
+    // Reset library controller
+    await _webViewService.runJavascript(
+      'window.LibraryController && window.LibraryController.reset()'
+    );
+
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    // Get initial batch of library items
+    await updateLibraryItems();
+
+    // If we got initial items, try to load more immediately to fill the screen
+    if (store.libraryItems.value.isNotEmpty) {
+      debugPrint('📚 Got ${store.libraryItems.value.length} initial items, loading more...');
+      await loadMoreLibraryItems();
+      // Load even more to ensure we have enough items
+      if (store.libraryItems.value.length < 20) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        await loadMoreLibraryItems();
+      }
+    }
+  }
+
+  Future<void> updateLibraryItems() async {
+    try {
+      // First, debug the DOM to see what's there (only on first call)
+      if (store.libraryItems.value.isEmpty) {
+        final debugResult = await _webViewService.runJavascriptWithResult(
+          'window.debugLibraryDOM && window.debugLibraryDOM()'
+        );
+        debugPrint('🔍 [Library] DOM Debug: $debugResult');
+      }
+
+      final result = await _webViewService.runJavascriptWithResult(
+        'window.getLibraryItems && window.getLibraryItems()'
+      );
+
+      if (result != null && result != 'null' && result != '[]') {
+        final List<LibraryItem> items = LibraryItem.fromJsonList(result.toString());
+
+        store.libraryItems.value = items;
+        debugPrint('✅ [Library] ${store.libraryItems.value.length} items loaded');
+
+        store.isLoadingLibrary.value = false;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          notifyListeners();
+        });
+      } else {
+        debugPrint('⚠️ [Library] No items found');
+        store.isLoadingLibrary.value = false;
+      }
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error updating library items: $e');
+      debugPrint('Stack trace: $stackTrace');
+      store.isLoadingLibrary.value = false;
+    }
+  }
+
+  Future<void> loadMoreLibraryItems() async {
+    // Prevent multiple simultaneous load requests
+    if (store.isLoadingLibrary.value) return;
+
+    try {
+      store.isLoadingLibrary.value = true;
+      final previousCount = store.libraryItems.value.length;
+
+      debugPrint('📜 Loading more library items...');
+
+      // Call the window function to load more
+      final loadResult = await _webViewService.runJavascriptWithResult(
+        'window.loadMoreLibraryItems && window.loadMoreLibraryItems()'
+      );
+
+      if (loadResult != null) {
+        debugPrint('📜 Load more result: $loadResult');
+      }
+
+      // Wait for Spotify to load new items
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Update library items
+      await updateLibraryItems();
+
+      final newCount = store.libraryItems.value.length;
+      if (newCount > previousCount) {
+        debugPrint('✅ Loaded ${newCount - previousCount} new items (total: $newCount)');
+      } else {
+        debugPrint('⚠️ No new items loaded. May have reached the end.');
+      }
+
+      // Always reset loading state
+      store.isLoadingLibrary.value = false;
+    } catch (e) {
+      debugPrint('Error loading more library items: $e');
+      store.isLoadingLibrary.value = false;
+    }
+  }
+
+  Future<void> syncScrollToLibraryIndex(int index) async {
+    // Scroll to a specific library item by its index
+    final result = await _webViewService.runJavascriptWithResult(
+      'window.scrollLibraryToIndex && window.scrollLibraryToIndex($index)'
+    );
+
+    if (result != null) {
+      debugPrint('📜 Scrolled to library item #$index: $result');
+
+      // After scrolling, update items if new ones are loaded
+      await Future.delayed(const Duration(milliseconds: 500));
+      await updateLibraryItems();
+    }
+  }
+
+  Future<void> playLibraryItem(String itemId, String itemType) async {
+    debugPrint('🎵 Playing library item: $itemId (type: $itemType)');
+
+    // Escape quotes in itemId to prevent JavaScript errors
+    final escapedItemId = itemId.replaceAll('"', '\\"').replaceAll("'", "\\'");
+
+    // Navigate to the item by clicking on it in the WebView
+    final result = await _webViewService.runJavascriptWithResult('''
+      (function() {
+        try {
+          // Find the library item by its ID
+          const itemRow = document.querySelector('[aria-labelledby*="$escapedItemId"]');
+          if (itemRow) {
+            // Click on the item to open it
+            itemRow.click();
+            return true;
+          }
+          return false;
+        } catch (e) {
+          console.error('Error playing library item:', e);
+          return false;
+        }
+      })()
+    ''');
+
+    if (result == 'true' || result == true) {
+      debugPrint('✅ Successfully clicked library item');
+      // Give time for navigation to complete
+      await Future.delayed(const Duration(milliseconds: 1000));
+    } else {
+      debugPrint('⚠️ Failed to find library item in DOM');
     }
   }
 }

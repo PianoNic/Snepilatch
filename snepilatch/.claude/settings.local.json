@@ -22,7 +22,8 @@
       "Bash(chmod:*)",
       "Bash(rm:*)",
       "Bash(git stash:*)",
-      "Bash(git fetch:*)"
+      "Bash(git fetch:*)",
+      "Bash(./gradlew --stop)"
     ],
     "deny": [],
     "ask": []

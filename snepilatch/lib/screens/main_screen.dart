@@ -3,7 +3,7 @@ import '../controllers/spotify_controller.dart';
 import '../widgets/mini_player.dart';
 import '../widgets/expanded_player.dart';
 import 'home_page.dart';
-import 'songs_page.dart';
+import 'library_page.dart';
 import 'search_page.dart';
 import 'user_page.dart';
 
@@ -41,7 +41,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
 
     _pages = [
       HomePage(spotifyController: widget.spotifyController),
-      SongsPage(spotifyController: widget.spotifyController),
+      LibraryPage(spotifyController: widget.spotifyController),
       SearchPage(spotifyController: widget.spotifyController),
       UserPage(spotifyController: widget.spotifyController),
     ];
@@ -85,8 +85,8 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
       case 0: // Home page
         widget.spotifyController.navigateToHomepage();
         break;
-      case 1: // Songs/Library page
-        widget.spotifyController.navigateToLikedSongs();
+      case 1: // Library page
+        widget.spotifyController.navigateToLibrary();
         break;
       case 2: // Search page
         widget.spotifyController.navigateToSearchPage();
@@ -315,11 +315,11 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     switch (_selectedIndex) {
       case 0: // Home page
         return null;
-      case 1: // Songs/Library page
+      case 1: // Library page
         return [
           IconButton(
             onPressed: () {
-              widget.spotifyController.navigateToLikedSongs();
+              widget.spotifyController.navigateToLibrary();
             },
             icon: Icon(
               Icons.refresh,

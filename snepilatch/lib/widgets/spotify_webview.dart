@@ -48,9 +48,9 @@ class _SpotifyWebViewWidgetState extends State<SpotifyWebViewWidget> with Automa
       builder: (context, showWebView, _) {
         return Stack(
           children: [
-            // Always render WebView but position it off-screen when hidden
+            // Always render WebView but position it slightly off-screen when hidden (for sidebar visibility)
             Positioned(
-              left: showWebView ? 0 : 500,
+              left: showWebView ? 0 : 100,
               top: 0,
               width: showWebView ? MediaQuery.of(context).size.width : 400,
               height: showWebView ? MediaQuery.of(context).size.height : 800,

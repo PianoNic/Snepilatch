@@ -9,6 +9,7 @@ class JavaScriptLoaderService {
   static const String actionsScriptPath = 'assets/js/spotify-actions.js';
   static const String playlistControllerScriptPath = 'assets/js/spotify-playlist-controller.js';
   static const String homepageScriptPath = 'assets/js/spotify-homepage.js';
+  static const String libraryScriptPath = 'assets/js/spotify-library.js';
   static const String adBlockerScriptPath = 'assets/js/spotify-adblocker.js';
 
   /// Load JavaScript content from an asset file
@@ -51,6 +52,11 @@ class JavaScriptLoaderService {
     return loadJavaScript(homepageScriptPath);
   }
 
+  /// Load the Library JavaScript
+  static Future<String> loadLibraryScript() async {
+    return loadJavaScript(libraryScriptPath);
+  }
+
   /// Load the AdBlocker JavaScript
   static Future<String> loadAdBlockerScript() async {
     return loadJavaScript(adBlockerScriptPath);
@@ -63,6 +69,7 @@ class JavaScriptLoaderService {
       loadActionsScript(),
       loadPlaylistControllerScript(),
       loadHomepageScript(),
+      loadLibraryScript(),
       // loadAdBlockerScript(), // COMMENTED OUT: Causes black screen on login page
     ]);
 

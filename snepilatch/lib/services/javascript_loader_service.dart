@@ -63,7 +63,7 @@ class JavaScriptLoaderService {
       loadActionsScript(),
       loadPlaylistControllerScript(),
       loadHomepageScript(),
-      loadAdBlockerScript(),
+      // loadAdBlockerScript(), // COMMENTED OUT: Causes black screen on login page
     ]);
 
     return scripts.where((script) => script.isNotEmpty).join('\n\n');

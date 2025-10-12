@@ -5,6 +5,7 @@ import '../models/user.dart';
 import '../models/song.dart';
 import '../models/search_result.dart';
 import '../models/homepage_item.dart';
+import '../models/homepage_shortcut.dart';
 
 class SpotifyScraperService {
   // JavaScript functions are loaded from assets/js/spotify-scraper.js and spotify-homepage.js
@@ -14,6 +15,7 @@ class SpotifyScraperService {
   // - window.getSongs() - Returns song list as JSON
   // - window.getSearchResults() - Returns search results as JSON
   // - window.getHomepageSections() - Returns homepage sections as JSON
+  // - window.getHomepageShortcuts() - Returns homepage shortcuts as JSON
 
   // Parse playback info from JavaScript response using proper JSON
   static PlaybackState? parsePlaybackInfo(String jsonString) {
@@ -78,6 +80,17 @@ class SpotifyScraperService {
       return jsonList.map((json) => HomepageSection.fromJson(json)).toList();
     } catch (e) {
       debugPrint('Error parsing homepage sections: $e');
+      return [];
+    }
+  }
+
+  // Parse homepage shortcuts from JavaScript response using proper JSON
+  static List<HomepageShortcut> parseHomepageShortcuts(String jsonString) {
+    try {
+      final List<dynamic> jsonList = jsonDecode(jsonString);
+      return jsonList.map((json) => HomepageShortcut.fromJson(json)).toList();
+    } catch (e) {
+      debugPrint('Error parsing homepage shortcuts: $e');
       return [];
     }
   }

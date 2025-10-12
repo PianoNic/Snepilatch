@@ -398,8 +398,32 @@ class SpotifyController extends ChangeNotifier {
         // Single notification for all updates
         notifyListeners();
       }
+
+      // Enforce 75% volume limit (runs every scrape cycle)
+      await _enforceVolumeLimit();
     } catch (e) {
       debugPrint('❌ [SpotifyController] Error scraping: $e');
+    }
+  }
+
+  // Enforce 75% volume limit in the background
+  Future<void> _enforceVolumeLimit() async {
+    try {
+      final result = await _webViewService.runJavascriptWithResult(
+        'window.spotifyEnforceVolumeLimit && window.spotifyEnforceVolumeLimit()'
+      );
+
+      if (result != null && result != 'null') {
+        final data = jsonDecode(result.toString());
+
+        // Only log when volume was actually reduced
+        if (data['success'] == true && data['previousVolume'] != null) {
+          debugPrint('🔊 [VolumeLimit] ${data['message']}');
+        }
+      }
+    } catch (e) {
+      // Silently fail - volume limiting is not critical
+      // debugPrint('Error enforcing volume limit: $e');
     }
   }
 

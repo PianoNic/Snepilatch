@@ -431,6 +431,81 @@
         return tryClickNavigation();
     };
 
+    // Volume limiter function - enforces 75% maximum volume
+    window.spotifyEnforceVolumeLimit = function() {
+        try {
+            const MAX_VOLUME = 0.75; // 75% maximum volume
+
+            // Check if playing on another device
+            // The banner with the broadcast/speaker icon only appears when playing on a DIFFERENT device
+            // If banner is NOT there, it means we're playing on THIS device (the app)
+
+            // Look for the specific SVG icon that indicates playing on another device
+            // This icon has the specific path data for the broadcast/speaker symbol
+            const deviceBannerIcon = document.querySelector('svg[data-encore-id="icon"] path[d*="M14.5 8a6.47 6.47 0 0 0-1.3-3.9"]');
+
+            // If banner icon is visible, it means playing on OTHER device - don't limit volume
+            if (deviceBannerIcon) {
+                return {
+                    success: false,
+                    message: 'Playing on another device, not limiting volume',
+                    skipped: true
+                };
+            }
+
+            // Banner NOT visible = playing on THIS device = limit volume
+
+            // Find the volume slider input
+            const volumeInput = document.querySelector('[data-testid="volume-bar"] input[type="range"]');
+
+            if (!volumeInput) {
+                return {
+                    success: false,
+                    message: 'Volume slider not found'
+                };
+            }
+
+            // Get current volume value
+            const currentVolume = parseFloat(volumeInput.value);
+
+            // If volume is above the limit, set it to the limit
+            if (currentVolume > MAX_VOLUME) {
+                // Set the value
+                volumeInput.value = MAX_VOLUME;
+
+                // Trigger input event to update the UI
+                const inputEvent = new Event('input', { bubbles: true });
+                volumeInput.dispatchEvent(inputEvent);
+
+                // Trigger change event to ensure it's saved
+                const changeEvent = new Event('change', { bubbles: true });
+                volumeInput.dispatchEvent(changeEvent);
+
+                return {
+                    success: true,
+                    previousVolume: currentVolume,
+                    newVolume: MAX_VOLUME,
+                    message: `Volume reduced from ${Math.round(currentVolume * 100)}% to ${Math.round(MAX_VOLUME * 100)}%`
+                };
+            }
+
+            // Volume is within limit
+            return {
+                success: true,
+                currentVolume: currentVolume,
+                message: `Volume is at ${Math.round(currentVolume * 100)}%, within limit`,
+                skipped: false
+            };
+
+        } catch (e) {
+            console.error('Error enforcing volume limit:', e);
+            return {
+                success: false,
+                error: e.message
+            };
+        }
+    };
+
     console.log('Spotify action functions injected into window');
     return true;
 })();

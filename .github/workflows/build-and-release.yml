@@ -106,3 +106,81 @@ jobs:
           append_body: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Send Discord Notification
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_BODY: ${{ github.event.release.body }}
+          RELEASE_URL: ${{ github.event.release.html_url }}
+        run: |
+          # Parse release body to extract sections
+          RELEASE_BODY_ESCAPED=$(echo "$RELEASE_BODY" | jq -Rs .)
+
+          # Create Discord message
+          cat > discord_payload.json << 'EOF'
+          {
+            "content": "@everyone\n\n📱 **New Release - $RELEASE_TAG!**\nA new update is now available!\n\n**What's New:**\n$CHANGES\n\n**Download the latest version:** [$RELEASE_TAG]($RELEASE_URL)\n\nThanks for your support and feedback! 🎵✨"
+          }
+          EOF
+
+          # Process the release body to format it nicely
+          python3 << 'PYTHON_SCRIPT'
+          import json
+          import os
+          import re
+
+          release_body = os.environ.get('RELEASE_BODY', '')
+          release_tag = os.environ.get('RELEASE_TAG', '')
+          release_url = os.environ.get('RELEASE_URL', '')
+
+          # Extract sections from release body
+          changes = []
+          current_section = None
+
+          for line in release_body.split('\n'):
+              line = line.strip()
+              if not line:
+                  continue
+
+              # Detect section headers
+              if line.startswith('## '):
+                  continue
+              elif line.startswith('🚀 Features') or line.startswith('**🚀 Features**'):
+                  current_section = '🚀 Features'
+                  changes.append('')
+                  changes.append('🚀 **Features**')
+              elif line.startswith('✨ Enhancements') or line.startswith('**✨ Enhancements**'):
+                  current_section = '✨ Enhancements'
+                  changes.append('')
+                  changes.append('✨ **Enhancements**')
+              elif line.startswith('🛠️ Refactors') or line.startswith('**🛠️ Refactors**'):
+                  current_section = '🛠️ Refactors'
+                  changes.append('')
+                  changes.append('🛠️ **Refactors**')
+              elif line.startswith('🐛 Bug Fixes') or line.startswith('**🐛 Bug Fixes**'):
+                  current_section = '🐛 Bug Fixes'
+                  changes.append('')
+                  changes.append('🐛 **Bug Fixes**')
+              elif line.startswith('- ') and current_section:
+                  changes.append(line)
+              elif line.startswith('**Full Changelog'):
+                  break
+
+          # Build the message content
+          changes_text = '\n'.join(changes) if changes else 'See release notes for details.'
+
+          message = f"📱 **New Release - {release_tag}!**\nA new update is now available!\n\n**What's New:**{changes_text}\n\n**Download the latest version:** [{release_tag}]({release_url})\n\nThanks for your support and feedback! 🎵✨\n\n||@everyone||"
+
+          payload = {
+              "content": message
+          }
+
+          with open('discord_payload.json', 'w') as f:
+              json.dump(payload, f)
+          PYTHON_SCRIPT
+
+          # Send to Discord
+          curl -H "Content-Type: application/json" \
+               -d @discord_payload.json \
+               "$DISCORD_WEBHOOK_URL"

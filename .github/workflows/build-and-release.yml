@@ -135,6 +135,7 @@ jobs:
           # Extract sections from release body
           changes = []
           current_section = None
+          note_text = ""
 
           for line in release_body.split('\n'):
               line = line.strip()
@@ -162,13 +163,18 @@ jobs:
                   changes.append('🐛 **Bug Fixes**')
               elif line.startswith('- ') and current_section:
                   changes.append(line)
+              elif line.startswith('📝 **Note:**'):
+                  note_text = line
               elif line.startswith('**Full Changelog'):
                   break
 
           # Build the message content
           changes_text = '\n'.join(changes) if changes else 'See release notes for details.'
 
-          message = f"📱 **New Release - {release_tag}!**\nA new update is now available!\n\n**What's New:**{changes_text}\n\n**Download the latest version:** [{release_tag}]({release_url})\n\nThanks for your support and feedback! 🎵✨\n\n||@everyone||"
+          # Add note if present
+          note_section = f"\n\n{note_text}" if note_text else ""
+
+          message = f"📱 **New Release - {release_tag}!**\nA new update is now available!\n\n**What's New:**{changes_text}{note_section}\n\n**Download the latest version:** [{release_tag}]({release_url})\n\nThanks for your support and feedback! 🎵✨\n\n||@everyone||"
 
           payload = {
               "content": message

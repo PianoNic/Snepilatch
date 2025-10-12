@@ -45,6 +45,8 @@ template: |
 
   $CHANGES
 
+  📝 **Note:** If you're on v0.4.0 or higher, the app will auto-update when you open it! For older versions, please download manually.
+
   **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
 
 exclude-labels:

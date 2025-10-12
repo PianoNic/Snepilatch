@@ -111,18 +111,16 @@ jobs:
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           RELEASE_TAG: ${{ github.ref_name }}
-          RELEASE_BODY: ${{ github.event.release.body }}
-          RELEASE_URL: ${{ github.event.release.html_url }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO_NAME: ${{ github.repository }}
         run: |
-          # Parse release body to extract sections
-          RELEASE_BODY_ESCAPED=$(echo "$RELEASE_BODY" | jq -Rs .)
+          # Fetch release data from GitHub API
+          RELEASE_DATA=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/$REPO_NAME/releases/tags/$RELEASE_TAG")
 
-          # Create Discord message
-          cat > discord_payload.json << 'EOF'
-          {
-            "content": "@everyone\n\n📱 **New Release - $RELEASE_TAG!**\nA new update is now available!\n\n**What's New:**\n$CHANGES\n\n**Download the latest version:** [$RELEASE_TAG]($RELEASE_URL)\n\nThanks for your support and feedback! 🎵✨"
-          }
-          EOF
+          # Export for Python script
+          export RELEASE_BODY=$(echo "$RELEASE_DATA" | jq -r '.body')
+          export RELEASE_URL=$(echo "$RELEASE_DATA" | jq -r '.html_url')
 
           # Process the release body to format it nicely
           python3 << 'PYTHON_SCRIPT'

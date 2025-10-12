@@ -19,7 +19,10 @@
       "Read(//f/Coding/Snepilatch/**)",
       "Bash(flutter run:*)",
       "Bash(flutter:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(rm:*)",
+      "Bash(git stash:*)",
+      "Bash(git fetch:*)"
     ],
     "deny": [],
     "ask": []

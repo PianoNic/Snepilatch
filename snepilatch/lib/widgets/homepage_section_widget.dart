@@ -73,7 +73,7 @@ class HomepageItemCard extends StatelessWidget {
                     width: 160,
                     height: 160,
                     decoration: BoxDecoration(
-                      color: Colors.grey[800],
+                      color: const Color(0xFF2a2a2a),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: item.imageUrl.isNotEmpty
@@ -99,6 +99,7 @@ class HomepageItemCard extends StatelessWidget {
                           ),
                   ),
                 ),
+                // Play button - only interactive element
                 Positioned(
                   right: 8,
                   bottom: 8,

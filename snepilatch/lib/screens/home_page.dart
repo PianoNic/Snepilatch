@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../controllers/spotify_controller.dart';
 import '../widgets/homepage_section_widget.dart';
+import '../widgets/homepage_shortcuts_widget.dart';
 
 class HomePage extends StatelessWidget {
   final SpotifyController spotifyController;
@@ -12,6 +13,7 @@ class HomePage extends StatelessWidget {
         animation: spotifyController,
         builder: (context, child) {
           final homepageSections = spotifyController.homepageSections;
+          final homepageShortcuts = spotifyController.homepageShortcuts;
           final isLoggedIn = spotifyController.isLoggedIn;
 
           return SingleChildScrollView(
@@ -19,11 +21,15 @@ class HomePage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: _buildWelcomeCard(context),
-                ),
-                const SizedBox(height: 24),
+                // Shortcuts section (recently played items in grid)
+                if (homepageShortcuts.isNotEmpty) ...[
+                  HomepageShortcutsWidget(
+                    shortcuts: homepageShortcuts,
+                    controller: spotifyController,
+                  ),
+                  const SizedBox(height: 32),
+                ],
+
                 if (!isLoggedIn)
                   Padding(
                     padding: const EdgeInsets.all(16.0),
@@ -55,7 +61,7 @@ class HomePage extends StatelessWidget {
                       ),
                     ),
                   )
-                else if (homepageSections.isEmpty)
+                else if (homepageSections.isEmpty && homepageShortcuts.isEmpty)
                   Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Center(
@@ -90,76 +96,4 @@ class HomePage extends StatelessWidget {
         },
       );
   }
-
-  Widget _buildWelcomeCard(BuildContext context) {
-    final username = spotifyController.username ?? 'Guest';
-    final isLoggedIn = spotifyController.isLoggedIn;
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
-    return Card(
-      elevation: 4,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: isDarkMode
-                ? [
-                    Theme.of(context).colorScheme.primaryContainer,
-                    Theme.of(context).colorScheme.secondaryContainer,
-                  ]
-                : [
-                    Theme.of(context).colorScheme.primary,
-                    Theme.of(context).colorScheme.secondary,
-                  ],
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              isLoggedIn ? 'Welcome back,' : 'Welcome to Snepilatch',
-              style: TextStyle(
-                fontSize: 18,
-                color: isDarkMode
-                    ? Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.8)
-                    : Colors.white70,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              isLoggedIn ? username : 'Your Spotify Controller',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: isDarkMode
-                    ? Theme.of(context).colorScheme.onPrimaryContainer
-                    : Colors.white,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              isLoggedIn
-                  ? spotifyController.currentTrack != null
-                      ? 'Now playing: ${spotifyController.currentTrack}'
-                      : 'No music playing'
-                  : 'Login to start controlling Spotify',
-              style: TextStyle(
-                fontSize: 14,
-                color: isDarkMode
-                    ? Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.8)
-                    : Colors.white70,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
 }

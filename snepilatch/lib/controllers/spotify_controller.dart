@@ -8,6 +8,7 @@ import '../models/playback_state.dart' as app_models;
 import '../models/search_result.dart';
 import '../models/user.dart';
 import '../models/homepage_item.dart';
+import '../models/homepage_shortcut.dart';
 import '../services/webview_service.dart';
 import '../services/spotify_scraper_service.dart';
 import '../services/spotify_actions_service.dart';
@@ -131,6 +132,7 @@ class SpotifyController extends ChangeNotifier {
   bool get isCurrentTrackLiked => store.isCurrentTrackLiked.value;
   bool get debugWebViewVisible => _debugWebViewVisible;
   List<HomepageSection> get homepageSections => store.homepageSections.value;
+  List<HomepageShortcut> get homepageShortcuts => store.homepageShortcuts.value;
   String get shuffleMode => store.shuffleMode.value.value;
   String get repeatMode => store.repeatMode.value.value;
   String get currentTime => store.currentTime.value;
@@ -337,9 +339,14 @@ class SpotifyController extends ChangeNotifier {
         'window.getHomepageSections ? window.getHomepageSections() : "[]"'
       );
 
+      final shortcutsResult = await _webViewService.runJavascriptWithResult(
+        'window.getHomepageShortcuts ? window.getHomepageShortcuts() : "[]"'
+      );
+
       app_models.PlaybackState? newState;
       User? newUser;
       List<HomepageSection>? newHomepageSections;
+      List<HomepageShortcut>? newHomepageShortcuts;
 
       // Parse playback info using proper JSON parsing
       if (playbackResult != null && playbackResult != 'null') {
@@ -359,6 +366,15 @@ class SpotifyController extends ChangeNotifier {
         newHomepageSections = SpotifyScraperService.parseHomepageSections(jsonString);
         if (newHomepageSections.isNotEmpty) {
           store.homepageSections.value = newHomepageSections;
+        }
+      }
+
+      // Parse homepage shortcuts
+      if (shortcutsResult != null && shortcutsResult != 'null' && shortcutsResult != '[]') {
+        final String jsonString = shortcutsResult.toString();
+        newHomepageShortcuts = SpotifyScraperService.parseHomepageShortcuts(jsonString);
+        if (newHomepageShortcuts.isNotEmpty) {
+          store.homepageShortcuts.value = newHomepageShortcuts;
         }
       }
 
@@ -463,6 +479,50 @@ class SpotifyController extends ChangeNotifier {
     Future.delayed(const Duration(milliseconds: 500), () {
       _scrapeAllInfo();
     });
+  }
+
+  // Navigation methods
+  Future<void> navigateToHomepage() async {
+    debugPrint('🏠 Navigating to homepage...');
+
+    try {
+      // Use SPA navigation to go back to homepage
+      final result = await _webViewService.runJavascriptWithResult('''
+        (function() {
+          try {
+            const history = window.history;
+            const targetUrl = 'https://open.spotify.com';
+
+            // Push state without reload
+            history.pushState({}, '', targetUrl);
+
+            // Trigger a popstate event to let Spotify's router handle it
+            const popstateEvent = new PopStateEvent('popstate', { state: {} });
+            window.dispatchEvent(popstateEvent);
+
+            return "spa_navigation";
+          } catch (e) {
+            console.error('Homepage navigation failed:', e);
+            return false;
+          }
+        })()
+      ''');
+
+      debugPrint('🏠 Homepage navigation result: $result');
+
+      if (result == '"spa_navigation"') {
+        debugPrint('🚀 Using SPA navigation to Homepage (no page reload)');
+        await Future.delayed(const Duration(milliseconds: 800));
+        // Force scrape to update homepage sections
+        _scrapeAllInfo();
+      } else {
+        debugPrint('⚠️ Could not navigate to Homepage via SPA, trying direct navigation');
+        await Future.delayed(const Duration(milliseconds: 1000));
+      }
+    } catch (e) {
+      debugPrint('❌ Error navigating to homepage: $e');
+      await Future.delayed(const Duration(milliseconds: 1000));
+    }
   }
 
   // Search methods

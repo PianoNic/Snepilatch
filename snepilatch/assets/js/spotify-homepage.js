@@ -2,6 +2,93 @@
 // These functions scrape and interact with the Spotify homepage
 
 (function() {
+    // Inject getHomepageShortcuts into window (the grid at the top)
+    window.getHomepageShortcuts = function() {
+        try {
+            const shortcuts = [];
+
+            // Find the shortcuts section (typically labeled "Guten Tag" or "Good afternoon")
+            const shortcutsSection = document.querySelector('section[aria-label*="Guten"], section[aria-label*="Good"], section[aria-label*="afternoon"], section[aria-label*="evening"], section[aria-label*="morning"]');
+
+            if (!shortcutsSection) {
+                console.log('No shortcuts section found');
+                return JSON.stringify([]);
+            }
+
+            // Find all shortcut cards (they have a specific structure)
+            const shortcutCards = shortcutsSection.querySelectorAll('[draggable="true"]');
+
+            shortcutCards.forEach(card => {
+                // Get title from link or paragraph
+                const titleEl = card.querySelector('p[class*="RidYQJ8faceMVnFLBEMC"], a p');
+                const title = titleEl?.textContent?.trim() || '';
+
+                // Get image
+                const imgEl = card.querySelector('img[data-testid="shortcut-image"]');
+                let imageUrl = imgEl?.src || '';
+
+                // Upgrade image quality
+                if (imageUrl && imageUrl.includes('ab67616d00004851')) {
+                    imageUrl = imageUrl.replace('ab67616d00004851', 'ab67616d00001e02');
+                }
+
+                // Get href
+                const linkEl = card.querySelector('a[href]');
+                const href = linkEl?.getAttribute('href') || '';
+
+                // Determine type from href
+                let type = 'unknown';
+                if (href.includes('/playlist/')) type = 'playlist';
+                else if (href.includes('/album/')) type = 'album';
+                else if (href.includes('/artist/')) type = 'artist';
+                else if (href.includes('/collection')) type = 'collection';
+                else if (href.includes('/user/')) type = 'collection';
+                else if (href.includes('/episode/')) type = 'episode';
+
+                // Extract ID from href
+                let id = '';
+                if (type === 'playlist' || type === 'album' || type === 'artist' || type === 'episode') {
+                    const parts = href.split('/');
+                    id = parts[parts.length - 1] || '';
+                } else {
+                    id = href;
+                }
+
+                // Check if currently playing (look for pause button or playing indicator)
+                const playButton = card.querySelector('[data-testid="play-button"]');
+                const isPlaying = playButton?.getAttribute('aria-label')?.toLowerCase().includes('pause') || false;
+
+                // Check for progress bar (for episodes/podcasts)
+                const progressBar = card.querySelector('[role="progressbar"]');
+                let progressPercentage = null;
+                if (progressBar) {
+                    const ariaValueNow = progressBar.getAttribute('aria-valuenow');
+                    if (ariaValueNow) {
+                        progressPercentage = parseInt(ariaValueNow, 10);
+                    }
+                }
+
+                if (title && imageUrl) {
+                    shortcuts.push({
+                        id: id,
+                        title: title,
+                        imageUrl: imageUrl,
+                        href: href,
+                        type: type,
+                        isPlaying: isPlaying,
+                        progressPercentage: progressPercentage
+                    });
+                }
+            });
+
+            return JSON.stringify(shortcuts);
+        } catch (e) {
+            console.error('Error getting homepage shortcuts:', e);
+            return JSON.stringify([]);
+        }
+    };
+
+
     // Inject getHomepageSections into window
     window.getHomepageSections = function() {
         try {
@@ -213,6 +300,7 @@
             return false;
         }
     };
+
 
     console.log('Spotify homepage functions injected into window');
     return true;

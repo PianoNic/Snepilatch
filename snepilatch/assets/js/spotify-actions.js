@@ -1,6 +1,6 @@
 // Spotify Action Functions
 // These functions control playback and navigation in the Spotify web player
-
+ 
 (function() {
     // Inject play function into window
     window.spotifyPlay = function() {

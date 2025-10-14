@@ -3,7 +3,7 @@
  * Based on webpack injection and esperanto ads API manipulation
  * @author ririxi (adapted for Snepilatch)
  */
-"use strict";
+"use strict"; 
 
 (function() {
     'use strict';

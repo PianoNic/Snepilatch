@@ -24,8 +24,12 @@
       "Bash(git stash:*)",
       "Bash(git fetch:*)",
       "Bash(git add:*)",
+<<<<<<< HEAD
       "Bash(git commit:*)",
       "Bash(git log:*)"
+=======
+      "Bash(git commit:*)"
+>>>>>>> 4a64b5c211a27e272840b2414a894cc7f2b5c55b
     ],
     "deny": [],
     "ask": []

@@ -165,6 +165,50 @@
     suppressPlayerAPIErrors();
 
     // =====================================
+    // MEDIA ELEMENT AD SKIPPER (FALLBACK)
+    // =====================================
+
+    /**
+     * Auto-skip short audio/video ads by fast-forwarding to the end
+     * This is a fallback in case API-based blocking fails
+     */
+    const installMediaAdSkipper = () => {
+        const originalCreateElement = document.createElement.bind(document);
+
+        document.createElement = function() {
+            const element = originalCreateElement.apply(this, arguments);
+
+            if (element instanceof HTMLMediaElement) {
+                element.addEventListener("play", (event) => {
+                    const target = event.currentTarget;
+
+                    // Skip non-blob sources (likely ads) that are shorter than 40 seconds
+                    if (!target.src.startsWith("blob:https://open.spotify.com/") &&
+                        target.duration > 0 &&
+                        target.duration < 40.0) {
+
+                        console.log(`🛡️ MediaAdSkipper: Detected short audio (${target.duration.toFixed(1)}s), auto-skipping`);
+
+                        // Fast-forward to the end after a tiny delay
+                        setTimeout(() => {
+                            if (target.duration > 0) {
+                                target.currentTime = target.duration;
+                            }
+                        }, 10);
+                    }
+                });
+            }
+
+            return element;
+        };
+
+        console.log('✅ Media element ad skipper installed (fallback protection)');
+    };
+
+    // Install media ad skipper immediately
+    installMediaAdSkipper();
+
+    // =====================================
     // WEBPACK LOADER & AD CLIENT INJECTION
     // =====================================
 

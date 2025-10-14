@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import '../utils/logger.dart';
 
 class WebViewService {
   InAppWebViewController? controller;
@@ -34,6 +34,7 @@ class WebViewService {
 
   void setController(InAppWebViewController webController) {
     controller = webController;
+    logInfo('WebView controller initialized', source: 'WebViewService');
   }
 
   Future<NavigationActionPolicy> shouldOverrideUrlLoading(
@@ -42,30 +43,30 @@ class WebViewService {
 
     if (uri != null) {
       String url = uri.toString();
-      debugPrint('🔗 Navigation request to: $url');
+      logDebug('Navigation request to: $url', source: 'WebViewService');
 
       // Prevent redirects to app store or mobile app
       if (url.contains('apps.apple.com') ||
           url.contains('play.google.com') ||
           url.contains('spotify://')) {
-        debugPrint('❌ Blocked navigation to: $url');
+        logWarning('Blocked navigation to app store/mobile: $url', source: 'WebViewService');
         return NavigationActionPolicy.CANCEL;
       }
 
       // Allow navigation to login page
       if (url.contains('accounts.spotify.com')) {
-        debugPrint('✅ Allowing navigation to login page');
+        logInfo('Allowing navigation to login page', source: 'WebViewService');
         return NavigationActionPolicy.ALLOW;
       }
     }
 
-    debugPrint('✅ Allowing navigation');
+    logDebug('Allowing navigation', source: 'WebViewService');
     return NavigationActionPolicy.ALLOW;
   }
 
   Future<PermissionResponse?> onPermissionRequest(
       InAppWebViewController controller, PermissionRequest permissionRequest) async {
-    debugPrint('Permission requested: ${permissionRequest.resources}');
+    logDebug('Permission requested: ${permissionRequest.resources}', source: 'WebViewService');
 
     // Always grant permission for DRM content
     return PermissionResponse(
@@ -80,7 +81,7 @@ class WebViewService {
         await controller!.evaluateJavascript(source: source);
       }
     } catch (e) {
-      debugPrint('Error running JavaScript: $e');
+      logError('Error running JavaScript', source: 'WebViewService', error: e);
     }
   }
 
@@ -90,7 +91,7 @@ class WebViewService {
         return await controller!.evaluateJavascript(source: source);
       }
     } catch (e) {
-      debugPrint('Error running JavaScript with result: $e');
+      logError('Error running JavaScript with result', source: 'WebViewService', error: e);
       return null;
     }
     return null;

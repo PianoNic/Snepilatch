@@ -4,7 +4,9 @@ import '../controllers/spotify_controller.dart';
 import '../widgets/theme_settings.dart';
 import '../widgets/app_update_dialog.dart';
 import '../pages/release_notes_page.dart';
+import '../pages/logs_viewer_page.dart';
 import '../services/update_service.dart';
+import '../main.dart';
 
 class UserPage extends StatefulWidget {
   final SpotifyController spotifyController;
@@ -91,6 +93,8 @@ class _UserPageState extends State<UserPage> {
                 ),
                 // Update Section
                 _buildUpdateSection(context),
+                // Developer Tools Section
+                _buildDeveloperSection(context),
                 const SizedBox(height: 16),
               ],
             ),
@@ -296,6 +300,43 @@ class _UserPageState extends State<UserPage> {
                 },
                 icon: const Icon(Icons.notes, size: 18),
                 label: const Text('Release Notes'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDeveloperSection(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.all(16),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Developer Tools',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            // Console Logs Button
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => LogsViewerPage(loggingService: loggingService),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.terminal, size: 18),
+                label: const Text('Console Logs'),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),

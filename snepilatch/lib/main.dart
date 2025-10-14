@@ -4,12 +4,23 @@ import 'controllers/spotify_controller.dart';
 import 'screens/main_screen.dart';
 import 'pages/loading_screen.dart';
 import 'services/audio_handler_service.dart';
+import 'services/logging_service.dart';
+import 'utils/logger.dart';
 import 'widgets/app_update_dialog.dart';
 import 'widgets/spotify_webview.dart';
 
 late AudioHandler audioHandler;
+late LoggingService loggingService;
 
 void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize logging service
+  loggingService = LoggingService();
+  Logger.init(loggingService);
+
+  logInfo('Application starting', source: 'main');
+
   // Initialize audio service
   audioHandler = await AudioService.init(
     builder: () => SpotifyAudioHandler(),
@@ -22,6 +33,8 @@ void main() async {
       notificationColor: Color(0xFF1DB954), // Spotify green
     ),
   );
+
+  logInfo('Audio service initialized', source: 'main');
 
   runApp(const MyApp());
 }

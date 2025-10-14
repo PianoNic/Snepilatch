@@ -88,6 +88,45 @@
     blockSentry();
 
     // =====================================
+    // CONSOLE ERROR SUPPRESSION
+    // =====================================
+
+    /**
+     * Suppress PlayerAPIClientError messages in console
+     */
+    const suppressPlayerAPIErrors = () => {
+        const originalConsoleError = console.error;
+        const originalConsoleWarn = console.warn;
+
+        console.error = function(...args) {
+            const message = args.join(' ');
+            // Suppress PlayerAPIClientError timeout messages
+            if (message.includes('PlayerAPIClientError') ||
+                message.includes("didn't receive an acknowledgement")) {
+                // Silently ignore these errors
+                return;
+            }
+            originalConsoleError.apply(console, args);
+        };
+
+        console.warn = function(...args) {
+            const message = args.join(' ');
+            // Suppress PlayerAPIClientError timeout warnings
+            if (message.includes('PlayerAPIClientError') ||
+                message.includes("didn't receive an acknowledgement")) {
+                // Silently ignore these warnings
+                return;
+            }
+            originalConsoleWarn.apply(console, args);
+        };
+
+        console.log('✅ PlayerAPIClientError console suppression installed');
+    };
+
+    // Suppress console errors immediately
+    suppressPlayerAPIErrors();
+
+    // =====================================
     // WEBPACK LOADER & AD CLIENT INJECTION
     // =====================================
 
@@ -181,13 +220,21 @@
         }
     };
 
-    // Retry counter for slot handling
+    // Retry counter for slot handling with exponential backoff
     const retryMap = new Map();
     const retryCounter = (slotId, action) => {
         if (!retryMap.has(slotId)) retryMap.set(slotId, { count: 0 });
         if (action === "increment") retryMap.get(slotId).count++;
         else if (action === "clear") retryMap.delete(slotId);
         else if (action === "get") return retryMap.get(slotId)?.count;
+    };
+
+    /**
+     * Calculate exponential backoff delay
+     */
+    const getBackoffDelay = (retryCount) => {
+        // Exponential backoff: 2s, 4s, 8s, 16s
+        return Math.min(2000 * Math.pow(2, retryCount), 16000);
     };
 
     // =====================================
@@ -312,7 +359,7 @@
     // Debouncing for ad manager configuration
     let configureAdManagersTimeout = null;
     let lastConfigureTime = 0;
-    const CONFIGURE_COOLDOWN = 5000; // 5 seconds minimum between calls
+    const CONFIGURE_COOLDOWN = 10000; // 10 seconds minimum between calls (increased from 5s)
 
     /**
      * Configure all ad managers to disable ads (with debouncing)
@@ -479,18 +526,23 @@
         catch (error) {
             console.warn(`AdBlocker: Error handling slot ${slotId} (non-critical):`, error.message);
 
-            // Reduced retry logic
+            // Exponential backoff retry logic
             retryCounter(slotId, "increment");
-            if (retryCounter(slotId, "get") > 2) {
-                console.warn(`AdBlocker: Giving up on slot ${slotId} after 2 retries`);
+            const retryCount = retryCounter(slotId, "get");
+
+            if (retryCount > 3) {
+                console.warn(`AdBlocker: Giving up on slot ${slotId} after 3 retries`);
                 retryCounter(slotId, "clear");
                 return;
             }
-            setTimeout(() => handleAdSlot(data), 2000);
+
+            const backoffDelay = getBackoffDelay(retryCount);
+            console.log(`AdBlocker: Retrying slot ${slotId} in ${backoffDelay}ms (attempt ${retryCount + 1})`);
+            setTimeout(() => handleAdSlot(data), backoffDelay);
         }
 
-        // Reconfigure ad managers (will be debounced)
-        configureAdManagers();
+        // Don't reconfigure ad managers here - causes too many API calls
+        // configureAdManagers();
     };
 
     /**
@@ -644,11 +696,14 @@
         }
 
         // Periodic updates (less frequent to avoid API spam)
-        setTimeout(enableExperimentalFeatures, 3000);
-        setTimeout(updateAllSlotSettings, 10000);
+        setTimeout(enableExperimentalFeatures, 5000);
+        setTimeout(updateAllSlotSettings, 15000);
 
-        // Periodic slot settings updates every 60 seconds (instead of 30)
-        setInterval(updateAllSlotSettings, 60000);
+        // Periodic slot settings updates every 120 seconds (increased from 60s)
+        setInterval(updateAllSlotSettings, 120000);
+
+        // Periodic ad manager reconfiguration every 120 seconds
+        setInterval(configureAdManagers, 120000);
 
         isInitialized = true;
         console.log('✅ AdBlocker: Fully initialized and active!');

@@ -110,12 +110,14 @@ lib/
 - SpotifyStore provides reactive state with individual ValueNotifiers
 
 ### WebView Integration
-- Periodic scraping (1-second intervals) for real-time updates
+- Periodic scraping (500ms intervals) for real-time updates
 - JavaScript functions injected: `getPlayingInfo()`, `getUserInfo()`
 - DOM selectors target Spotify's data-testid attributes
 - Handles both visible and hidden WebView modes
 - WebView runs off-screen when hidden to maintain functionality
 - URL debug logging available (prints current URL every second)
+- **Ad Blocker**: Has debouncing (5s cooldown) and timeout protection (3s max per API call) to prevent overwhelming Spotify's internal API and causing PlayerAPIClientError timeouts
+- **Sentry Blocking**: Blocks Sentry error reporting (window.Sentry, fetch, XHR) to prevent error alerts from reaching Spotify's servers
 
 ### Infinite Scrolling Implementation
 - **PlaylistController**: JavaScript class injected into Spotify web page

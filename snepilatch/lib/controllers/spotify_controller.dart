@@ -17,6 +17,7 @@ import '../services/injection_monitor_service.dart';
 import '../services/theme_service.dart';
 import '../services/audio_handler_service.dart';
 import '../stores/spotify_store.dart';
+import '../utils/logger.dart';
 import '../main.dart';
 
 class SpotifyController extends ChangeNotifier {
@@ -35,6 +36,7 @@ class SpotifyController extends ChangeNotifier {
 
   SpotifyController() {
     debugPrint('🚀 [SpotifyController] Constructor called');
+    logInfo('SpotifyController initialized', source: 'SpotifyController');
     _injectionMonitor = InjectionMonitorService(_webViewService);
     _startPeriodicScraping();
     // Progress animation removed - using scraped values only
@@ -162,10 +164,12 @@ class SpotifyController extends ChangeNotifier {
 
   Future<void> onLoadStop(InAppWebViewController controller, WebUri? url) async {
     debugPrint('🌐 [SpotifyController] Page finished loading: $url');
+    logInfo('WebView page loaded: ${url?.toString() ?? "unknown"}', source: 'SpotifyController');
 
     // Skip injection and checks if we're on the login page
     if (url != null && url.toString().contains('accounts.spotify.com')) {
       debugPrint('🔐 On login page, skipping injection and checks');
+      logDebug('On login page, skipping JavaScript injection', source: 'SpotifyController');
       return;
     }
 
@@ -430,6 +434,7 @@ class SpotifyController extends ChangeNotifier {
 
   // Playback control methods with optimistic updates
   Future<void> play() async {
+    logDebug('Play button pressed', source: 'SpotifyController');
     store.setPlaying(true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       notifyListeners();
@@ -438,6 +443,7 @@ class SpotifyController extends ChangeNotifier {
   }
 
   Future<void> pause() async {
+    logDebug('Pause button pressed', source: 'SpotifyController');
     store.setPlaying(false);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       notifyListeners();
@@ -446,6 +452,7 @@ class SpotifyController extends ChangeNotifier {
   }
 
   Future<void> next() async {
+    logInfo('Skipping to next track', source: 'SpotifyController');
     store.startUserControl();
     await _webViewService.runJavascript(SpotifyActionsService.nextScript);
     // Force scrape after delay to get new track info
@@ -455,6 +462,7 @@ class SpotifyController extends ChangeNotifier {
   }
 
   Future<void> previous() async {
+    logInfo('Going to previous track', source: 'SpotifyController');
     store.startUserControl();
     await _webViewService.runJavascript(SpotifyActionsService.previousScript);
     // Force scrape after delay to get new track info
@@ -644,6 +652,7 @@ class SpotifyController extends ChangeNotifier {
   // Navigation methods
   Future<void> navigateToLogin() async {
     debugPrint('🔐 Navigating to login page...');
+    logInfo('User navigating to Spotify login', source: 'SpotifyController');
 
     // Show the WebView first
     store.showWebView.value = true;
@@ -737,6 +746,8 @@ class SpotifyController extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    logInfo('User logging out from Spotify', source: 'SpotifyController');
+
     // Clear user data from store
     store.clearUserData();
 
@@ -948,6 +959,10 @@ class SpotifyController extends ChangeNotifier {
     } catch (e, stackTrace) {
       debugPrint('❌ Error updating tracks from controller: $e');
       debugPrint('Stack trace: $stackTrace');
+      logError('Failed to update tracks from PlaylistController',
+        source: 'SpotifyController',
+        error: e,
+        stackTrace: stackTrace);
       store.isLoadingSongs.value = false;
     }
   }

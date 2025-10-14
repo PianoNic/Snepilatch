@@ -11,6 +11,83 @@
     console.log('🛡️ Snepilatch AdBlocker: Initializing...');
 
     // =====================================
+    // SENTRY ERROR REPORTING BLOCKER
+    // =====================================
+
+    /**
+     * Block Sentry error reporting to prevent PlayerAPIClientError alerts
+     */
+    const blockSentry = () => {
+        let sentryBlockCount = 0;
+
+        // Block Sentry initialization
+        window.Sentry = undefined;
+        Object.defineProperty(window, 'Sentry', {
+            get: () => {
+                sentryBlockCount++;
+                console.log(`🛡️ [${sentryBlockCount}] Blocked Sentry initialization attempt`);
+                return undefined;
+            },
+            set: () => {
+                sentryBlockCount++;
+                console.log(`🛡️ [${sentryBlockCount}] Blocked Sentry.set() attempt`);
+            },
+            configurable: false
+        });
+
+        // Block Raven (old Sentry client)
+        window.Raven = undefined;
+        Object.defineProperty(window, 'Raven', {
+            get: () => {
+                sentryBlockCount++;
+                console.log(`🛡️ [${sentryBlockCount}] Blocked Raven (old Sentry) initialization attempt`);
+                return undefined;
+            },
+            set: () => {
+                sentryBlockCount++;
+                console.log(`🛡️ [${sentryBlockCount}] Blocked Raven.set() attempt`);
+            },
+            configurable: false
+        });
+
+        // Intercept and block Sentry network requests
+        const originalFetch = window.fetch;
+        window.fetch = function(...args) {
+            const url = args[0]?.toString() || '';
+            if (url.includes('sentry.io') || url.includes('sentry-cdn')) {
+                sentryBlockCount++;
+                console.log(`🛡️ [${sentryBlockCount}] Blocked Sentry fetch request:`, url);
+                return Promise.resolve(new Response('{}', { status: 200 }));
+            }
+            return originalFetch.apply(this, args);
+        };
+
+        // Also block XMLHttpRequest to Sentry
+        const originalXHROpen = XMLHttpRequest.prototype.open;
+        XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+            if (url.toString().includes('sentry.io') || url.toString().includes('sentry-cdn')) {
+                sentryBlockCount++;
+                console.log(`🛡️ [${sentryBlockCount}] Blocked Sentry XHR ${method} request:`, url);
+                // Return a no-op
+                return;
+            }
+            return originalXHROpen.call(this, method, url, ...rest);
+        };
+
+        console.log('✅ Sentry error reporting blocker installed');
+
+        // Log summary every 30 seconds if there were blocks
+        setInterval(() => {
+            if (sentryBlockCount > 0) {
+                console.log(`📊 Sentry Blocker Summary: ${sentryBlockCount} total blocks`);
+            }
+        }, 30000);
+    };
+
+    // Block Sentry immediately
+    blockSentry();
+
+    // =====================================
     // WEBPACK LOADER & AD CLIENT INJECTION
     // =====================================
 
@@ -232,56 +309,103 @@
         }
     };
 
+    // Debouncing for ad manager configuration
+    let configureAdManagersTimeout = null;
+    let lastConfigureTime = 0;
+    const CONFIGURE_COOLDOWN = 5000; // 5 seconds minimum between calls
+
     /**
-     * Configure all ad managers to disable ads
+     * Configure all ad managers to disable ads (with debouncing)
      */
     const configureAdManagers = async () => {
+        // Clear any pending configuration
+        if (configureAdManagersTimeout) {
+            clearTimeout(configureAdManagersTimeout);
+        }
+
+        // Check cooldown
+        const now = Date.now();
+        if (now - lastConfigureTime < CONFIGURE_COOLDOWN) {
+            console.log('AdBlocker: Skipping configure (cooldown active)');
+            return;
+        }
+
         if (!AdManagers) return;
 
         try {
+            lastConfigureTime = now;
             const { audio, billboard, leaderboard, sponsoredPlaylist, inStreamApi, vto } = AdManagers;
 
-            // Add negative playtime to prevent ad triggers
-            const testingClient = getTestingClient(webpackCache.functionModules, productState.transport);
-            if (testingClient) {
-                await testingClient.addPlaytime({ seconds: -100000000000 });
-            }
-
-            // Disable audio ads
+            // Disable audio ads (without API calls when possible)
             if (audio) {
-                await audio.disable();
                 audio.isNewAdsNpvEnabled = false;
+                // Only call disable if not already disabled
+                if (typeof audio.disable === 'function' && !audio._disabled) {
+                    try {
+                        await Promise.race([
+                            audio.disable(),
+                            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
+                        ]);
+                        audio._disabled = true;
+                    } catch (e) {
+                        console.warn('AdBlocker: Audio disable timeout/error (non-critical)');
+                    }
+                }
             }
 
-            // Disable billboard ads
-            if (billboard) {
-                await billboard.disable();
+            // Disable other ad managers with timeout protection
+            const disableWithTimeout = async (manager, name) => {
+                if (manager && typeof manager.disable === 'function' && !manager._disabled) {
+                    try {
+                        await Promise.race([
+                            manager.disable(),
+                            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
+                        ]);
+                        manager._disabled = true;
+                    } catch (e) {
+                        console.warn(`AdBlocker: ${name} disable timeout/error (non-critical)`);
+                    }
+                }
+            };
+
+            await Promise.all([
+                disableWithTimeout(billboard, 'Billboard'),
+                disableWithTimeout(inStreamApi, 'InStream'),
+                disableWithTimeout(sponsoredPlaylist, 'SponsoredPlaylist'),
+            ]);
+
+            // Handle leaderboard separately (different method name)
+            if (leaderboard && typeof leaderboard.disableLeaderboard === 'function' && !leaderboard._disabled) {
+                try {
+                    await Promise.race([
+                        leaderboard.disableLeaderboard(),
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
+                    ]);
+                    leaderboard._disabled = true;
+                } catch (e) {
+                    console.warn('AdBlocker: Leaderboard disable timeout/error (non-critical)');
+                }
             }
 
-            // Disable leaderboard ads
-            if (leaderboard) {
-                await leaderboard.disableLeaderboard();
-            }
-
-            // Disable sponsored playlists
-            if (sponsoredPlaylist) {
-                await sponsoredPlaylist.disable();
-            }
-
-            // Disable in-stream ads
-            if (inStreamApi) {
-                await inStreamApi.disable();
-            }
-
-            // Disable VTO ads
+            // Handle VTO
             if (vto) {
-                await vto.manager.disable();
                 vto.isNewAdsNpvEnabled = false;
+                if (vto.manager && typeof vto.manager.disable === 'function' && !vto.manager._disabled) {
+                    try {
+                        await Promise.race([
+                            vto.manager.disable(),
+                            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
+                        ]);
+                        vto.manager._disabled = true;
+                    } catch (e) {
+                        console.warn('AdBlocker: VTO disable timeout/error (non-critical)');
+                    }
+                }
             }
 
             console.log('✅ AdBlocker: Configured all ad managers');
 
-            // Also update product state
+            // Update product state with debouncing
             setTimeout(disableAds, 100);
         }
         catch (error) {
@@ -307,44 +431,65 @@
     };
 
     /**
-     * Handle individual ad slot
+     * Handle individual ad slot (with debouncing and timeout protection)
      */
-    const handleAdSlot = (data) => {
+    const handleAdSlot = async (data) => {
         const slotId = data?.adSlotEvent?.slotId || data?.slotId;
         if (!slotId) return;
 
         try {
-            // Clear slot using ads core connector
+            // Clear slot using ads core connector (with timeout)
             const adsCoreConnector = AdManagers?.audio?.inStreamApi?.adsCoreConnector;
             if (typeof adsCoreConnector?.clearSlot === "function") {
-                adsCoreConnector.clearSlot(slotId);
+                try {
+                    await Promise.race([
+                        Promise.resolve(adsCoreConnector.clearSlot(slotId)),
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2000))
+                    ]);
+                } catch (e) {
+                    console.warn(`AdBlocker: clearSlot timeout for ${slotId} (non-critical)`);
+                }
             }
 
-            // Clear using slots client
+            // Clear using slots client (with timeout)
             const slotsClient = getSlotsClient(webpackCache.functionModules, productState.transport);
             if (slotsClient) {
-                slotsClient.clearAllAds({ slotId });
+                try {
+                    await Promise.race([
+                        slotsClient.clearAllAds({ slotId }),
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2000))
+                    ]);
+                } catch (e) {
+                    console.warn(`AdBlocker: clearAllAds timeout for ${slotId} (non-critical)`);
+                }
             }
 
-            // Update slot settings
-            updateSlotSettings(slotId);
+            // Update slot settings (with timeout)
+            try {
+                await Promise.race([
+                    updateSlotSettings(slotId),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2000))
+                ]);
+            } catch (e) {
+                console.warn(`AdBlocker: updateSlotSettings timeout for ${slotId} (non-critical)`);
+            }
 
             console.log(`✅ AdBlocker: Handled ad slot ${slotId}`);
         }
         catch (error) {
-            console.error(`AdBlocker: Failed to handle slot ${slotId}`, error);
+            console.warn(`AdBlocker: Error handling slot ${slotId} (non-critical):`, error.message);
 
-            // Retry logic
+            // Reduced retry logic
             retryCounter(slotId, "increment");
-            if (retryCounter(slotId, "get") > 5) {
-                console.error(`AdBlocker: Giving up on slot ${slotId} after 5 retries`);
+            if (retryCounter(slotId, "get") > 2) {
+                console.warn(`AdBlocker: Giving up on slot ${slotId} after 2 retries`);
                 retryCounter(slotId, "clear");
                 return;
             }
-            setTimeout(() => handleAdSlot(data), 1000);
+            setTimeout(() => handleAdSlot(data), 2000);
         }
 
-        // Reconfigure ad managers
+        // Reconfigure ad managers (will be debounced)
         configureAdManagers();
     };
 
@@ -498,12 +643,12 @@
             );
         }
 
-        // Periodic updates
+        // Periodic updates (less frequent to avoid API spam)
         setTimeout(enableExperimentalFeatures, 3000);
-        setTimeout(updateAllSlotSettings, 5000);
+        setTimeout(updateAllSlotSettings, 10000);
 
-        // Periodic slot settings updates every 30 seconds
-        setInterval(updateAllSlotSettings, 30000);
+        // Periodic slot settings updates every 60 seconds (instead of 30)
+        setInterval(updateAllSlotSettings, 60000);
 
         isInitialized = true;
         console.log('✅ AdBlocker: Fully initialized and active!');

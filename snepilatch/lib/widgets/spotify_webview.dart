@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../controllers/spotify_controller.dart';
+import '../utils/logger.dart';
 
 class SpotifyWebViewWidget extends StatefulWidget {
   final SpotifyController spotifyController;
@@ -24,6 +25,7 @@ class _SpotifyWebViewWidgetState extends State<SpotifyWebViewWidget> with Automa
     }
 
     debugPrint('🔄 [SpotifyWebViewWidget] Building WebView widget');
+    logDebug('Building WebView widget', source: 'SpotifyWebViewWidget');
 
     // Keep WebView always in the widget tree to prevent recreation
     final webView = InAppWebView(
@@ -39,6 +41,14 @@ class _SpotifyWebViewWidgetState extends State<SpotifyWebViewWidget> with Automa
       onConsoleMessage: (controller, consoleMessage) {
         if (widget.spotifyController.showWebView) {
           debugPrint('Console: ${consoleMessage.message}');
+        }
+        // Log console messages from WebView
+        if (consoleMessage.messageLevel == ConsoleMessageLevel.ERROR) {
+          logError('WebView console error: ${consoleMessage.message}', source: 'SpotifyWebView');
+        } else if (consoleMessage.messageLevel == ConsoleMessageLevel.WARNING) {
+          logWarning('WebView console warning: ${consoleMessage.message}', source: 'SpotifyWebView');
+        } else {
+          logDebug('WebView console: ${consoleMessage.message}', source: 'SpotifyWebView');
         }
       },
     );

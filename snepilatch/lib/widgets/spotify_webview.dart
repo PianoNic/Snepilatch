@@ -39,16 +39,24 @@ class _SpotifyWebViewWidgetState extends State<SpotifyWebViewWidget> with Automa
       shouldOverrideUrlLoading: widget.spotifyController.shouldOverrideUrlLoading,
       onPermissionRequest: widget.spotifyController.onPermissionRequest,
       onConsoleMessage: (controller, consoleMessage) {
+        // Filter out PlayerAPIClientError spam
+        final message = consoleMessage.message;
+        if (message.contains('PlayerAPIClientError') ||
+            message.contains("didn't receive an acknowledgement")) {
+          // Silently ignore PlayerAPIClientError timeout messages
+          return;
+        }
+
         if (widget.spotifyController.showWebView) {
-          debugPrint('Console: ${consoleMessage.message}');
+          debugPrint('Console: $message');
         }
         // Log console messages from WebView
         if (consoleMessage.messageLevel == ConsoleMessageLevel.ERROR) {
-          logError('WebView console error: ${consoleMessage.message}', source: 'SpotifyWebView');
+          logError('WebView console error: $message', source: 'SpotifyWebView');
         } else if (consoleMessage.messageLevel == ConsoleMessageLevel.WARNING) {
-          logWarning('WebView console warning: ${consoleMessage.message}', source: 'SpotifyWebView');
+          logWarning('WebView console warning: $message', source: 'SpotifyWebView');
         } else {
-          logDebug('WebView console: ${consoleMessage.message}', source: 'SpotifyWebView');
+          logDebug('WebView console: $message', source: 'SpotifyWebView');
         }
       },
     );

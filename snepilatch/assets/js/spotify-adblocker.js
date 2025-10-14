@@ -1,733 +1,599 @@
-// Spotify Ad Blocker Functions
-// Comprehensive ad blocking for audio, visual ads, and premium prompts
+/**
+ * Advanced Spotify Ad Blocker for Snepilatch
+ * Based on webpack injection and esperanto ads API manipulation
+ * @author ririxi (adapted for Snepilatch)
+ */
+"use strict";
 
 (function() {
     'use strict';
 
-    // Configuration
-    const config = {
-        debug: false,
-        muteAds: true,
-        skipAds: true,
-        hideVisualAds: true,
-        checkInterval: 250
-    };
+    console.log('🛡️ Snepilatch AdBlocker: Initializing...');
 
-    // Logging utility
-    const log = (message, ...args) => {
-        if (config.debug) {
-            console.log('[Spotify AdBlocker]', message, ...args);
-        }
-    };
+    // =====================================
+    // WEBPACK LOADER & AD CLIENT INJECTION
+    // =====================================
 
-    // Query for element with retry
-    const queryAsync = (query, interval = config.checkInterval) => {
-        return new Promise((resolve) => {
-            let attempts = 0;
-            const maxAttempts = 40; // 10 seconds max wait
-            const checkElement = () => {
-                attempts++;
-                const element = document.querySelector(query);
-                if (element) {
-                    resolve(element);
-                } else if (attempts < maxAttempts) {
-                    setTimeout(checkElement, interval);
-                } else {
-                    resolve(null); // Resolve with null after timeout
-                }
-            };
-            checkElement();
-        });
-    };
-
-    // State tracking
-    let audioElement = null;
-    let lastAdState = false;
-    let playInterval = null;
-
-    // Check if an ad is currently playing
-    const isAdPlaying = () => {
-        // Check for ad indicators in multiple places
-        const adIndicators = [
-            // Direct ad indicators
-            document.querySelector('[data-testid="context-item-info-ad-subtitle"]'),
-            document.querySelector('.now-playing a[href*="/ad/"]'),
-            document.querySelector('[aria-label*="Advertisement"]'),
-            document.querySelector('.now-playing-bar .advertisement'),
-            // Check for ad in now playing section
-            document.querySelector('.now-playing > a'),
-            // Check if current track info contains ad markers
-            document.querySelector('[data-testid="now-playing-widget"] a[href*="/ad/"]')
-        ];
-
-        const hasAdIndicator = adIndicators.some(indicator => indicator !== null);
-
-        // Also check audio element source
-        if (!hasAdIndicator && audioElement && audioElement.src) {
-            const isAdUrl = audioElement.src.includes('/ad/') ||
-                            audioElement.src.includes('spotify.com/ad');
-            if (isAdUrl) {
-                log('Ad detected via audio URL');
-                return true;
-            }
-        }
-
-        if (hasAdIndicator && !lastAdState) {
-            log('Ad started playing');
-            lastAdState = true;
-        } else if (!hasAdIndicator && lastAdState) {
-            log('Ad finished playing');
-            lastAdState = false;
-        }
-
-        return hasAdIndicator;
-    };
-
-    // Remove ad elements from DOM
-    const removeAdElements = () => {
-        const adSelectors = [
-            // Premium upgrade prompts
-            '[aria-label="Upgrade to Premium"]',
-            '[data-testid="upgrade-button"]',
-            '.upgrade-button',
-            'a[href*="/premium"]:not([data-testid="logo"])',
-            'button:has-text("Upgrade")',
-            '.ButtonInner-sc-14ud5tc-0.fcsOIN',
-
-            // Ad containers
-            '[data-testid="ad-slot-container"]',
-            '[class*="ad-slot"]',
-            '[class*="AdSlot"]',
-            '.ad-container',
-            '.AdUnitContainer',
-            '.sponsored-content',
-            '[data-testid="sponsored-slot"]',
-
-            // Banner ads
-            '.desktoproutes-homepage-takeover-ad-hptoComponent',
-            '.InlineAds',
-            '.WiPggcPDzbwGxoxwLWFf',
-            '[class*="AdBanner"]',
-
-            // Video ads
-            'video[class*="ad"]',
-            '[data-testid="video-ad"]',
-            '.video-ads-container',
-
-            // Sponsored content
-            '[aria-label*="Sponsored"]',
-            'div[aria-label*="Advertisement"]',
-            '[data-testid="context-item-info-ad-subtitle"]',
-            '.sponsored-track'
-        ];
-
-        let removedCount = 0;
-        adSelectors.forEach(selector => {
-            try {
-                document.querySelectorAll(selector).forEach(element => {
-                    if (element && element.parentNode) {
-                        element.style.display = 'none';
-                        element.remove();
-                        removedCount++;
-                    }
-                });
-            } catch (e) {
-                // Ignore selector errors
-            }
-        });
-
-        if (removedCount > 0) {
-            log(`Removed ${removedCount} ad elements`);
-        }
-    };
-
-    // Handle audio ads by muting or skipping
-    const handleAudioAds = async () => {
+    /**
+     * Load webpack cache and function modules from Spotify's web player
+     */
+    const loadWebpack = () => {
         try {
-            // Try to find audio element
-            if (!audioElement) {
-                audioElement = document.querySelector('audio');
+            // Check if webpack is available
+            if (!window.webpackChunkclient_web) {
+                console.warn('AdBlocker: Webpack not yet available, will retry...');
+                return { cache: [], functionModules: [] };
             }
-            if (!audioElement) return;
 
-            // Check if ad is playing
-            if (isAdPlaying()) {
-                if (config.muteAds) {
-                    audioElement.volume = 0;
-                    audioElement.muted = true;
-                    log('Muted ad audio');
-                }
-
-                if (config.skipAds) {
-                    // Method 1: Try to skip forward
-                    const skipButton = document.querySelector('[data-testid="control-button-skip-forward"]');
-                    if (skipButton && !skipButton.disabled) {
-                        skipButton.click();
-                        log('Clicked skip button');
+            const require = window.webpackChunkclient_web.push([[Symbol()], {}, (re) => re]);
+            const cache = Object.keys(require.m).map(id => require(id));
+            const modules = cache
+                .filter(module => typeof module === "object")
+                .flatMap(module => {
+                    try {
+                        return Object.values(module);
                     }
+                    catch { }
+                });
+            const functionModules = modules.filter(module => typeof module === "function");
 
-                    // Method 2: Fast forward through ad
-                    if (audioElement.duration && isFinite(audioElement.duration)) {
-                        audioElement.currentTime = audioElement.duration - 0.1;
-                        log('Fast forwarded through ad');
-                    }
-
-                    // Method 3: Clear audio source
-                    if (audioElement.src && audioElement.src.includes('/ad/')) {
-                        audioElement.src = '';
-                        audioElement.pause();
-                        log('Cleared ad audio source');
-
-                        // Try to resume playback
-                        setTimeout(() => {
-                            const playButton = document.querySelector('[data-testid="control-button-playpause"]');
-                            if (playButton && playButton.getAttribute('aria-label')?.includes('Play')) {
-                                playButton.click();
-                            }
-                        }, 500);
-                    }
-                }
-            } else {
-                // Restore audio if not an ad
-                if (audioElement.muted && config.muteAds) {
-                    audioElement.volume = 1;
-                    audioElement.muted = false;
-                }
-            }
-        } catch (error) {
-            log('Error handling audio ads:', error);
+            console.log(`✅ AdBlocker: Loaded webpack - ${cache.length} cache items, ${functionModules.length} function modules`);
+            return { cache, functionModules };
+        }
+        catch (error) {
+            console.error("AdBlocker: Failed to load webpack", error);
+            return { cache: [], functionModules: [] };
         }
     };
 
-    // Intercept audio element creation
-    const interceptAudioCreation = () => {
-        const originalCreateElement = document.createElement.bind(document);
-
-        document.createElement = function(tagName) {
-            const element = originalCreateElement(tagName);
-
-            if (tagName.toLowerCase() === 'audio') {
-                audioElement = element;
-                log('Audio element captured');
-
-                // Override play method
-                const originalPlay = element.play.bind(element);
-                element.play = function() {
-                    if (isAdPlaying()) {
-                        log('Blocked ad audio playback');
-
-                        // Still try to play but muted
-                        element.volume = 0;
-                        element.muted = true;
-
-                        // Try to skip
-                        setTimeout(() => {
-                            const skipButton = document.querySelector('[data-testid="control-button-skip-forward"]');
-                            if (skipButton) skipButton.click();
-                        }, 100);
-
-                        return originalPlay().catch(() => {});
-                    }
-                    return originalPlay();
-                };
+    /**
+     * Get the esperanto settings client for ad configuration
+     */
+    const getSettingsClient = (cache, functionModules = [], transport = {}) => {
+        try {
+            const settingsClient = cache.find((m) => m?.settingsClient)?.settingsClient;
+            if (!settingsClient) {
+                const settings = functionModules.find(m =>
+                    m?.SERVICE_ID === "spotify.ads.esperanto.settings.proto.Settings" ||
+                    m?.SERVICE_ID === "spotify.ads.esperanto.proto.Settings"
+                );
+                if (!settings) return null;
+                return new settings(transport);
             }
-
-            return element;
-        };
-    };
-
-    // Monitor now playing bar for ads
-    const monitorNowPlayingBar = async () => {
-        const nowPlayingBar = await queryAsync('[data-testid="now-playing-bar"], .now-playing-bar');
-        const playButton = await queryAsync('[data-testid="control-button-playpause"], button[title="Play"], button[title="Pause"]');
-
-        if (!nowPlayingBar) {
-            log('Now playing bar not found, retrying in 5 seconds');
-            setTimeout(monitorNowPlayingBar, 5000);
-            return;
+            return settingsClient;
         }
-
-        let skipAttempts = 0;
-        const maxSkipAttempts = 3;
-
-        // Monitor for changes
-        const observer = new MutationObserver(() => {
-            const link = document.querySelector('.now-playing > a');
-
-            if (link || isAdPlaying()) {
-                log('Ad detected in now playing bar');
-
-                // Clear any existing play interval
-                if (playInterval) {
-                    clearInterval(playInterval);
-                    playInterval = null;
-                }
-
-                // Multiple skip strategies
-                skipAttempts = 0;
-                const trySkip = () => {
-                    skipAttempts++;
-
-                    // Try skip button
-                    const skipButton = document.querySelector('[data-testid="control-button-skip-forward"]');
-                    if (skipButton && !skipButton.disabled) {
-                        skipButton.click();
-                        log('Attempted skip via skip button');
-                    }
-
-                    // Clear audio if possible
-                    if (audioElement) {
-                        audioElement.src = '';
-                        audioElement.pause();
-                    }
-
-                    // Try to play/pause to skip
-                    if (playButton) {
-                        playButton.click();
-                        setTimeout(() => {
-                            if (document.querySelector('.now-playing > a') && skipAttempts < maxSkipAttempts) {
-                                trySkip();
-                            }
-                        }, 500);
-                    }
-                };
-
-                trySkip();
-
-                // Set up interval to keep trying
-                if (!playInterval) {
-                    playInterval = setInterval(() => {
-                        if (!document.querySelector('.now-playing > a') && !isAdPlaying()) {
-                            clearInterval(playInterval);
-                            playInterval = null;
-                            log('Ad cleared, stopping skip attempts');
-                        } else if (playButton) {
-                            playButton.click();
-                        }
-                    }, 500);
-                }
-            } else if (playInterval) {
-                clearInterval(playInterval);
-                playInterval = null;
-            }
-        });
-
-        observer.observe(nowPlayingBar, {
-            childList: true,
-            subtree: true,
-            attributes: true,
-            characterData: true
-        });
-
-        log('Now playing bar observer attached');
+        catch (error) {
+            console.error("AdBlocker: Failed to get ads settings client", error);
+            return null;
+        }
     };
 
-    // Add CSS to hide visual ads
-    const injectAdBlockerStyles = () => {
-        if (document.getElementById('spotify-adblocker-styles')) return;
+    /**
+     * Get the slots client for ad slot manipulation
+     */
+    const getSlotsClient = (functionModules, transport) => {
+        try {
+            const slots = functionModules.find(m =>
+                m.SERVICE_ID === "spotify.ads.esperanto.slots.proto.Slots" ||
+                m.SERVICE_ID === "spotify.ads.esperanto.proto.Slots"
+            );
+            if (!slots) return null;
+            return new slots(transport);
+        }
+        catch (error) {
+            console.error("AdBlocker: Failed to get slots client", error);
+            return null;
+        }
+    };
 
-        const style = document.createElement('style');
-        style.id = 'spotify-adblocker-styles';
-        style.textContent = `
-            /* Hide upgrade buttons and premium prompts */
-            [aria-label="Upgrade to Premium"],
-            [data-testid="upgrade-button"],
-            .upgrade-button,
-            a[href*="/premium"]:not([data-testid="logo"]),
-            .ButtonInner-sc-14ud5tc-0.fcsOIN,
+    /**
+     * Get the testing client for playtime manipulation
+     */
+    const getTestingClient = (functionModules, transport) => {
+        try {
+            const testing = functionModules.find(m =>
+                m.SERVICE_ID === "spotify.ads.esperanto.testing.proto.Testing" ||
+                m.SERVICE_ID === "spotify.ads.esperanto.proto.Testing"
+            );
+            if (!testing) return null;
+            return new testing(transport);
+        }
+        catch (error) {
+            console.error("AdBlocker: Failed to get testing client", error);
+            return null;
+        }
+    };
 
-            /* Hide ad containers */
+    // Retry counter for slot handling
+    const retryMap = new Map();
+    const retryCounter = (slotId, action) => {
+        if (!retryMap.has(slotId)) retryMap.set(slotId, { count: 0 });
+        if (action === "increment") retryMap.get(slotId).count++;
+        else if (action === "clear") retryMap.delete(slotId);
+        else if (action === "get") return retryMap.get(slotId)?.count;
+    };
+
+    // =====================================
+    // CSS-BASED AD HIDING
+    // =====================================
+
+    const hideAdLikeElements = () => {
+        if (document.getElementById('snepilatch-adblocker-styles')) return;
+
+        const css = document.createElement('style');
+        css.id = 'snepilatch-adblocker-styles';
+
+        // Get upgrade text in current locale (fallback to default selectors)
+        const upgradeSelectors = [
+            'button[aria-label*="Upgrade"]',
+            'button[aria-label*="Premium"]',
+            'button[title*="Upgrade"]',
+            'button[title*="Premium"]',
+            '.main-topBar-UpgradeButton'
+        ].join(', ');
+
+        css.innerHTML = `
+            /* Hide ad slots and containers */
+            .sl_aPp6GDg05ItSfmsS7, .nHCJskDZVlmDhNNS9Ixv, .utUDWsORU96S7boXm2Aq,
+            .cpBP3znf6dhHLA2dywjy, .G7JYBeU1c2QawLyFs5VK, .vYl1kgf1_R18FCmHgdw2,
+            .vZkc6VwrFz0EjVBuHGmx, .iVAZDcTm1XGjxwKlQisz, ._I_1HMbDnNlNAaViEnbp,
+            .xXj7eFQ8SoDKYXy6L3E1, .F68SsPm8lZFktQ1lWsQz, .MnW5SczTcbdFHxLZ_Z8j,
+            .WiPggcPDzbwGxoxwLWFf, .ReyA3uE3K7oEz7PTTnAn, .x8e0kqJPS0bM4dVK7ESH,
+            .gZ2Nla3mdRREDCwybK6X, .SChMe0Tert7lmc5jqH01, .AwF4EfqLOIJ2xO7CjHoX,
+            .UlkNeRDFoia4UDWtrOr4, .k_RKSQxa2u5_6KmcOoSw, ._mWmycP_WIvMNQdKoAFb,
+            .O3UuqEx6ibrxyOJIdpdg, .akCwgJVf4B4ep6KYwrk5, .bIA4qeTh_LSwQJuVxDzl,
+            .ajr9pah2nj_5cXrAofU_, .gvn0k6QI7Yl_A0u46hKn, .obTnuSx7ZKIIY1_fwJhe,
+            .IiLMLyxs074DwmEH4x5b, .RJjM91y1EBycwhT_wH59, .mxn5B5ceO2ksvMlI1bYz,
+            .l8wtkGVi89_AsA3nXDSR, .Th1XPPdXMnxNCDrYsnwb, .SJMBltbXfqUiByDAkUN_,
+            .Nayn_JfAUsSO0EFapLuY, .YqlFpeC9yMVhGmd84Gdo, .HksuyUyj1n3aTnB4nHLd,
+            .DT8FJnRKoRVWo77CPQbQ, ._Cq69xKZBtHaaeMZXIdk,
+            .main-leaderboardComponent-container, .sponsor-container,
+            a.link-subtle.main-navBar-navBarLink.GKnnhbExo0U9l7Jz2rdc,
+            ${upgradeSelectors},
+            .main-contextMenu-menuItem a[href^="https://www.spotify.com/premium/"],
+            div[data-testid*="hpto"],
             [data-testid="ad-slot-container"],
-            [class*="ad-slot"],
-            [class*="AdSlot"],
-            .ad-container,
-            .AdUnitContainer,
-            .sponsored-content,
+            [class*="ad-slot"], [class*="AdSlot"],
+            .ad-container, .AdUnitContainer, .sponsored-content,
             [data-testid="sponsored-slot"],
-
-            /* Hide banners */
-            .desktoproutes-homepage-takeover-ad-hptoComponent,
-            .InlineAds,
-            .WiPggcPDzbwGxoxwLWFf,
-            [class*="AdBanner"],
-
-            /* Hide popups and overlays */
-            body > div:not(#main):not([class*="spotify"]):not([class*="Root"]),
-
-            /* Hide video ads */
-            video[class*="ad"],
-            [data-testid="video-ad"],
-            .video-ads-container,
-
-            /* Hide sponsored content */
-            [aria-label*="Sponsored"],
-            div[aria-label*="Advertisement"],
-            [data-testid="context-item-info-ad-subtitle"] {
+            [aria-label*="Advertisement"], [aria-label*="Sponsored"] {
                 display: none !important;
                 visibility: hidden !important;
                 opacity: 0 !important;
-                pointer-events: none !important;
                 height: 0 !important;
                 width: 0 !important;
                 overflow: hidden !important;
-            }
-
-            /* Ensure main content is visible */
-            #main,
-            .Root__main-view,
-            [data-testid="main-view"] {
-                display: block !important;
-                visibility: visible !important;
+                pointer-events: none !important;
             }
         `;
-        document.head.appendChild(style);
-        log('Injected ad blocker styles');
+        document.head.appendChild(css);
+        console.log('✅ AdBlocker: Injected CSS to hide ad elements');
     };
 
-    // Main initialization
-    const initAdBlocker = async () => {
-        log('Initializing Spotify AdBlocker');
+    // =====================================
+    // CORE AD BLOCKING FUNCTIONALITY
+    // =====================================
 
-        // Inject styles immediately
-        injectAdBlockerStyles();
+    let webpackCache = { cache: [], functionModules: [] };
+    let Platform = null;
+    let AdManagers = null;
+    let productState = null;
+    let isInitialized = false;
 
-        // Set up audio interception
-        interceptAudioCreation();
+    /**
+     * Wait for Spotify platform API to be available
+     */
+    const waitForPlatform = () => {
+        return new Promise((resolve) => {
+            const checkPlatform = () => {
+                // Try to find Spotify platform in various locations
+                if (window.Spotify && window.Spotify.Platform) {
+                    Platform = window.Spotify.Platform;
+                    AdManagers = Platform.AdManagers;
 
-        // Start monitoring
-        monitorNowPlayingBar();
+                    // Get product state
+                    const UserAPI = Platform.UserAPI;
+                    productState = UserAPI?._product_state ||
+                                   UserAPI?._product_state_service ||
+                                   Platform?.ProductStateAPI?.productStateApi;
 
-        // Set up periodic checks
-        setInterval(() => {
-            if (config.hideVisualAds) {
-                removeAdElements();
-            }
-            if (config.skipAds || config.muteAds) {
-                handleAudioAds();
-            }
-        }, config.checkInterval);
+                    if (AdManagers && Object.keys(AdManagers).length > 0 && productState) {
+                        console.log('✅ AdBlocker: Spotify Platform API found');
+                        resolve(true);
+                        return;
+                    }
+                }
 
-        // Set up mutation observer for dynamic content
-        const observer = new MutationObserver(() => {
-            if (config.hideVisualAds) {
-                removeAdElements();
-            }
-            if (config.skipAds || config.muteAds) {
-                handleAudioAds();
-            }
+                // Retry after delay
+                setTimeout(checkPlatform, 500);
+            };
+            checkPlatform();
         });
+    };
 
-        // Wait for body to be available
-        const body = await queryAsync('body');
-        if (body) {
-            observer.observe(body, {
-                childList: true,
-                subtree: true,
-                attributes: false,
-                attributeOldValue: false
+    /**
+     * Disable ads in product state
+     */
+    const disableAds = async () => {
+        if (!productState) return;
+        try {
+            await productState.putOverridesValues({
+                pairs: {
+                    ads: "0",
+                    catalogue: "premium",
+                    product: "premium",
+                    type: "premium"
+                }
             });
+            console.log('✅ AdBlocker: Set product state to premium');
+        }
+        catch (error) {
+            console.error("AdBlocker: Failed to disable ads in product state", error);
+        }
+    };
+
+    /**
+     * Configure all ad managers to disable ads
+     */
+    const configureAdManagers = async () => {
+        if (!AdManagers) return;
+
+        try {
+            const { audio, billboard, leaderboard, sponsoredPlaylist, inStreamApi, vto } = AdManagers;
+
+            // Add negative playtime to prevent ad triggers
+            const testingClient = getTestingClient(webpackCache.functionModules, productState.transport);
+            if (testingClient) {
+                await testingClient.addPlaytime({ seconds: -100000000000 });
+            }
+
+            // Disable audio ads
+            if (audio) {
+                await audio.disable();
+                audio.isNewAdsNpvEnabled = false;
+            }
+
+            // Disable billboard ads
+            if (billboard) {
+                await billboard.disable();
+            }
+
+            // Disable leaderboard ads
+            if (leaderboard) {
+                await leaderboard.disableLeaderboard();
+            }
+
+            // Disable sponsored playlists
+            if (sponsoredPlaylist) {
+                await sponsoredPlaylist.disable();
+            }
+
+            // Disable in-stream ads
+            if (inStreamApi) {
+                await inStreamApi.disable();
+            }
+
+            // Disable VTO ads
+            if (vto) {
+                await vto.manager.disable();
+                vto.isNewAdsNpvEnabled = false;
+            }
+
+            console.log('✅ AdBlocker: Configured all ad managers');
+
+            // Also update product state
+            setTimeout(disableAds, 100);
+        }
+        catch (error) {
+            console.error("AdBlocker: Failed to configure ad managers", error);
+        }
+    };
+
+    /**
+     * Get ad slots from Spotify
+     */
+    const getAdSlots = async () => {
+        try {
+            const slotsClient = getSlotsClient(webpackCache.functionModules, productState.transport);
+            if (slotsClient) {
+                const response = await slotsClient.getSlots();
+                return response.adSlots || [];
+            }
+        }
+        catch (error) {
+            console.error("AdBlocker: Failed to get ad slots", error);
+        }
+        return [];
+    };
+
+    /**
+     * Handle individual ad slot
+     */
+    const handleAdSlot = (data) => {
+        const slotId = data?.adSlotEvent?.slotId || data?.slotId;
+        if (!slotId) return;
+
+        try {
+            // Clear slot using ads core connector
+            const adsCoreConnector = AdManagers?.audio?.inStreamApi?.adsCoreConnector;
+            if (typeof adsCoreConnector?.clearSlot === "function") {
+                adsCoreConnector.clearSlot(slotId);
+            }
+
+            // Clear using slots client
+            const slotsClient = getSlotsClient(webpackCache.functionModules, productState.transport);
+            if (slotsClient) {
+                slotsClient.clearAllAds({ slotId });
+            }
+
+            // Update slot settings
+            updateSlotSettings(slotId);
+
+            console.log(`✅ AdBlocker: Handled ad slot ${slotId}`);
+        }
+        catch (error) {
+            console.error(`AdBlocker: Failed to handle slot ${slotId}`, error);
+
+            // Retry logic
+            retryCounter(slotId, "increment");
+            if (retryCounter(slotId, "get") > 5) {
+                console.error(`AdBlocker: Giving up on slot ${slotId} after 5 retries`);
+                retryCounter(slotId, "clear");
+                return;
+            }
+            setTimeout(() => handleAdSlot(data), 1000);
         }
 
-        log('AdBlocker initialized successfully');
+        // Reconfigure ad managers
+        configureAdManagers();
     };
 
-    // Start initialization
+    /**
+     * Update settings for specific ad slot
+     */
+    const updateSlotSettings = async (slotId) => {
+        try {
+            const settingsClient = getSettingsClient(
+                webpackCache.cache,
+                webpackCache.functionModules,
+                productState.transport
+            );
+            if (!settingsClient) return;
+
+            await settingsClient.updateAdServerEndpoint({
+                slotIds: [slotId],
+                url: "http://localhost/no/thanks"
+            });
+            await settingsClient.updateStreamTimeInterval({
+                slotId,
+                timeInterval: "0"
+            });
+            await settingsClient.updateSlotEnabled({
+                slotId,
+                enabled: false
+            });
+            await settingsClient.updateDisplayTimeInterval({
+                slotId,
+                timeInterval: "0"
+            });
+        }
+        catch (error) {
+            console.error(`AdBlocker: Failed to update slot settings for ${slotId}`, error);
+        }
+    };
+
+    /**
+     * Subscribe to ad slot events
+     */
+    const subscribeToSlot = (slotId) => {
+        try {
+            const adsCoreConnector = AdManagers?.audio?.inStreamApi?.adsCoreConnector;
+            if (adsCoreConnector && typeof adsCoreConnector.subscribeToSlot === 'function') {
+                adsCoreConnector.subscribeToSlot(slotId, handleAdSlot);
+                console.log(`✅ AdBlocker: Subscribed to slot ${slotId}`);
+            }
+        }
+        catch (error) {
+            console.error(`AdBlocker: Failed to subscribe to slot ${slotId}`, error);
+        }
+    };
+
+    /**
+     * Bind to all ad slots
+     */
+    const bindToSlots = async () => {
+        const slots = await getAdSlots();
+        console.log(`✅ AdBlocker: Found ${slots.length} ad slots`);
+
+        for (const slot of slots) {
+            const slotId = slot.slotId || slot.slot_id;
+            if (slotId) {
+                subscribeToSlot(slotId);
+                // Immediately handle the slot
+                setTimeout(() => handleAdSlot({ adSlotEvent: { slotId } }), 50);
+            }
+        }
+    };
+
+    /**
+     * Update all slot settings periodically
+     */
+    const updateAllSlotSettings = async () => {
+        const slots = await getAdSlots();
+        for (const slot of slots) {
+            const slotId = slot.slotId || slot.slot_id;
+            if (slotId) {
+                await updateSlotSettings(slotId);
+            }
+        }
+    };
+
+    /**
+     * Enable experimental features to hide ads
+     */
+    const enableExperimentalFeatures = async () => {
+        try {
+            const overrides = {
+                enableEsperantoMigration: true,
+                enableInAppMessaging: false,
+                hideUpgradeCTA: true,
+                enablePremiumUserForMiniPlayer: true,
+            };
+
+            // Try Platform API first
+            if (Platform?.RemoteConfigDebugAPI) {
+                for (const [key, value] of Object.entries(overrides)) {
+                    await Platform.RemoteConfigDebugAPI.setOverride(
+                        { source: "web", type: "boolean", name: key },
+                        value
+                    );
+                }
+                console.log('✅ AdBlocker: Set experimental features via Platform API');
+            }
+        }
+        catch (error) {
+            console.error("AdBlocker: Failed to set experimental features", error);
+        }
+    };
+
+    /**
+     * Main initialization function
+     */
+    const initializeAdBlocker = async () => {
+        if (isInitialized) {
+            console.log('⚠️ AdBlocker: Already initialized');
+            return;
+        }
+
+        console.log('🚀 AdBlocker: Starting initialization...');
+
+        // Inject CSS immediately
+        hideAdLikeElements();
+
+        // Wait for Spotify Platform to be ready
+        await waitForPlatform();
+
+        // Load webpack cache
+        webpackCache = loadWebpack();
+        if (webpackCache.cache.length === 0) {
+            console.warn('⚠️ AdBlocker: Webpack not loaded yet, retrying in 2 seconds...');
+            setTimeout(initializeAdBlocker, 2000);
+            return;
+        }
+
+        // Bind to ad slots
+        await bindToSlots();
+
+        // Configure ad managers
+        await configureAdManagers();
+
+        // Enable experimental features
+        await enableExperimentalFeatures();
+
+        // Subscribe to product state changes
+        if (productState && typeof productState.subValues === 'function') {
+            productState.subValues(
+                { keys: ["ads", "catalogue", "product", "type"] },
+                () => configureAdManagers()
+            );
+        }
+
+        // Periodic updates
+        setTimeout(enableExperimentalFeatures, 3000);
+        setTimeout(updateAllSlotSettings, 5000);
+
+        // Periodic slot settings updates every 30 seconds
+        setInterval(updateAllSlotSettings, 30000);
+
+        isInitialized = true;
+        console.log('✅ AdBlocker: Fully initialized and active!');
+    };
+
+    // =====================================
+    // FALLBACK DOM-BASED AD BLOCKING
+    // =====================================
+
+    /**
+     * Fallback DOM observer to remove ad elements
+     */
+    const initDOMObserver = () => {
+        const observer = new MutationObserver(() => {
+            // Remove any ad elements that appear
+            const adSelectors = [
+                '[data-testid="ad-slot-container"]',
+                '[class*="ad-slot"]',
+                '.ad-container',
+                '[aria-label*="Advertisement"]'
+            ];
+
+            adSelectors.forEach(selector => {
+                document.querySelectorAll(selector).forEach(el => {
+                    if (el && el.parentNode) {
+                        el.remove();
+                    }
+                });
+            });
+        });
+
+        if (document.body) {
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        }
+    };
+
+    // =====================================
+    // STARTUP
+    // =====================================
+
+    // Start initialization when page is ready
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initAdBlocker);
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeAdBlocker();
+            initDOMObserver();
+        });
     } else {
-        initAdBlocker();
+        initializeAdBlocker();
+        initDOMObserver();
     }
 
-    // Public API for external control
+    // Public API for Flutter to control the ad blocker
     window.spotifyAdBlocker = {
-        enable: () => {
-            config.skipAds = true;
-            config.muteAds = true;
-            config.hideVisualAds = true;
-            log('AdBlocker enabled');
+        enable: async () => {
+            console.log('AdBlocker: Enabling...');
+            await initializeAdBlocker();
         },
         disable: () => {
-            config.skipAds = false;
-            config.muteAds = false;
-            config.hideVisualAds = false;
-            log('AdBlocker disabled');
+            console.log('AdBlocker: Disable not fully implemented (requires full state reset)');
+            isInitialized = false;
         },
-        setDebug: (enabled) => {
-            config.debug = enabled;
-            log(`Debug mode ${enabled ? 'enabled' : 'disabled'}`);
+        status: () => {
+            return {
+                initialized: isInitialized,
+                hasWebpack: webpackCache.cache.length > 0,
+                hasPlatform: Platform !== null,
+                hasAdManagers: AdManagers !== null
+            };
         },
-        isAdPlaying: isAdPlaying,
-        forceRemoveAds: removeAdElements,
-        getConfig: () => config
+        forceUpdate: async () => {
+            await configureAdManagers();
+            await updateAllSlotSettings();
+        }
     };
 
-    // Status function
+    // Global status function
     window.getAdBlockerStatus = function() {
+        const status = window.spotifyAdBlocker.status();
         return JSON.stringify({
-            enabled: config.skipAds || config.muteAds || config.hideVisualAds,
-            adDetected: isAdPlaying(),
-            config: {
-                skipAds: config.skipAds,
-                muteAds: config.muteAds,
-                hideVisualAds: config.hideVisualAds,
-                debug: config.debug
-            },
+            enabled: status.initialized,
+            webpackLoaded: status.hasWebpack,
+            platformReady: status.hasPlatform,
+            adManagersFound: status.hasAdManagers,
             timestamp: new Date().toISOString()
         });
     };
 
-    // ===============================
-    // SENTRY BLOCKER SECTION
-    // ===============================
+    console.log('✅ Snepilatch AdBlocker script loaded');
 
-    console.log('🛡️ Initializing Complete Sentry Blocker...');
-
-    // Block all Sentry-related global objects
-    const sentryObjects = [
-        'Sentry', '__SENTRY__', '__sentry__', '__sentry_browser_bundle__',
-        'Raven', '__raven__', 'SentryReplay', '__sentryReplaySession__',
-        '__SENTRY_RELEASE__', '__SENTRY_DSN__', '__sentryEvents__'
-    ];
-
-    sentryObjects.forEach(obj => {
-        // Block existing objects
-        if (window[obj]) {
-            delete window[obj];
-            console.log(`🚫 Deleted existing ${obj}`);
-        }
-
-        // Prevent future assignments
-        Object.defineProperty(window, obj, {
-            get: () => {
-                console.log(`🚫 Blocked access to ${obj}`);
-                return undefined;
-            },
-            set: (value) => {
-                console.log(`🚫 Blocked assignment to ${obj}`);
-                return false;
-            },
-            configurable: false,
-            enumerable: false
-        });
-    });
-
-    // Block Sentry methods if they try to attach to other objects
-    const blockSentryMethods = (obj) => {
-        if (!obj) return;
-
-        const sentryMethods = [
-            'init', 'captureException', 'captureMessage', 'captureEvent',
-            'configureScope', 'withScope', 'setUser', 'setTag', 'setContext',
-            'addBreadcrumb', 'setExtra', 'setLevel', 'setTransaction',
-            'startTransaction', 'getCurrentHub', 'getHubFromCarrier'
-        ];
-
-        sentryMethods.forEach(method => {
-            if (obj[method]) {
-                obj[method] = () => {
-                    console.log(`🚫 Blocked Sentry.${method}()`);
-                    return undefined;
-                };
-            }
-        });
-    };
-
-    // Override Error constructor to prevent Sentry from hooking into it
-    const OriginalError = window.Error;
-    window.Error = function(...args) {
-        const error = new OriginalError(...args);
-        // Remove any Sentry properties that might be added
-        Object.keys(error).forEach(key => {
-            if (key.toLowerCase().includes('sentry')) {
-                delete error[key];
-            }
-        });
-        return error;
-    };
-    window.Error.prototype = OriginalError.prototype;
-
-    // Block all Sentry network requests
-    const sentryPatterns = [
-        'sentry.io',
-        'ingest.sentry',
-        'sentry-cdn.com',
-        'ravenjs.com',
-        '/api/[0-9]+/envelope/',
-        '/api/[0-9]+/store/',
-        'sentry_key=',
-        'sentry_version=',
-        'sentry-trace',
-        'sentry_client='
-    ];
-
-    const isSentryRequest = (url) => {
-        const urlStr = (url || '').toString().toLowerCase();
-        return sentryPatterns.some(pattern => {
-            if (pattern.includes('[0-9]+')) {
-                const regex = new RegExp(pattern.replace(/\[0-9\]\+/g, '\\d+'));
-                return regex.test(urlStr);
-            }
-            return urlStr.includes(pattern);
-        });
-    };
-
-    // Block fetch
-    const originalFetch = window.fetch;
-    window.fetch = function(url, ...args) {
-        if (isSentryRequest(url)) {
-            console.log('🚫 Blocked Sentry fetch:', url.toString().substring(0, 80));
-            return Promise.reject(new Error('Sentry blocked'));
-        }
-        return originalFetch.call(this, url, ...args);
-    };
-
-    // Block XHR
-    const XHROpen = XMLHttpRequest.prototype.open;
-    XMLHttpRequest.prototype.open = function(method, url, ...rest) {
-        this._sentryBlocked = isSentryRequest(url);
-        if (this._sentryBlocked) {
-            console.log('🚫 Blocked Sentry XHR:', url.toString().substring(0, 80));
-        }
-        return XHROpen.call(this, method, url, ...rest);
-    };
-
-    const XHRSend = XMLHttpRequest.prototype.send;
-    XMLHttpRequest.prototype.send = function(data) {
-        if (this._sentryBlocked) return;
-
-        // Also check if the data being sent contains Sentry info
-        try {
-            const dataStr = (data || '').toString();
-            if (dataStr.includes('sentry_client') || dataStr.includes('exception')) {
-                console.log('🚫 Blocked Sentry data in XHR payload');
-                return;
-            }
-        } catch (e) {}
-
-        return XHRSend.apply(this, arguments);
-    };
-
-    // Block SendBeacon
-    if (navigator.sendBeacon) {
-        const originalBeacon = navigator.sendBeacon;
-        navigator.sendBeacon = function(url) {
-            if (isSentryRequest(url)) {
-                console.log('🚫 Blocked Sentry beacon:', url.toString().substring(0, 80));
-                return false;
-            }
-            return originalBeacon.apply(this, arguments);
-        };
-    }
-
-    // Block WebSocket
-    const OriginalWebSocket = window.WebSocket;
-    window.WebSocket = new Proxy(OriginalWebSocket, {
-        construct(target, args) {
-            const url = args[0];
-            if (isSentryRequest(url)) {
-                console.log('🚫 Blocked Sentry WebSocket:', url);
-                throw new Error('Sentry WebSocket blocked');
-            }
-            return new target(...args);
-        }
-    });
-
-    // Block script tags
-    const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-            mutation.addedNodes.forEach((node) => {
-                if (node.tagName === 'SCRIPT') {
-                    // Check src
-                    if (node.src && isSentryRequest(node.src)) {
-                        node.remove();
-                        console.log('🚫 Removed Sentry script tag');
-                    }
-                    // Check inline script content
-                    if (node.textContent &&
-                        (node.textContent.includes('Sentry') ||
-                         node.textContent.includes('raven') ||
-                         node.textContent.includes('sentry'))) {
-                        node.textContent = '// Sentry blocked';
-                        console.log('🚫 Neutralized inline Sentry script');
-                    }
-                }
-            });
-        });
-    });
-
-    observer.observe(document.documentElement, {
-        childList: true,
-        subtree: true
-    });
-
-    // Override console methods to strip Sentry
-    ['log', 'error', 'warn', 'info', 'debug'].forEach(method => {
-        const original = console[method];
-        console[method] = function(...args) {
-            // Filter out Sentry-related logs
-            const argsStr = args.join(' ').toLowerCase();
-            if (argsStr.includes('sentry') || argsStr.includes('raven')) {
-                return;
-            }
-            return original.apply(console, args);
-        };
-    });
-
-    // Block localStorage/sessionStorage Sentry data
-    const blockSentryStorage = () => {
-        const storages = [localStorage, sessionStorage];
-        storages.forEach(storage => {
-            try {
-                Object.keys(storage).forEach(key => {
-                    if (key.toLowerCase().includes('sentry') ||
-                        key.toLowerCase().includes('raven')) {
-                        storage.removeItem(key);
-                        console.log(`🚫 Removed Sentry data from storage: ${key}`);
-                    }
-                });
-            } catch (e) {}
-        });
-    };
-
-    // Clean storage immediately and periodically
-    blockSentryStorage();
-    setInterval(blockSentryStorage, 5000);
-
-    // Override addEventListener to prevent Sentry error handlers
-    const originalAddEventListener = window.addEventListener;
-    window.addEventListener = function(type, listener, ...args) {
-        if (type === 'error' || type === 'unhandledrejection') {
-            const listenerStr = listener.toString();
-            if (listenerStr.includes('Sentry') || listenerStr.includes('raven')) {
-                console.log(`🚫 Blocked Sentry ${type} event listener`);
-                return;
-            }
-        }
-        return originalAddEventListener.call(this, type, listener, ...args);
-    };
-
-    // Block performance observer (Sentry uses this for monitoring)
-    if (window.PerformanceObserver) {
-        const OriginalPerfObserver = window.PerformanceObserver;
-        window.PerformanceObserver = new Proxy(OriginalPerfObserver, {
-            construct(target, args) {
-                const callback = args[0];
-                if (callback && callback.toString().includes('sentry')) {
-                    console.log('🚫 Blocked Sentry PerformanceObserver');
-                    return {
-                        observe: () => {},
-                        disconnect: () => {},
-                        takeRecords: () => []
-                    };
-                }
-                return new target(...args);
-            }
-        });
-    }
-
-    console.log('✅ Complete Sentry Blocker Active');
-    console.log('🚫 Blocking: All Sentry initialization, objects, network requests, and monitoring');
-
-    // Final status message
-    console.log('Spotify AdBlocker & Sentry Blocker loaded and ready');
 })();

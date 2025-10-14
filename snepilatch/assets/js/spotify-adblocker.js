@@ -98,6 +98,7 @@
         const originalConsoleError = console.error;
         const originalConsoleWarn = console.warn;
 
+        // Override console.error to suppress PlayerAPIClientError messages
         console.error = function(...args) {
             const message = args.join(' ');
             // Suppress PlayerAPIClientError timeout messages
@@ -109,6 +110,7 @@
             originalConsoleError.apply(console, args);
         };
 
+        // Override console.warn to suppress PlayerAPIClientError warnings
         console.warn = function(...args) {
             const message = args.join(' ');
             // Suppress PlayerAPIClientError timeout warnings
@@ -120,7 +122,43 @@
             originalConsoleWarn.apply(console, args);
         };
 
-        console.log('✅ PlayerAPIClientError console suppression installed');
+        // Handle unhandled promise rejections (this is the key!)
+        // PlayerAPIClientError appears as "Uncaught (in promise)" which means it's an unhandled rejection
+        window.addEventListener('unhandledrejection', function(event) {
+            const reason = event.reason?.toString() || '';
+            const message = event.reason?.message || '';
+
+            // Check if this is a PlayerAPIClientError
+            if (reason.includes('PlayerAPIClientError') ||
+                message.includes('PlayerAPIClientError') ||
+                message.includes("didn't receive an acknowledgement")) {
+                // Prevent the error from being logged to console
+                event.preventDefault();
+                // Optionally log a suppressed message (comment out if you don't want any logging)
+                // console.log('🛡️ Suppressed PlayerAPIClientError:', message);
+            }
+        });
+
+        // Also handle regular window errors
+        const originalOnError = window.onerror;
+        window.onerror = function(msg, url, lineNo, columnNo, error) {
+            const message = msg?.toString() || '';
+
+            // Suppress PlayerAPIClientError
+            if (message.includes('PlayerAPIClientError') ||
+                message.includes("didn't receive an acknowledgement")) {
+                // Return true to prevent default browser error handling
+                return true;
+            }
+
+            // Call original handler for other errors
+            if (originalOnError) {
+                return originalOnError(msg, url, lineNo, columnNo, error);
+            }
+            return false;
+        };
+
+        console.log('✅ PlayerAPIClientError console suppression installed (including Promise rejections)');
     };
 
     // Suppress console errors immediately

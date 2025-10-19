@@ -263,7 +263,7 @@
         }
     };
 
-    // Function to navigate to a homepage item using SPA navigation
+    // Function to navigate to a homepage item
     window.navigateToHomepageItem = function(href) {
         try {
             const currentUrl = window.location.href;
@@ -275,32 +275,247 @@
                 return true;
             }
 
-            // Use Spotify's SPA navigation (same pattern as spotify-actions.js)
-            const history = window.history;
+            console.log('Attempting to navigate to: ' + targetUrl + ' from: ' + currentUrl);
 
-            // Push state without reload
-            history.pushState({}, '', targetUrl);
-
-            // Trigger a popstate event to let Spotify's router handle it
-            const popstateEvent = new PopStateEvent('popstate', { state: {} });
-            window.dispatchEvent(popstateEvent);
-
-            console.log('Triggered SPA navigation to: ' + targetUrl);
-            return true;
-        } catch (err) {
-            console.error('SPA navigation failed:', err);
-
-            // Fallback: try clicking the link
+            // Method 1: Try to find and click the actual link element by href
             const linkEl = document.querySelector(`a[href="${href}"]`);
             if (linkEl) {
-                linkEl.click();
+                console.log('Found link element, clicking it...');
+                // Make sure the link is visible before clicking
+                linkEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Use a small delay to ensure DOM is ready
+                setTimeout(() => {
+                    linkEl.click();
+                }, 100);
                 return true;
             }
 
+            console.log('Link not found by href, trying SPA navigation...');
+
+            // Method 2: Use Spotify's SPA navigation as fallback
+            try {
+                const history = window.history;
+                history.pushState({}, '', targetUrl);
+                const popstateEvent = new PopStateEvent('popstate', { state: {} });
+                window.dispatchEvent(popstateEvent);
+                console.log('Triggered SPA navigation to: ' + targetUrl);
+                return true;
+            } catch (spaErr) {
+                console.error('SPA navigation also failed:', spaErr);
+                return false;
+            }
+        } catch (err) {
+            console.error('Error navigating to homepage item:', err);
             return false;
         }
     };
 
+    // Function to click "Mehr anzeigen" button to expand results
+    window.clickShowMoreButton = function() {
+        try {
+            console.log('Attempting to click "Mehr anzeigen" button...');
+
+            // Try to find the button by class name
+            const button = document.querySelector('button.NIccMWgYS0OibP_70DRO');
+
+            if (button) {
+                console.log('Found "Mehr anzeigen" button, clicking it...');
+                button.click();
+                return true;
+            } else {
+                console.log('Could not find "Mehr anzeigen" button');
+                return false;
+            }
+        } catch (err) {
+            console.error('Error clicking "Mehr anzeigen" button:', err);
+            return false;
+        }
+    };
+
+    // Function to get monthly listeners from artist page
+    window.getArtistInfo = function() {
+        try {
+            console.log('Getting artist info...');
+
+            const info = {};
+
+            // Try to find monthly listeners text
+            const textElements = document.querySelectorAll('[data-encore-id="text"]');
+            for (const el of textElements) {
+                const text = el.textContent?.trim() || '';
+                // Look for patterns like "1,234,567 Hörer pro Monat" or "X monthly listeners"
+                if (text.includes('Hörer pro Monat') || text.includes('monthly listener')) {
+                    info.monthlyListeners = text;
+                    console.log('Found monthly listeners:', text);
+                    break;
+                }
+            }
+
+            // Try alternative: look for numbers followed by listener text
+            const allText = document.body.innerText;
+            const listenerMatch = allText.match(/(\d{1,3}(?:[.,]\d{3})*)\s*(?:Hörer pro Monat|monthly listener)/);
+            if (listenerMatch && !info.monthlyListeners) {
+                info.monthlyListeners = listenerMatch[0];
+                console.log('Found monthly listeners (alt):', listenerMatch[0]);
+            }
+
+            return JSON.stringify(info);
+        } catch (err) {
+            console.error('Error getting artist info:', err);
+            return JSON.stringify({});
+        }
+    };
+
+    // Function to follow/unfollow an artist
+    window.toggleFollowArtist = function() {
+        try {
+            console.log('Attempting to toggle follow status...');
+
+            // Find the follow button within the action bar
+            const actionBar = document.querySelector('[data-testid="action-bar"]');
+
+            if (actionBar) {
+                // Find the secondary button (follow button) within the action bar
+                const followButton = actionBar.querySelector('button[data-encore-id="buttonSecondary"]');
+
+                if (followButton) {
+                    console.log('Found follow button');
+                    console.log('Clicking follow button...');
+                    followButton.click();
+
+                    // Wait for Spotify to update the UI and return the new status
+                    return new Promise(resolve => {
+                        setTimeout(() => {
+                            // Check the new status after clicking
+                            const newAriaLabel = followButton.getAttribute('aria-label') || '';
+                            const newButtonText = followButton.textContent?.trim() || '';
+
+                            console.log('After click - aria-label:', newAriaLabel);
+                            console.log('After click - button text:', newButtonText);
+
+                            const isNowFollowed = newAriaLabel.includes('Entfernen') ||
+                                               newAriaLabel.includes('Remove from') ||
+                                               newButtonText.length > 0 && !newButtonText.includes('Follow');
+
+                            console.log('New follow status: ' + (isNowFollowed ? 'followed' : 'not followed'));
+                            resolve(isNowFollowed);
+                        }, 500); // Wait 500ms for UI to update
+                    });
+                }
+            }
+
+            console.log('Could not find follow button');
+            return false;
+        } catch (err) {
+            console.error('Error toggling follow:', err);
+            return false;
+        }
+    };
+
+    // Function to check if artist is followed
+    window.isArtistFollowed = function() {
+        try {
+            console.log('Checking if artist is followed...');
+
+            // Find the follow button within the action bar
+            const actionBar = document.querySelector('[data-testid="action-bar"]');
+
+            if (actionBar) {
+                const followButton = actionBar.querySelector('button[data-encore-id="buttonSecondary"]');
+
+                if (followButton) {
+                    // Check the aria-label to determine follow status
+                    const ariaLabel = followButton.getAttribute('aria-label') || '';
+                    const buttonText = followButton.textContent?.trim() || '';
+
+                    console.log('Follow button aria-label:', ariaLabel);
+                    console.log('Follow button text:', buttonText);
+
+                    // If aria-label contains "Entfernen" (remove/unfollow) or "Remove from", artist is followed
+                    // If text is empty or says "Follow", artist is not followed
+                    const isFollowed = ariaLabel.includes('Entfernen') ||
+                                     ariaLabel.includes('Remove from') ||
+                                     buttonText.length > 0 && !buttonText.includes('Follow');
+
+                    console.log('Artist is ' + (isFollowed ? 'followed' : 'not followed'));
+                    return isFollowed;
+                }
+            }
+
+            console.log('Could not find follow button');
+            return false;
+        } catch (err) {
+            console.error('Error checking follow status:', err);
+            return false;
+        }
+    };
+
+    // Function to check if artist is currently playing
+    window.isArtistPlaying = function() {
+        try {
+            console.log('Checking if artist is playing...');
+
+            // Find the play button within the action bar
+            const actionBar = document.querySelector('[data-testid="action-bar"]');
+
+            if (actionBar) {
+                const playButton = actionBar.querySelector('button[data-testid="play-button"]');
+
+                if (playButton) {
+                    const ariaLabel = playButton.getAttribute('aria-label') || '';
+                    console.log('Play button aria-label:', ariaLabel);
+
+                    // If aria-label is "Pause", the artist is currently playing
+                    // If aria-label is "Play", the artist is not playing
+                    const isPlaying = ariaLabel.toLowerCase().includes('pause');
+
+                    console.log('Artist is ' + (isPlaying ? 'playing' : 'not playing'));
+                    return isPlaying;
+                }
+            }
+
+            console.log('Could not find play button');
+            return false;
+        } catch (err) {
+            console.error('Error checking play status:', err);
+            return false;
+        }
+    };
+
+    // Function to toggle play/pause for artist
+    window.toggleArtistPlayPause = function() {
+        try {
+            console.log('Attempting to toggle artist play/pause...');
+
+            // Find the play button within the action bar
+            const actionBar = document.querySelector('[data-testid="action-bar"]');
+
+            if (actionBar) {
+                const playButton = actionBar.querySelector('button[data-testid="play-button"]');
+
+                if (playButton) {
+                    console.log('Found play button, clicking it...');
+                    playButton.click();
+
+                    // Wait for UI update and return new status
+                    return new Promise(resolve => {
+                        setTimeout(() => {
+                            const newAriaLabel = playButton.getAttribute('aria-label') || '';
+                            const isNowPlaying = newAriaLabel.toLowerCase().includes('pause');
+                            console.log('New play status: ' + (isNowPlaying ? 'playing' : 'not playing'));
+                            resolve(isNowPlaying);
+                        }, 300);
+                    });
+                }
+            }
+
+            console.log('Could not find play button');
+            return false;
+        } catch (err) {
+            console.error('Error toggling play/pause:', err);
+            return false;
+        }
+    };
 
     console.log('Spotify homepage functions injected into window');
     return true;

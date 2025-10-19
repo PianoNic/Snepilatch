@@ -1142,4 +1142,308 @@ class SpotifyController extends ChangeNotifier {
       store.isLoadingSongs.value = false;
     }
   }
+
+  // Fetch tracks from album detail page
+  Future<List<Song>> fetchAlbumTracks() async {
+    try {
+      debugPrint('📀 Fetching album tracks...');
+
+      // Initialize PlaylistController for this page
+      await _webViewService.runJavascript(
+        'window.PlaylistController && window.PlaylistController.reset()'
+      );
+
+      // Wait for tracks to be scanned
+      await Future.delayed(const Duration(seconds: 1));
+
+      // Get tracks
+      final result = await _webViewService.runJavascriptWithResult(
+        SpotifyActionsService.getLoadedTracksScript
+      );
+
+      if (result != null && result != 'null') {
+        final data = jsonDecode(result.toString());
+        final tracks = data['tracks'] as List?;
+
+        if (tracks != null && tracks.isNotEmpty) {
+          final songs = tracks.map((track) => Song.fromJson({
+            'index': track['position'] ?? track['index'] ?? 0,
+            'title': track['title'] ?? '',
+            'artist': (track['artists'] as List?)?.join(', ') ?? '',
+            'album': track['album'] ?? '',
+            'image': track['coverUrl'],
+            'duration': track['duration'],
+          })).toList();
+
+          debugPrint('✅ Fetched ${songs.length} album tracks');
+          return songs;
+        }
+      }
+
+      return [];
+    } catch (e) {
+      debugPrint('❌ Error fetching album tracks: $e');
+      return [];
+    }
+  }
+
+  // Fetch tracks from playlist detail page
+  Future<List<Song>> fetchPlaylistTracks() async {
+    try {
+      debugPrint('📋 Fetching playlist tracks...');
+
+      // Initialize PlaylistController for this page
+      await _webViewService.runJavascript(
+        'window.PlaylistController && window.PlaylistController.reset()'
+      );
+
+      // Wait for tracks to be scanned
+      await Future.delayed(const Duration(seconds: 1));
+
+      // Get tracks
+      final result = await _webViewService.runJavascriptWithResult(
+        SpotifyActionsService.getLoadedTracksScript
+      );
+
+      if (result != null && result != 'null') {
+        final data = jsonDecode(result.toString());
+        final tracks = data['tracks'] as List?;
+
+        if (tracks != null && tracks.isNotEmpty) {
+          final songs = tracks.map((track) => Song.fromJson({
+            'index': track['position'] ?? track['index'] ?? 0,
+            'title': track['title'] ?? '',
+            'artist': (track['artists'] as List?)?.join(', ') ?? '',
+            'album': track['album'] ?? '',
+            'image': track['coverUrl'],
+            'duration': track['duration'],
+          })).toList();
+
+          debugPrint('✅ Fetched ${songs.length} playlist tracks');
+          return songs;
+        }
+      }
+
+      return [];
+    } catch (e) {
+      debugPrint('❌ Error fetching playlist tracks: $e');
+      return [];
+    }
+  }
+
+  // Fetch top tracks from artist detail page
+  Future<List<Song>> fetchArtistTracks() async {
+    try {
+      debugPrint('🎤 Fetching artist top tracks...');
+
+      // Try to click "Mehr anzeigen" button to expand results
+      final clickResult = await _webViewService.runJavascriptWithResult(
+        'window.clickShowMoreButton && window.clickShowMoreButton()'
+      );
+
+      if (clickResult == true || clickResult == 'true') {
+        debugPrint('✅ Clicked "Mehr anzeigen" button');
+        // Wait for expanded content to load
+        await Future.delayed(const Duration(seconds: 2));
+      } else {
+        debugPrint('⚠️ "Mehr anzeigen" button not found or could not be clicked');
+      }
+
+      // Initialize PlaylistController for this page
+      await _webViewService.runJavascript(
+        'window.PlaylistController && window.PlaylistController.reset()'
+      );
+
+      // Wait for tracks to be scanned
+      await Future.delayed(const Duration(seconds: 1));
+
+      // Get tracks
+      final result = await _webViewService.runJavascriptWithResult(
+        SpotifyActionsService.getLoadedTracksScript
+      );
+
+      if (result != null && result != 'null') {
+        final data = jsonDecode(result.toString());
+        final tracks = data['tracks'] as List?;
+
+        if (tracks != null && tracks.isNotEmpty) {
+          final songs = tracks.map((track) => Song.fromJson({
+            'index': track['position'] ?? track['index'] ?? 0,
+            'title': track['title'] ?? '',
+            'artist': (track['artists'] as List?)?.join(', ') ?? '',
+            'album': track['album'] ?? '',
+            'image': track['coverUrl'],
+            'duration': track['duration'],
+          })).toList();
+
+          debugPrint('✅ Fetched ${songs.length} artist top tracks');
+          return songs;
+        }
+      }
+
+      return [];
+    } catch (e) {
+      debugPrint('❌ Error fetching artist tracks: $e');
+      return [];
+    }
+  }
+
+  // Get artist info (monthly listeners)
+  Future<String?> getArtistMonthlyListeners() async {
+    try {
+      debugPrint('📊 Fetching artist monthly listeners...');
+
+      final result = await _webViewService.runJavascriptWithResult(
+        'window.getArtistInfo && window.getArtistInfo()'
+      );
+
+      if (result != null && result != 'null') {
+        final data = jsonDecode(result.toString());
+        final monthlyListeners = data['monthlyListeners'] as String?;
+
+        if (monthlyListeners != null) {
+          debugPrint('✅ Got monthly listeners: $monthlyListeners');
+          return monthlyListeners;
+        }
+      }
+
+      return null;
+    } catch (e) {
+      debugPrint('❌ Error fetching artist monthly listeners: $e');
+      return null;
+    }
+  }
+
+  // Check if artist is followed
+  Future<bool> isArtistFollowed() async {
+    try {
+      debugPrint('🔍 Checking if artist is followed...');
+
+      final result = await _webViewService.runJavascriptWithResult(
+        'window.isArtistFollowed && window.isArtistFollowed()'
+      );
+
+      final isFollowed = result == true || result == 'true';
+      debugPrint('${isFollowed ? '✅' : '⭕'} Artist followed status: $isFollowed');
+      return isFollowed;
+    } catch (e) {
+      debugPrint('❌ Error checking follow status: $e');
+      return false;
+    }
+  }
+
+  // Toggle follow/unfollow artist and return new status
+  Future<bool> toggleFollowArtist() async {
+    try {
+      debugPrint('❤️ Toggling artist follow status...');
+
+      final result = await _webViewService.runJavascriptWithResult(
+        '''
+        (async function() {
+          const result = window.toggleFollowArtist && await window.toggleFollowArtist();
+          return result;
+        })()
+        '''
+      );
+
+      // The result should be the new follow status (true/false)
+      final newFollowStatus = result == true || result == 'true';
+
+      if (result != null && result != 'null') {
+        debugPrint('✅ Successfully toggled follow status. New status: ${newFollowStatus ? 'followed' : 'not followed'}');
+        return newFollowStatus;
+      } else {
+        debugPrint('⚠️ Could not toggle follow status');
+        return false;
+      }
+    } catch (e) {
+      debugPrint('❌ Error toggling follow: $e');
+      return false;
+    }
+  }
+
+  // Check if artist is currently playing
+  Future<bool> isArtistPlaying() async {
+    try {
+      debugPrint('🎵 Checking if artist is playing...');
+
+      final result = await _webViewService.runJavascriptWithResult(
+        'window.isArtistPlaying && window.isArtistPlaying()'
+      );
+
+      final isPlaying = result == true || result == 'true';
+      debugPrint('${isPlaying ? '▶️' : '⏸️'} Artist play status: ${isPlaying ? 'playing' : 'not playing'}');
+      return isPlaying;
+    } catch (e) {
+      debugPrint('❌ Error checking artist play status: $e');
+      return false;
+    }
+  }
+
+  // Toggle play/pause for artist and return new status
+  Future<bool> toggleArtistPlayPause() async {
+    try {
+      debugPrint('⏯️ Toggling artist play/pause...');
+
+      final result = await _webViewService.runJavascriptWithResult(
+        '''
+        (async function() {
+          const result = window.toggleArtistPlayPause && await window.toggleArtistPlayPause();
+          return result;
+        })()
+        '''
+      );
+
+      final isNowPlaying = result == true || result == 'true';
+      debugPrint('✅ Artist play/pause toggled. New status: ${isNowPlaying ? 'playing' : 'not playing'}');
+      return isNowPlaying;
+    } catch (e) {
+      debugPrint('❌ Error toggling artist play/pause: $e');
+      return false;
+    }
+  }
+
+  // Pause current playback
+  Future<bool> pausePlayback() async {
+    try {
+      debugPrint('⏸️ Pausing playback...');
+
+      // Use the play button in the action bar to toggle pause
+      final result = await _webViewService.runJavascriptWithResult(
+        '''
+        (async function() {
+          try {
+            const actionBar = document.querySelector('[data-testid="action-bar"]');
+            if (actionBar) {
+              const playButton = actionBar.querySelector('button[data-testid="play-button"]');
+              if (playButton) {
+                const ariaLabel = playButton.getAttribute('aria-label') || '';
+                // Only click if currently playing (aria-label contains "pause")
+                if (ariaLabel.toLowerCase().includes('pause')) {
+                  playButton.click();
+                  return true;
+                }
+              }
+            }
+            return false;
+          } catch (e) {
+            console.error('Error pausing:', e);
+            return false;
+          }
+        })()
+        '''
+      );
+
+      final success = result == true || result == 'true';
+      if (success) {
+        debugPrint('✅ Playback paused');
+      } else {
+        debugPrint('⚠️ Could not pause playback');
+      }
+      return success;
+    } catch (e) {
+      debugPrint('❌ Error pausing playback: $e');
+      return false;
+    }
+  }
 }

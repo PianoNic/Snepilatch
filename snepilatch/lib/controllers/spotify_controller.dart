@@ -160,6 +160,19 @@ class SpotifyController extends ChangeNotifier {
     _injectionMonitor.startMonitoring();
   }
 
+  Future<void> onLoadStart(InAppWebViewController controller, WebUri? url) async {
+    debugPrint('🚀 [SpotifyController] onLoadStart called for URL: ${url?.toString()}');
+
+    // Inject PCM audio interceptor EARLY - before page loads
+    try {
+      debugPrint('💉 [SpotifyController] Injecting PCM interceptor BEFORE page loads...');
+      WebViewAudioStreamer.instance.injectAudioScript(controller);
+      debugPrint('✅ [SpotifyController] Early PCM interceptor injected');
+    } catch (e) {
+      debugPrint('⚠️ Failed to inject early audio streaming: $e');
+    }
+  }
+
   Future<void> onLoadStop(InAppWebViewController controller, WebUri? url) async {
     debugPrint('🌐 [SpotifyController] Page finished loading: $url');
 
@@ -182,13 +195,7 @@ class SpotifyController extends ChangeNotifier {
     // Add small delay to ensure JavaScript is fully executed
     await Future.delayed(const Duration(milliseconds: 500));
 
-    // Inject audio streaming script
-
-    try {
-      WebViewAudioStreamer.instance.injectAudioScript(controller);
-    } catch (e) {
-      debugPrint('⚠️ Failed to inject audio streaming: $e');
-    }
+    // Audio streaming script already injected in onLoadStart for early interception
 
     // Only start scraping if not already initialized
     if (!store.isInitialized.value) {

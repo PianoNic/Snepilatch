@@ -105,4 +105,7 @@ class WebViewAudioStreamer {
   String get status => _audioServer?.getStatus() ?? 'Not initialized';
   int get bytesReceived => _audioServer?.totalBytesReceived ?? 0;
   int get packetsReceived => _audioServer?.packetsReceived ?? 0;
+
+  // Expose audio server for debugging
+  AudioWebSocketServer? get audioServer => _audioServer;
 }

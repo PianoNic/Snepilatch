@@ -29,6 +29,10 @@ class WebViewService {
       horizontalScrollBarEnabled: true,
       transparentBackground: false,
       disableDefaultErrorPage: false,
+      // Allow WebSocket connections
+      mixedContentMode: MixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW,
+      allowUniversalAccessFromFileURLs: true,
+      javaScriptCanOpenWindowsAutomatically: true,
     );
   }
 

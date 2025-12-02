@@ -7,6 +7,7 @@ import '../widgets/app_update_dialog.dart';
 import '../pages/release_notes_page.dart';
 import '../services/update_service.dart';
 import '../services/webview_audio_streamer.dart';
+import 'audio_debug_page.dart';
 
 class UserPage extends StatefulWidget {
   final SpotifyController spotifyController;
@@ -393,22 +394,45 @@ class _UserPageState extends State<UserPage> {
               style: TextStyle(fontSize: 12),
             ),
             const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () {
-                // Force re-inject audio script
-                final controller = widget.spotifyController.webViewService.controller;
-                if (controller != null) {
-                  WebViewAudioStreamer.instance.injectAudioScript(controller);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Audio script re-injected'),
-                      duration: Duration(seconds: 2),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      // Force re-inject audio script
+                      final controller = widget.spotifyController.webViewService.controller;
+                      if (controller != null) {
+                        WebViewAudioStreamer.instance.injectAudioScript(controller);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Audio script re-injected'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Re-inject Script'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const AudioDebugPage()),
+                      );
+                    },
+                    icon: const Icon(Icons.bug_report),
+                    label: const Text('Debug Audio'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.deepPurple,
+                      foregroundColor: Colors.white,
                     ),
-                  );
-                }
-              },
-              icon: const Icon(Icons.refresh),
-              label: const Text('Re-inject Audio Script'),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

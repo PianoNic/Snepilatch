@@ -1,14 +1,17 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter_sound/flutter_sound.dart';
+import 'package:just_audio/just_audio.dart' as just_audio;
 import 'dart:convert';
 
-/// Service to play PCM audio data received from WebSocket
-/// Uses flutter_sound for low-latency PCM playback
-class AudioPlaybackPCMService {
-  static AudioPlaybackPCMService? _instance;
-  FlutterSoundPlayer? _player;
+/// Enhanced audio service that registers with Android's AudioManager
+/// This ensures Wavelet and other audio apps can detect and process our audio
+class AudioPlaybackServiceEnhanced extends BaseAudioHandler {
+  static AudioPlaybackServiceEnhanced? _instance;
+  FlutterSoundPlayer? _soundPlayer;
+  final just_audio.AudioPlayer _audioPlayer = just_audio.AudioPlayer(); // For audio session management
 
   // Audio format from JavaScript
   int _sampleRate = 44100;
@@ -27,42 +30,96 @@ class AudioPlaybackPCMService {
   bool _isProcessing = false;
 
   // Singleton
-  static AudioPlaybackPCMService get instance {
-    _instance ??= AudioPlaybackPCMService._();
+  static Future<AudioPlaybackServiceEnhanced> getInstance() async {
+    if (_instance == null) {
+      _instance = await AudioService.init(
+        builder: () => AudioPlaybackServiceEnhanced._(),
+        config: const AudioServiceConfig(
+          androidNotificationChannelId: 'com.example.snepilatch.channel.audio',
+          androidNotificationChannelName: 'Snepilatch Audio',
+          androidNotificationOngoing: false,  // Changed to false to work with androidStopForegroundOnPause: false
+          androidShowNotificationBadge: false,
+          androidNotificationIcon: 'drawable/ic_notification',
+          androidStopForegroundOnPause: false,  // Keep service running when paused for Wavelet
+        ),
+      );
+      await _instance!._initialize();
+    }
     return _instance!;
   }
 
-  AudioPlaybackPCMService._() {
-    _initialize();
-  }
+  AudioPlaybackServiceEnhanced._();
 
   Future<void> _initialize() async {
     try {
-      _player = FlutterSoundPlayer();
+      // Initialize audio session for system registration
+      // Using a silent audio source to register with AudioManager
+      await _audioPlayer.setUrl(
+        'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+        initialPosition: Duration.zero,
+      );
+      await _audioPlayer.setVolume(0.0); // Mute the dummy audio
 
-      // Open the player for PCM streaming
-      await _player!.openPlayer();
+      // Set media item to show in system
+      final mediaItem = MediaItem(
+        id: 'spotify_stream',
+        album: 'Spotify',
+        title: 'Streaming Audio',
+        artist: 'Snepilatch',
+        duration: const Duration(hours: 1),
+        artUri: Uri.parse('https://open.spotify.com/favicon.ico'),
+      );
+
+      // Add media item to queue
+      queue.add([mediaItem]);
+      playbackState.add(PlaybackState(
+        controls: [
+          MediaControl.play,
+          MediaControl.pause,
+          MediaControl.stop,
+        ],
+        systemActions: const {
+          MediaAction.play,
+          MediaAction.pause,
+          MediaAction.stop,
+          MediaAction.seek,
+        },
+        androidCompactActionIndices: const [0, 1],
+        processingState: AudioProcessingState.ready,
+        playing: false,
+        updatePosition: Duration.zero,
+        bufferedPosition: Duration.zero,
+        speed: 1.0,
+        queueIndex: 0,
+      ));
+
+      // Initialize flutter_sound for PCM playback
+      _soundPlayer = FlutterSoundPlayer();
+      await _soundPlayer!.openPlayer();
 
       // Start PCM feed with specified format
-      await _player!.startPlayerFromStream(
+      await _soundPlayer!.startPlayerFromStream(
         codec: Codec.pcm16,
         numChannels: _channels,
         sampleRate: _sampleRate,
-        bufferSize: 8192,  // Buffer size in bytes
-        interleaved: true,  // PCM data is interleaved
+        bufferSize: 8192,
+        interleaved: true,
       );
 
       _isInitialized = true;
       _isPlaying = true;
 
-      debugPrint('🎵 PCM audio playback service initialized');
+      debugPrint('🎵 Enhanced audio service initialized with AudioManager registration');
+      debugPrint('✅ App should now be visible to Wavelet');
       debugPrint('📊 Format: ${_sampleRate}Hz, ${_bitDepth}-bit, ${_channels == 1 ? "Mono" : "Stereo"}');
-      debugPrint('🎧 Ready to stream PCM audio through Android audio system');
+
+      // Start audio session
+      await play();
 
       // Start processing buffer periodically
       _startBufferProcessor();
     } catch (e) {
-      debugPrint('❌ Failed to initialize PCM player: $e');
+      debugPrint('❌ Failed to initialize enhanced audio service: $e');
     }
   }
 
@@ -88,8 +145,8 @@ class AudioPlaybackPCMService {
         final chunk = _audioBuffer.removeAt(0);
 
         // Feed PCM data to player
-        if (_player != null && _isPlaying && _player!.uint8ListSink != null) {
-          _player!.uint8ListSink!.add(chunk);
+        if (_soundPlayer != null && _isPlaying && _soundPlayer!.uint8ListSink != null) {
+          _soundPlayer!.uint8ListSink!.add(chunk);
         }
       }
     } catch (e) {
@@ -126,12 +183,12 @@ class AudioPlaybackPCMService {
   Future<void> _restartWithNewFormat() async {
     try {
       // Stop current playback
-      if (_player != null && _player!.isPlaying) {
-        await _player!.stopPlayer();
+      if (_soundPlayer != null && _soundPlayer!.isPlaying) {
+        await _soundPlayer!.stopPlayer();
       }
 
       // Restart with new format
-      await _player!.startPlayerFromStream(
+      await _soundPlayer!.startPlayerFromStream(
         codec: Codec.pcm16,
         numChannels: _channels,
         sampleRate: _sampleRate,
@@ -186,42 +243,84 @@ class AudioPlaybackPCMService {
     }
   }
 
-  void pause() {
-    if (_isPlaying && _player != null) {
-      _player!.pausePlayer();
-      _isPlaying = false;
-      debugPrint('⏸️ PCM playback paused');
-    }
-  }
+  @override
+  Future<void> play() async {
+    if (!_isPlaying) {
+      // Start just_audio player to register audio session
+      await _audioPlayer.play();
 
-  void resume() {
-    if (!_isPlaying && _player != null) {
-      _player!.resumePlayer();
+      // Resume PCM playback
+      if (_soundPlayer != null) {
+        await _soundPlayer!.resumePlayer();
+      }
+
       _isPlaying = true;
-      debugPrint('▶️ PCM playback resumed');
+
+      // Update playback state for system
+      playbackState.add(playbackState.value.copyWith(
+        playing: true,
+        processingState: AudioProcessingState.ready,
+      ));
+
+      debugPrint('▶️ Audio playback started - visible to Wavelet');
     }
   }
 
+  @override
+  Future<void> pause() async {
+    if (_isPlaying) {
+      // Pause just_audio
+      await _audioPlayer.pause();
+
+      // Pause PCM playback
+      if (_soundPlayer != null) {
+        await _soundPlayer!.pausePlayer();
+      }
+
+      _isPlaying = false;
+
+      // Update playback state
+      playbackState.add(playbackState.value.copyWith(
+        playing: false,
+      ));
+
+      debugPrint('⏸️ Audio playback paused');
+    }
+  }
+
+  @override
   Future<void> stop() async {
     _isPlaying = false;
     _playbackTimer?.cancel();
 
-    if (_player != null) {
+    // Stop just_audio
+    await _audioPlayer.stop();
+
+    // Stop PCM player
+    if (_soundPlayer != null) {
       try {
-        await _player!.stopPlayer();
-        await _player!.closePlayer();
+        await _soundPlayer!.stopPlayer();
+        await _soundPlayer!.closePlayer();
       } catch (e) {
         debugPrint('⚠️ Error stopping player: $e');
       }
     }
 
     _audioBuffer.clear();
-    debugPrint('⏹️ PCM playback stopped');
+
+    // Update playback state
+    playbackState.add(playbackState.value.copyWith(
+      playing: false,
+      processingState: AudioProcessingState.idle,
+    ));
+
+    debugPrint('⏹️ Audio playback stopped');
   }
 
   void dispose() {
     stop();
-    _player = null;
+    _audioPlayer.dispose();
+    _soundPlayer = null;
     _instance = null;
   }
 

@@ -22,7 +22,13 @@
       "Bash(chmod:*)",
       "Bash(git restore:*)",
       "Bash(grep:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(ipconfig)",
+      "Bash(findstr:*)",
+      "Bash(adb shell:*)",
+      "Bash(dir assets)",
+      "Bash(dir androidappsrcmainresdrawable)",
+      "Bash(adb install:*)"
     ],
     "deny": [],
     "ask": []

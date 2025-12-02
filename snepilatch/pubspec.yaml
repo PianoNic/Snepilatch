@@ -48,6 +48,7 @@ dependencies:
   flutter_markdown: ^0.7.4
   shelf: ^1.4.0
   shelf_web_socket: ^1.0.0
+  flutter_sound: ^9.2.13
   web_socket_channel: ^2.4.0
 
 dev_dependencies:

@@ -33,6 +33,7 @@ class _SpotifyWebViewWidgetState extends State<SpotifyWebViewWidget> with Automa
       ),
       initialSettings: widget.spotifyController.getWebViewSettings(),
       onWebViewCreated: widget.spotifyController.onWebViewCreated,
+      onLoadStart: widget.spotifyController.onLoadStart,
       onLoadStop: widget.spotifyController.onLoadStop,
       shouldOverrideUrlLoading: widget.spotifyController.shouldOverrideUrlLoading,
       onPermissionRequest: widget.spotifyController.onPermissionRequest,

@@ -6,6 +6,7 @@ import 'home_page.dart';
 import 'songs_page.dart';
 import 'search_page.dart';
 import 'user_page.dart';
+import 'devices_page.dart';
 
 class MainScreen extends StatefulWidget {
   final SpotifyController spotifyController;
@@ -107,6 +108,32 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     return Stack(
       children: [
         Scaffold(
+          floatingActionButton: widget.spotifyController.isLoggedIn
+              ? FloatingActionButton.small(
+                  onPressed: () {
+                    widget.spotifyController.webViewOpacity.value = 1.0;
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      isDismissible: true,
+                      enableDrag: true,
+                      backgroundColor: Theme.of(context).colorScheme.surface,
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                      ),
+                      builder: (context) {
+                        return DevicesModalContent(spotifyController: widget.spotifyController);
+                      },
+                    ).then((_) {
+                      if (mounted) {
+                        widget.spotifyController.webViewOpacity.value = 0.0;
+                      }
+                    });
+                  },
+                  tooltip: 'Change Device',
+                  child: const Icon(Icons.devices),
+                )
+              : null,
           body: Column(
             children: [
               // Schuly-style app bar
@@ -256,11 +283,11 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                     ? CircleAvatar(
                         radius: 12,
                         backgroundImage: NetworkImage(widget.spotifyController.userProfileImage!),
-                        backgroundColor: _selectedIndex == 3 ? primaryColor : Theme.of(context).colorScheme.onSurfaceVariant,
+                        backgroundColor: _selectedIndex == 4 ? primaryColor : Theme.of(context).colorScheme.onSurfaceVariant,
                       )
                     : Icon(
                         Icons.person_outline,
-                        color: _selectedIndex == 3 ? primaryColor : Theme.of(context).colorScheme.onSurfaceVariant,
+                        color: _selectedIndex == 4 ? primaryColor : Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                 selectedIcon: widget.spotifyController.isLoggedIn &&
                              widget.spotifyController.userProfileImage != null
@@ -328,7 +355,20 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
             tooltip: 'Refresh',
           ),
         ];
-      case 3: // Profile page
+      case 3: // Devices page
+        return [
+          IconButton(
+            onPressed: () {
+              widget.spotifyController.refreshDevices();
+            },
+            icon: Icon(
+              Icons.refresh,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+            tooltip: 'Refresh Devices',
+          ),
+        ];
+      case 4: // Profile page
         return null;
       default:
         return null;

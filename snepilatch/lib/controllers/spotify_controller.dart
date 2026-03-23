@@ -9,6 +9,7 @@ import '../models/search_result.dart';
 import '../models/user.dart';
 import '../models/homepage_item.dart';
 import '../models/homepage_shortcut.dart';
+import '../models/device.dart';
 import '../services/webview_service.dart';
 import '../services/spotify_scraper_service.dart';
 import '../services/spotify_actions_service.dart';
@@ -135,6 +136,8 @@ class SpotifyController extends ChangeNotifier {
   bool get debugWebViewVisible => _debugWebViewVisible;
   List<HomepageSection> get homepageSections => store.homepageSections.value;
   List<HomepageShortcut> get homepageShortcuts => store.homepageShortcuts.value;
+  List<Device> get devices => store.devices.value;
+  String? get activeDeviceId => store.activeDeviceId.value;
   String get shuffleMode => store.shuffleMode.value.value;
   String get repeatMode => store.repeatMode.value.value;
   String get currentTime => store.currentTime.value;
@@ -1140,6 +1143,116 @@ class SpotifyController extends ChangeNotifier {
     } catch (e) {
       debugPrint('Error loading more songs: $e');
       store.isLoadingSongs.value = false;
+    }
+  }
+
+  // Device management methods
+  Future<void> openDevicePanel() async {
+    try {
+      debugPrint('🔌 [SpotifyController] Opening device panel...');
+
+      // Click the device connect button in Spotify
+      await _webViewService.runJavascript('''
+        (function() {
+          // First try to find the always-visible device button with data-restore-focus-key="device_picker"
+          let deviceButton = document.querySelector('button[data-restore-focus-key="device_picker"]');
+
+          if (deviceButton) {
+            console.log('Found device button via data-restore-focus-key');
+            deviceButton.click();
+            return true;
+          }
+
+          // Fallback: Find by aria-label containing device/connect info
+          const buttons = document.querySelectorAll('button');
+          for (const button of buttons) {
+            const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
+
+            // Look for the device connect button
+            if (ariaLabel.includes('gerät') || ariaLabel.includes('device') ||
+                ariaLabel.includes('verbinden') || ariaLabel.includes('connect')) {
+              console.log('Found device button via aria-label');
+              button.click();
+              return true;
+            }
+          }
+
+          // Last fallback: Look for the text link that shows current device
+          const textLinks = document.querySelectorAll('button[data-encore-id="textLink"]');
+          for (const link of textLinks) {
+            const text = link.textContent?.toLowerCase() || '';
+            if (text.includes('wiedergabe') || text.includes('playing on')) {
+              console.log('Found device button via text link');
+              link.click();
+              return true;
+            }
+          }
+
+          console.warn('Device button not found');
+          return false;
+        })()
+      ''');
+
+      // Wait for panel to open
+      await Future.delayed(const Duration(milliseconds: 500));
+      debugPrint('✅ [SpotifyController] Device panel opened');
+    } catch (e) {
+      debugPrint('Error opening device panel: $e');
+    }
+  }
+
+  Future<void> refreshDevices() async {
+    try {
+      debugPrint('🔄 [SpotifyController] Refreshing devices list...');
+
+      final devicesResult = await _webViewService.runJavascriptWithResult(
+        SpotifyActionsService.getDevicesScript
+      );
+
+      if (devicesResult != null && devicesResult != 'null') {
+        final String jsonString = devicesResult.toString();
+        final newDevices = SpotifyScraperService.parseDevices(jsonString);
+
+        if (newDevices.isNotEmpty) {
+          store.devices.value = newDevices;
+
+          // Update active device ID
+          final activeDevice = newDevices.firstWhere(
+            (device) => device.isActive,
+            orElse: () => newDevices.first,
+          );
+          store.activeDeviceId.value = activeDevice.id;
+
+          debugPrint('✅ [SpotifyController] Loaded ${newDevices.length} devices');
+          notifyListeners();
+        } else {
+          debugPrint('⚠️ [SpotifyController] No devices found');
+        }
+      }
+    } catch (e) {
+      debugPrint('Error refreshing devices: $e');
+    }
+  }
+
+  Future<bool> switchDevice(String deviceId) async {
+    try {
+      debugPrint('🔄 [SpotifyController] Switching to device: $deviceId');
+
+      await _webViewService.runJavascriptWithResult(
+        SpotifyActionsService.switchDeviceScript(deviceId)
+      );
+
+      // Wait for device switch to complete and UI to update
+      await Future.delayed(const Duration(milliseconds: 800));
+
+      // Refresh devices to get updated state
+      await refreshDevices();
+
+      debugPrint('✅ [SpotifyController] Device switched successfully');
+      return true;
+    } catch (e) {
+      debugPrint('Error switching device: $e');
+      return false;
     }
   }
 }

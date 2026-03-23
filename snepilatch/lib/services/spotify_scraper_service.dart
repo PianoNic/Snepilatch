@@ -6,9 +6,10 @@ import '../models/song.dart';
 import '../models/search_result.dart';
 import '../models/homepage_item.dart';
 import '../models/homepage_shortcut.dart';
+import '../models/device.dart';
 
 class SpotifyScraperService {
-  // JavaScript functions are loaded from assets/js/spotify-scraper.js and spotify-homepage.js
+  // JavaScript functions are loaded from assets/js/spotify-scraper.js, spotify-homepage.js, and spotify-devices.js
   // Functions injected into window:
   // - window.getPlayingInfo() - Returns playback state as JSON
   // - window.getUserInfo() - Returns user info as JSON
@@ -16,6 +17,7 @@ class SpotifyScraperService {
   // - window.getSearchResults() - Returns search results as JSON
   // - window.getHomepageSections() - Returns homepage sections as JSON
   // - window.getHomepageShortcuts() - Returns homepage shortcuts as JSON
+  // - window.getDevices() - Returns device list as JSON
 
   // Parse playback info from JavaScript response using proper JSON
   static PlaybackState? parsePlaybackInfo(String jsonString) {
@@ -91,6 +93,16 @@ class SpotifyScraperService {
       return jsonList.map((json) => HomepageShortcut.fromJson(json)).toList();
     } catch (e) {
       debugPrint('Error parsing homepage shortcuts: $e');
+      return [];
+    }
+  }
+
+  // Parse devices from JavaScript response using proper JSON
+  static List<Device> parseDevices(String jsonString) {
+    try {
+      return Device.fromJsonList(jsonString);
+    } catch (e) {
+      debugPrint('Error parsing devices: $e');
       return [];
     }
   }

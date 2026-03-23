@@ -2,6 +2,7 @@ class SpotifyActionsService {
   // JavaScript functions are loaded from:
   // - assets/js/spotify-actions.js (playback controls)
   // - assets/js/spotify-playlist-controller.js (playlist management)
+  // - assets/js/spotify-devices.js (device management)
 
   // Action functions injected into window:
   // - window.spotifyPlay()
@@ -17,6 +18,9 @@ class SpotifyActionsService {
   // - window.spotifyPlayTrackAtIndex(index)
   // - window.spotifyScrollPage(offset)
   // - window.spotifyOpenLikedSongs()
+  // - window.getDevices()
+  // - window.switchDevice(deviceId)
+  // - window.refreshDevices()
 
   // PlaylistController functions:
   // - window.PlaylistController (class instance)
@@ -47,4 +51,9 @@ class SpotifyActionsService {
   static const String getLoadedTracksScript = 'window.getLoadedTracks();';
   static const String debugScrollScript = 'window.debugScrollInfo();';
   static const String resetLoadingStateScript = 'window.resetLoadingState();';
+
+  // Device scripts
+  static const String getDevicesScript = 'window.getDevices();';
+  static String switchDeviceScript(String deviceId) => 'window.switchDevice("$deviceId");';
+  static const String refreshDevicesScript = 'window.refreshDevices();';
 }

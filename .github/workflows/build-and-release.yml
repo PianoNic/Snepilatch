@@ -18,6 +18,15 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
+      - name: Download KotifyClient JAR
+        env:
+          GH_TOKEN: ${{ secrets.KOTIFY_PAT }}
+        run: |
+          mkdir -p src/app/libs
+          gh release download --repo PianoNic/KotifyClient --pattern "KotifyClient-obfuscated.jar" --dir src/app/libs
+          mv src/app/libs/KotifyClient-obfuscated.jar src/app/libs/KotifyClient.jar
+          echo "Downloaded KotifyClient JAR ($(du -h src/app/libs/KotifyClient.jar | cut -f1))"
+
       - name: Setup release keystore
         working-directory: ./src/app
         env:

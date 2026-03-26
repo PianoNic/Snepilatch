@@ -131,7 +131,7 @@ fun UpdateDialog(
         },
         confirmButton = {
             if (!isDownloading) {
-                FilledButton(onClick = {
+                Button(onClick = {
                     isDownloading = true
                     error = null
                     scope.launch {

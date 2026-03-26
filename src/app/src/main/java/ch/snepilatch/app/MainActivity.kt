@@ -15,12 +15,17 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
+import ch.snepilatch.app.ui.components.UpdateDialog
 import ch.snepilatch.app.ui.screens.LoadingScreen
 import ch.snepilatch.app.ui.screens.SpotifyApp
 import ch.snepilatch.app.ui.screens.SpotifyLoginScreen
 import ch.snepilatch.app.ui.theme.SpotifyBlack
+import ch.snepilatch.app.util.UpdateInfo
+import ch.snepilatch.app.util.UpdateService
 import ch.snepilatch.app.util.loadCookies
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -45,6 +50,9 @@ class MainActivity : ComponentActivity() {
             val error by vm.initError.collectAsState()
             val needsLogin by vm.needsLogin.collectAsState()
 
+            // Auto-update check
+            var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
+
             val context = this@MainActivity
             LaunchedEffect(Unit) {
                 vm.loadPreferences(context)
@@ -55,6 +63,17 @@ class MainActivity : ComponentActivity() {
                         vm.initialize(savedCookies)
                     } else {
                         vm.showLogin()
+                    }
+                }
+
+                // Check for updates in background
+                withContext(Dispatchers.IO) {
+                    val info = UpdateService.checkForUpdates(context)
+                    if (info != null) {
+                        val dismissed = UpdateService.getDismissedVersion(context)
+                        if (dismissed != info.latestVersion) {
+                            updateInfo = info
+                        }
                     }
                 }
             }
@@ -72,6 +91,14 @@ class MainActivity : ComponentActivity() {
                     .fillMaxSize(),
                 color = SpotifyBlack
             ) {
+                // Update dialog
+                if (updateInfo != null) {
+                    UpdateDialog(
+                        updateInfo = updateInfo!!,
+                        onDismiss = { updateInfo = null }
+                    )
+                }
+
                 when {
                     needsLogin -> SpotifyLoginScreen(vm)
                     !initialized -> LoadingScreen(

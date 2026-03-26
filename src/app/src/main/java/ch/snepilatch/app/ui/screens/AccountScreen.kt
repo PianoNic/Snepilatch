@@ -23,11 +23,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import android.content.Intent
+import android.net.Uri
 import ch.snepilatch.app.BuildConfig
 import ch.snepilatch.app.ui.components.ProfileInfoItem
+import ch.snepilatch.app.ui.components.UpdateDialog
 import ch.snepilatch.app.ui.theme.*
+import ch.snepilatch.app.util.UpdateInfo
+import ch.snepilatch.app.util.UpdateService
 import ch.snepilatch.app.util.clearCookies
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun AccountScreen(vm: SpotifyViewModel) {
@@ -330,6 +338,73 @@ fun AccountScreen(vm: SpotifyViewModel) {
             supportingContent = { Text(BuildConfig.VERSION_NAME, color = SpotifyLightGray) },
             leadingContent = { Icon(Icons.Default.Info, null, tint = SpotifyLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+        )
+
+        // Check for Updates
+        val scope = rememberCoroutineScope()
+        val updateContext = androidx.compose.ui.platform.LocalContext.current
+        var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
+        var isChecking by remember { mutableStateOf(false) }
+        var upToDate by remember { mutableStateOf(false) }
+
+        ListItem(
+            headlineContent = { Text("Check for Updates", color = SpotifyWhite) },
+            supportingContent = { Text(
+                when {
+                    isChecking -> "Checking..."
+                    upToDate -> "You're on the latest version"
+                    else -> "Tap to check for new versions"
+                },
+                color = if (upToDate) animatedPrimary else SpotifyLightGray
+            ) },
+            leadingContent = {
+                if (isChecking) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp,
+                        color = animatedPrimary
+                    )
+                } else {
+                    Icon(Icons.Default.SystemUpdate, null, tint = SpotifyLightGray)
+                }
+            },
+            trailingContent = { if (!isChecking) Icon(Icons.Default.ChevronRight, null, tint = SpotifyLightGray) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable(enabled = !isChecking) {
+                isChecking = true
+                upToDate = false
+                scope.launch {
+                    val info = withContext(Dispatchers.IO) {
+                        UpdateService.checkForUpdates(updateContext)
+                    }
+                    isChecking = false
+                    if (info != null) {
+                        updateInfo = info
+                    } else {
+                        upToDate = true
+                    }
+                }
+            }
+        )
+
+        if (updateInfo != null) {
+            UpdateDialog(
+                updateInfo = updateInfo!!,
+                onDismiss = { updateInfo = null }
+            )
+        }
+
+        // Release Notes
+        ListItem(
+            headlineContent = { Text("Release Notes", color = SpotifyWhite) },
+            supportingContent = { Text("View changelog on GitHub", color = SpotifyLightGray) },
+            leadingContent = { Icon(Icons.Default.Description, null, tint = SpotifyLightGray) },
+            trailingContent = { Icon(Icons.Default.ChevronRight, null, tint = SpotifyLightGray) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/PianoNic/Snepilatch/releases"))
+                updateContext.startActivity(intent)
+            }
         )
 
         Spacer(Modifier.height(24.dp))

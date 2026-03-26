@@ -1,0 +1,7 @@
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/snepilatch_Logo_dev.png"
+  adaptive_icon_background: "#FF6B6B"
+  adaptive_icon_foreground: "assets/snepilatch_Logo_dev.png"
+  remove_alpha_ios: true

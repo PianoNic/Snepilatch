@@ -4,7 +4,7 @@
 </p>
 
 <p align="center">
-  <strong>An simplicity focused open-source music streaming frontend for Android</strong>
+  <strong>A simplicity focused open-source music streaming app for Android</strong>
 </p>
 
 <p align="center">
@@ -14,12 +14,13 @@
 </p>
 
 ## Features
-- Clean, intuitive interface
-- Homepage with music discovery
-- Library to see your favorites
-- Browse songs
-- Full playback controls
-- Material Design aesthetics
+- Native Android app with Jetpack Compose
+- Full playback controls with Spotify Connect
+- Lyrics display with synced scrolling
+- Queue management with direct track navigation
+- Library with liked songs, playlists, albums, and artists
+- Search and browse
+- Material 3 design
 - Automatic updates
 
 ## Screenshots
@@ -33,11 +34,25 @@
 ## Installation
 Check the [releases page](https://github.com/Pianonic/snepilatch/releases) for the latest APK.
 
+If you're on **v0.4.0+**, the app will auto-update when you open it.
+
+## Building from source
+
+Requires JDK 17+ and the [KotifyClient](https://github.com/PianoNic/KotifyClient) JAR.
+
+```bash
+# Place KotifyClient.jar in app/libs/
+cp /path/to/KotifyClient.jar app/libs/
+
+# Build debug APK
+./gradlew assembleDebug
+
+# Build release APK (requires signing key)
+./gradlew assembleRelease
+```
+
 ## Community
 Join our [Discord Server](https://discord.gg/NJxKMSNYRG)
 
 ## License
 MIT License - See [LICENSE](https://github.com/Pianonic/snepilatch/blob/main/LICENSE) file for details.
-
----
-<p align="center">Made with ❤️ by <a href="https://github.com/Pianonic">Pianonic</a></p>

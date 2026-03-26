@@ -1,0 +1,28 @@
+# Build outputs
+build/
+src/build/
+src/app/build/
+*.apk
+
+# Gradle
+.gradle/
+src/.gradle/
+local.properties
+src/local.properties
+
+# IDE
+.idea/
+*.iml
+
+# Signing
+key.properties
+src/key.properties
+*.jks
+*.keystore
+
+# KotifyClient JAR (external dependency, not committed)
+src/app/libs/KotifyClient.jar
+
+# OS files
+.DS_Store
+Thumbs.db

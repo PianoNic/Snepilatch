@@ -333,6 +333,19 @@ fun AccountScreen(vm: SpotifyViewModel) {
             modifier = Modifier.clickable { vm.loadDevices(); vm.showDevices.value = true }
         )
 
+        Spacer(Modifier.height(24.dp))
+
+        HorizontalDivider(color = SpotifyGray, modifier = Modifier.padding(horizontal = 16.dp))
+
+        // About section
+        Text(
+            "About",
+            color = SpotifyWhite,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp)
+        )
+
         ListItem(
             headlineContent = { Text("App Version", color = SpotifyWhite) },
             supportingContent = { Text(BuildConfig.VERSION_NAME, color = SpotifyLightGray) },
@@ -395,17 +408,20 @@ fun AccountScreen(vm: SpotifyViewModel) {
         }
 
         // Release Notes
+        var showReleaseNotes by remember { mutableStateOf(false) }
+
         ListItem(
             headlineContent = { Text("Release Notes", color = SpotifyWhite) },
-            supportingContent = { Text("View changelog on GitHub", color = SpotifyLightGray) },
+            supportingContent = { Text("View changelog", color = SpotifyLightGray) },
             leadingContent = { Icon(Icons.Default.Description, null, tint = SpotifyLightGray) },
             trailingContent = { Icon(Icons.Default.ChevronRight, null, tint = SpotifyLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            modifier = Modifier.clickable {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/PianoNic/Snepilatch/releases"))
-                updateContext.startActivity(intent)
-            }
+            modifier = Modifier.clickable { showReleaseNotes = true }
         )
+
+        if (showReleaseNotes) {
+            ReleaseNotesDialog(onDismiss = { showReleaseNotes = false })
+        }
 
         Spacer(Modifier.height(24.dp))
 

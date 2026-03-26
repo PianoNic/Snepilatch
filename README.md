@@ -38,18 +38,7 @@ If you're on **v0.4.0+**, the app will auto-update when you open it.
 
 ## Building from source
 
-Requires JDK 17+ and the [KotifyClient](https://github.com/PianoNic/KotifyClient) JAR.
-
-```bash
-# Place KotifyClient.jar in app/libs/
-cp /path/to/KotifyClient.jar app/libs/
-
-# Build debug APK
-./gradlew assembleDebug
-
-# Build release APK (requires signing key)
-./gradlew assembleRelease
-```
+> **Note:** This project depends on [KotifyClient](https://github.com/PianoNic/KotifyClient), a private library that is not included in this repository. The CI pipeline downloads it automatically from a private GitHub release. Without it, the project will not compile. If you're interested in contributing, reach out on our Discord server.
 
 ## Community
 Join our [Discord Server](https://discord.gg/NJxKMSNYRG)

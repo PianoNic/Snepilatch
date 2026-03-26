@@ -114,77 +114,129 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO_NAME: ${{ github.repository }}
         run: |
+          # Skip if webhook URL is not configured
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "::warning::DISCORD_WEBHOOK_URL not set, skipping Discord notification"
+            exit 0
+          fi
+
           # Fetch release data from GitHub API
           RELEASE_DATA=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
             "https://api.github.com/repos/$REPO_NAME/releases/tags/$RELEASE_TAG")
 
-          # Export for Python script
-          export RELEASE_BODY=$(echo "$RELEASE_DATA" | jq -r '.body')
-          export RELEASE_URL=$(echo "$RELEASE_DATA" | jq -r '.html_url')
+          # Validate release data was fetched successfully
+          if [ "$(echo "$RELEASE_DATA" | jq -r '.message // empty')" = "Not Found" ]; then
+            echo "::error::Could not fetch release data for tag $RELEASE_TAG"
+            exit 1
+          fi
 
-          # Process the release body to format it nicely
+          # Export release info for Python script
+          export RELEASE_BODY=$(echo "$RELEASE_DATA" | jq -r '.body // ""')
+          export RELEASE_URL=$(echo "$RELEASE_DATA" | jq -r '.html_url // ""')
+          export RELEASE_PUBLISHED=$(echo "$RELEASE_DATA" | jq -r '.published_at // ""')
+
+          # Extract direct APK download URL from release assets
+          export APK_URL=$(echo "$RELEASE_DATA" | jq -r '.assets[] | select(.name | endswith(".apk")) | .browser_download_url // empty')
+
+          # Build Discord embed payload
           python3 << 'PYTHON_SCRIPT'
           import json
           import os
           import re
+          from datetime import datetime
 
           release_body = os.environ.get('RELEASE_BODY', '')
           release_tag = os.environ.get('RELEASE_TAG', '')
           release_url = os.environ.get('RELEASE_URL', '')
+          release_published = os.environ.get('RELEASE_PUBLISHED', '')
+          apk_url = os.environ.get('APK_URL', '')
+          repo_name = os.environ.get('REPO_NAME', '')
 
-          # Extract sections from release body
-          changes = []
-          current_section = None
-          note_text = ""
+          # Clean the release body for the embed description:
+          # - Strip the "## What's Changed" header
+          # - Strip the "Full Changelog" link
+          # - Strip the auto-update note (shown separately in embed footer)
+          # - Trim excess whitespace
+          # This lets release-drafter's markdown pass through directly,
+          # so any category changes in release-drafter.yml are automatically reflected.
+          description = release_body
+          description = description.replace('\r\n', '\n')
+          description = re.sub(r"^## What's Changed\n*", '', description, flags=re.MULTILINE)
+          description = re.sub(r'\*\*Full Changelog[:\*].*', '', description, flags=re.DOTALL)
+          description = re.sub(r'📝 \*\*Note:\*\*.*\n*', '', description)
+          description = description.strip()
 
-          for line in release_body.split('\n'):
-              line = line.strip()
-              if not line:
-                  continue
+          if not description:
+              description = 'See release notes for details.'
 
-              # Detect section headers
-              if line.startswith('## '):
-                  continue
-              elif line.startswith('🚀 Features') or line.startswith('**🚀 Features**'):
-                  current_section = '🚀 Features'
-                  changes.append('')
-                  changes.append('🚀 **Features**')
-              elif line.startswith('✨ Enhancements') or line.startswith('**✨ Enhancements**'):
-                  current_section = '✨ Enhancements'
-                  changes.append('')
-                  changes.append('✨ **Enhancements**')
-              elif line.startswith('🛠️ Refactors') or line.startswith('**🛠️ Refactors**'):
-                  current_section = '🛠️ Refactors'
-                  changes.append('')
-                  changes.append('🛠️ **Refactors**')
-              elif line.startswith('🐛 Bug Fixes') or line.startswith('**🐛 Bug Fixes**'):
-                  current_section = '🐛 Bug Fixes'
-                  changes.append('')
-                  changes.append('🐛 **Bug Fixes**')
-              elif line.startswith('- ') and current_section:
-                  changes.append(line)
-              elif line.startswith('📝 **Note:**'):
-                  note_text = line
-              elif line.startswith('**Full Changelog'):
-                  break
+          # Append auto-update note and spacing before the fields
+          description += '\n\n> 📝 If you\'re on **v0.4.0+**, the app will auto-update when you open it!'
 
-          # Build the message content
-          changes_text = '\n'.join(changes) if changes else 'See release notes for details.'
+          # Truncate to Discord embed description limit (4096 chars)
+          if len(description) > 4000:
+              description = description[:3997] + '...'
 
-          # Add note if present
-          note_section = f"\n\n{note_text}" if note_text else ""
+          # Build embed fields
+          fields = []
 
-          message = f"📱 **New Release - {release_tag}!**\nA new update is now available!\n\n**What's New:**{changes_text}{note_section}\n\n**Download the latest version:** [{release_tag}]({release_url})\n\nThanks for your support and feedback! 🎵✨\n\n||@everyone||"
+          if apk_url:
+              fields.append({
+                  "name": "📥 Download APK",
+                  "value": f"[snepilatch-{release_tag}.apk]({apk_url})",
+                  "inline": True
+              })
+
+          fields.append({
+              "name": "📋 Release Notes",
+              "value": f"[View on GitHub]({release_url})",
+              "inline": True
+          })
+
+          # Build thumbnail URL from repo icon and banner from repo social preview
+          icon_url = f"https://raw.githubusercontent.com/{repo_name}/main/assets/snepilatch_Logo.png"
+          banner_url = "https://repository-images.githubusercontent.com/1048941028/0f6a518b-1c90-492c-be39-3eba2a3cab99"
+
+          # Build the timestamp from published_at
+          timestamp = release_published if release_published else datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
 
           payload = {
-              "content": message
+              "content": "||@everyone||",
+              "allowed_mentions": {
+                  "parse": ["everyone"]
+              },
+              "embeds": [{
+                  "title": f"📱 New Release — {release_tag}",
+                  "description": description,
+                  "url": release_url,
+                  "color": 0x1DB954,
+                  "fields": fields,
+                  "thumbnail": {
+                      "url": icon_url
+                  },
+                  "image": {
+                      "url": banner_url
+                  },
+                  "footer": {
+                      "text": "Thanks for your support! 🎵"
+                  },
+                  "timestamp": timestamp
+              }]
           }
 
           with open('discord_payload.json', 'w') as f:
               json.dump(payload, f)
           PYTHON_SCRIPT
 
-          # Send to Discord
-          curl -H "Content-Type: application/json" \
+          # Send to Discord and check response
+          HTTP_CODE=$(curl -s -o discord_response.txt -w "%{http_code}" \
+               -H "Content-Type: application/json" \
                -d @discord_payload.json \
-               "$DISCORD_WEBHOOK_URL"
+               "$DISCORD_WEBHOOK_URL")
+
+          if [ "$HTTP_CODE" -ne 204 ] && [ "$HTTP_CODE" -ne 200 ]; then
+            echo "::warning::Discord webhook returned HTTP $HTTP_CODE"
+            cat discord_response.txt
+            exit 1
+          fi
+
+          echo "Discord notification sent successfully (HTTP $HTTP_CODE)"

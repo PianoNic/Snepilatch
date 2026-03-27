@@ -1,47 +1,42 @@
-# <p align="center">SNEPILATCH</p>
-<p align="center">
-  <img src="./assets/app_icon.svg" width="200" alt="SNEPILATCH Logo">
-</p>
+# Snepilatch
 
-<p align="center">
-  <strong>A simplicity focused open-source music streaming app for Android</strong>
-</p>
-
-<p align="center">
-  <a href="https://github.com/Pianonic/snepilatch"><img src="https://badgetrack.pianonic.ch/badge?tag=snepilatch&label=visits&color=4f3a96&style=flat" alt="visits" /></a>
-  <a href="https://github.com/Pianonic/snepilatch/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Pianonic/snepilatch?color=1e424c&label=License"/></a>
-  <a href="https://github.com/Pianonic/snepilatch/releases"><img src="https://img.shields.io/github/v/release/Pianonic/snepilatch?include_prereleases&color=0c9b4d&label=Latest%20Release"/></a>
-</p>
+A simplicity-focused, open-source music streaming app for Android.
 
 ## Features
-- Native Android app with Jetpack Compose
+
 - Full playback controls with Spotify Connect
-- Lyrics display with synced scrolling
+- Synced lyrics display
 - Queue management with direct track navigation
-- Library with liked songs, playlists, albums, and artists
+- Library: liked songs, playlists, albums, artists
 - Search and browse
 - Material 3 design
-- Automatic updates
+- Automatic in-app updates
+
+## Tech Stack
+
+- Kotlin + Jetpack Compose
+- Material 3
+- Spotify Connect
 
 ## Screenshots
-<p align="center">
-  <img src="./assets/screenshot_home.PNG" width="200" alt="Home">
-  <img src="./assets/screenshot_player.PNG" width="200" alt="Player">
-  <img src="./assets/screenshot_library.PNG" width="200" alt="Library">
-  <img src="./assets/screenshot_search.PNG" width="200" alt="Search">
-</p>
+
+| Home | Player | Library | Search |
+|------|--------|---------|--------|
+| ![Home](assets/home.png) | ![Player](assets/player.png) | ![Library](assets/library.png) | ![Search](assets/search.png) |
 
 ## Installation
-Check the [releases page](https://github.com/Pianonic/snepilatch/releases) for the latest APK.
 
-If you're on **v0.4.0+**, the app will auto-update when you open it.
+Download the latest APK from the [Releases](https://github.com/PianoNic/Snepilatch/releases) page.
+From v0.4.0+, the app auto-updates on launch.
 
-## Building from source
+## Building from Source
 
-> **Note:** This project depends on a private library that is not included in this repository. Without it, the project will not compile. If you're interested in contributing, reach out on our Discord server.
+> This project depends on a private library not included in the repository. It will not compile without it.
 
 ## Community
-Join our [Discord Server](https://discord.gg/NJxKMSNYRG)
+
+[Discord](https://discord.gg/NJxKMSNYRG)
 
 ## License
-MIT License - See [LICENSE](https://github.com/Pianonic/snepilatch/blob/main/LICENSE) file for details.
+
+[MIT](LICENSE)

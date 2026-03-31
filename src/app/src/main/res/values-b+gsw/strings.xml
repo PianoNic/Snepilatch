@@ -1,0 +1,102 @@
+<resources>
+    <!-- Common -->
+    <string name="cancel">Abbräche</string>
+    <string name="share">Teile</string>
+    <string name="loading">Am Lade…</string>
+    <string name="unknown">Unbekannt</string>
+
+    <!-- Bottom Nav -->
+    <string name="nav_home">Dihei</string>
+    <string name="nav_search">Suechi</string>
+    <string name="nav_library">Bibliothek</string>
+    <string name="nav_account">Konto</string>
+
+    <!-- Home -->
+    <string name="greeting_fallback">Guete Abig</string>
+
+    <!-- Search -->
+    <string name="search_placeholder">Songs, Künstler, Albä…</string>
+
+    <!-- Library -->
+    <string name="library_search_placeholder">I de Bibliothek sueche</string>
+    <string name="library_playlists">Playlists</string>
+    <string name="library_artists">Künstler</string>
+    <string name="library_albums">Albä</string>
+
+    <!-- Player -->
+    <string name="now_playing">Lauft grad</string>
+    <string name="add_to_queue">Id Wartelischte</string>
+    <string name="add_to_playlist">Zu Playlist dezue</string>
+    <string name="like">Gfallt mer</string>
+    <string name="unlike">Gfallt mer nüm</string>
+    <string name="visit_album">Album aaluege</string>
+
+    <!-- Detail Screen -->
+    <string name="follow">Folge</string>
+    <string name="following">Folg i</string>
+    <string name="popular">Beliebt</string>
+    <string name="popular_releases">Beliebti Releases</string>
+    <string name="fans_also_like">Fans möged au</string>
+    <string name="more_by">Meh vo %s</string>
+
+    <!-- Account -->
+    <string name="account">Konto</string>
+    <string name="settings">Istellige</string>
+    <string name="about">Über</string>
+    <string name="special_thanks">Speziell Dank</string>
+    <string name="premium">Premium</string>
+    <string name="username">Benutzername</string>
+    <string name="user_id">Benutzer-ID</string>
+    <string name="plan">Abo</string>
+    <string name="plan_free">Gratis</string>
+    <string name="followers_playlists">%d Follower · %d Playlists</string>
+    <string name="log_out">Abmelde</string>
+
+    <!-- Settings -->
+    <string name="lossless_audio">Verlustfreii Audio</string>
+    <string name="lossless_on">FLAC über %s</string>
+    <string name="lossless_off">Standardqualität</string>
+    <string name="lossless_provider">Verlustfreii Quelle</string>
+    <string name="canvas_background">Canvas-Hintergrund</string>
+    <string name="canvas_on">Video hinterm Albumcover</string>
+    <string name="canvas_off">Uus</string>
+    <string name="lyrics_animation">Lyrics-Animation</string>
+    <string name="lyrics_anim_desc">Wähl d Animation für ziilesyncti Lyrics.</string>
+    <string name="lyrics_vertical">Vo obe na une</string>
+    <string name="lyrics_horizontal">Vo links na rächts</string>
+    <string name="notification_left_button">Benachrichtigung links</string>
+    <string name="notification_right_button">Benachrichtigung rächts</string>
+    <string name="notif_like">Gfallt mer</string>
+    <string name="notif_like_desc">Gfallt-mer umschalte</string>
+    <string name="notif_shuffle">Zuefallswiedergab</string>
+    <string name="notif_shuffle_desc">Zuefallswiedergab umschalte</string>
+    <string name="notif_repeat">Wiederhole</string>
+    <string name="notif_repeat_desc">Wiederholig wächsle (us → alli → eis)</string>
+    <string name="connect_to_device">Mit Grät verbinde</string>
+    <string name="content_region">Inhaltsregion</string>
+    <string name="content_region_desc">Beeiflusst Suechergebnis und Empfählige</string>
+
+    <!-- About -->
+    <string name="app_version">App-Version</string>
+    <string name="check_for_updates">Nach Updates sueche</string>
+    <string name="checking">Am Prüefe…</string>
+    <string name="up_to_date">Du hesch di nöischti Version</string>
+    <string name="tap_to_check">Tipp zum nach Updates sueche</string>
+    <string name="release_notes">Versionshinwiis</string>
+    <string name="view_changelog">Änderige aaluege</string>
+
+    <!-- Update Dialog -->
+    <string name="update_available">Update verfüegbar</string>
+    <string name="current_version">Aktuell</string>
+    <string name="new_version">Neu</string>
+    <string name="whats_new">Was isch neu:</string>
+    <string name="update_now">Jetzt aktualisiere</string>
+    <string name="later">Spöter</string>
+
+    <!-- Devices -->
+    <string name="searching_devices">Am Grät sueche…</string>
+
+    <!-- Notification -->
+    <string name="added_to_liked">Zu de Lieblingssongs dezue</string>
+    <string name="removed_from_liked">Vo de Lieblingssongs weg</string>
+</resources>

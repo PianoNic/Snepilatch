@@ -15,8 +15,9 @@ A simplicity-focused, open-source music streaming app for Android.
 ## Tech Stack
 
 - Kotlin + Jetpack Compose (migrated from Flutter + WebView)
-- ExoPlayer with Widevine DRM for native audio playback
-- Proprietary KotifyClient for Spotify Connect protocol
+- ExoPlayer with Widevine DRM and optimized buffering for native audio playback
+- Proprietary KotifyClient for Spotify Connect protocol and real-time WebSocket state
+- Protocol-level ad blocking via state machine auto-advance
 - Material 3
 
 ## Screenshots

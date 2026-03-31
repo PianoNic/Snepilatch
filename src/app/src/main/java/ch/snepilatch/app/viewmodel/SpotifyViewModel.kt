@@ -210,9 +210,22 @@ class SpotifyViewModel : ViewModel() {
 
                 val phoneName = android.os.Build.MODEL
                 val pc = PlayerConnect(sess, deviceName = phoneName)
+
+                // Persist device ID to avoid ghost devices on Spotify's device list
+                val svcContext = MusicPlaybackService.instance as? android.content.Context
+                val devicePrefs = svcContext?.getSharedPreferences("kotify_prefs", android.content.Context.MODE_PRIVATE)
+                val savedDeviceId = devicePrefs?.getString("persisted_device_id", null)
+                if (savedDeviceId != null) {
+                    pc.setPersistedDeviceId(savedDeviceId)
+                    LokiLogger.i(TAG, "Reusing persisted device ID: $savedDeviceId")
+                }
                 pc.ready()
+                val currentDeviceId = pc.ourDeviceId()
+                if (currentDeviceId != null && currentDeviceId != savedDeviceId) {
+                    devicePrefs?.edit()?.putString("persisted_device_id", currentDeviceId)?.apply()
+                }
                 player = pc
-                LokiLogger.i(TAG, "Player ready, device: ${pc.ourDeviceId()}")
+                LokiLogger.i(TAG, "Player ready, device: $currentDeviceId")
                 loadDevices()
 
                 pc.onPlaybackId { fileId ->
@@ -1840,9 +1853,16 @@ class SpotifyViewModel : ViewModel() {
     override fun onCleared() {
         super.onCleared()
         positionJob?.cancel()
-        viewModelScope.launch(Dispatchers.IO) {
-            try { player?.disconnect() }
-            catch (_: Exception) {}
+        // Use runBlocking to ensure disconnect completes before the process dies.
+        // viewModelScope is already cancelled at this point.
+        val p = player
+        if (p != null) {
+            Thread {
+                kotlinx.coroutines.runBlocking {
+                    try { p.disconnect() }
+                    catch (_: Exception) {}
+                }
+            }.start()
         }
     }
 }

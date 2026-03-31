@@ -325,6 +325,76 @@ fun AccountScreen(vm: SpotifyViewModel) {
             )
         }
 
+        // Content region picker
+        val currentRegion by vm.contentRegion.collectAsState()
+        var showRegionPicker by remember { mutableStateOf(false) }
+        ListItem(
+            headlineContent = { Text("Content Region", color = SpotifyWhite) },
+            supportingContent = { Text(currentRegion, color = SpotifyLightGray) },
+            leadingContent = { Icon(Icons.Default.Language, null, tint = SpotifyLightGray) },
+            trailingContent = { Icon(Icons.Default.ChevronRight, null, tint = SpotifyLightGray) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable { showRegionPicker = true }
+        )
+        if (showRegionPicker) {
+            AlertDialog(
+                onDismissRequest = { showRegionPicker = false },
+                title = { Text("Content Region", color = SpotifyWhite) },
+                text = {
+                    Column {
+                        listOf(
+                            "US" to "United States",
+                            "GB" to "United Kingdom",
+                            "DE" to "Germany",
+                            "CH" to "Switzerland",
+                            "FR" to "France",
+                            "JP" to "Japan",
+                            "KR" to "South Korea",
+                            "AU" to "Australia",
+                            "BR" to "Brazil",
+                            "CA" to "Canada",
+                            "SE" to "Sweden"
+                        ).forEach { (code, label) ->
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        vm.setContentRegion(code, audioContext)
+                                        showRegionPicker = false
+                                    }
+                                    .padding(vertical = 12.dp, horizontal = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = currentRegion == code,
+                                    onClick = {
+                                        vm.setContentRegion(code, audioContext)
+                                        showRegionPicker = false
+                                    },
+                                    colors = RadioButtonDefaults.colors(
+                                        selectedColor = animatedPrimary,
+                                        unselectedColor = SpotifyLightGray
+                                    )
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Column {
+                                    Text(label, color = SpotifyWhite, fontSize = 15.sp)
+                                    Text(code, color = SpotifyLightGray, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                },
+                containerColor = SpotifyGray,
+                confirmButton = {},
+                dismissButton = {
+                    TextButton(onClick = { showRegionPicker = false }) {
+                        Text("Cancel", color = SpotifyLightGray)
+                    }
+                }
+            )
+        }
+
         // Notification button options
         val buttonOptions = listOf(
             "like" to "Like / Unlike" to "Toggle liked state",

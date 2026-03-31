@@ -220,32 +220,21 @@ class SpotifyViewModel : ViewModel() {
                 isInitialized.value = true
                 initRetryCount = 0
 
+                // Disconnect any existing player before creating a new one
+                // This prevents duplicate device registrations
+                player?.let { oldPlayer ->
+                    LokiLogger.i(TAG, "Disconnecting old player before creating new one")
+                    try { oldPlayer.disconnect() } catch (_: Exception) {}
+                    player = null
+                }
+
                 val phoneName = android.os.Build.MODEL
                 val pc = PlayerConnect(sess, deviceName = phoneName)
 
-                // Persist device ID — but invalidate if app version changed
-                // (capabilities may have changed between builds)
-                val svcContext = MusicPlaybackService.instance as? android.content.Context
-                val devicePrefs = svcContext?.getSharedPreferences("kotify_prefs", android.content.Context.MODE_PRIVATE)
-                val currentVersion = try { svcContext?.packageManager?.getPackageInfo(svcContext.packageName, 0)?.versionCode } catch (_: Exception) { null }
-                val savedVersion = devicePrefs?.getInt("device_id_version", -1)
-                val savedDeviceId = devicePrefs?.getString("persisted_device_id", null)
-                if (savedDeviceId != null && savedVersion == currentVersion) {
-                    pc.setPersistedDeviceId(savedDeviceId)
-                    LokiLogger.i(TAG, "Reusing persisted device ID: $savedDeviceId")
-                } else if (savedDeviceId != null) {
-                    LokiLogger.i(TAG, "App version changed ($savedVersion -> $currentVersion), generating fresh device ID")
-                }
+                // Fresh device ID every launch — avoids stale server-side registrations
                 pc.ready()
-                val currentDeviceId = pc.ourDeviceId()
-                if (currentDeviceId != null) {
-                    devicePrefs?.edit()
-                        ?.putString("persisted_device_id", currentDeviceId)
-                        ?.putInt("device_id_version", currentVersion ?: -1)
-                        ?.apply()
-                }
                 player = pc
-                LokiLogger.i(TAG, "Player ready, device: $currentDeviceId")
+                LokiLogger.i(TAG, "Player ready, device: ${pc.ourDeviceId()}")
                 loadDevices()
 
                 pc.onPlaybackId { fileId ->

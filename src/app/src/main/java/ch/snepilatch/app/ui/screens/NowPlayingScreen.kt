@@ -452,9 +452,18 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                         val streaming by vm.isStreaming.collectAsState()
                         val audioOutput by vm.audioOutputName.collectAsState()
                         val audioType by vm.audioOutputType.collectAsState()
-                        // Refresh audio output info
+                        // Live audio output tracking
                         val audioCtx = LocalContext.current
-                        LaunchedEffect(streaming) { vm.updateAudioOutput(audioCtx) }
+                        DisposableEffect(Unit) {
+                            val am = audioCtx.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
+                            vm.updateAudioOutput(audioCtx)
+                            val cb = object : android.media.AudioDeviceCallback() {
+                                override fun onAudioDevicesAdded(added: Array<out android.media.AudioDeviceInfo>?) { vm.updateAudioOutput(audioCtx) }
+                                override fun onAudioDevicesRemoved(removed: Array<out android.media.AudioDeviceInfo>?) { vm.updateAudioOutput(audioCtx) }
+                            }
+                            am.registerAudioDeviceCallback(cb, null)
+                            onDispose { am.unregisterAudioDeviceCallback(cb) }
+                        }
                         val audioIcon = when (audioType) {
                             "bluetooth" -> Icons.Default.Bluetooth
                             "wired" -> Icons.Default.Headphones
@@ -822,7 +831,16 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                     val audioOutput by vm.audioOutputName.collectAsState()
                     val audioType by vm.audioOutputType.collectAsState()
                     val audioCtx2 = LocalContext.current
-                    LaunchedEffect(streaming) { vm.updateAudioOutput(audioCtx2) }
+                    DisposableEffect(Unit) {
+                        val am = audioCtx2.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
+                        vm.updateAudioOutput(audioCtx2)
+                        val cb = object : android.media.AudioDeviceCallback() {
+                            override fun onAudioDevicesAdded(added: Array<out android.media.AudioDeviceInfo>?) { vm.updateAudioOutput(audioCtx2) }
+                            override fun onAudioDevicesRemoved(removed: Array<out android.media.AudioDeviceInfo>?) { vm.updateAudioOutput(audioCtx2) }
+                        }
+                        am.registerAudioDeviceCallback(cb, null)
+                        onDispose { am.unregisterAudioDeviceCallback(cb) }
+                    }
                     val audioIcon = when (audioType) {
                         "bluetooth" -> Icons.Default.Bluetooth
                         "wired" -> Icons.Default.Headphones

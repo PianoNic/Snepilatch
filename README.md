@@ -28,7 +28,6 @@ A simplicity-focused, open-source music streaming app for Android.
 ## Installation
 
 Download the latest APK from the [Releases](https://github.com/PianoNic/Snepilatch/releases) page.
-From v0.4.0+, the app auto-updates on launch.
 
 ## Building from Source
 

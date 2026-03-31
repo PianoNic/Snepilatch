@@ -1,3 +1,109 @@
 <resources>
     <string name="app_name">Snepilatch</string>
+
+    <!-- Common -->
+    <string name="cancel">Cancel</string>
+    <string name="share">Share</string>
+    <string name="loading">Loading…</string>
+    <string name="unknown">Unknown</string>
+
+    <!-- Bottom Nav -->
+    <string name="nav_home">Home</string>
+    <string name="nav_search">Search</string>
+    <string name="nav_library">Library</string>
+    <string name="nav_account">Account</string>
+
+    <!-- Home -->
+    <string name="greeting_fallback">Good evening</string>
+
+    <!-- Search -->
+    <string name="search_placeholder">Songs, artists, albums…</string>
+
+    <!-- Library -->
+    <string name="library_search_placeholder">Search in Your Library</string>
+    <string name="library_playlists">Playlists</string>
+    <string name="library_artists">Artists</string>
+    <string name="library_albums">Albums</string>
+
+    <!-- Player -->
+    <string name="now_playing">Now playing</string>
+    <string name="add_to_queue">Add to Queue</string>
+    <string name="add_to_playlist">Add to Playlist</string>
+    <string name="like">Like</string>
+    <string name="unlike">Unlike</string>
+    <string name="visit_album">Visit Album</string>
+
+    <!-- Detail Screen -->
+    <string name="follow">Follow</string>
+    <string name="following">Following</string>
+    <string name="popular">Popular</string>
+    <string name="popular_releases">Popular Releases</string>
+    <string name="fans_also_like">Fans also like</string>
+    <string name="more_by">More by %s</string>
+
+    <!-- Account -->
+    <string name="account">Account</string>
+    <string name="settings">Settings</string>
+    <string name="about">About</string>
+    <string name="special_thanks">Special Thanks</string>
+    <string name="premium">Premium</string>
+    <string name="username">Username</string>
+    <string name="user_id">User ID</string>
+    <string name="plan">Plan</string>
+    <string name="plan_free">Free</string>
+    <string name="followers_playlists">%d Followers · %d Playlists</string>
+    <string name="log_out">Log out</string>
+
+    <!-- Settings -->
+    <string name="lossless_audio">Lossless Audio</string>
+    <string name="lossless_on">FLAC via %s</string>
+    <string name="lossless_off">Standard quality</string>
+    <string name="lossless_provider">Lossless Provider</string>
+    <string name="tidal_desc">Tidal — FLAC up to 1411kbps</string>
+    <string name="qobuz_desc">Qobuz — FLAC up to 9216kbps</string>
+    <string name="canvas_background">Canvas Background</string>
+    <string name="canvas_on">Looping video behind album art</string>
+    <string name="canvas_off">Off</string>
+    <string name="lyrics_animation">Lyrics Animation</string>
+    <string name="lyrics_anim_desc">Choose how line-synced lyrics animate.</string>
+    <string name="lyrics_vertical">Top to Bottom</string>
+    <string name="lyrics_horizontal">Left to Right</string>
+    <string name="notification_left_button">Notification Left Button</string>
+    <string name="notification_right_button">Notification Right Button</string>
+    <string name="notif_like">Like / Unlike</string>
+    <string name="notif_like_desc">Toggle liked state for current track</string>
+    <string name="notif_shuffle">Shuffle</string>
+    <string name="notif_shuffle_desc">Toggle shuffle mode</string>
+    <string name="notif_repeat">Repeat</string>
+    <string name="notif_repeat_desc">Cycle repeat (off → all → one)</string>
+    <string name="connect_to_device">Connect to a device</string>
+    <string name="content_region">Content Region</string>
+    <string name="content_region_desc">Affects search results and recommendations</string>
+
+    <!-- About -->
+    <string name="app_version">App Version</string>
+    <string name="check_for_updates">Check for Updates</string>
+    <string name="checking">Checking…</string>
+    <string name="up_to_date">You\'re on the latest version</string>
+    <string name="tap_to_check">Tap to check for new versions</string>
+    <string name="release_notes">Release Notes</string>
+    <string name="view_changelog">View changelog</string>
+
+    <!-- Update Dialog -->
+    <string name="update_available">Update Available</string>
+    <string name="current_version">Current</string>
+    <string name="new_version">New</string>
+    <string name="whats_new">What\'s new:</string>
+    <string name="update_now">Update Now</string>
+    <string name="later">Later</string>
+
+    <!-- Devices -->
+    <string name="searching_devices">Searching for devices…</string>
+
+    <!-- Notification -->
+    <string name="added_to_liked">Added to Liked Songs</string>
+    <string name="removed_from_liked">Removed from Liked Songs</string>
+
+    <!-- Playback -->
+    <string name="playback_ended">Playback ended</string>
 </resources>

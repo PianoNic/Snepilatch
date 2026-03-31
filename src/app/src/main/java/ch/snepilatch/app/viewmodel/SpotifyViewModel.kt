@@ -597,14 +597,28 @@ class SpotifyViewModel : ViewModel() {
                     if (isStreaming.value) {
                         withContext(Dispatchers.Main) { MusicPlaybackService.instance?.syncPlay(_playback.value.positionMs) }
                     }
-                    p.resume()
+                    try {
+                        p.resume()
+                    } catch (e: Exception) {
+                        LokiLogger.w(TAG, "resume failed, transferring playback and retrying: ${e.message}")
+                        p.transferPlaybackHere()
+                        delay(500)
+                        p.resume()
+                    }
                 } else {
                     _playback.value = _playback.value.copy(isPaused = true)
                     positionJob?.cancel()
                     if (isStreaming.value) {
                         withContext(Dispatchers.Main) { MusicPlaybackService.instance?.syncPause() }
                     }
-                    p.pause()
+                    try {
+                        p.pause()
+                    } catch (e: Exception) {
+                        LokiLogger.w(TAG, "pause failed, transferring playback and retrying: ${e.message}")
+                        p.transferPlaybackHere()
+                        delay(500)
+                        p.pause()
+                    }
                 }
                 LokiLogger.i(TAG, "[Timing] CMD $action API done in ${System.currentTimeMillis() - t0}ms")
             } catch (e: CancellationException) { throw e }
@@ -1076,26 +1090,8 @@ class SpotifyViewModel : ViewModel() {
 
     fun wireServiceControls() {
         val svc = MusicPlaybackService.instance ?: return
-        svc.onPlay = {
-            viewModelScope.launch(Dispatchers.IO) {
-                try { player?.resume() }
-                catch (e: CancellationException) { throw e }
-                catch (e: Exception) {
-                    if (e.message?.contains("Timeout") == true) LokiLogger.w(TAG, "svc play: timeout")
-                    else LokiLogger.e(TAG, "svc play", e)
-                }
-            }
-        }
-        svc.onPause = {
-            viewModelScope.launch(Dispatchers.IO) {
-                try { player?.pause() }
-                catch (e: CancellationException) { throw e }
-                catch (e: Exception) {
-                    if (e.message?.contains("Timeout") == true) LokiLogger.w(TAG, "svc pause: timeout")
-                    else LokiLogger.e(TAG, "svc pause", e)
-                }
-            }
-        }
+        svc.onPlay = { togglePlayPause() }
+        svc.onPause = { togglePlayPause() }
         svc.onSkipNext = {
             viewModelScope.launch(Dispatchers.IO) {
                 try { player?.skipNext() }

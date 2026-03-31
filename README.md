@@ -5,7 +5,7 @@ A simplicity-focused, open-source music streaming app for Android.
 ## Features
 
 - Fully native UI built with Jetpack Compose and Material 3
-- Full playback controls with Spotify Connect
+- Full playback controls with Spfy Connect
 - Synced lyrics display
 - Queue management with direct track navigation
 - Library: liked songs, playlists, albums, artists
@@ -19,7 +19,7 @@ A simplicity-focused, open-source music streaming app for Android.
 
 - Kotlin + Jetpack Compose (migrated from Flutter + WebView)
 - ExoPlayer with Widevine DRM and optimized buffering for native audio playback
-- Proprietary KotifyClient for Spotify Connect protocol and real-time WebSocket state
+- Proprietary KotifyClient for Spfy Connect protocol and real-time WebSocket state
 - Protocol-level ad blocking via state machine auto-advance
 - Material 3
 

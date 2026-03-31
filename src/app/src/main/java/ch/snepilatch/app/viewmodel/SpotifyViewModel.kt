@@ -60,6 +60,9 @@ class SpotifyViewModel : ViewModel() {
     private var username: String = ""
     val isInitialized = MutableStateFlow(false)
     val initError = MutableStateFlow<String?>(null)
+    val rateLimitCooldown = MutableStateFlow(false)
+    val cooldownSeconds = MutableStateFlow(0)
+    private var initRetryCount = 0
 
     // Streaming
     private val cdn = CdnPlayback()
@@ -211,6 +214,7 @@ class SpotifyViewModel : ViewModel() {
                 LokiLogger.i(TAG, "User: $username ($displayName), premium: $isPremium")
 
                 isInitialized.value = true
+                initRetryCount = 0
 
                 val phoneName = android.os.Build.MODEL
                 val pc = PlayerConnect(sess, deviceName = phoneName)
@@ -271,7 +275,11 @@ class SpotifyViewModel : ViewModel() {
 
                 pc.onTrackChange { event ->
                     val delta = if (lastCommandTs > 0) System.currentTimeMillis() - lastCommandTs else -1
-                    LokiLogger.i(TAG, "[Timing] WS onTrackChange arrived (${delta}ms after CMD '$lastCommandName') -> ${event.current?.get("uri")}")
+                    LokiLogger.i(TAG, "[Timing] WS onTrackChange arrived (${delta}ms after CMD '$lastCommandName') -> ${event.current?.get("uri")} fileId=${event.currentFileId}")
+                    // Set latestFileId from cluster state so resolveAndPlay doesn't wait for onPlaybackId
+                    if (event.currentFileId != null) {
+                        latestFileId = event.currentFileId
+                    }
                     // Cancel any in-flight resolve — only the latest track change matters
                     resolveJob?.cancel()
                     resolveJob = viewModelScope.launch(Dispatchers.IO) {
@@ -337,7 +345,41 @@ class SpotifyViewModel : ViewModel() {
                 }
             } catch (e: Exception) {
                 LokiLogger.e(TAG, "Init failed", e)
-                initError.value = e.message ?: "Unknown error"
+                val msg = e.message ?: "Unknown error"
+                if (msg.contains("Unauthorized") || msg.contains("401") || msg.contains("code\":400")) {
+                    initRetryCount++
+                    if (initRetryCount > 5) {
+                        LokiLogger.e(TAG, "Rate limited — 5 retries exhausted, giving up")
+                        initError.value = "Connection failed after 5 attempts. Please try again later."
+                        rateLimitCooldown.value = false
+                        return@launch
+                    }
+                    val cooldownSecs = 20 * initRetryCount // 20s, 40s, 60s...
+                    LokiLogger.w(TAG, "Rate limited, attempt $initRetryCount/5, cooling down ${cooldownSecs}s...")
+                    initError.value = "Rate limited — attempt $initRetryCount/5"
+                    rateLimitCooldown.value = true
+                    for (i in cooldownSecs downTo 1) {
+                        cooldownSeconds.value = i
+                        delay(1000)
+                    }
+                    rateLimitCooldown.value = false
+                    cooldownSeconds.value = 0
+                    initError.value = null
+                    // Retry after cooldown
+                    try {
+                        val ctx = MusicPlaybackService.instance as? android.content.Context ?: return@launch
+                        val savedCookies = ch.snepilatch.app.util.loadCookies(ctx)
+                        if (savedCookies != null) {
+                            initialize(savedCookies)
+                        } else {
+                            needsLogin.value = true
+                        }
+                    } catch (_: Exception) {
+                        needsLogin.value = true
+                    }
+                } else {
+                    initError.value = msg
+                }
             }
         }
     }
@@ -1361,18 +1403,32 @@ class SpotifyViewModel : ViewModel() {
                     nextCdnFileId = null
                 } else {
                     // Use file ID from cluster state or from onPlaybackId (state machine)
-                    // onPlaybackId fires on a different thread around the same time as onTrackChange
                     var fileId = event.currentFileId ?: latestFileId
                     if (fileId == null) {
-                        LokiLogger.d(TAG, "SpotifyCDN: Waiting for file ID from state machine...")
-                        for (attempt in 1..25) {
-                            delay(200)
+                        // Brief wait — onPlaybackId may fire slightly after onTrackChange
+                        LokiLogger.d(TAG, "SpotifyCDN: Waiting briefly for file ID...")
+                        for (attempt in 1..5) {
+                            delay(100)
                             fileId = latestFileId
                             if (fileId != null) break
                         }
                     }
+                    // If still null, fetch file ID from track metadata API
                     if (fileId == null) {
-                        throw IllegalStateException("No file ID received from state machine after 3s")
+                        LokiLogger.i(TAG, "SpotifyCDN: No file ID from state machine, fetching from metadata API...")
+                        val trackId = trackUri.removePrefix("spotify:track:")
+                        val gid = sp.trackIdToGid(trackId)
+                        val meta = sp.getTrackMetadata(gid)
+                        val mp4File = sp.findFile(meta, kotify.cdn.SpotifyPlayback.AudioQuality.MP4_128)
+                            ?: sp.findFile(meta, kotify.cdn.SpotifyPlayback.AudioQuality.MP4_256)
+                        fileId = mp4File?.fileId
+                        if (fileId != null) {
+                            LokiLogger.i(TAG, "SpotifyCDN: Got file ID from metadata: $fileId")
+                            latestFileId = fileId
+                        }
+                    }
+                    if (fileId == null) {
+                        throw IllegalStateException("No file ID available")
                     }
                     LokiLogger.i(TAG, "SpotifyCDN: Resolving fileId=$fileId")
                     val cdnUrls = sp.getCdnUrls(fileId)

@@ -14,8 +14,6 @@
   <a href="https://discord.gg/NJxKMSNYRG"><img src="https://img.shields.io/discord/1288927764787752990?color=5865F2&label=Discord&logo=discord&logoColor=white" alt="Discord"/></a>
 </p>
 
----
-
 ## Features
 
 - Fully native UI built with Jetpack Compose and Material 3

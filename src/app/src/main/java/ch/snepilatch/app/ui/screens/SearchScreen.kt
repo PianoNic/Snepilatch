@@ -36,10 +36,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
@@ -83,6 +87,8 @@ fun SearchScreen(vm: SpotifyViewModel) {
     val results by vm.searchResults.collectAsState()
     val isSearching by vm.isSearching.collectAsState()
     val focusManager = LocalFocusManager.current
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
     Column(Modifier.fillMaxSize().padding(top = 12.dp)) {
         Text(
@@ -99,7 +105,8 @@ fun SearchScreen(vm: SpotifyViewModel) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .clip(RoundedCornerShape(8.dp)),
+                .clip(RoundedCornerShape(8.dp))
+                .focusRequester(focusRequester),
             placeholder = { Text("Songs, artists, albums...", color = SpotifyLightGray.copy(alpha = 0.7f)) },
             leadingIcon = { Icon(Icons.Default.Search, null, tint = SpotifyBlack) },
             trailingIcon = {

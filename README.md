@@ -27,7 +27,7 @@ A simplicity-focused, open-source music streaming app for Android.
 
 | Home | Player | Library | Search |
 |------|--------|---------|--------|
-| ![Home](assets/home.png) | ![Player](assets/player.png) | ![Library](assets/library.png) | ![Search](assets/search.png) |
+| ![Home](assets/screenshot_home.PNG) | ![Player](assets/screenshot_player.PNG) | ![Library](assets/screenshot_library.PNG) | ![Search](assets/screenshot_search.PNG) |
 
 ## Installation
 

@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import android.graphics.SurfaceTexture
 import android.net.Uri
 import android.view.TextureView
 import androidx.compose.ui.platform.LocalContext
@@ -77,10 +78,10 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
             var canvasPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
 
             var textureRef by remember { mutableStateOf<TextureView?>(null) }
+            var surfaceReady by remember { mutableStateOf(false) }
 
-            // Lifecycle observer: pause/resume canvas on lifecycle events
             val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-            DisposableEffect(canvasVideoUrl) {
+            DisposableEffect(canvasVideoUrl, lifecycleOwner) {
                 val player = ExoPlayer.Builder(context).build().apply {
                     setMediaItem(MediaItem.fromUri(Uri.parse(canvasVideoUrl!!)))
                     repeatMode = Player.REPEAT_MODE_ALL
@@ -106,16 +107,25 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                     prepare()
                 }
                 canvasPlayer = player
-                textureRef?.let { player.setVideoTextureView(it) }
+                if (surfaceReady) {
+                    textureRef?.let { player.setVideoTextureView(it) }
+                }
 
-                // Resume/pause canvas with lifecycle to fix freeze on return
+                // Pause/resume canvas with activity lifecycle (handles backgrounding)
                 val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
                     when (event) {
+                        androidx.lifecycle.Lifecycle.Event.ON_START,
                         androidx.lifecycle.Lifecycle.Event.ON_RESUME -> {
                             player.playWhenReady = true
-                            textureRef?.let { player.setVideoTextureView(it) }
+                            // Re-attach surface to force frame refresh after resume
+                            if (surfaceReady) {
+                                textureRef?.let {
+                                    player.clearVideoTextureView(it)
+                                    player.setVideoTextureView(it)
+                                }
+                            }
                         }
-                        androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> {
+                        androidx.lifecycle.Lifecycle.Event.ON_STOP -> {
                             player.playWhenReady = false
                         }
                         else -> {}
@@ -132,10 +142,32 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
 
             AndroidView(
                 factory = { ctx ->
-                    TextureView(ctx).also { textureRef = it }
+                    TextureView(ctx).apply {
+                        surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+                            override fun onSurfaceTextureAvailable(
+                                surface: SurfaceTexture, width: Int, height: Int
+                            ) {
+                                surfaceReady = true
+                                textureRef = this@apply
+                                canvasPlayer?.setVideoTextureView(this@apply)
+                            }
+                            override fun onSurfaceTextureSizeChanged(
+                                surface: SurfaceTexture, width: Int, height: Int
+                            ) {}
+                            override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
+                                surfaceReady = false
+                                canvasPlayer?.clearVideoTextureView(this@apply)
+                                return true
+                            }
+                            override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {}
+                        }
+                        textureRef = this
+                    }
                 },
                 update = { texture ->
-                    canvasPlayer?.setVideoTextureView(texture)
+                    if (surfaceReady) {
+                        canvasPlayer?.setVideoTextureView(texture)
+                    }
                 },
                 modifier = Modifier.fillMaxSize()
             )

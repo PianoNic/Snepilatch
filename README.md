@@ -4,12 +4,15 @@ A simplicity-focused, open-source music streaming app for Android.
 
 ## Features
 
+- Fully native UI built with Jetpack Compose and Material 3
 - Full playback controls with Spotify Connect
 - Synced lyrics display
 - Queue management with direct track navigation
 - Library: liked songs, playlists, albums, artists
 - Search and browse
-- Material 3 design
+- Dynamic color theming from album art
+- Gesture-based player with swipe navigation
+- Canvas background animations
 - Automatic in-app updates
 
 ## Tech Stack

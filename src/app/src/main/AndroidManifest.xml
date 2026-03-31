@@ -57,6 +57,8 @@
                 <action android:name="ch.snepilatch.app.PREV" />
                 <action android:name="ch.snepilatch.app.PLAY_PAUSE" />
                 <action android:name="ch.snepilatch.app.NEXT" />
+                <action android:name="ch.snepilatch.app.LEFT_ACTION" />
+                <action android:name="ch.snepilatch.app.RIGHT_ACTION" />
             </intent-filter>
         </receiver>
     </application>

@@ -18,6 +18,20 @@ class MediaActionReceiver : BroadcastReceiver() {
                 }
             }
             "ch.snepilatch.app.NEXT" -> svc.onSkipNext?.invoke()
+            "ch.snepilatch.app.LEFT_ACTION" -> {
+                when (svc.notificationLeftButton) {
+                    "like" -> svc.onLikeToggle?.invoke()
+                    "shuffle" -> svc.onShuffleToggle?.invoke()
+                    "repeat" -> svc.onRepeatToggle?.invoke()
+                }
+            }
+            "ch.snepilatch.app.RIGHT_ACTION" -> {
+                when (svc.notificationRightButton) {
+                    "like" -> svc.onLikeToggle?.invoke()
+                    "shuffle" -> svc.onShuffleToggle?.invoke()
+                    "repeat" -> svc.onRepeatToggle?.invoke()
+                }
+            }
         }
     }
 }

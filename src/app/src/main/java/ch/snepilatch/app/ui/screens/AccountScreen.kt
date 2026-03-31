@@ -325,6 +325,101 @@ fun AccountScreen(vm: SpotifyViewModel) {
             )
         }
 
+        // Notification button options
+        val buttonOptions = listOf(
+            "like" to "Like / Unlike" to "Toggle liked state",
+            "shuffle" to "Shuffle" to "Toggle shuffle mode",
+            "repeat" to "Repeat" to "Cycle repeat (off → all → one)"
+        )
+        fun buttonLabel(type: String) = when (type) {
+            "like" -> "Like / Unlike"
+            "shuffle" -> "Shuffle"
+            "repeat" -> "Repeat"
+            else -> type
+        }
+
+        // Left notification button
+        val leftButton by vm.notificationLeftButton.collectAsState()
+        var showLeftPicker by remember { mutableStateOf(false) }
+        ListItem(
+            headlineContent = { Text("Notification Left Button", color = SpotifyWhite) },
+            supportingContent = { Text(buttonLabel(leftButton), color = SpotifyLightGray) },
+            leadingContent = { Icon(Icons.Default.Notifications, null, tint = SpotifyLightGray) },
+            trailingContent = { Icon(Icons.Default.ChevronRight, null, tint = SpotifyLightGray) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable { showLeftPicker = true }
+        )
+        if (showLeftPicker) {
+            AlertDialog(
+                onDismissRequest = { showLeftPicker = false },
+                title = { Text("Left Button", color = SpotifyWhite) },
+                text = {
+                    Column {
+                        buttonOptions.forEach { (pair, desc) ->
+                            val (value, label) = pair
+                            Row(
+                                Modifier.fillMaxWidth().clickable {
+                                    vm.setNotificationLeftButton(value, audioContext)
+                                    showLeftPicker = false
+                                }.padding(vertical = 12.dp, horizontal = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(selected = leftButton == value, onClick = {
+                                    vm.setNotificationLeftButton(value, audioContext)
+                                    showLeftPicker = false
+                                }, colors = RadioButtonDefaults.colors(selectedColor = animatedPrimary, unselectedColor = SpotifyLightGray))
+                                Spacer(Modifier.width(8.dp))
+                                Column { Text(label, color = SpotifyWhite, fontSize = 15.sp); Text(desc, color = SpotifyLightGray, fontSize = 12.sp) }
+                            }
+                        }
+                    }
+                },
+                containerColor = SpotifyGray, confirmButton = {},
+                dismissButton = { TextButton(onClick = { showLeftPicker = false }) { Text("Cancel", color = SpotifyLightGray) } }
+            )
+        }
+
+        // Right notification button
+        val rightButton by vm.notificationRightButton.collectAsState()
+        var showRightPicker by remember { mutableStateOf(false) }
+        ListItem(
+            headlineContent = { Text("Notification Right Button", color = SpotifyWhite) },
+            supportingContent = { Text(buttonLabel(rightButton), color = SpotifyLightGray) },
+            leadingContent = { Icon(Icons.Default.Notifications, null, tint = SpotifyLightGray) },
+            trailingContent = { Icon(Icons.Default.ChevronRight, null, tint = SpotifyLightGray) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable { showRightPicker = true }
+        )
+        if (showRightPicker) {
+            AlertDialog(
+                onDismissRequest = { showRightPicker = false },
+                title = { Text("Right Button", color = SpotifyWhite) },
+                text = {
+                    Column {
+                        buttonOptions.forEach { (pair, desc) ->
+                            val (value, label) = pair
+                            Row(
+                                Modifier.fillMaxWidth().clickable {
+                                    vm.setNotificationRightButton(value, audioContext)
+                                    showRightPicker = false
+                                }.padding(vertical = 12.dp, horizontal = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(selected = rightButton == value, onClick = {
+                                    vm.setNotificationRightButton(value, audioContext)
+                                    showRightPicker = false
+                                }, colors = RadioButtonDefaults.colors(selectedColor = animatedPrimary, unselectedColor = SpotifyLightGray))
+                                Spacer(Modifier.width(8.dp))
+                                Column { Text(label, color = SpotifyWhite, fontSize = 15.sp); Text(desc, color = SpotifyLightGray, fontSize = 12.sp) }
+                            }
+                        }
+                    }
+                },
+                containerColor = SpotifyGray, confirmButton = {},
+                dismissButton = { TextButton(onClick = { showRightPicker = false }) { Text("Cancel", color = SpotifyLightGray) } }
+            )
+        }
+
         ListItem(
             headlineContent = { Text("Connect to a device", color = SpotifyWhite) },
             leadingContent = { Icon(Icons.Default.Devices, null, tint = SpotifyLightGray) },

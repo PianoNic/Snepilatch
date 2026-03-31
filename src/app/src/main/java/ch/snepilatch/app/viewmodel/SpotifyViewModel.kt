@@ -178,6 +178,12 @@ class SpotifyViewModel : ViewModel() {
 
 
     fun initialize(cookies: Map<String, String>) {
+        // Clean up any leftover from previous session
+        MusicPlaybackService.sharedPlayer?.let {
+            try { kotlinx.coroutines.runBlocking { it.disconnect() } } catch (_: Exception) {}
+        }
+        MusicPlaybackService.sharedPlayer = null
+        MusicPlaybackService.sharedSession = null
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val sess = Session(SessionConfig(
@@ -234,6 +240,9 @@ class SpotifyViewModel : ViewModel() {
                 // Fresh device ID every launch — avoids stale server-side registrations
                 pc.ready()
                 player = pc
+                // Store on service so it survives Activity/ViewModel recreation
+                MusicPlaybackService.sharedPlayer = pc
+                MusicPlaybackService.sharedSession = sess
                 LokiLogger.i(TAG, "Player ready, device: ${pc.ourDeviceId()}")
                 loadDevices()
 
@@ -1902,7 +1911,8 @@ class SpotifyViewModel : ViewModel() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val devicesInfo = player?.getDevices() ?: return@launch
-                _devices.value = devicesInfo.devices.values.toList()
+                // Filter out hobs_ duplicates — they're internal Spotify IDs for the same device
+                _devices.value = devicesInfo.devices.filter { !it.key.startsWith("hobs_") }.values.toList()
                 val activeId = devicesInfo.activeDeviceId
                 LokiLogger.i(TAG, "Devices: ${devicesInfo.devices.keys}, activeId=$activeId")
                 activeDeviceName.value = if (activeId != null) {
@@ -2018,14 +2028,15 @@ class SpotifyViewModel : ViewModel() {
     override fun onCleared() {
         super.onCleared()
         positionJob?.cancel()
-        // Use runBlocking to ensure disconnect completes before the process dies.
-        // viewModelScope is already cancelled at this point.
+        // Kill everything — disconnect player and clean up
         val p = player
+        player = null
+        MusicPlaybackService.sharedPlayer = null
+        MusicPlaybackService.sharedSession = null
         if (p != null) {
             Thread {
                 kotlinx.coroutines.runBlocking {
-                    try { p.disconnect() }
-                    catch (_: Exception) {}
+                    try { p.disconnect() } catch (_: Exception) {}
                 }
             }.start()
         }

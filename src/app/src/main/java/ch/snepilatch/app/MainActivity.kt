@@ -44,6 +44,19 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        if (isFinishing) {
+            // App is actually closing (not config change) — kill everything
+            MusicPlaybackService.instance?.let { svc ->
+                svc.player.stop()
+                svc.stopSelf()
+            }
+            MusicPlaybackService.sharedPlayer = null
+            MusicPlaybackService.sharedSession = null
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleDeepLinkIntent(intent)

@@ -39,6 +39,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         private const val NOTIFICATION_ID = 1
         var instance: MusicPlaybackService? = null
             private set
+        // Shared PlayerConnect — survives Activity/ViewModel recreation
+        var sharedPlayer: kotify.api.playerconnect.PlayerConnect? = null
+        var sharedSession: kotify.session.Session? = null
     }
 
     private var mediaSession: MediaSessionCompat? = null
@@ -587,10 +590,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        if (!player.isPlaying) {
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
-        }
+        // App swiped from recents — kill everything
+        player.stop()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
     }
 
     private fun broadcastAudioEffectAction(action: String) {
@@ -623,6 +626,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             release()
         }
         player.release()
+        // Clean up shared references
+        sharedPlayer = null
+        sharedSession = null
         instance = null
         super.onDestroy()
     }

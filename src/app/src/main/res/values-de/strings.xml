@@ -1,0 +1,102 @@
+<resources>
+    <!-- Common -->
+    <string name="cancel">Abbrechen</string>
+    <string name="share">Teilen</string>
+    <string name="loading">Laden…</string>
+    <string name="unknown">Unbekannt</string>
+
+    <!-- Bottom Nav -->
+    <string name="nav_home">Start</string>
+    <string name="nav_search">Suche</string>
+    <string name="nav_library">Bibliothek</string>
+    <string name="nav_account">Konto</string>
+
+    <!-- Home -->
+    <string name="greeting_fallback">Guten Abend</string>
+
+    <!-- Search -->
+    <string name="search_placeholder">Songs, Künstler, Alben…</string>
+
+    <!-- Library -->
+    <string name="library_search_placeholder">In Bibliothek suchen</string>
+    <string name="library_playlists">Playlists</string>
+    <string name="library_artists">Künstler</string>
+    <string name="library_albums">Alben</string>
+
+    <!-- Player -->
+    <string name="now_playing">Aktueller Titel</string>
+    <string name="add_to_queue">Zur Warteschlange</string>
+    <string name="add_to_playlist">Zu Playlist hinzufügen</string>
+    <string name="like">Gefällt mir</string>
+    <string name="unlike">Gefällt mir nicht mehr</string>
+    <string name="visit_album">Album anzeigen</string>
+
+    <!-- Detail Screen -->
+    <string name="follow">Folgen</string>
+    <string name="following">Folge ich</string>
+    <string name="popular">Beliebt</string>
+    <string name="popular_releases">Beliebte Veröffentlichungen</string>
+    <string name="fans_also_like">Fans mögen auch</string>
+    <string name="more_by">Mehr von %s</string>
+
+    <!-- Account -->
+    <string name="account">Konto</string>
+    <string name="settings">Einstellungen</string>
+    <string name="about">Über</string>
+    <string name="special_thanks">Besonderer Dank</string>
+    <string name="premium">Premium</string>
+    <string name="username">Benutzername</string>
+    <string name="user_id">Benutzer-ID</string>
+    <string name="plan">Abo</string>
+    <string name="plan_free">Kostenlos</string>
+    <string name="followers_playlists">%d Follower · %d Playlists</string>
+    <string name="log_out">Abmelden</string>
+
+    <!-- Settings -->
+    <string name="lossless_audio">Verlustfreies Audio</string>
+    <string name="lossless_on">FLAC über %s</string>
+    <string name="lossless_off">Standardqualität</string>
+    <string name="lossless_provider">Verlustfreier Anbieter</string>
+    <string name="canvas_background">Canvas-Hintergrund</string>
+    <string name="canvas_on">Video hinter Albumcover</string>
+    <string name="canvas_off">Aus</string>
+    <string name="lyrics_animation">Lyrics-Animation</string>
+    <string name="lyrics_anim_desc">Wähle die Animation für zeilenweise Lyrics.</string>
+    <string name="lyrics_vertical">Von oben nach unten</string>
+    <string name="lyrics_horizontal">Von links nach rechts</string>
+    <string name="notification_left_button">Benachrichtigung linke Taste</string>
+    <string name="notification_right_button">Benachrichtigung rechte Taste</string>
+    <string name="notif_like">Gefällt mir</string>
+    <string name="notif_like_desc">Gefällt-mir-Status umschalten</string>
+    <string name="notif_shuffle">Zufallswiedergabe</string>
+    <string name="notif_shuffle_desc">Zufallswiedergabe umschalten</string>
+    <string name="notif_repeat">Wiederholen</string>
+    <string name="notif_repeat_desc">Wiederholung wechseln (aus → alle → eins)</string>
+    <string name="connect_to_device">Mit Gerät verbinden</string>
+    <string name="content_region">Inhaltsregion</string>
+    <string name="content_region_desc">Beeinflusst Suchergebnisse und Empfehlungen</string>
+
+    <!-- About -->
+    <string name="app_version">App-Version</string>
+    <string name="check_for_updates">Nach Updates suchen</string>
+    <string name="checking">Prüfe…</string>
+    <string name="up_to_date">Du hast die neueste Version</string>
+    <string name="tap_to_check">Tippe, um nach Updates zu suchen</string>
+    <string name="release_notes">Versionshinweise</string>
+    <string name="view_changelog">Änderungsprotokoll anzeigen</string>
+
+    <!-- Update Dialog -->
+    <string name="update_available">Update verfügbar</string>
+    <string name="current_version">Aktuell</string>
+    <string name="new_version">Neu</string>
+    <string name="whats_new">Was ist neu:</string>
+    <string name="update_now">Jetzt aktualisieren</string>
+    <string name="later">Später</string>
+
+    <!-- Devices -->
+    <string name="searching_devices">Suche nach Geräten…</string>
+
+    <!-- Notification -->
+    <string name="added_to_liked">Zu Lieblingssongs hinzugefügt</string>
+    <string name="removed_from_liked">Aus Lieblingssongs entfernt</string>
+</resources>

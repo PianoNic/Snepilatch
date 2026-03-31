@@ -154,6 +154,8 @@ class SpotifyViewModel : ViewModel() {
     // Notification button preferences: "like", "shuffle", "repeat"
     val notificationLeftButton = MutableStateFlow("repeat")
     val notificationRightButton = MutableStateFlow("like")
+    // Content region for CDN resolution
+    val contentRegion = MutableStateFlow("US")
     // Canvas background
     val canvasEnabled = MutableStateFlow(false)
     val canvasUrl = MutableStateFlow<String?>(null)
@@ -359,6 +361,28 @@ class SpotifyViewModel : ViewModel() {
             return true
         }
         return false
+    }
+
+    /**
+     * Handle a deep link URI from open.spotify.com.
+     * Supported paths: /track/{id}, /album/{id}, /playlist/{id}, /artist/{id}
+     */
+    fun handleDeepLink(uri: android.net.Uri) {
+        val segments = uri.pathSegments ?: return
+        if (segments.size < 2) return
+        val type = segments[0]
+        val id = segments[1]
+        if (id.isBlank()) return
+
+        LokiLogger.i(TAG, "Deep link: type=$type id=$id")
+
+        when (type) {
+            "track" -> playTrack("spotify:track:$id")
+            "album" -> openAlbum(id)
+            "playlist" -> openPlaylist(id)
+            "artist" -> openArtist(id)
+            else -> LokiLogger.i(TAG, "Unsupported deep link type: $type")
+        }
     }
 
     // --- Playback ---
@@ -1008,6 +1032,12 @@ class SpotifyViewModel : ViewModel() {
             }.apply()
     }
 
+    fun setContentRegion(region: String, context: Context) {
+        contentRegion.value = region
+        context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
+            .edit().putString("content_region", region).apply()
+    }
+
     fun setLyricsAnimDirection(direction: String, context: Context) {
         lyricsAnimDirection.value = direction
         context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
@@ -1024,6 +1054,7 @@ class SpotifyViewModel : ViewModel() {
         }
         lyricsAnimDirection.value = prefs.getString("lyrics_anim_direction", "vertical") ?: "vertical"
         canvasEnabled.value = prefs.getBoolean("canvas_enabled", false)
+        contentRegion.value = prefs.getString("content_region", "US") ?: "US"
         notificationLeftButton.value = prefs.getString("notification_left_button", "repeat") ?: "repeat"
         notificationRightButton.value = prefs.getString("notification_right_button", "like") ?: "like"
     }
@@ -1339,7 +1370,7 @@ class SpotifyViewModel : ViewModel() {
         }
 
         try {
-            val result = cdn.resolveFromTrack(event, region = "US", preferredSource = preferredAudioSource.value)
+            val result = cdn.resolveFromTrack(event, region = contentRegion.value, preferredSource = preferredAudioSource.value)
             when (result) {
                 is StreamResult.Success -> {
                     // Don't resume Spotify yet — onReady callback will sync after ExoPlayer buffers
@@ -1396,7 +1427,7 @@ class SpotifyViewModel : ViewModel() {
                         ?: it["image_url"]?.toString()
                 }
 
-                val result = cdn.resolveStreamUrl(trackId, region = "US", youtubeSearchQuery = searchQuery, preferredSource = preferredAudioSource.value)
+                val result = cdn.resolveStreamUrl(trackId, region = contentRegion.value, youtubeSearchQuery = searchQuery, preferredSource = preferredAudioSource.value)
                 when (result) {
                     is StreamResult.Success -> {
                         // playUrl will buffer, then onReady fires → syncs Spotify
@@ -1462,7 +1493,7 @@ class SpotifyViewModel : ViewModel() {
                 .joinToString(" ").takeIf { it.isNotBlank() }
 
             LokiLogger.i(TAG, "Pre-resolving next: $title by $artist")
-            val result = cdn.resolveStreamUrl(nextId, region = "US", youtubeSearchQuery = searchQuery, preferredSource = preferredAudioSource.value)
+            val result = cdn.resolveStreamUrl(nextId, region = contentRegion.value, youtubeSearchQuery = searchQuery, preferredSource = preferredAudioSource.value)
             if (result is StreamResult.Success) {
                 nextStreamUrl = result.info.url
                 nextTrackInfo = TrackInfo(uri = nextUri, name = title, artist = artist, albumArt = art)

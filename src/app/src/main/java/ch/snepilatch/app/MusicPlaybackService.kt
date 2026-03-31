@@ -70,6 +70,17 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     var onTrackTransition: (() -> Unit)? = null
     var onPlaybackError: ((String) -> Unit)? = null
     var onPlaybackEnded: (() -> Unit)? = null
+    var onLikeToggle: (() -> Unit)? = null
+    var onShuffleToggle: (() -> Unit)? = null
+    var onRepeatToggle: (() -> Unit)? = null
+
+    // Notification custom button state
+    var isLiked: Boolean = false
+    var isShuffling: Boolean = false
+    var repeatMode: String = "off"  // "off", "context", "track"
+    // Which extra buttons to show: "like", "shuffle", "repeat"
+    var notificationLeftButton: String = "repeat"
+    var notificationRightButton: String = "like"
 
     override fun onCreate() {
         super.onCreate()
@@ -203,6 +214,19 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                     player.stop()
                     stopForeground(STOP_FOREGROUND_REMOVE)
                     stopSelf()
+                }
+
+                override fun onCustomAction(action: String?, extras: Bundle?) {
+                    val buttonType = when (action) {
+                        "LEFT_ACTION" -> notificationLeftButton
+                        "RIGHT_ACTION" -> notificationRightButton
+                        else -> return
+                    }
+                    when (buttonType) {
+                        "like" -> onLikeToggle?.invoke()
+                        "shuffle" -> onShuffleToggle?.invoke()
+                        "repeat" -> onRepeatToggle?.invoke()
+                    }
                 }
             })
             isActive = true
@@ -418,7 +442,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             player.playWhenReady -> PlaybackStateCompat.STATE_PAUSED
             else -> PlaybackStateCompat.STATE_PAUSED
         }
-        val playbackState = PlaybackStateCompat.Builder()
+        val builder = PlaybackStateCompat.Builder()
             .setActions(
                 PlaybackStateCompat.ACTION_PLAY or
                 PlaybackStateCompat.ACTION_PAUSE or
@@ -429,11 +453,35 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 PlaybackStateCompat.ACTION_STOP
             )
             .setState(state, player.currentPosition, 1f)
-            .build()
-        mediaSession?.setPlaybackState(playbackState)
+
+        // Add custom actions for left and right buttons
+        fun addButtonAction(type: String, actionName: String) {
+            when (type) {
+                "like" -> {
+                    val icon = if (isLiked) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline
+                    builder.addCustomAction(actionName, if (isLiked) "Unlike" else "Like", icon)
+                }
+                "shuffle" -> {
+                    val icon = if (isShuffling) R.drawable.ic_shuffle_on else R.drawable.ic_shuffle_off
+                    builder.addCustomAction(actionName, "Shuffle", icon)
+                }
+                "repeat" -> {
+                    val icon = when (repeatMode) {
+                        "track" -> R.drawable.ic_repeat_one
+                        "context" -> R.drawable.ic_repeat_on
+                        else -> R.drawable.ic_repeat_off
+                    }
+                    builder.addCustomAction(actionName, "Repeat", icon)
+                }
+            }
+        }
+        addButtonAction(notificationLeftButton, "LEFT_ACTION")
+        addButtonAction(notificationRightButton, "RIGHT_ACTION")
+
+        mediaSession?.setPlaybackState(builder.build())
     }
 
-    private fun updateNotification() {
+    fun updateNotification() {
         updatePlaybackState()
         updateMediaSessionMetadata()
         val nm = getSystemService(NotificationManager::class.java)
@@ -459,28 +507,58 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             Intent("ch.snepilatch.app.NEXT"),
             PendingIntent.FLAG_IMMUTABLE
         )
+        val leftIntent = PendingIntent.getBroadcast(
+            this, 3,
+            Intent("ch.snepilatch.app.LEFT_ACTION"),
+            PendingIntent.FLAG_IMMUTABLE
+        )
+        val rightIntent = PendingIntent.getBroadcast(
+            this, 4,
+            Intent("ch.snepilatch.app.RIGHT_ACTION"),
+            PendingIntent.FLAG_IMMUTABLE
+        )
 
         val playPauseIcon = if (isPlaying)
             android.R.drawable.ic_media_pause
         else
             android.R.drawable.ic_media_play
 
+        fun buttonIcon(type: String) = when (type) {
+            "like" -> if (isLiked) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline
+            "shuffle" -> if (isShuffling) R.drawable.ic_shuffle_on else R.drawable.ic_shuffle_off
+            "repeat" -> when (repeatMode) {
+                "track" -> R.drawable.ic_repeat_one
+                "context" -> R.drawable.ic_repeat_on
+                else -> R.drawable.ic_repeat_off
+            }
+            else -> R.drawable.ic_heart_outline
+        }
+        fun buttonLabel(type: String) = when (type) {
+            "like" -> if (isLiked) "Unlike" else "Like"
+            "shuffle" -> "Shuffle"
+            "repeat" -> "Repeat"
+            else -> "Like"
+        }
+
         val sessionToken = mediaSession?.sessionToken
 
+        // Layout: [left] [prev] [play/pause] [next] [right]
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_media_play)
-            .setContentTitle(currentTitle.ifEmpty { "Kotify" })
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(currentTitle.ifEmpty { "Snepilatch" })
             .setContentText(currentArtist)
             .setLargeIcon(currentArt)
             .setOngoing(isPlaying)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .addAction(buttonIcon(notificationLeftButton), buttonLabel(notificationLeftButton), leftIntent)
             .addAction(android.R.drawable.ic_media_previous, "Previous", prevIntent)
             .addAction(playPauseIcon, if (isPlaying) "Pause" else "Play", playPauseIntent)
             .addAction(android.R.drawable.ic_media_next, "Next", nextIntent)
+            .addAction(buttonIcon(notificationRightButton), buttonLabel(notificationRightButton), rightIntent)
             .setStyle(
                 androidx.media.app.NotificationCompat.MediaStyle()
                     .setMediaSession(sessionToken)
-                    .setShowActionsInCompactView(0, 1, 2)
+                    .setShowActionsInCompactView(1, 2, 3)
             )
             .setContentIntent(mediaSession?.controller?.sessionActivity)
             .build()

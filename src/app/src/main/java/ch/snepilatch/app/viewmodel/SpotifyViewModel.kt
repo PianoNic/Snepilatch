@@ -151,6 +151,9 @@ class SpotifyViewModel : ViewModel() {
     val preferredAudioSource = MutableStateFlow<String?>(null)
     // Lyrics animation direction for line-synced (non word-synced): "vertical" or "horizontal"
     val lyricsAnimDirection = MutableStateFlow("vertical")
+    // Notification button preferences: "like", "shuffle", "repeat"
+    val notificationLeftButton = MutableStateFlow("repeat")
+    val notificationRightButton = MutableStateFlow("like")
     // Canvas background
     val canvasEnabled = MutableStateFlow(false)
     val canvasUrl = MutableStateFlow<String?>(null)
@@ -475,6 +478,13 @@ class SpotifyViewModel : ViewModel() {
             startPositionTicker()
         } else {
             positionJob?.cancel()
+        }
+
+        // Sync notification button states
+        MusicPlaybackService.instance?.let { svc ->
+            svc.isLiked = currentTrackLiked.value
+            svc.isShuffling = state.is_shuffling
+            svc.repeatMode = state.repeat_mode
         }
 
         // Update active device indicator from state
@@ -987,6 +997,28 @@ class SpotifyViewModel : ViewModel() {
         }
         lyricsAnimDirection.value = prefs.getString("lyrics_anim_direction", "vertical") ?: "vertical"
         canvasEnabled.value = prefs.getBoolean("canvas_enabled", false)
+        notificationLeftButton.value = prefs.getString("notification_left_button", "repeat") ?: "repeat"
+        notificationRightButton.value = prefs.getString("notification_right_button", "like") ?: "like"
+    }
+
+    fun setNotificationLeftButton(button: String, context: Context) {
+        notificationLeftButton.value = button
+        context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
+            .edit().putString("notification_left_button", button).apply()
+        MusicPlaybackService.instance?.let { svc ->
+            svc.notificationLeftButton = button
+            svc.updateNotification()
+        }
+    }
+
+    fun setNotificationRightButton(button: String, context: Context) {
+        notificationRightButton.value = button
+        context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
+            .edit().putString("notification_right_button", button).apply()
+        MusicPlaybackService.instance?.let { svc ->
+            svc.notificationRightButton = button
+            svc.updateNotification()
+        }
     }
 
     fun setCanvasEnabled(enabled: Boolean, context: Context) {
@@ -1070,6 +1102,41 @@ class SpotifyViewModel : ViewModel() {
                 try { player?.seek(posMs.toInt()) }
                 catch (e: CancellationException) { throw e }
                 catch (e: Exception) { LokiLogger.e(TAG, "svc seek", e) }
+            }
+        }
+        // Load notification button preference
+        val prefs = svc.getSharedPreferences("kotify_prefs", android.content.Context.MODE_PRIVATE)
+        svc.notificationLeftButton = prefs.getString("notification_left_button", "repeat") ?: "repeat"
+        svc.notificationRightButton = prefs.getString("notification_right_button", "like") ?: "like"
+
+        svc.onLikeToggle = lambda@{
+            val track = _playback.value.track ?: return@lambda
+            val trackId = track.uri.removePrefix("spotify:track:")
+            if (currentTrackLiked.value) {
+                unlikeSong(trackId)
+            } else {
+                likeSong(trackId)
+            }
+            viewModelScope.launch {
+                kotlinx.coroutines.delay(300)
+                svc.isLiked = currentTrackLiked.value
+                svc.updateNotification()
+            }
+        }
+        svc.onShuffleToggle = {
+            toggleShuffle()
+            viewModelScope.launch {
+                kotlinx.coroutines.delay(300)
+                svc.isShuffling = _playback.value.isShuffling
+                svc.updateNotification()
+            }
+        }
+        svc.onRepeatToggle = {
+            cycleRepeat()
+            viewModelScope.launch {
+                kotlinx.coroutines.delay(300)
+                svc.repeatMode = _playback.value.repeatMode
+                svc.updateNotification()
             }
         }
         svc.onTrackTransition = {

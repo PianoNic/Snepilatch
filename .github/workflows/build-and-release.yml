@@ -143,8 +143,6 @@ jobs:
           if not description:
               description = 'See release notes for details.'
 
-          description += '\n\n> 📝 If you\'re on **v0.4.0+**, the app will auto-update when you open it!'
-
           if len(description) > 4000:
               description = description[:3997] + '...'
 

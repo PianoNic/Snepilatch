@@ -128,17 +128,24 @@ class MainActivity : ComponentActivity() {
 
                 when {
                     needsLogin -> SpotifyLoginScreen(vm)
-                    !initialized -> LoadingScreen(
-                        error = error,
-                        onLogin = { vm.showLogin() },
-                        onRetry = {
-                            val cookies = loadCookies(context)
-                            if (cookies != null) {
-                                vm.initError.value = null
-                                vm.initialize(cookies)
+                    !initialized -> {
+                        val cooldown by vm.rateLimitCooldown.collectAsState()
+                        val seconds by vm.cooldownSeconds.collectAsState()
+                        val displayError = if (cooldown) "Rate limited — retrying in ${seconds}s..." else error
+                        LoadingScreen(
+                            error = displayError,
+                            onLogin = { if (!cooldown) vm.showLogin() },
+                            onRetry = {
+                                if (!cooldown) {
+                                    val cookies = loadCookies(context)
+                                    if (cookies != null) {
+                                        vm.initError.value = null
+                                        vm.initialize(cookies)
+                                    }
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
                     else -> SpotifyApp(vm)
                 }
             }

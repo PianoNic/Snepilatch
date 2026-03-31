@@ -450,6 +450,17 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                         val activeDevice by vm.activeDeviceName.collectAsState()
                         val provider by vm.streamProvider.collectAsState()
                         val streaming by vm.isStreaming.collectAsState()
+                        val audioOutput by vm.audioOutputName.collectAsState()
+                        val audioType by vm.audioOutputType.collectAsState()
+                        // Refresh audio output info
+                        val audioCtx = LocalContext.current
+                        LaunchedEffect(streaming) { vm.updateAudioOutput(audioCtx) }
+                        val audioIcon = when (audioType) {
+                            "bluetooth" -> Icons.Default.Bluetooth
+                            "wired" -> Icons.Default.Headphones
+                            "usb" -> Icons.Default.Usb
+                            else -> Icons.Default.Speaker
+                        }
                         Row(
                             Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -467,10 +478,10 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                                         .clickable { vm.loadDevices(); vm.showDevices.value = true },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(Icons.Default.Devices, "Devices", tint = SpotifyWhite, modifier = Modifier.size(20.dp))
+                                    Icon(audioIcon, "Audio Output", tint = SpotifyWhite, modifier = Modifier.size(20.dp))
                                 }
                                 Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                    activeDevice?.let { InfoPill(Icons.Default.Devices, it) }
+                                    audioOutput?.let { InfoPill(audioIcon, it) }
                                     provider?.let { SourcePill(it) }
                                 }
                             }
@@ -808,6 +819,16 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                     val activeDevice by vm.activeDeviceName.collectAsState()
                     val provider by vm.streamProvider.collectAsState()
                     val streaming by vm.isStreaming.collectAsState()
+                    val audioOutput by vm.audioOutputName.collectAsState()
+                    val audioType by vm.audioOutputType.collectAsState()
+                    val audioCtx2 = LocalContext.current
+                    LaunchedEffect(streaming) { vm.updateAudioOutput(audioCtx2) }
+                    val audioIcon = when (audioType) {
+                        "bluetooth" -> Icons.Default.Bluetooth
+                        "wired" -> Icons.Default.Headphones
+                        "usb" -> Icons.Default.Usb
+                        else -> Icons.Default.Speaker
+                    }
                     Row(
                         Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -825,10 +846,10 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                                     .clickable { vm.loadDevices(); vm.showDevices.value = true },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.Devices, "Devices", tint = SpotifyWhite, modifier = Modifier.size(22.dp))
+                                Icon(audioIcon, "Audio Output", tint = SpotifyWhite, modifier = Modifier.size(22.dp))
                             }
                             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                activeDevice?.let { InfoPill(Icons.Default.Devices, it) }
+                                audioOutput?.let { InfoPill(audioIcon, it) }
                                 provider?.let { SourcePill(it) }
                             }
                         }

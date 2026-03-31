@@ -150,6 +150,10 @@ class SpotifyViewModel : ViewModel() {
     private var appContext: Context? = null
     private var lastPaletteUrl: String? = null
 
+    // Audio output device (Bluetooth, speaker, wired)
+    val audioOutputName = MutableStateFlow<String?>(null)
+    val audioOutputType = MutableStateFlow("speaker") // "speaker", "bluetooth", "wired", "usb"
+
     // Audio source preference: null = auto (default chain), or "tidal", "qobuz", "youtube"
     val preferredAudioSource = MutableStateFlow<String?>(null)
     // Lyrics animation direction for line-synced (non word-synced): "vertical" or "horizontal"
@@ -1193,6 +1197,51 @@ class SpotifyViewModel : ViewModel() {
         appContext = context.applicationContext
         val intent = Intent(context, MusicPlaybackService::class.java)
         context.startForegroundService(intent)
+    }
+
+    fun updateAudioOutput(context: Context) {
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+        val devices = audioManager.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS)
+        // Find the active output — prefer Bluetooth > USB > Wired > Speaker
+        val active = devices.firstOrNull {
+            it.type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+            it.type == android.media.AudioDeviceInfo.TYPE_BLE_HEADSET ||
+            it.type == android.media.AudioDeviceInfo.TYPE_BLE_SPEAKER
+        } ?: devices.firstOrNull {
+            it.type == android.media.AudioDeviceInfo.TYPE_USB_HEADSET ||
+            it.type == android.media.AudioDeviceInfo.TYPE_USB_DEVICE
+        } ?: devices.firstOrNull {
+            it.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET ||
+            it.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES
+        }
+
+        if (active != null) {
+            val name = active.productName?.toString()?.takeIf { it.isNotBlank() && it != "null" }
+                ?: when (active.type) {
+                    android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+                    android.media.AudioDeviceInfo.TYPE_BLE_HEADSET,
+                    android.media.AudioDeviceInfo.TYPE_BLE_SPEAKER -> "Bluetooth"
+                    android.media.AudioDeviceInfo.TYPE_USB_HEADSET,
+                    android.media.AudioDeviceInfo.TYPE_USB_DEVICE -> "USB Audio"
+                    android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET,
+                    android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> "Wired"
+                    else -> "External"
+                }
+            audioOutputName.value = name
+            audioOutputType.value = when (active.type) {
+                android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+                android.media.AudioDeviceInfo.TYPE_BLE_HEADSET,
+                android.media.AudioDeviceInfo.TYPE_BLE_SPEAKER -> "bluetooth"
+                android.media.AudioDeviceInfo.TYPE_USB_HEADSET,
+                android.media.AudioDeviceInfo.TYPE_USB_DEVICE -> "usb"
+                android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET,
+                android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> "wired"
+                else -> "speaker"
+            }
+        } else {
+            audioOutputName.value = "Speaker"
+            audioOutputType.value = "speaker"
+        }
     }
 
     fun wireServiceControls() {

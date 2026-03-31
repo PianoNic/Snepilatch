@@ -26,3 +26,6 @@ src/app/libs/KotifyClient.jar
 # OS files
 .DS_Store
 Thumbs.db
+
+# AI Plans
+docs/superpowers/

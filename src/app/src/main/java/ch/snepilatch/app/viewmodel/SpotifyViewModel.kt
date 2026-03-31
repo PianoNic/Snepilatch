@@ -623,7 +623,8 @@ class SpotifyViewModel : ViewModel() {
                     }
                     try {
                         p.resume()
-                    } catch (e: Exception) {
+                    } catch (e: CancellationException) { throw e }
+                    catch (e: Exception) {
                         LokiLogger.w(TAG, "resume failed, transferring playback and retrying: ${e.message}")
                         p.transferPlaybackHere()
                         delay(500)
@@ -637,7 +638,8 @@ class SpotifyViewModel : ViewModel() {
                     }
                     try {
                         p.pause()
-                    } catch (e: Exception) {
+                    } catch (e: CancellationException) { throw e }
+                    catch (e: Exception) {
                         LokiLogger.w(TAG, "pause failed, transferring playback and retrying: ${e.message}")
                         p.transferPlaybackHere()
                         delay(500)
@@ -1351,10 +1353,12 @@ class SpotifyViewModel : ViewModel() {
                     MusicPlaybackService.instance?.stop()
                 }
                 // ExoPlayer extracts PSSH from the MP4 init segment automatically
+                // Refresh token if needed and use resolved spclient host (not hardcoded region)
+                val sess = session ?: throw IllegalStateException("Session not initialized")
                 val licenseHeaders = mutableMapOf<String, String>()
-                session?.baseClient?.accessToken?.let { licenseHeaders["Authorization"] = "Bearer $it" }
-                session?.baseClient?.clientToken?.let { licenseHeaders["client-token"] = it }
-                val licenseUrl = "https://gew4-spclient.spotify.com/widevine-license/v1/audio/license"
+                sess.baseClient.accessToken?.let { licenseHeaders["Authorization"] = "Bearer $it" }
+                sess.baseClient.clientToken?.let { licenseHeaders["client-token"] = it }
+                val licenseUrl = sess.spclientUrl("widevine-license/v1/audio/license")
                 withContext(Dispatchers.Main) {
                     MusicPlaybackService.instance?.playDrmUrl(cdnUrl, licenseUrl, licenseHeaders, title, artist, art)
                 }

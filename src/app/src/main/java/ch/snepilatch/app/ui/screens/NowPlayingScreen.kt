@@ -78,13 +78,14 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
 
             var textureRef by remember { mutableStateOf<TextureView?>(null) }
 
+            // Lifecycle observer: pause/resume canvas on lifecycle events
+            val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
             DisposableEffect(canvasVideoUrl) {
                 val player = ExoPlayer.Builder(context).build().apply {
                     setMediaItem(MediaItem.fromUri(Uri.parse(canvasVideoUrl!!)))
                     repeatMode = Player.REPEAT_MODE_ALL
                     volume = 0f
                     playWhenReady = true
-                    // Scale video to center-crop when size is known
                     addListener(object : Player.Listener {
                         override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
                             val tv = textureRef ?: return
@@ -106,7 +107,24 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                 }
                 canvasPlayer = player
                 textureRef?.let { player.setVideoTextureView(it) }
+
+                // Resume/pause canvas with lifecycle to fix freeze on return
+                val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                    when (event) {
+                        androidx.lifecycle.Lifecycle.Event.ON_RESUME -> {
+                            player.playWhenReady = true
+                            textureRef?.let { player.setVideoTextureView(it) }
+                        }
+                        androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> {
+                            player.playWhenReady = false
+                        }
+                        else -> {}
+                    }
+                }
+                lifecycleOwner.lifecycle.addObserver(observer)
+
                 onDispose {
+                    lifecycleOwner.lifecycle.removeObserver(observer)
                     player.release()
                     canvasPlayer = null
                 }

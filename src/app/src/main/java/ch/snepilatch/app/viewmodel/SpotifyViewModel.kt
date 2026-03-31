@@ -151,6 +151,8 @@ class SpotifyViewModel : ViewModel() {
     val preferredAudioSource = MutableStateFlow<String?>(null)
     // Lyrics animation direction for line-synced (non word-synced): "vertical" or "horizontal"
     val lyricsAnimDirection = MutableStateFlow("vertical")
+    // Language preference: "system", "en", "de", "ru", "gsw"
+    val appLanguage = MutableStateFlow("system")
     // Notification button preferences: "like", "shuffle", "repeat"
     val notificationLeftButton = MutableStateFlow("repeat")
     val notificationRightButton = MutableStateFlow("like")
@@ -1046,6 +1048,26 @@ class SpotifyViewModel : ViewModel() {
             .edit().putString("lyrics_anim_direction", direction).apply()
     }
 
+    fun setAppLanguage(language: String, context: Context) {
+        appLanguage.value = language
+        context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
+            .edit().putString("app_language", language).apply()
+        // Apply locale change
+        val locale = if (language == "system") {
+            java.util.Locale.getDefault()
+        } else if (language == "gsw") {
+            java.util.Locale.Builder().setLanguageTag("gsw").build()
+        } else {
+            java.util.Locale(language)
+        }
+        val config = context.resources.configuration
+        config.setLocale(locale)
+        @Suppress("DEPRECATION")
+        context.resources.updateConfiguration(config, context.resources.displayMetrics)
+        // Restart activity to apply
+        (context as? android.app.Activity)?.recreate()
+    }
+
     fun loadPreferences(context: Context) {
         val prefs = context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
         val savedSource = prefs.getString("audio_source", null)
@@ -1055,6 +1077,16 @@ class SpotifyViewModel : ViewModel() {
             prefs.edit().remove("audio_source").apply()
         }
         lyricsAnimDirection.value = prefs.getString("lyrics_anim_direction", "vertical") ?: "vertical"
+        appLanguage.value = prefs.getString("app_language", "system") ?: "system"
+        // Apply saved language on startup
+        val lang = appLanguage.value
+        if (lang != "system") {
+            val locale = if (lang == "gsw") java.util.Locale.Builder().setLanguageTag("gsw").build() else java.util.Locale(lang)
+            val config = context.resources.configuration
+            config.setLocale(locale)
+            @Suppress("DEPRECATION")
+            context.resources.updateConfiguration(config, context.resources.displayMetrics)
+        }
         canvasEnabled.value = prefs.getBoolean("canvas_enabled", false)
         contentRegion.value = prefs.getString("content_region", "US") ?: "US"
         notificationLeftButton.value = prefs.getString("notification_left_button", "repeat") ?: "repeat"

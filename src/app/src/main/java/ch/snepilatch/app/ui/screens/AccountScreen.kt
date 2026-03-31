@@ -138,9 +138,58 @@ fun AccountScreen(vm: SpotifyViewModel) {
             modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp)
         )
 
+        val audioContext = androidx.compose.ui.platform.LocalContext.current
+
+        // Language picker
+        val appLanguage by vm.appLanguage.collectAsState()
+        var showLanguagePicker by remember { mutableStateOf(false) }
+        val languages = listOf(
+            "system" to "System Default",
+            "en" to "English",
+            "de" to "Deutsch",
+            "ru" to "Русский",
+            "gsw" to "Schwiizerdütsch"
+        )
+        val currentLanguageLabel = languages.find { it.first == appLanguage }?.second ?: "System Default"
+        ListItem(
+            headlineContent = { Text("Language", color = SpotifyWhite) },
+            supportingContent = { Text(currentLanguageLabel, color = SpotifyLightGray) },
+            leadingContent = { Icon(Icons.Default.Language, null, tint = SpotifyLightGray) },
+            trailingContent = { Icon(Icons.Default.ChevronRight, null, tint = SpotifyLightGray) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable { showLanguagePicker = true }
+        )
+        if (showLanguagePicker) {
+            AlertDialog(
+                onDismissRequest = { showLanguagePicker = false },
+                title = { Text("Language", color = SpotifyWhite) },
+                text = {
+                    Column {
+                        languages.forEach { (code, label) ->
+                            Row(
+                                Modifier.fillMaxWidth().clickable {
+                                    vm.setAppLanguage(code, audioContext)
+                                    showLanguagePicker = false
+                                }.padding(vertical = 12.dp, horizontal = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(selected = appLanguage == code, onClick = {
+                                    vm.setAppLanguage(code, audioContext)
+                                    showLanguagePicker = false
+                                }, colors = RadioButtonDefaults.colors(selectedColor = animatedPrimary, unselectedColor = SpotifyLightGray))
+                                Spacer(Modifier.width(8.dp))
+                                Text(label, color = SpotifyWhite, fontSize = 15.sp)
+                            }
+                        }
+                    }
+                },
+                containerColor = SpotifyGray, confirmButton = {},
+                dismissButton = { TextButton(onClick = { showLanguagePicker = false }) { Text("Cancel", color = SpotifyLightGray) } }
+            )
+        }
+
         // Audio settings
         val audioSource by vm.preferredAudioSource.collectAsState()
-        val audioContext = androidx.compose.ui.platform.LocalContext.current
         val isLossless = audioSource == "tidal" || audioSource == "qobuz"
 
         // Lossless toggle

@@ -15,14 +15,6 @@ A simplicity-focused, open-source music streaming app for Android.
 - Canvas background animations
 - Automatic in-app updates
 
-## Tech Stack
-
-- Kotlin + Jetpack Compose (migrated from Flutter + WebView)
-- ExoPlayer with Widevine DRM and optimized buffering for native audio playback
-- Proprietary KotifyClient for Spfy Connect protocol and real-time WebSocket state
-- Protocol-level ad blocking via state machine auto-advance
-- Material 3
-
 ## Screenshots
 
 ![Screenshots](assets/product_mockup.png)

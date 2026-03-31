@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.ui.components.SpotifyImage
 import ch.snepilatch.app.ui.components.TrackRow
 import ch.snepilatch.app.ui.theme.*
+import ch.snepilatch.app.util.stripHtml
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
 
 @Composable
@@ -104,7 +105,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
             item {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                     if (detail.description != null) {
-                        Text(detail.description!!, color = SpotifyLightGray, fontSize = 13.sp, maxLines = 2)
+                        Text(stripHtml(detail.description!!), color = SpotifyLightGray, fontSize = 13.sp, maxLines = 2)
                         Spacer(Modifier.height(4.dp))
                     }
                     // Owner · songs · duration all on one line
@@ -145,7 +146,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
                         )
                     }
                     // Type + date + summary all on one line
-                    val meta = listOfNotNull(detail.albumType, detail.releaseDate, detail.description).joinToString(" · ")
+                    val meta = listOfNotNull(detail.albumType, detail.releaseDate, detail.description?.let { stripHtml(it) }).joinToString(" · ")
                     if (meta.isNotBlank()) {
                         Text(meta, color = SpotifyLightGray, fontSize = 13.sp)
                     }
@@ -407,7 +408,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
                 Text(
-                    detail.biography!!,
+                    stripHtml(detail.biography!!),
                     color = SpotifyLightGray,
                     fontSize = 14.sp,
                     maxLines = 4,

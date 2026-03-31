@@ -69,10 +69,15 @@ class SpotifyViewModel : ViewModel() {
     private var nextStreamUrl: String? = null
     private var nextTrackInfo: TrackInfo? = null
     private var nextStreamProvider: String? = null
+    private var nextCdnUrl: String? = null      // Pre-resolved Spotify CDN URL (DRM)
+    private var nextCdnFileId: String? = null   // File ID for the pre-resolved CDN track
+    private var lastCommandTs: Long = 0L  // timing: when last user command was sent
+    private var lastCommandName: String = ""
     val isStreaming = MutableStateFlow(false)
     val streamProvider = MutableStateFlow<String?>(null)
     val isNextReady = MutableStateFlow(false)
     private var suppressRemotePause = false
+    private var resolveJob: Job? = null  // Cancel in-flight resolveAndPlay when a new track arrives
 
 
     // Account
@@ -164,7 +169,7 @@ class SpotifyViewModel : ViewModel() {
                 val sess = Session(SessionConfig(
                     identifier = "kotify-android",
                     initialCookies = cookies,
-                    deviceProfile = kotify.config.DeviceProfile.ANDROID
+                    deviceProfile = kotify.config.DeviceProfile.CHROME_WINDOWS
                 ))
                 sess.load()
                 session = sess
@@ -214,27 +219,23 @@ class SpotifyViewModel : ViewModel() {
 
                 pc.onNextPlaybackId { fileId, uri, name ->
                     if (preferredAudioSource.value == null) {
+                        // Deduplicate — don't re-resolve if we already have this file ID cached
+                        if (fileId == nextCdnFileId && nextCdnUrl != null) return@onNextPlaybackId
                         viewModelScope.launch(Dispatchers.IO) {
                             try {
                                 val sp = spotifyPlayback ?: return@launch
+                                // Double-check after coroutine dispatch (another callback may have resolved it)
+                                if (fileId == nextCdnFileId && nextCdnUrl != null) return@launch
                                 LokiLogger.d(TAG, "Pre-resolving next Spotify CDN: $name ($fileId)")
                                 val cdnUrls = sp.getCdnUrls(fileId)
                                 val cdnUrl = cdnUrls.firstOrNull() ?: return@launch
-                                val licenseHeaders = mutableMapOf<String, String>()
-                                session?.baseClient?.accessToken?.let { licenseHeaders["Authorization"] = "Bearer $it" }
-                                session?.baseClient?.clientToken?.let { licenseHeaders["client-token"] = it }
-                                val licenseUrl = "https://gew4-spclient.spotify.com/widevine-license/v1/audio/license"
-                                val mediaItem = MusicPlaybackService.instance?.buildDrmMediaItem(cdnUrl, licenseUrl, licenseHeaders)
-                                if (mediaItem != null) {
-                                    withContext(Dispatchers.Main) {
-                                        MusicPlaybackService.instance?.let { svc ->
-                                            if (svc.player.mediaItemCount > 1) svc.player.removeMediaItems(1, svc.player.mediaItemCount)
-                                            svc.player.addMediaItem(mediaItem)
-                                        }
-                                    }
-                                    isNextReady.value = true
-                                    LokiLogger.i(TAG, "Next Spotify CDN pre-resolved: $name")
-                                }
+                                // Cache the resolved CDN URL — DON'T queue in ExoPlayer.
+                                // DRM items can't be pre-queued because each needs its own
+                                // Widevine license session, and rapid transitions cause key mismatches.
+                                nextCdnUrl = cdnUrl
+                                nextCdnFileId = fileId
+                                isNextReady.value = true
+                                LokiLogger.i(TAG, "Next Spotify CDN pre-resolved: $name")
                             } catch (e: Exception) {
                                 LokiLogger.d(TAG, "Pre-resolve next CDN failed: ${e.message}")
                             }
@@ -243,18 +244,18 @@ class SpotifyViewModel : ViewModel() {
                 }
 
                 pc.onState { state ->
+                    val delta = if (lastCommandTs > 0) System.currentTimeMillis() - lastCommandTs else -1
+                    LokiLogger.i(TAG, "[Timing] WS onState arrived (${delta}ms after CMD '$lastCommandName')")
                     viewModelScope.launch { updatePlaybackFromState(state) }
                 }
 
                 pc.onTrackChange { event ->
-                    viewModelScope.launch(Dispatchers.IO) {
-                        val state2 = pc.getState()
-                        if (state2?.is_active_device == true || preferredAudioSource.value == null) {
-                            resolveAndPlay(event)
-                        } else {
-                            LokiLogger.i(TAG, "Track changed but not our device, skipping stream")
-                        }
-                        // Refresh queue if it's currently visible
+                    val delta = if (lastCommandTs > 0) System.currentTimeMillis() - lastCommandTs else -1
+                    LokiLogger.i(TAG, "[Timing] WS onTrackChange arrived (${delta}ms after CMD '$lastCommandName') -> ${event.current?.get("uri")}")
+                    // Cancel any in-flight resolve — only the latest track change matters
+                    resolveJob?.cancel()
+                    resolveJob = viewModelScope.launch(Dispatchers.IO) {
+                        resolveAndPlay(event)
                         if (currentScreen.value == Screen.QUEUE) refreshQueue()
                     }
                 }
@@ -379,16 +380,28 @@ class SpotifyViewModel : ViewModel() {
         val actuallyPlaying = if (isStreaming.value) exoPlaying else state.isActuallyPlaying
         val actuallyPaused = if (isStreaming.value) !exoPlaying else state.is_paused
 
+        // When streaming, the audio source of truth is ExoPlayer, not Spotify's state.
+        // If Spotify's state says track B but we're still playing track A, keep showing track A.
+        val stateTrackUri = track?.get("uri")?.toString()
+        val isTrackMismatch = isStreaming.value && currentStreamUri != null && stateTrackUri != currentStreamUri
+
         // Detect remote seek: when streaming, if Spotify's position differs significantly
         // from ExoPlayer's, someone seeked from the web player — sync ExoPlayer
+        // Skip during track transitions (mismatch) to avoid false seeks
         val isSeekGuarded = System.currentTimeMillis() < seekGuardUntil
-        if (isStreaming.value && !isSeekGuarded && !isStreamLoading.value) {
+        if (isStreaming.value && !isSeekGuarded && !isStreamLoading.value && !isTrackMismatch) {
             val exoPos = withContext(Dispatchers.Main) {
                 MusicPlaybackService.instance?.getCurrentPosition()
             } ?: 0L
-            val spotifyPos = state.position_as_of_timestamp
+            // Interpolate Spotify's position using timestamp
+            val elapsed = (System.currentTimeMillis() - state.timestamp).coerceAtLeast(0)
+            val spotifyPos = if (state.is_playing && !state.is_paused) {
+                state.position_as_of_timestamp + elapsed
+            } else {
+                state.position_as_of_timestamp
+            }
             if (kotlin.math.abs(spotifyPos - exoPos) > 3000) {
-                LokiLogger.i(TAG, "Remote seek detected: Spotify=${spotifyPos}ms, ExoPlayer=${exoPos}ms — syncing")
+                LokiLogger.i(TAG, "Remote seek detected: Spotify=${spotifyPos}ms (interpolated), ExoPlayer=${exoPos}ms — syncing")
                 seekGuardUntil = System.currentTimeMillis() + 1500
                 withContext(Dispatchers.Main) {
                     MusicPlaybackService.instance?.syncSeek(spotifyPos)
@@ -398,35 +411,47 @@ class SpotifyViewModel : ViewModel() {
 
         val posMs = when {
             isSeekGuarded -> _playback.value.positionMs
+            isTrackMismatch -> _playback.value.positionMs  // Keep old position during transition
             isStreamLoading.value -> 0L
             isStreaming.value -> withContext(Dispatchers.Main) {
                 MusicPlaybackService.instance?.getCurrentPosition()
             } ?: state.position_as_of_timestamp
-            else -> state.position_as_of_timestamp
+            else -> {
+                // Not streaming: interpolate from timestamp
+                val elapsed = (System.currentTimeMillis() - state.timestamp).coerceAtLeast(0)
+                if (state.is_playing && !state.is_paused) {
+                    (state.position_as_of_timestamp + elapsed).coerceAtMost(state.duration)
+                } else {
+                    state.position_as_of_timestamp
+                }
+            }
         }
 
+        val displayTrack = if (isTrackMismatch) _playback.value.track else trackInfo
+        val displayDuration = if (isTrackMismatch) _playback.value.durationMs else state.duration
+
         _playback.value = PlaybackUiState(
-            track = trackInfo,
+            track = displayTrack,
             isPlaying = actuallyPlaying,
             isPaused = actuallyPaused,
             positionMs = posMs,
-            durationMs = state.duration,
+            durationMs = displayDuration,
             isShuffling = state.is_shuffling,
             repeatMode = state.repeat_mode,
             volume = _playback.value.volume
         )
 
-        // Extract theme colors from album art
-        if (imageUrl != null && imageUrl != lastPaletteUrl) {
-            lastPaletteUrl = imageUrl
-            extractColorsFromArt(imageUrl)
-        }
-
-        // Check liked state for current track
-        val trackUri = track?.get("uri")?.toString()
-        if (trackUri != null) {
-            checkLikedState(trackUri)
-            fetchCanvasForTrack(trackUri)
+        // Only update theme/liked/canvas for the track we're ACTUALLY displaying
+        val displayUri = displayTrack?.uri
+        if (!isTrackMismatch) {
+            if (imageUrl != null && imageUrl != lastPaletteUrl) {
+                lastPaletteUrl = imageUrl
+                extractColorsFromArt(imageUrl)
+            }
+            if (displayUri != null) {
+                checkLikedState(displayUri)
+                fetchCanvasForTrack(displayUri)
+            }
         }
 
         // Extract next track info for mini player swipe preview
@@ -521,11 +546,11 @@ class SpotifyViewModel : ViewModel() {
                     }
                     _playback.value = current.copy(positionMs = newPos.coerceAtMost(current.durationMs))
 
-                    // Every 10s, update Spotify's position to match ExoPlayer (seek only, no resume)
+                    // Every 30s, report position to Spotify via state PUT (not seek command)
                     tickCount++
-                    if (isStreaming.value && tickCount % 20 == 0) {
+                    if (isStreaming.value && tickCount % 60 == 0) {
                         launch(Dispatchers.IO) {
-                            try { player?.seek(newPos.toInt()) } catch (_: Exception) {}
+                            try { player?.reportPosition(newPos, false) } catch (_: Exception) {}
                         }
                     }
                 }
@@ -535,24 +560,30 @@ class SpotifyViewModel : ViewModel() {
 
     fun togglePlayPause() {
         commandJob?.cancel()
+        val action = if (_playback.value.isPaused || !_playback.value.isPlaying) "resume" else "pause"
+        lastCommandTs = System.currentTimeMillis()
+        lastCommandName = action
+        LokiLogger.i(TAG, "[Timing] CMD $action sent")
         commandJob = viewModelScope.launch(Dispatchers.IO) {
             try {
                 val p = player ?: return@launch
-                if (_playback.value.isPaused || !_playback.value.isPlaying) {
+                val t0 = System.currentTimeMillis()
+                if (action == "resume") {
+                    _playback.value = _playback.value.copy(isPlaying = true, isPaused = false)
+                    startPositionTicker()
                     if (isStreaming.value) {
                         withContext(Dispatchers.Main) { MusicPlaybackService.instance?.syncPlay(_playback.value.positionMs) }
                     }
                     p.resume()
-                    _playback.value = _playback.value.copy(isPlaying = true, isPaused = false)
-                    startPositionTicker()
                 } else {
+                    _playback.value = _playback.value.copy(isPaused = true)
+                    positionJob?.cancel()
                     if (isStreaming.value) {
                         withContext(Dispatchers.Main) { MusicPlaybackService.instance?.syncPause() }
                     }
                     p.pause()
-                    _playback.value = _playback.value.copy(isPaused = true)
-                    positionJob?.cancel()
                 }
+                LokiLogger.i(TAG, "[Timing] CMD $action API done in ${System.currentTimeMillis() - t0}ms")
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { LokiLogger.e(TAG, "togglePlayPause", e) }
         }
@@ -560,8 +591,15 @@ class SpotifyViewModel : ViewModel() {
 
     fun skipNext() {
         commandJob?.cancel()
+        lastCommandTs = System.currentTimeMillis()
+        lastCommandName = "skipNext"
+        LokiLogger.i(TAG, "[Timing] CMD skipNext sent")
         commandJob = viewModelScope.launch(Dispatchers.IO) {
-            try { player?.skipNext(); delay(500); refreshState() }
+            try {
+                val t0 = System.currentTimeMillis()
+                player?.skipNext()
+                LokiLogger.i(TAG, "[Timing] CMD skipNext API done in ${System.currentTimeMillis() - t0}ms")
+            }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { LokiLogger.e(TAG, "skipNext", e) }
         }
@@ -569,8 +607,15 @@ class SpotifyViewModel : ViewModel() {
 
     fun skipPrevious() {
         commandJob?.cancel()
+        lastCommandTs = System.currentTimeMillis()
+        lastCommandName = "skipPrevious"
+        LokiLogger.i(TAG, "[Timing] CMD skipPrevious sent")
         commandJob = viewModelScope.launch(Dispatchers.IO) {
-            try { player?.skipPrevious(); delay(500); refreshState() }
+            try {
+                val t0 = System.currentTimeMillis()
+                player?.skipPrevious()
+                LokiLogger.i(TAG, "[Timing] CMD skipPrevious API done in ${System.currentTimeMillis() - t0}ms")
+            }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { LokiLogger.e(TAG, "skipPrevious", e) }
         }
@@ -1028,13 +1073,12 @@ class SpotifyViewModel : ViewModel() {
             }
         }
         svc.onTrackTransition = {
-            // ExoPlayer auto-advanced to the pre-buffered next track
-            // Tell Spotify to advance too, then pre-resolve the new next track
+            // ExoPlayer auto-advanced to the pre-buffered next track.
+            // TrackPlaybackHandler already advanced the state machine on Spotify's side.
+            // Just refresh UI state and pre-resolve the new next track.
             viewModelScope.launch(Dispatchers.IO) {
                 try {
-                    player?.skipNext()
-                    delay(500)
-                    refreshState()
+                    // WebSocket will push the new state — just pre-resolve next track
                     preResolveNextTrack()
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) { LokiLogger.e(TAG, "svc trackTransition", e) }
@@ -1052,10 +1096,10 @@ class SpotifyViewModel : ViewModel() {
         svc.onPlaybackEnded = {
             viewModelScope.launch(Dispatchers.IO) {
                 try {
-                    LokiLogger.i(TAG, "ExoPlayer ended, advancing Spotify")
-                    player?.skipNext()
-                    delay(500)
-                    refreshState()
+                    // TrackPlaybackHandler.autoAdvanceToNextTrack() already advanced
+                    // the state machine and sent state updates to Spotify.
+                    // DON'T call skipNext() — it would double-advance.
+                    LokiLogger.i(TAG, "ExoPlayer ended — TrackPlaybackHandler auto-advanced")
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) {
                     LokiLogger.e(TAG, "playbackEnded advance failed, stopping", e)
@@ -1074,8 +1118,7 @@ class SpotifyViewModel : ViewModel() {
             startPositionTicker()
             viewModelScope.launch(Dispatchers.IO) {
                 try {
-                    player?.seek(0)
-                    // For Spotify CDN: resume Spotify so other clients (Chrome) show us as playing
+                    // For Spotify CDN: resume Spotify so other clients show us as playing
                     if (preferredAudioSource.value == null) {
                         player?.resume()
                     }
@@ -1085,7 +1128,9 @@ class SpotifyViewModel : ViewModel() {
     }
 
     private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent) {
+        val resolveStart = System.currentTimeMillis()
         val trackUri = event.current?.get("uri")?.toString() ?: return
+        LokiLogger.i(TAG, "[Timing] resolveAndPlay start for $trackUri (${resolveStart - lastCommandTs}ms after CMD)")
         if (trackUri.startsWith("spotify:ad:")) {
             LokiLogger.i(TAG, "[AdSkip] Ad detected: $trackUri — skipping to next track")
             // Don't stop ExoPlayer — let current song keep playing while ad is skipped
@@ -1093,8 +1138,6 @@ class SpotifyViewModel : ViewModel() {
                 try {
                     delay(1000) // Brief delay so Spotify processes the ad
                     player?.skipNext()
-                    delay(500)
-                    refreshState()
                 } catch (_: Exception) {}
             }
             return
@@ -1111,23 +1154,34 @@ class SpotifyViewModel : ViewModel() {
 
         isStreamLoading.value = true
         isNextReady.value = false
+        positionJob?.cancel()
 
-        // Stop the old song immediately so it doesn't bleed into the new track
-        MusicPlaybackService.instance?.stop()
-
+        // Don't stop the old song — let it keep playing until the new one is ready.
+        // ExoPlayer's setMediaItem() in playUrl/playDrmUrl will seamlessly replace it.
         // Pause Spotify so it doesn't advance while we resolve the stream
         // Skip for Spotify CDN — we want Spotify to keep showing us as "playing"
         if (preferredAudioSource.value != null) {
             try { player?.pause() } catch (_: Exception) {}
         }
-
-        _playback.value = _playback.value.copy(positionMs = 0)
-        positionJob?.cancel()
         val art = metadata?.let {
             it["image_xlarge_url"]?.toString()
                 ?: it["image_large_url"]?.toString()
                 ?: it["image_url"]?.toString()
         }
+
+        // Update UI with new track info immediately — audio will follow in ~100ms
+        val newTrack = TrackInfo(
+            uri = trackUri, name = title, artist = artist, albumArt = art,
+            albumName = metadata?.get("album_title")?.toString(),
+            durationMs = (metadata?.get("duration")?.toString()?.toLongOrNull() ?: _playback.value.durationMs)
+        )
+        _playback.value = _playback.value.copy(track = newTrack, positionMs = 0)
+        if (art != null && art != lastPaletteUrl) {
+            lastPaletteUrl = art
+            extractColorsFromArt(art)
+        }
+        checkLikedState(trackUri)
+        fetchCanvasForTrack(trackUri)
 
         // Check if we already pre-resolved this track
         val preResolvedUrl = nextStreamUrl
@@ -1153,24 +1207,42 @@ class SpotifyViewModel : ViewModel() {
             try {
                 val sp = spotifyPlayback ?: throw IllegalStateException("SpotifyPlayback not initialized")
 
-                // Use file ID from cluster state or from onPlaybackId (state machine)
-                // onPlaybackId fires on a different thread around the same time as onTrackChange
-                var fileId = event.currentFileId ?: latestFileId
-                if (fileId == null) {
-                    LokiLogger.d(TAG, "SpotifyCDN: Waiting for file ID from state machine...")
-                    for (attempt in 1..25) {
-                        delay(200)
-                        fileId = latestFileId
-                        if (fileId != null) break
+                // Check if we already pre-resolved this CDN URL
+                // IMPORTANT: nextCdnUrl is for the NEXT track. Only use it if the
+                // file ID matches what we need for the CURRENT track.
+                val currentFileId = event.currentFileId ?: latestFileId
+                val cachedCdnUrl = if (currentFileId != null && nextCdnFileId == currentFileId) nextCdnUrl else null
+                val cdnUrl: String
+                if (cachedCdnUrl != null) {
+                    cdnUrl = cachedCdnUrl
+                    LokiLogger.i(TAG, "SpotifyCDN: Using pre-resolved CDN URL (fileId=$currentFileId)")
+                    nextCdnUrl = null
+                    nextCdnFileId = null
+                } else {
+                    // Use file ID from cluster state or from onPlaybackId (state machine)
+                    // onPlaybackId fires on a different thread around the same time as onTrackChange
+                    var fileId = event.currentFileId ?: latestFileId
+                    if (fileId == null) {
+                        LokiLogger.d(TAG, "SpotifyCDN: Waiting for file ID from state machine...")
+                        for (attempt in 1..25) {
+                            delay(200)
+                            fileId = latestFileId
+                            if (fileId != null) break
+                        }
                     }
+                    if (fileId == null) {
+                        throw IllegalStateException("No file ID received from state machine after 3s")
+                    }
+                    LokiLogger.i(TAG, "SpotifyCDN: Resolving fileId=$fileId")
+                    val cdnUrls = sp.getCdnUrls(fileId)
+                    cdnUrl = cdnUrls.firstOrNull() ?: throw IllegalStateException("No CDN URLs")
+                    LokiLogger.i(TAG, "SpotifyCDN: Resolved ${cdnUrls.size} mirrors")
                 }
-                if (fileId == null) {
-                    throw IllegalStateException("No file ID received from state machine after 3s")
+                // DRM: must stop old player to close the Widevine session cleanly.
+                // Unlike non-DRM, we can't seamlessly replace — each track needs its own license.
+                withContext(Dispatchers.Main) {
+                    MusicPlaybackService.instance?.stop()
                 }
-                LokiLogger.i(TAG, "SpotifyCDN: Resolving fileId=$fileId")
-                val cdnUrls = sp.getCdnUrls(fileId)
-                val cdnUrl = cdnUrls.firstOrNull() ?: throw IllegalStateException("No CDN URLs")
-                LokiLogger.i(TAG, "SpotifyCDN: Resolved ${cdnUrls.size} mirrors")
                 // ExoPlayer extracts PSSH from the MP4 init segment automatically
                 val licenseHeaders = mutableMapOf<String, String>()
                 session?.baseClient?.accessToken?.let { licenseHeaders["Authorization"] = "Bearer $it" }
@@ -1182,6 +1254,7 @@ class SpotifyViewModel : ViewModel() {
                 isStreaming.value = true
                 streamProvider.value = "Spotify CDN"
                 isStreamLoading.value = false
+                LokiLogger.i(TAG, "[Timing] resolveAndPlay DRM loaded in ${System.currentTimeMillis() - resolveStart}ms (${System.currentTimeMillis() - lastCommandTs}ms total from CMD)")
                 preResolveNextTrack()
                 return
             } catch (e: Exception) {

@@ -1,0 +1,102 @@
+<resources>
+    <!-- Common -->
+    <string name="cancel">Отмена</string>
+    <string name="share">Поделиться</string>
+    <string name="loading">Загрузка…</string>
+    <string name="unknown">Неизвестно</string>
+
+    <!-- Bottom Nav -->
+    <string name="nav_home">Главная</string>
+    <string name="nav_search">Поиск</string>
+    <string name="nav_library">Библиотека</string>
+    <string name="nav_account">Аккаунт</string>
+
+    <!-- Home -->
+    <string name="greeting_fallback">Добрый вечер</string>
+
+    <!-- Search -->
+    <string name="search_placeholder">Песни, исполнители, альбомы…</string>
+
+    <!-- Library -->
+    <string name="library_search_placeholder">Поиск в библиотеке</string>
+    <string name="library_playlists">Плейлисты</string>
+    <string name="library_artists">Исполнители</string>
+    <string name="library_albums">Альбомы</string>
+
+    <!-- Player -->
+    <string name="now_playing">Сейчас играет</string>
+    <string name="add_to_queue">В очередь</string>
+    <string name="add_to_playlist">В плейлист</string>
+    <string name="like">Нравится</string>
+    <string name="unlike">Не нравится</string>
+    <string name="visit_album">Перейти к альбому</string>
+
+    <!-- Detail Screen -->
+    <string name="follow">Подписаться</string>
+    <string name="following">Вы подписаны</string>
+    <string name="popular">Популярное</string>
+    <string name="popular_releases">Популярные релизы</string>
+    <string name="fans_also_like">Фанатам также нравится</string>
+    <string name="more_by">Ещё от %s</string>
+
+    <!-- Account -->
+    <string name="account">Аккаунт</string>
+    <string name="settings">Настройки</string>
+    <string name="about">О приложении</string>
+    <string name="special_thanks">Благодарности</string>
+    <string name="premium">Премиум</string>
+    <string name="username">Имя пользователя</string>
+    <string name="user_id">ID пользователя</string>
+    <string name="plan">Подписка</string>
+    <string name="plan_free">Бесплатно</string>
+    <string name="followers_playlists">%d подписчиков · %d плейлистов</string>
+    <string name="log_out">Выйти</string>
+
+    <!-- Settings -->
+    <string name="lossless_audio">Без потерь</string>
+    <string name="lossless_on">FLAC через %s</string>
+    <string name="lossless_off">Стандартное качество</string>
+    <string name="lossless_provider">Источник без потерь</string>
+    <string name="canvas_background">Фон Canvas</string>
+    <string name="canvas_on">Видео за обложкой альбома</string>
+    <string name="canvas_off">Выкл</string>
+    <string name="lyrics_animation">Анимация текста</string>
+    <string name="lyrics_anim_desc">Выберите анимацию для построчного текста.</string>
+    <string name="lyrics_vertical">Сверху вниз</string>
+    <string name="lyrics_horizontal">Слева направо</string>
+    <string name="notification_left_button">Левая кнопка уведомления</string>
+    <string name="notification_right_button">Правая кнопка уведомления</string>
+    <string name="notif_like">Нравится</string>
+    <string name="notif_like_desc">Переключить статус «нравится»</string>
+    <string name="notif_shuffle">Перемешать</string>
+    <string name="notif_shuffle_desc">Переключить перемешивание</string>
+    <string name="notif_repeat">Повтор</string>
+    <string name="notif_repeat_desc">Переключить повтор (выкл → все → один)</string>
+    <string name="connect_to_device">Подключиться к устройству</string>
+    <string name="content_region">Регион контента</string>
+    <string name="content_region_desc">Влияет на результаты поиска и рекомендации</string>
+
+    <!-- About -->
+    <string name="app_version">Версия приложения</string>
+    <string name="check_for_updates">Проверить обновления</string>
+    <string name="checking">Проверка…</string>
+    <string name="up_to_date">У вас последняя версия</string>
+    <string name="tap_to_check">Нажмите для проверки обновлений</string>
+    <string name="release_notes">Примечания к выпуску</string>
+    <string name="view_changelog">Просмотр изменений</string>
+
+    <!-- Update Dialog -->
+    <string name="update_available">Доступно обновление</string>
+    <string name="current_version">Текущая</string>
+    <string name="new_version">Новая</string>
+    <string name="whats_new">Что нового:</string>
+    <string name="update_now">Обновить</string>
+    <string name="later">Позже</string>
+
+    <!-- Devices -->
+    <string name="searching_devices">Поиск устройств…</string>
+
+    <!-- Notification -->
+    <string name="added_to_liked">Добавлено в любимые песни</string>
+    <string name="removed_from_liked">Удалено из любимых песен</string>
+</resources>

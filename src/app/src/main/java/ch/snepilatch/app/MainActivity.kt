@@ -1,7 +1,9 @@
 package ch.snepilatch.app
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -25,11 +27,26 @@ import ch.snepilatch.app.util.UpdateService
 import ch.snepilatch.app.util.loadCookies
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
+    private val pendingDeepLink = MutableStateFlow<Uri?>(null)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleDeepLinkIntent(intent)
+    }
+
+    private fun handleDeepLinkIntent(intent: Intent) {
+        if (intent.action == Intent.ACTION_VIEW) {
+            pendingDeepLink.value = intent.data
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleDeepLinkIntent(intent)
         volumeControlStream = android.media.AudioManager.STREAM_MUSIC
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
@@ -83,6 +100,16 @@ class MainActivity : ComponentActivity() {
                 if (initialized) {
                     kotlinx.coroutines.delay(500)
                     vm.wireServiceControls()
+                }
+            }
+
+            // Handle deep links reactively (works for both initial launch and onNewIntent)
+            val deepLinkUri by pendingDeepLink.collectAsState()
+            LaunchedEffect(deepLinkUri, initialized) {
+                if (initialized && deepLinkUri != null) {
+                    val uri = deepLinkUri!!
+                    pendingDeepLink.value = null
+                    vm.handleDeepLink(uri)
                 }
             }
 

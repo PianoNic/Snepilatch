@@ -22,6 +22,7 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -80,8 +81,19 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             .setUsage(C.USAGE_MEDIA)
             .build()
 
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                30_000,   // min buffer: 30s
+                120_000,  // max buffer: 2 min
+                1_500,    // playback start buffer: 1.5s
+                3_000     // rebuffer: 3s
+            )
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
+
         player = ExoPlayer.Builder(this)
             .setAudioAttributes(audioAttributes, true)
+            .setLoadControl(loadControl)
             .build()
 
         player.addListener(object : Player.Listener {
@@ -220,30 +232,37 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         currentTitle = title
         currentArtist = artist
 
+        // Start audio IMMEDIATELY — don't wait for art
+        mainHandler.post {
+            player.playWhenReady = false
+            player.setMediaItem(buildMediaItem(url))
+            player.prepare()
+            updateMediaSessionMetadata()
+            updateNotification()
+
+            if (startPlaying) {
+                player.addListener(object : Player.Listener {
+                    override fun onPlaybackStateChanged(playbackState: Int) {
+                        if (playbackState == Player.STATE_READY) {
+                            player.removeListener(this)
+                            player.playWhenReady = true
+                            updateNotification()
+                            LokiLogger.i(TAG, "Stream ready, playback started")
+                            onReady?.invoke()
+                        }
+                    }
+                })
+            }
+        }
+
+        // Load art in background, update notification when ready
         serviceScope.launch {
             val bitmap = albumArtUrl?.let { loadBitmap(it) }
             meta.art = bitmap
             currentArt = bitmap
             mainHandler.post {
-                player.playWhenReady = false
-                player.setMediaItem(buildMediaItem(url))
-                player.prepare()
                 updateMediaSessionMetadata()
                 updateNotification()
-
-                if (startPlaying) {
-                    player.addListener(object : Player.Listener {
-                        override fun onPlaybackStateChanged(playbackState: Int) {
-                            if (playbackState == Player.STATE_READY) {
-                                player.removeListener(this)
-                                player.playWhenReady = true
-                                updateNotification()
-                                LokiLogger.i(TAG, "Stream ready, playback started")
-                                onReady?.invoke()
-                            }
-                        }
-                    })
-                }
             }
         }
     }
@@ -339,25 +358,32 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         currentTitle = title
         currentArtist = artist
 
+        // Start audio IMMEDIATELY — don't wait for art
+        mainHandler.post {
+            player.playWhenReady = false
+            player.setMediaItem(buildDrmMediaItem(url, licenseUrl, licenseHeaders))
+            player.prepare()
+            updateMediaSessionMetadata()
+            updateNotification()
+            player.addListener(object : Player.Listener {
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    if (playbackState == Player.STATE_READY) {
+                        player.removeListener(this)
+                        player.play()
+                        onReady?.invoke()
+                    }
+                }
+            })
+        }
+
+        // Load art in background
         serviceScope.launch {
             val bitmap = albumArtUrl?.let { loadBitmap(it) }
             meta.art = bitmap
             currentArt = bitmap
             mainHandler.post {
-                player.playWhenReady = false
-                player.setMediaItem(buildDrmMediaItem(url, licenseUrl, licenseHeaders))
-                player.prepare()
                 updateMediaSessionMetadata()
                 updateNotification()
-                player.addListener(object : Player.Listener {
-                    override fun onPlaybackStateChanged(playbackState: Int) {
-                        if (playbackState == Player.STATE_READY) {
-                            player.removeListener(this)
-                            player.play()
-                            onReady?.invoke()
-                        }
-                    }
-                })
             }
         }
     }

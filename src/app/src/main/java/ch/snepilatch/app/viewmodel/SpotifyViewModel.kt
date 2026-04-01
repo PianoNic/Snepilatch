@@ -246,6 +246,19 @@ class SpotifyViewModel : ViewModel() {
                 LokiLogger.i(TAG, "Player ready, device: ${pc.ourDeviceId()}")
                 loadDevices()
 
+                // Refresh access token periodically to prevent stale credentials
+                viewModelScope.launch(Dispatchers.IO) {
+                    while (true) {
+                        delay(50 * 60 * 1000L) // Every 50 minutes
+                        try {
+                            sess.baseClient.refreshAccessToken()
+                            LokiLogger.i(TAG, "Access token refreshed")
+                        } catch (e: Exception) {
+                            LokiLogger.w(TAG, "Token refresh failed: ${e.message}")
+                        }
+                    }
+                }
+
                 pc.onPlaybackId { fileId ->
                     LokiLogger.i(TAG, "Got file ID from state machine: $fileId")
                     latestFileId = fileId
@@ -576,6 +589,18 @@ class SpotifyViewModel : ViewModel() {
             svc.isLiked = currentTrackLiked.value
             svc.isShuffling = state.is_shuffling
             svc.repeatMode = state.repeat_mode
+        }
+
+        // Detect playback transfer away — stop local ExoPlayer
+        if (isStreaming.value && state.has_active_device && !state.is_active_device) {
+            LokiLogger.i(TAG, "Playback transferred to another device — stopping local stream")
+            isStreaming.value = false
+            streamProvider.value = null
+            currentStreamUri = null
+            positionJob?.cancel()
+            withContext(Dispatchers.Main) {
+                MusicPlaybackService.instance?.stop()
+            }
         }
 
         // Update active device indicator from state
@@ -1334,14 +1359,17 @@ class SpotifyViewModel : ViewModel() {
         svc.onPlaybackEnded = {
             viewModelScope.launch(Dispatchers.IO) {
                 try {
-                    // TrackPlaybackHandler.autoAdvanceToNextTrack() already advanced
-                    // the state machine and sent state updates to Spotify.
-                    // DON'T call skipNext() — it would double-advance.
-                    LokiLogger.i(TAG, "ExoPlayer ended — TrackPlaybackHandler auto-advanced")
+                    LokiLogger.i(TAG, "ExoPlayer ended — waiting 1s for auto-advance...")
+                    // Give TrackPlaybackHandler time to auto-advance via state machine
+                    delay(1000)
+                    // Safety net: if no new track loaded after 1s, force skip
+                    if (!(_playback.value.isPlaying && !_playback.value.isPaused)) {
+                        LokiLogger.w(TAG, "Auto-advance didn't fire, forcing skipNext")
+                        player?.skipNext()
+                    }
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) {
                     LokiLogger.e(TAG, "playbackEnded advance failed, stopping", e)
-                    // Skip failed (auth error, etc.) — update UI to reflect stopped state
                     isStreaming.value = false
                     streamProvider.value = null
                     currentStreamUri = null

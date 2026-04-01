@@ -263,11 +263,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         mainHandler.post {
             player.playWhenReady = false
             player.setMediaItem(buildMediaItem(url))
-            player.prepare()
-            updateMediaSessionMetadata()
-            updateNotification()
 
             if (startPlaying) {
+                // Register listener BEFORE prepare() so we catch STATE_READY
                 player.addListener(object : Player.Listener {
                     override fun onPlaybackStateChanged(playbackState: Int) {
                         if (playbackState == Player.STATE_READY) {
@@ -280,6 +278,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                     }
                 })
             }
+
+            player.prepare()
+            updateMediaSessionMetadata()
+            updateNotification()
         }
 
         // Load art in background, update notification when ready
@@ -389,18 +391,20 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         mainHandler.post {
             player.playWhenReady = false
             player.setMediaItem(buildDrmMediaItem(url, licenseUrl, licenseHeaders))
-            player.prepare()
-            updateMediaSessionMetadata()
-            updateNotification()
+            // Register listener BEFORE prepare() so we catch STATE_READY
             player.addListener(object : Player.Listener {
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     if (playbackState == Player.STATE_READY) {
                         player.removeListener(this)
                         player.play()
+                        LokiLogger.i(TAG, "DRM stream ready, playback started")
                         onReady?.invoke()
                     }
                 }
             })
+            player.prepare()
+            updateMediaSessionMetadata()
+            updateNotification()
         }
 
         // Load art in background

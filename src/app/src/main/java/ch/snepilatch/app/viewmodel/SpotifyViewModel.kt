@@ -592,6 +592,7 @@ class SpotifyViewModel : ViewModel() {
         }
 
         // Detect playback transfer away — stop local ExoPlayer
+        LokiLogger.d(TAG, "Transfer check: streaming=${isStreaming.value} hasActive=${state.has_active_device} isOurs=${state.is_active_device}")
         if (isStreaming.value && state.has_active_device && !state.is_active_device) {
             LokiLogger.i(TAG, "Playback transferred to another device — stopping local stream")
             isStreaming.value = false

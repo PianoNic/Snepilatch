@@ -647,43 +647,46 @@ class SpotifyViewModel : ViewModel() {
             activeDeviceName.value = null
         }
 
-        // Update playing context (album/playlist/artist/collection)
-        val contextUri = state.context_uri
-        val albumTitle = track?.albumName
-        playingContext.value = when {
-            contextUri == null -> null
+        playingContext.value = resolvePlayingContext(state.context_uri, track)
+        lastContextUri = state.context_uri
+    }
+
+    /**
+     * Map the current context URI (spotify:playlist:..., :album:..., :artist:...,
+     * :collection:tracks) into a [PlayingContext] suitable for display. Playlist
+     * names require an API lookup, which is cached and fired asynchronously —
+     * the first emission uses the cached value (or a placeholder) and a
+     * subsequent push updates the playingContext flow once the API returns.
+     */
+    private fun resolvePlayingContext(
+        contextUri: String?,
+        track: kotify.api.playerstatus.PlayerTrack?
+    ): PlayingContext? {
+        if (contextUri == null) return null
+        return when {
             contextUri.contains(":collection:tracks") -> PlayingContext("Liked Songs", "Liked Songs", contextUri)
             contextUri.contains(":playlist:") -> {
                 val playlistId = contextUri.substringAfter(":playlist:")
                 val cached = playlistNameCache[playlistId]
-                if (cached != null) {
-                    PlayingContext("Playlist", cached, contextUri)
-                } else {
-                    if (lastContextUri != contextUri) {
-                        viewModelScope.launch(Dispatchers.IO) {
-                            try {
-                                val sess = session ?: return@launch
-                                val info = kotify.api.playlist.Playlist(sess).getPlaylist(playlistId, limit = 1)
-                                val title = info.name.takeIf { it.isNotBlank() }
-                                if (title != null) {
-                                    playlistNameCache[playlistId] = title
-                                    playingContext.value = PlayingContext("Playlist", title, contextUri)
-                                }
-                            } catch (_: Exception) {}
-                        }
+                if (cached == null && lastContextUri != contextUri) {
+                    viewModelScope.launch(Dispatchers.IO) {
+                        try {
+                            val sess = session ?: return@launch
+                            val info = kotify.api.playlist.Playlist(sess).getPlaylist(playlistId, limit = 1)
+                            val title = info.name.takeIf { it.isNotBlank() }
+                            if (title != null) {
+                                playlistNameCache[playlistId] = title
+                                playingContext.value = PlayingContext("Playlist", title, contextUri)
+                            }
+                        } catch (_: Exception) {}
                     }
-                    PlayingContext("Playlist", playlistNameCache[playlistId] ?: "Playlist", contextUri)
                 }
+                PlayingContext("Playlist", cached ?: "Playlist", contextUri)
             }
-            contextUri.contains(":album:") -> {
-                PlayingContext("Album", albumTitle ?: "Album", contextUri)
-            }
-            contextUri.contains(":artist:") -> {
-                PlayingContext("Artist", track?.artistName ?: "Artist", contextUri)
-            }
+            contextUri.contains(":album:") -> PlayingContext("Album", track?.albumName ?: "Album", contextUri)
+            contextUri.contains(":artist:") -> PlayingContext("Artist", track?.artistName ?: "Artist", contextUri)
             else -> null
         }
-        lastContextUri = contextUri
     }
 
     private fun startPositionTicker() = positionInterpolator.start()

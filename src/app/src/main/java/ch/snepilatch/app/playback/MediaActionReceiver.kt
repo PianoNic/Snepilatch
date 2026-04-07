@@ -1,4 +1,4 @@
-package ch.snepilatch.app
+package ch.snepilatch.app.playback
 
 import android.content.BroadcastReceiver
 import android.content.Context

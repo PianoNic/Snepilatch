@@ -1,4 +1,4 @@
-package ch.snepilatch.app
+package ch.snepilatch.app.playback
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -17,6 +17,8 @@ import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import android.os.Bundle
 import androidx.core.app.NotificationCompat
+import ch.snepilatch.app.R
+import ch.snepilatch.app.util.LokiLogger
 import androidx.media.MediaBrowserServiceCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C

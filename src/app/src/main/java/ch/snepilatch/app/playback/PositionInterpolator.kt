@@ -1,4 +1,4 @@
-package ch.snepilatch.app.viewmodel
+package ch.snepilatch.app.playback
 
 import ch.snepilatch.app.data.PlaybackUiState
 import kotlinx.coroutines.CoroutineScope

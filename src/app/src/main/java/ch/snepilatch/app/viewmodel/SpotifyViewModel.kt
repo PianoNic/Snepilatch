@@ -11,8 +11,9 @@ import androidx.palette.graphics.Palette
 import coil.ImageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
-import ch.snepilatch.app.LokiLogger
-import ch.snepilatch.app.MusicPlaybackService
+import ch.snepilatch.app.util.LokiLogger
+import ch.snepilatch.app.playback.MusicPlaybackService
+import ch.snepilatch.app.playback.PositionInterpolator
 import ch.snepilatch.app.data.*
 import kotify.api.album.Album
 import kotify.api.artist.Artist

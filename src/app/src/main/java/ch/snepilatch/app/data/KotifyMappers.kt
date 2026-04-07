@@ -1,4 +1,4 @@
-package ch.snepilatch.app.viewmodel
+package ch.snepilatch.app.data
 
 import ch.snepilatch.app.data.DetailData
 import ch.snepilatch.app.data.RelatedAlbum

@@ -1,4 +1,4 @@
-package ch.snepilatch.app
+package ch.snepilatch.app.util
 
 import android.os.Build
 import android.util.Log

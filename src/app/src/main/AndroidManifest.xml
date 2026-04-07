@@ -57,7 +57,7 @@
         </activity>
 
         <service
-            android:name=".MusicPlaybackService"
+            android:name=".playback.MusicPlaybackService"
             android:exported="true"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
@@ -76,7 +76,7 @@
         </provider>
 
         <receiver
-            android:name=".MediaActionReceiver"
+            android:name=".playback.MediaActionReceiver"
             android:exported="false">
             <intent-filter>
                 <action android:name="ch.snepilatch.app.PREV" />

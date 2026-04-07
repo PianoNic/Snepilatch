@@ -41,9 +41,6 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         private const val NOTIFICATION_ID = 1
         var instance: MusicPlaybackService? = null
             private set
-        // Shared PlayerConnect — survives Activity/ViewModel recreation
-        var sharedPlayer: kotify.api.playerconnect.PlayerConnect? = null
-        var sharedSession: kotify.session.Session? = null
     }
 
     private var mediaSession: MediaSessionCompat? = null
@@ -637,9 +634,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             release()
         }
         player.release()
-        // Clean up shared references
-        sharedPlayer = null
-        sharedSession = null
+        // Do NOT clear SessionHolder here — the VM and MainActivity already
+        // handle explicit user-close teardown. If the service is dying for
+        // other reasons (e.g. low memory) we want the session to stay live
+        // so the next launch can resume.
         instance = null
         super.onDestroy()
     }

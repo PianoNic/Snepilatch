@@ -45,6 +45,13 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
     private var mediaSession: MediaSessionCompat? = null
     private val mainHandler = Handler(Looper.getMainLooper())
+
+    // DRM load bookkeeping. A single persistent listener in onCreate watches
+    // for STATE_READY; these flags tell it "yes, we just called playDrmUrl,
+    // please fire onReady". Stacked anonymous listeners caused duplicate
+    // onReady fires on rapid successive loads.
+    private var awaitingDrmReady = false
+    private var drmReadyStartPlaying = false
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     lateinit var player: ExoPlayer
         private set
@@ -121,6 +128,11 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
             override fun onPlaybackStateChanged(playbackState: Int) {
                 updateNotification()
+                if (playbackState == Player.STATE_READY && awaitingDrmReady) {
+                    awaitingDrmReady = false
+                    LokiLogger.i(TAG, "DRM stream ready (playWhenReady=$drmReadyStartPlaying, pos=${player.currentPosition}ms)")
+                    onReady?.invoke()
+                }
                 if (playbackState == Player.STATE_ENDED) {
                     LokiLogger.i(TAG, "Playback ended (STATE_ENDED)")
                     onPlaybackEnded?.invoke()
@@ -388,24 +400,16 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         currentTitle = title
         currentArtist = artist
 
-        // Start audio IMMEDIATELY — don't wait for art
+        // Start audio IMMEDIATELY — don't wait for art. A single persistent
+        // readyListener is registered once in onCreate (see drmReadyListener)
+        // and fires onReady via awaitingReadyFor. Previously we added a new
+        // anonymous listener per call, which stacked up on rapid loads and
+        // caused duplicate onReady invocations.
         mainHandler.post {
-            // Seek-on-load: setMediaItem with a startPositionMs makes ExoPlayer prepare,
-            // seek, and reach STATE_READY at that exact position. No post-prepare seek
-            // dance — eliminates the race where the post-ready seek fails to actually
-            // produce audio (the bug in the cold-start sync).
+            awaitingDrmReady = true
+            drmReadyStartPlaying = startPlaying
             player.setMediaItem(buildDrmMediaItem(url, licenseUrl, licenseHeaders), startPositionMs)
             player.playWhenReady = startPlaying
-            // Register listener BEFORE prepare() so we catch STATE_READY
-            player.addListener(object : Player.Listener {
-                override fun onPlaybackStateChanged(playbackState: Int) {
-                    if (playbackState == Player.STATE_READY) {
-                        player.removeListener(this)
-                        LokiLogger.i(TAG, "DRM stream ready (playWhenReady=$startPlaying, pos=${player.currentPosition}ms)")
-                        onReady?.invoke()
-                    }
-                }
-            })
             player.prepare()
             updateMediaSessionMetadata()
             updateNotification()

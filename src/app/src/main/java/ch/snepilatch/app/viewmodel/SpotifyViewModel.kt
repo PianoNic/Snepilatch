@@ -1637,8 +1637,13 @@ class SpotifyViewModel : ViewModel() {
                     fileId = latestFileId
                 }
                 if (fileId == null) {
-                    LokiLogger.d(TAG, "SpotifyCDN: Waiting briefly for file ID...")
-                    for (attempt in 1..5) {
+                    // onPlaybackId can take several seconds to arrive after a
+                    // track change on this account. Wait up to 5 seconds
+                    // before falling back — that's long enough to catch
+                    // almost all arrivals without making the user wait
+                    // forever on a dead track.
+                    LokiLogger.d(TAG, "SpotifyCDN: Waiting for file ID (up to 5s)...")
+                    for (attempt in 1..50) {
                         delay(100)
                         if (latestFileIdUri == trackUri) {
                             fileId = latestFileId

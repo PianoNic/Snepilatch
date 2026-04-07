@@ -17,6 +17,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
+import ch.snepilatch.app.playback.MediaButtonReceiver
 import ch.snepilatch.app.playback.MusicPlaybackService
 import ch.snepilatch.app.playback.SessionHolder
 import ch.snepilatch.app.ui.components.UpdateDialog
@@ -114,6 +115,20 @@ class MainActivity : ComponentActivity() {
                 if (initialized) {
                     kotlinx.coroutines.delay(500)
                     vm.wireServiceControls()
+                }
+            }
+
+            // Headphone cold-launch: if MainActivity was started by the
+            // MediaButtonReceiver with an autoplay extra, fire togglePlayPause
+            // as soon as init finishes so the user hears music without having
+            // to tap the play button.
+            LaunchedEffect(initialized) {
+                if (initialized && intent.getBooleanExtra(MediaButtonReceiver.EXTRA_AUTO_PLAY, false)) {
+                    intent.removeExtra(MediaButtonReceiver.EXTRA_AUTO_PLAY)
+                    kotlinx.coroutines.delay(600) // let wireServiceControls finish
+                    if (!vm.playback.value.isPlaying) {
+                        vm.togglePlayPause()
+                    }
                 }
             }
 

@@ -14,6 +14,8 @@ import coil.request.SuccessResult
 import ch.snepilatch.app.util.LokiLogger
 import ch.snepilatch.app.playback.MusicPlaybackService
 import ch.snepilatch.app.playback.PositionInterpolator
+import ch.snepilatch.app.playback.engine.SpotifyCdnResolver
+import ch.snepilatch.app.playback.engine.SpotifyStream
 import ch.snepilatch.app.data.*
 import kotify.api.album.Album
 import kotify.api.artist.Artist
@@ -68,6 +70,7 @@ class SpotifyViewModel : ViewModel() {
     // Streaming
     private val cdn = CdnPlayback()
     private var spotifyPlayback: SpotifyPlayback? = null
+    private var cdnResolver: SpotifyCdnResolver? = null
     private var latestFileId: String? = null  // from TrackPlaybackHandler via onPlaybackId
     private var currentStreamUri: String? = null
     private var nextStreamUrl: String? = null
@@ -211,7 +214,9 @@ class SpotifyViewModel : ViewModel() {
                 ))
                 sess.load()
                 session = sess
-                spotifyPlayback = SpotifyPlayback(sess)
+                val sp = SpotifyPlayback(sess)
+                spotifyPlayback = sp
+                cdnResolver = SpotifyCdnResolver(sess, sp)
                 LokiLogger.i(TAG, "Session loaded")
 
                 // Start loading home and library immediately after session is ready
@@ -293,16 +298,15 @@ class SpotifyViewModel : ViewModel() {
                         if (fileId == nextCdnFileId && nextCdnUrl != null) return@onNextPlaybackId
                         viewModelScope.launch(Dispatchers.IO) {
                             try {
-                                val sp = spotifyPlayback ?: return@launch
+                                val resolver = cdnResolver ?: return@launch
                                 // Double-check after coroutine dispatch (another callback may have resolved it)
                                 if (fileId == nextCdnFileId && nextCdnUrl != null) return@launch
                                 LokiLogger.d(TAG, "Pre-resolving next Spotify CDN: $name ($fileId)")
-                                val cdnUrls = sp.getCdnUrls(fileId)
-                                val cdnUrl = cdnUrls.firstOrNull() ?: return@launch
+                                val stream = resolver.resolveForFileId(fileId)
                                 // Cache the resolved CDN URL — DON'T queue in ExoPlayer.
                                 // DRM items can't be pre-queued because each needs its own
                                 // Widevine license session, and rapid transitions cause key mismatches.
-                                nextCdnUrl = cdnUrl
+                                nextCdnUrl = stream.cdnUrl
                                 nextCdnFileId = fileId
                                 isNextReady.value = true
                                 LokiLogger.i(TAG, "Next Spotify CDN pre-resolved: $name")
@@ -763,10 +767,8 @@ class SpotifyViewModel : ViewModel() {
      */
     private suspend fun coldStartPlay() {
         val p = player ?: return
-        val sp = spotifyPlayback
-        val sess = session
-        if (sp == null || sess == null) {
-            LokiLogger.w(TAG, "[ColdStart] SpotifyPlayback / Session not initialized, falling back to legacy resume")
+        if (cdnResolver == null) {
+            LokiLogger.w(TAG, "[ColdStart] CdnResolver not initialized, falling back to legacy resume")
             try { p.resume() } catch (_: Exception) {}
             return
         }
@@ -842,18 +844,9 @@ class SpotifyViewModel : ViewModel() {
         LokiLogger.i(TAG, "[ColdStart] file id=$fileId for $trackUri — resolving CDN")
 
         try {
-            // Resolve the Spotify CDN URL for this file id
-            val cdnUrls = sp.getCdnUrls(fileId)
-            val cdnUrl = cdnUrls.firstOrNull()
-                ?: throw IllegalStateException("No CDN mirrors")
-            LokiLogger.i(TAG, "[ColdStart] resolved ${cdnUrls.size} CDN mirrors")
-
-            // Load ExoPlayer paused. The Widevine session prepares in the background
-            // while the user still sees the loading spinner.
-            val licenseHeaders = mutableMapOf<String, String>()
-            sess.baseClient.accessToken?.let { licenseHeaders["Authorization"] = "Bearer $it" }
-            sess.baseClient.clientToken?.let { licenseHeaders["client-token"] = it }
-            val licenseUrl = sess.spclientUrl("widevine-license/v1/audio/license")
+            val resolver = cdnResolver ?: throw IllegalStateException("CdnResolver not initialized")
+            val stream = resolver.resolveForFileId(fileId)
+            LokiLogger.i(TAG, "[ColdStart] resolved ${stream.mirrorCount} CDN mirrors")
 
             // Start ExoPlayer at the right position from the moment it's ready —
             // no post-prepare seek dance. setMediaItem(item, startPositionMs)
@@ -863,7 +856,7 @@ class SpotifyViewModel : ViewModel() {
             playUrlAt = System.currentTimeMillis()
             withContext(Dispatchers.Main) {
                 MusicPlaybackService.instance?.playDrmUrl(
-                    cdnUrl, licenseUrl, licenseHeaders, title, artist, art,
+                    stream.cdnUrl, stream.licenseUrl, stream.licenseHeaders, title, artist, art,
                     startPlaying = true,
                     startPositionMs = savedPositionAtEntry,
                 )
@@ -1644,19 +1637,31 @@ class SpotifyViewModel : ViewModel() {
         // Spotify CDN path: resolve CDN URL directly from Spotify's infrastructure
         if (preferredAudioSource.value == null) {
             try {
-                val sp = spotifyPlayback ?: throw IllegalStateException("SpotifyPlayback not initialized")
+                val resolver = cdnResolver ?: throw IllegalStateException("CdnResolver not initialized")
 
                 // Check if we already pre-resolved this CDN URL
                 // IMPORTANT: nextCdnUrl is for the NEXT track. Only use it if the
                 // file ID matches what we need for the CURRENT track.
                 val currentFileId = event.currentFileId ?: latestFileId
                 val cachedCdnUrl = if (currentFileId != null && nextCdnFileId == currentFileId) nextCdnUrl else null
-                val cdnUrl: String
-                if (cachedCdnUrl != null) {
-                    cdnUrl = cachedCdnUrl
+                val stream: SpotifyStream = if (cachedCdnUrl != null) {
                     LokiLogger.i(TAG, "SpotifyCDN: Using pre-resolved CDN URL (fileId=$currentFileId)")
                     nextCdnUrl = null
                     nextCdnFileId = null
+                    // Build license metadata for the cached URL via a throwaway resolve-like call.
+                    // We already have the URL, so we just need the license bits — cheapest path
+                    // is to resolve fresh; but to avoid the double-roundtrip, reuse the cached URL
+                    // and the current session's license endpoint.
+                    val sess = session ?: throw IllegalStateException("Session not initialized")
+                    val licenseHeaders = mutableMapOf<String, String>()
+                    sess.baseClient.accessToken?.let { licenseHeaders["Authorization"] = "Bearer $it" }
+                    sess.baseClient.clientToken?.let { licenseHeaders["client-token"] = it }
+                    SpotifyStream(
+                        cdnUrl = cachedCdnUrl,
+                        licenseUrl = sess.spclientUrl("widevine-license/v1/audio/license"),
+                        licenseHeaders = licenseHeaders,
+                        mirrorCount = 1
+                    )
                 } else {
                     // Use file ID from cluster state or from onPlaybackId (state machine)
                     var fileId = event.currentFileId ?: latestFileId
@@ -1672,12 +1677,7 @@ class SpotifyViewModel : ViewModel() {
                     // If still null, fetch file ID from track metadata API
                     if (fileId == null) {
                         LokiLogger.i(TAG, "SpotifyCDN: No file ID from state machine, fetching from metadata API...")
-                        val trackId = trackUri.removePrefix("spotify:track:")
-                        val gid = sp.trackIdToGid(trackId)
-                        val meta = sp.getTrackMetadata(gid)
-                        val mp4File = sp.findFile(meta, kotify.cdn.SpotifyPlayback.AudioQuality.MP4_128)
-                            ?: sp.findFile(meta, kotify.cdn.SpotifyPlayback.AudioQuality.MP4_256)
-                        fileId = mp4File?.fileId
+                        fileId = resolver.fetchFileIdFromMetadata(trackUri)
                         if (fileId != null) {
                             LokiLogger.i(TAG, "SpotifyCDN: Got file ID from metadata: $fileId")
                             latestFileId = fileId
@@ -1687,27 +1687,20 @@ class SpotifyViewModel : ViewModel() {
                         throw IllegalStateException("No file ID available")
                     }
                     LokiLogger.i(TAG, "SpotifyCDN: Resolving fileId=$fileId")
-                    val cdnUrls = sp.getCdnUrls(fileId)
-                    cdnUrl = cdnUrls.firstOrNull() ?: throw IllegalStateException("No CDN URLs")
-                    LokiLogger.i(TAG, "SpotifyCDN: Resolved ${cdnUrls.size} mirrors")
+                    val resolved = resolver.resolveForFileId(fileId)
+                    LokiLogger.i(TAG, "SpotifyCDN: Resolved ${resolved.mirrorCount} mirrors")
+                    resolved
                 }
                 // DRM: must stop old player to close the Widevine session cleanly.
                 // Unlike non-DRM, we can't seamlessly replace — each track needs its own license.
                 withContext(Dispatchers.Main) {
                     MusicPlaybackService.instance?.stop()
                 }
-                // ExoPlayer extracts PSSH from the MP4 init segment automatically
-                // Refresh token if needed and use resolved spclient host (not hardcoded region)
-                val sess = session ?: throw IllegalStateException("Session not initialized")
-                val licenseHeaders = mutableMapOf<String, String>()
-                sess.baseClient.accessToken?.let { licenseHeaders["Authorization"] = "Bearer $it" }
-                sess.baseClient.clientToken?.let { licenseHeaders["client-token"] = it }
-                val licenseUrl = sess.spclientUrl("widevine-license/v1/audio/license")
                 playUrlAt = System.currentTimeMillis()
                 val coldStart = coldStartPending
                 withContext(Dispatchers.Main) {
                     MusicPlaybackService.instance?.playDrmUrl(
-                        cdnUrl, licenseUrl, licenseHeaders, title, artist, art,
+                        stream.cdnUrl, stream.licenseUrl, stream.licenseHeaders, title, artist, art,
                         startPlaying = !coldStart,
                     )
                 }

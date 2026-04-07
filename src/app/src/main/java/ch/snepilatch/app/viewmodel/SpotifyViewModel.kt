@@ -101,7 +101,13 @@ class SpotifyViewModel : ViewModel() {
     // Playback
     private val _playback = MutableStateFlow(PlaybackUiState())
     val playback: StateFlow<PlaybackUiState> = _playback
-    private var positionJob: Job? = null
+    private val positionInterpolator = PositionInterpolator(
+        scope = viewModelScope,
+        playback = _playback,
+        isStreaming = isStreaming,
+        getExoPositionMs = { MusicPlaybackService.instance?.getCurrentPosition() },
+        reportPosition = { pos -> player?.reportPosition(pos, false) ?: Unit }
+    )
     private var commandJob: Job? = null
     private var seekGuardUntil: Long = 0  // suppress remote position updates briefly after local seek
 
@@ -600,7 +606,7 @@ class SpotifyViewModel : ViewModel() {
         if (actuallyPlaying) {
             startPositionTicker()
         } else {
-            positionJob?.cancel()
+            stopPositionTicker()
         }
 
         // Sync notification button states
@@ -617,7 +623,7 @@ class SpotifyViewModel : ViewModel() {
             isStreaming.value = false
             streamProvider.value = null
             currentStreamUri = null
-            positionJob?.cancel()
+            stopPositionTicker()
             withContext(Dispatchers.Main) {
                 MusicPlaybackService.instance?.stop()
             }
@@ -672,34 +678,8 @@ class SpotifyViewModel : ViewModel() {
         lastContextUri = contextUri
     }
 
-    private var tickCount = 0
-
-    private fun startPositionTicker() {
-        positionJob?.cancel()
-        tickCount = 0
-        positionJob = viewModelScope.launch {
-            while (true) {
-                delay(500)
-                val current = _playback.value
-                if (current.isPlaying && !current.isPaused && current.durationMs > 0) {
-                    val newPos = if (isStreaming.value) {
-                        MusicPlaybackService.instance?.getCurrentPosition() ?: (current.positionMs + 500)
-                    } else {
-                        current.positionMs + 500
-                    }
-                    _playback.value = current.copy(positionMs = newPos.coerceAtMost(current.durationMs))
-
-                    // Every 30s, report position to Spotify via state PUT (not seek command)
-                    tickCount++
-                    if (isStreaming.value && tickCount % 60 == 0) {
-                        launch(Dispatchers.IO) {
-                            try { player?.reportPosition(newPos, false) } catch (_: Exception) {}
-                        }
-                    }
-                }
-            }
-        }
-    }
+    private fun startPositionTicker() = positionInterpolator.start()
+    private fun stopPositionTicker() = positionInterpolator.stop()
 
     fun togglePlayPause() {
         commandJob?.cancel()
@@ -737,7 +717,7 @@ class SpotifyViewModel : ViewModel() {
                     }
                 } else {
                     _playback.value = _playback.value.copy(isPaused = true)
-                    positionJob?.cancel()
+                    stopPositionTicker()
                     if (isStreaming.value) {
                         withContext(Dispatchers.Main) { MusicPlaybackService.instance?.syncPause() }
                     }
@@ -1539,7 +1519,7 @@ class SpotifyViewModel : ViewModel() {
                     streamProvider.value = null
                     currentStreamUri = null
                     _playback.value = _playback.value.copy(isPlaying = false, isPaused = true)
-                    positionJob?.cancel()
+                    stopPositionTicker()
                 }
             }
         }
@@ -1614,7 +1594,7 @@ class SpotifyViewModel : ViewModel() {
 
         isStreamLoading.value = true
         isNextReady.value = false
-        positionJob?.cancel()
+        stopPositionTicker()
 
         // Don't stop the old song — let it keep playing until the new one is ready.
         // ExoPlayer's setMediaItem() in playUrl/playDrmUrl will seamlessly replace it.
@@ -1789,7 +1769,7 @@ class SpotifyViewModel : ViewModel() {
         isNextReady.value = false
         val startPositionMs = state.position_as_of_timestamp
         _playback.value = _playback.value.copy(positionMs = startPositionMs)
-        positionJob?.cancel()
+        stopPositionTicker()
 
         val shouldPlay = state.isActuallyPlaying
         val trackId = uri.removePrefix("spotify:track:")
@@ -2191,7 +2171,7 @@ class SpotifyViewModel : ViewModel() {
 
     override fun onCleared() {
         super.onCleared()
-        positionJob?.cancel()
+        stopPositionTicker()
         // Kill everything — disconnect player and clean up
         val p = player
         player = null

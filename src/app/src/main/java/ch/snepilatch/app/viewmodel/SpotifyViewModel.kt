@@ -1566,6 +1566,12 @@ class SpotifyViewModel : ViewModel() {
             } else {
                 _playback.value = _playback.value.copy(isPlaying = true, isPaused = false)
                 startPositionTicker()
+                // Hold the seek guard for 5s after any fresh track load so the
+                // stale position Spotify carries across a track transition
+                // can't trigger a bogus remote-seek that seeks ExoPlayer past
+                // the end of the new track. Five seconds is enough for the
+                // cluster snapshot to catch up to position 0 of the new song.
+                seekGuardUntil = System.currentTimeMillis() + 5_000L
                 viewModelScope.launch(Dispatchers.IO) {
                     try {
                         // For Spotify CDN: resume Spotify so other clients show us as playing

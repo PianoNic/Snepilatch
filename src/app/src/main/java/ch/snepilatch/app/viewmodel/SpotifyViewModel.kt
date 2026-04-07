@@ -5,6 +5,7 @@ import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import ch.snepilatch.app.util.LokiLogger
+import ch.snepilatch.app.util.detectActiveAudioOutput
 import ch.snepilatch.app.util.extractThemeColorsFromArt
 import ch.snepilatch.app.playback.MusicPlaybackService
 import ch.snepilatch.app.playback.PositionInterpolator
@@ -1357,48 +1358,9 @@ class SpotifyViewModel : ViewModel() {
     }
 
     fun updateAudioOutput(context: Context) {
-        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
-        val devices = audioManager.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS)
-        // Find the active output — prefer Bluetooth > USB > Wired > Speaker
-        val active = devices.firstOrNull {
-            it.type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
-            it.type == android.media.AudioDeviceInfo.TYPE_BLE_HEADSET ||
-            it.type == android.media.AudioDeviceInfo.TYPE_BLE_SPEAKER
-        } ?: devices.firstOrNull {
-            it.type == android.media.AudioDeviceInfo.TYPE_USB_HEADSET ||
-            it.type == android.media.AudioDeviceInfo.TYPE_USB_DEVICE
-        } ?: devices.firstOrNull {
-            it.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET ||
-            it.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES
-        }
-
-        if (active != null) {
-            val name = active.productName?.toString()?.takeIf { it.isNotBlank() && it != "null" }
-                ?: when (active.type) {
-                    android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
-                    android.media.AudioDeviceInfo.TYPE_BLE_HEADSET,
-                    android.media.AudioDeviceInfo.TYPE_BLE_SPEAKER -> "Bluetooth"
-                    android.media.AudioDeviceInfo.TYPE_USB_HEADSET,
-                    android.media.AudioDeviceInfo.TYPE_USB_DEVICE -> "USB Audio"
-                    android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET,
-                    android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> "Wired"
-                    else -> "External"
-                }
-            audioOutputName.value = name
-            audioOutputType.value = when (active.type) {
-                android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
-                android.media.AudioDeviceInfo.TYPE_BLE_HEADSET,
-                android.media.AudioDeviceInfo.TYPE_BLE_SPEAKER -> "bluetooth"
-                android.media.AudioDeviceInfo.TYPE_USB_HEADSET,
-                android.media.AudioDeviceInfo.TYPE_USB_DEVICE -> "usb"
-                android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET,
-                android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> "wired"
-                else -> "speaker"
-            }
-        } else {
-            audioOutputName.value = "Speaker"
-            audioOutputType.value = "speaker"
-        }
+        val output = detectActiveAudioOutput(context)
+        audioOutputName.value = output.name
+        audioOutputType.value = output.type
     }
 
     fun wireServiceControls() {

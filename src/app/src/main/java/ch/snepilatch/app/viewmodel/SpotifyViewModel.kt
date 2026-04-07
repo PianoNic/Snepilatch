@@ -1710,6 +1710,16 @@ class SpotifyViewModel : ViewModel() {
                 }
                 playUrlAt = System.currentTimeMillis()
                 val coldStart = coldStartPending
+                // Extend the seek guard across the entire DRM load + ready
+                // window. playDrmUrl posts to the main handler and returns
+                // instantly; the actual STATE_READY fires 1-2s later. Between
+                // those two points ExoPlayer reports position 0, and if a
+                // stale cluster snapshot interpolates tens of seconds forward
+                // the remote-seek detector would yank ExoPlayer past the
+                // start of the new track — the song would effectively be
+                // skipped because STATE_READY would fire at the seeked
+                // position, not at 0.
+                seekGuardUntil = System.currentTimeMillis() + 5_000L
                 withContext(Dispatchers.Main) {
                     MusicPlaybackService.instance?.playDrmUrl(
                         stream.cdnUrl, stream.licenseUrl, stream.licenseHeaders, title, artist, art,

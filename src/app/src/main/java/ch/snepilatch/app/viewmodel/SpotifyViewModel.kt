@@ -456,6 +456,28 @@ class SpotifyViewModel : ViewModel() {
         initialize(cookies)
     }
 
+    /**
+     * Launch [block] on Dispatchers.IO with the current [Session] as its
+     * receiver. If no session is live the launch is a no-op. Cancellation
+     * propagates; all other exceptions are caught and logged against [tag]
+     * so a single failed call can't crash the ViewModel.
+     *
+     * This replaces the boilerplate pattern of
+     * `viewModelScope.launch(Dispatchers.IO) { try { val s = session ?: return@launch ... } catch ... }`
+     * that appeared throughout the ViewModel.
+     */
+    private fun launchWithSession(tag: String, block: suspend (Session) -> Unit): Job =
+        viewModelScope.launch(Dispatchers.IO) {
+            val sess = session ?: return@launch
+            try {
+                block(sess)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                LokiLogger.e(TAG, tag, e)
+            }
+        }
+
     fun showLogin() {
         needsLogin.value = true
     }
@@ -994,13 +1016,10 @@ class SpotifyViewModel : ViewModel() {
     }
 
     fun addTrackToPlaylist(playlistId: String, trackUri: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val sess = session ?: return@launch
-                kotify.api.playlist.Playlist(sess).addToPlaylist(playlistId, listOf(trackUri))
-                LokiLogger.i(TAG, "Added $trackUri to playlist $playlistId")
-                _snackbarMessage.tryEmit("Added to playlist")
-            } catch (e: Exception) { LokiLogger.e(TAG, "addTrackToPlaylist", e) }
+        launchWithSession("addTrackToPlaylist") { sess ->
+            kotify.api.playlist.Playlist(sess).addToPlaylist(playlistId, listOf(trackUri))
+            LokiLogger.i(TAG, "Added $trackUri to playlist $playlistId")
+            _snackbarMessage.tryEmit("Added to playlist")
         }
     }
 
@@ -1163,26 +1182,20 @@ class SpotifyViewModel : ViewModel() {
     }
 
     fun openAlbumForTrack(trackUri: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val sess = session ?: return@launch
-                val trackId = trackUri.removePrefix("spotify:track:")
-                val track = Song(sess).getSong(trackId) ?: return@launch
-                val albumUri = track.album.uri.takeIf { it.isNotBlank() } ?: return@launch
-                openAlbum(albumUri.substringAfterLast(":"))
-            } catch (e: Exception) { LokiLogger.e(TAG, "openAlbumForTrack", e) }
+        launchWithSession("openAlbumForTrack") { sess ->
+            val trackId = trackUri.removePrefix("spotify:track:")
+            val track = Song(sess).getSong(trackId) ?: return@launchWithSession
+            val albumUri = track.album.uri.takeIf { it.isNotBlank() } ?: return@launchWithSession
+            openAlbum(albumUri.substringAfterLast(":"))
         }
     }
 
     fun openArtistForTrack(trackUri: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val sess = session ?: return@launch
-                val trackId = trackUri.removePrefix("spotify:track:")
-                val track = Song(sess).getSong(trackId) ?: return@launch
-                val artistUri = track.artists.firstOrNull()?.uri?.takeIf { it.isNotBlank() } ?: return@launch
-                openArtist(artistUri.substringAfterLast(":"))
-            } catch (e: Exception) { LokiLogger.e(TAG, "openArtistForTrack", e) }
+        launchWithSession("openArtistForTrack") { sess ->
+            val trackId = trackUri.removePrefix("spotify:track:")
+            val track = Song(sess).getSong(trackId) ?: return@launchWithSession
+            val artistUri = track.artists.firstOrNull()?.uri?.takeIf { it.isNotBlank() } ?: return@launchWithSession
+            openArtist(artistUri.substringAfterLast(":"))
         }
     }
 
@@ -1223,14 +1236,9 @@ class SpotifyViewModel : ViewModel() {
     private fun checkLikedState(trackUri: String) {
         if (trackUri == lastLikeCheckUri) return
         lastLikeCheckUri = trackUri
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val trackId = trackUri.removePrefix("spotify:track:")
-                val liked = session?.let { Song(it).isLiked(trackId) } ?: false
-                currentTrackLiked.value = liked
-            } catch (e: Exception) {
-                LokiLogger.e(TAG, "checkLikedState", e)
-            }
+        launchWithSession("checkLikedState") { sess ->
+            val trackId = trackUri.removePrefix("spotify:track:")
+            currentTrackLiked.value = Song(sess).isLiked(trackId)
         }
     }
 
@@ -1830,14 +1838,14 @@ class SpotifyViewModel : ViewModel() {
     // --- Home ---
 
     private fun loadHome() {
-        viewModelScope.launch(Dispatchers.IO) {
+        launchWithSession("loadHome") { sess ->
             try {
-                val sess = session ?: return@launch
                 val feed = Home(sess).getHomeFeed()
                 _homeData.value = feed
                 LokiLogger.i(TAG, "Home loaded: ${feed?.sections?.size} sections")
-            } catch (e: Exception) { LokiLogger.e(TAG, "loadHome", e) }
-            finally { isHomeLoading.value = false }
+            } finally {
+                isHomeLoading.value = false
+            }
         }
     }
 
@@ -1873,12 +1881,8 @@ class SpotifyViewModel : ViewModel() {
     // --- Library ---
 
     fun loadLibrary() {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val sess = session ?: return@launch
-                val data = Playlist(sess).getLibrary(limit = 50)
-                _library.value = data.toUiLibraryList()
-            } catch (e: Exception) { LokiLogger.e(TAG, "loadLibrary", e) }
+        launchWithSession("loadLibrary") { sess ->
+            _library.value = Playlist(sess).getLibrary(limit = 50).toUiLibraryList()
         }
     }
 

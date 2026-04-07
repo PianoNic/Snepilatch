@@ -2,16 +2,10 @@ package ch.snepilatch.app.viewmodel
 
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.drawable.BitmapDrawable
-import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.palette.graphics.Palette
-import coil.ImageLoader
-import coil.request.ImageRequest
-import coil.request.SuccessResult
 import ch.snepilatch.app.util.LokiLogger
+import ch.snepilatch.app.util.extractThemeColorsFromArt
 import ch.snepilatch.app.playback.MusicPlaybackService
 import ch.snepilatch.app.playback.PositionInterpolator
 import ch.snepilatch.app.playback.engine.SpotifyCdnResolver
@@ -2107,55 +2101,10 @@ class SpotifyViewModel : ViewModel() {
         val ctx = appContext ?: return
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val loader = ImageLoader(ctx)
-                val request = ImageRequest.Builder(ctx)
-                    .data(imageUrl)
-                    .allowHardware(false)
-                    .build()
-                val result = loader.execute(request)
-                if (result is SuccessResult) {
-                    val bitmap = (result.drawable as? BitmapDrawable)?.bitmap ?: return@launch
-                    val palette = Palette.from(bitmap).generate()
-                    val defaultGray = 0xFFB3B3B3.toInt()
-                    val defaultDarkGray = 0xFF808080.toInt()
-
-                    // Pick best color, filtering out too bright/dark/green
-                    fun isUsable(color: Int): Boolean {
-                        val r = (color shr 16) and 0xFF
-                        val g = (color shr 8) and 0xFF
-                        val b = color and 0xFF
-                        val brightness = (r * 299 + g * 587 + b * 114) / 1000
-                        if (brightness > 220 || brightness < 40) return false
-                        // Reject any green-dominant hue (70-170 degrees)
-                        val max = maxOf(r, g, b).toFloat()
-                        val min = minOf(r, g, b).toFloat()
-                        val sat = if (max == 0f) 0f else (max - min) / max
-                        if (sat > 0.3f && g == max.toInt() && g > 80) return false
-                        // Reject neon/overly saturated
-                        if (sat > 0.85f && brightness > 150) return false
-                        return true
-                    }
-
-                    val candidates = listOfNotNull(
-                        palette.vibrantSwatch?.rgb,
-                        palette.lightVibrantSwatch?.rgb,
-                        palette.darkVibrantSwatch?.rgb,
-                        palette.mutedSwatch?.rgb,
-                        palette.lightMutedSwatch?.rgb,
-                        palette.darkMutedSwatch?.rgb
-                    )
-                    val primary = candidates.firstOrNull { isUsable(it) } ?: defaultGray
-                    LokiLogger.d(TAG, "Palette: ${candidates.size} swatches, picked=#${Integer.toHexString(primary)}, usable=${candidates.count { isUsable(it) }}")
-                    val darkMuted = palette.getDarkMutedColor(0xFF282828.toInt())
-                    val muted = palette.getMutedColor(0xFF282828.toInt())
-
-                    themeColors.value = ThemeColors(
-                        primary = Color(primary),
-                        primaryDark = Color(primary).copy(alpha = 0.7f),
-                        surface = Color(darkMuted),
-                        gradientTop = Color(muted).copy(alpha = 0.8f),
-                        gradientBottom = Color(0xFF121212)
-                    )
+                val colors = extractThemeColorsFromArt(ctx, imageUrl)
+                if (colors != null) {
+                    themeColors.value = colors
+                    LokiLogger.d(TAG, "Palette updated from $imageUrl")
                 }
             } catch (e: Exception) {
                 LokiLogger.e(TAG, "extractColors", e)

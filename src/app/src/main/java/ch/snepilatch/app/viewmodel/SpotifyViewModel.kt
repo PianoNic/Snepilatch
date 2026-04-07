@@ -9,6 +9,7 @@ import ch.snepilatch.app.util.detectActiveAudioOutput
 import ch.snepilatch.app.util.extractThemeColorsFromArt
 import ch.snepilatch.app.playback.MusicPlaybackService
 import ch.snepilatch.app.playback.PositionInterpolator
+import ch.snepilatch.app.playback.SessionHolder
 import ch.snepilatch.app.playback.engine.SpotifyCdnResolver
 import ch.snepilatch.app.playback.engine.SpotifyStream
 import ch.snepilatch.app.data.*
@@ -52,9 +53,15 @@ class SpotifyViewModel : ViewModel() {
     private var screenStack = mutableListOf<Screen>()
     val needsLogin = MutableStateFlow(false)
 
-    // Session state
-    private var session: Session? = null
-    private var player: PlayerConnect? = null
+    // Session state — ownership lives in SessionHolder (process-scoped).
+    // These accessors make it obvious that the VM is a reader, not an owner,
+    // and keep the rest of the file unchanged.
+    private var session: Session?
+        get() = SessionHolder.session
+        set(value) { SessionHolder.session = value }
+    private var player: PlayerConnect?
+        get() = SessionHolder.player
+        set(value) { SessionHolder.player = value }
     private var username: String = ""
     val isInitialized = MutableStateFlow(false)
     val initError = MutableStateFlow<String?>(null)
@@ -64,8 +71,12 @@ class SpotifyViewModel : ViewModel() {
 
     // Streaming
     private val cdn = CdnPlayback()
-    private var spotifyPlayback: SpotifyPlayback? = null
-    private var cdnResolver: SpotifyCdnResolver? = null
+    private var spotifyPlayback: SpotifyPlayback?
+        get() = SessionHolder.spotifyPlayback
+        set(value) { SessionHolder.spotifyPlayback = value }
+    private var cdnResolver: SpotifyCdnResolver?
+        get() = SessionHolder.cdnResolver
+        set(value) { SessionHolder.cdnResolver = value }
     private var latestFileId: String? = null  // from TrackPlaybackHandler via onPlaybackId
     private var currentStreamUri: String? = null
     private var nextStreamUrl: String? = null
@@ -195,11 +206,10 @@ class SpotifyViewModel : ViewModel() {
 
     fun initialize(cookies: Map<String, String>) {
         // Clean up any leftover from previous session
-        MusicPlaybackService.sharedPlayer?.let {
+        SessionHolder.player?.let {
             try { kotlinx.coroutines.runBlocking { it.disconnect() } } catch (_: Exception) {}
         }
-        MusicPlaybackService.sharedPlayer = null
-        MusicPlaybackService.sharedSession = null
+        SessionHolder.clear()
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val sess = Session(SessionConfig(
@@ -256,10 +266,10 @@ class SpotifyViewModel : ViewModel() {
 
                 // Fresh device ID every launch — avoids stale server-side registrations
                 pc.ready()
+                // Assigning through the property setter publishes the player to
+                // SessionHolder — session/spotifyPlayback/cdnResolver are already
+                // live there from the initialization block above.
                 player = pc
-                // Store on service so it survives Activity/ViewModel recreation
-                MusicPlaybackService.sharedPlayer = pc
-                MusicPlaybackService.sharedSession = sess
                 LokiLogger.i(TAG, "Player ready, device: ${pc.ourDeviceId()}")
                 loadDevices()
 
@@ -2077,11 +2087,9 @@ class SpotifyViewModel : ViewModel() {
     override fun onCleared() {
         super.onCleared()
         stopPositionTicker()
-        // Kill everything — disconnect player and clean up
-        val p = player
-        player = null
-        MusicPlaybackService.sharedPlayer = null
-        MusicPlaybackService.sharedSession = null
+        // Kill everything — disconnect player and clear the process-level holder.
+        val p = SessionHolder.player
+        SessionHolder.clear()
         if (p != null) {
             Thread {
                 kotlinx.coroutines.runBlocking {

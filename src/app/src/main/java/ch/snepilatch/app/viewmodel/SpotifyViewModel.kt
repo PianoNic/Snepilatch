@@ -1524,10 +1524,17 @@ class SpotifyViewModel : ViewModel() {
                 coldStartPending = false
                 _playback.value = _playback.value.copy(isPlaying = true, isPaused = false, positionMs = pos)
                 startPositionTicker()
+                // Hold the seek guard for 15s after cold-start completion.
+                // The transfer + resume handshake can leave Spotify's cluster
+                // snapshot with a stale position_as_of_timestamp that
+                // interpolates tens of seconds past the real position — our
+                // remote-seek detector would then yank ExoPlayer forward and
+                // break playback. 15s is long enough for stale snapshots to
+                // wash out without blocking legitimate user seeks for long.
                 viewModelScope.launch(Dispatchers.IO) {
                     try {
                         try { player?.resume() } catch (_: Exception) {}
-                        seekGuardUntil = System.currentTimeMillis() + 1500L
+                        seekGuardUntil = System.currentTimeMillis() + 15_000L
                     } finally {
                         isStreamLoading.value = false
                     }

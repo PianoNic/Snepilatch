@@ -524,9 +524,14 @@ class SpotifyViewModel : ViewModel() {
                 MusicPlaybackService.instance?.getCurrentPosition()
             } ?: state.position_as_of_timestamp
             else -> {
-                // Not streaming: interpolate from timestamp
-                val elapsed = (System.currentTimeMillis() - state.timestamp).coerceAtLeast(0)
-                if (state.is_playing && !state.is_paused) {
+                // Not streaming: interpolate the snapshot position only if a device is
+                // actually playing right now. Spotify keeps is_playing=true even when no
+                // device is active (idle state), so on init the snapshot can be hours
+                // stale — interpolating against that would clamp the position to the end
+                // of the track. isActuallyPlaying already accounts for has_active_device
+                // and the position-vs-duration boundary, so it's the correct gate here.
+                if (state.isActuallyPlaying) {
+                    val elapsed = (System.currentTimeMillis() - state.timestamp).coerceAtLeast(0)
                     (state.position_as_of_timestamp + elapsed).coerceAtMost(state.duration)
                 } else {
                     state.position_as_of_timestamp

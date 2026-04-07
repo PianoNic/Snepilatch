@@ -202,9 +202,8 @@ class SpotifyViewModel : ViewModel() {
                 loadLibrary()
 
                 val userApi = User(sess)
-                val profile = userApi.getCurrentUser()
-                val profileMap = profile["profile"] as? Map<*, *>
-                username = profileMap?.get("username")?.toString() ?: ""
+                val me = userApi.getCurrentUser()
+                username = me.username
                 val isPremium = userApi.hasPremium()
                 // Get public profile (display name + avatar) from user-profile-view API
                 val pubProfile = userApi.getProfile(username)
@@ -298,7 +297,7 @@ class SpotifyViewModel : ViewModel() {
 
                 pc.onTrackChange { event ->
                     val delta = if (lastCommandTs > 0) System.currentTimeMillis() - lastCommandTs else -1
-                    LokiLogger.i(TAG, "[Timing] WS onTrackChange arrived (${delta}ms after CMD '$lastCommandName') -> ${event.current?.get("uri")} fileId=${event.currentFileId}")
+                    LokiLogger.i(TAG, "[Timing] WS onTrackChange arrived (${delta}ms after CMD '$lastCommandName') -> ${event.current?.uri} fileId=${event.currentFileId}")
                     // Set latestFileId from cluster state so resolveAndPlay doesn't wait for onPlaybackId
                     if (event.currentFileId != null) {
                         latestFileId = event.currentFileId
@@ -456,22 +455,14 @@ class SpotifyViewModel : ViewModel() {
 
     private suspend fun updatePlaybackFromState(state: PlayerStateData) {
         val track = state.track
-        val metadata = track?.get("metadata") as? Map<*, *>
-        // Try multiple image keys from Spotify Connect metadata
-        val imageUrl = metadata?.let {
-            it["image_xlarge_url"]?.toString()
-                ?: it["image_large_url"]?.toString()
-                ?: it["image_url"]?.toString()
-                ?: it["image_small_url"]?.toString()
-                ?: it["album_cover_art_url"]?.toString()
-        }
+        val imageUrl = track?.imageLargeUrl ?: track?.imageUrl ?: track?.imageSmallUrl
         val trackInfo = if (track != null) {
             TrackInfo(
-                uri = track["uri"]?.toString() ?: "",
-                name = metadata?.get("title")?.toString() ?: "Unknown",
-                artist = metadata?.get("artist_name")?.toString() ?: "Unknown",
+                uri = track.uri,
+                name = track.name.ifBlank { "Unknown" },
+                artist = track.artistName ?: "Unknown",
                 albumArt = imageUrl,
-                albumName = metadata?.get("album_title")?.toString(),
+                albumName = track.albumName,
                 durationMs = state.duration
             )
         } else null
@@ -489,7 +480,7 @@ class SpotifyViewModel : ViewModel() {
 
         // When streaming, the audio source of truth is ExoPlayer, not Spotify's state.
         // If Spotify's state says track B but we're still playing track A, keep showing track A.
-        val stateTrackUri = track?.get("uri")?.toString()
+        val stateTrackUri = track?.uri
         val isTrackMismatch = isStreaming.value && currentStreamUri != null && stateTrackUri != currentStreamUri
 
         // Detect remote seek: when streaming, if Spotify's position differs significantly
@@ -562,21 +553,7 @@ class SpotifyViewModel : ViewModel() {
         }
 
         // Extract next track info for mini player swipe preview
-        @Suppress("UNCHECKED_CAST")
-        val nextTracks = state.next_tracks as? List<Map<String, Any?>>
-        val nextMeta = nextTracks?.firstOrNull()?.let { nt ->
-            val ntUri = nt["uri"]?.toString() ?: return@let null
-            val ntMd = nt["metadata"] as? Map<*, *> ?: return@let null
-            TrackInfo(
-                uri = ntUri,
-                name = ntMd["title"]?.toString() ?: "Unknown",
-                artist = ntMd["artist_name"]?.toString() ?: "Unknown",
-                albumArt = ntMd["image_xlarge_url"]?.toString()
-                    ?: ntMd["image_large_url"]?.toString()
-                    ?: ntMd["image_url"]?.toString()
-            )
-        }
-        nextTrackPreview.value = nextMeta
+        nextTrackPreview.value = state.next_tracks.firstOrNull()?.toTrackInfo()
 
         if (actuallyPlaying) {
             startPositionTicker()
@@ -616,7 +593,7 @@ class SpotifyViewModel : ViewModel() {
 
         // Update playing context (album/playlist/artist/collection)
         val contextUri = state.context_uri
-        val albumTitle = metadata?.get("album_title")?.toString()
+        val albumTitle = track?.albumName
         playingContext.value = when {
             contextUri == null -> null
             contextUri.contains(":collection:tracks") -> PlayingContext("Liked Songs", "Liked Songs", contextUri)
@@ -630,10 +607,8 @@ class SpotifyViewModel : ViewModel() {
                         viewModelScope.launch(Dispatchers.IO) {
                             try {
                                 val sess = session ?: return@launch
-                                val data = kotify.api.playlist.Playlist(sess).getPlaylist(playlistId, limit = 1)
-                                val name = (data["data"] as? Map<*, *>)
-                                    ?.get("playlistV2") as? Map<*, *>
-                                val title = name?.get("name")?.toString()
+                                val info = kotify.api.playlist.Playlist(sess).getPlaylist(playlistId, limit = 1)
+                                val title = info.name.takeIf { it.isNotBlank() }
                                 if (title != null) {
                                     playlistNameCache[playlistId] = title
                                     playingContext.value = PlayingContext("Playlist", title, contextUri)
@@ -648,8 +623,7 @@ class SpotifyViewModel : ViewModel() {
                 PlayingContext("Album", albumTitle ?: "Album", contextUri)
             }
             contextUri.contains(":artist:") -> {
-                val name = metadata?.get("artist_name")?.toString()
-                PlayingContext("Artist", name ?: "Artist", contextUri)
+                PlayingContext("Artist", track?.artistName ?: "Artist", contextUri)
             }
             else -> null
         }
@@ -923,35 +897,31 @@ class SpotifyViewModel : ViewModel() {
         }
     }
 
-    @Suppress("UNCHECKED_CAST")
     fun refreshQueue() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val state = player?.getState() ?: return@launch
-                val nextTracks = state.next_tracks as? List<Map<String, Any?>> ?: emptyList()
                 val sess = session ?: return@launch
                 val songApi = Song(sess)
 
-                // Parse what we have from state metadata first
+                // Parse what we have from the typed cluster queue first.
                 data class ParsedTrack(
                     val uri: String,
                     val info: TrackInfo,
                     val needsFetch: Boolean
                 )
-                val parsed = nextTracks.mapNotNull { track ->
-                    val uri = track["uri"]?.toString() ?: return@mapNotNull null
-                    val uid = track["uid"]?.toString()
-                    val metadata = track["metadata"] as? Map<*, *>
-                    val title = metadata?.get("title")?.toString()
-                    val artist = metadata?.get("artist_name")?.toString()
-                    val art = metadata?.let {
-                        it["image_xlarge_url"]?.toString()
-                            ?: it["image_large_url"]?.toString()
-                            ?: it["image_url"]?.toString()
-                    }
-                    val dur = metadata?.get("duration")?.toString()?.toLongOrNull() ?: 0
-                    val needsFetch = title.isNullOrEmpty() || artist.isNullOrEmpty() || art == null
-                    ParsedTrack(uri, TrackInfo(uri = uri, name = title ?: "Unknown", artist = artist ?: "Unknown", albumArt = art, durationMs = dur, uid = uid), needsFetch)
+                val parsed = state.next_tracks.map { qt ->
+                    val art = qt.imageUrl
+                    val needsFetch = qt.name.isNullOrEmpty() || qt.artistName.isNullOrEmpty() || art == null
+                    val info = TrackInfo(
+                        uri = qt.uri,
+                        name = qt.name ?: "Unknown",
+                        artist = qt.artistName ?: "Unknown",
+                        albumArt = art,
+                        durationMs = qt.durationMs,
+                        uid = qt.uid,
+                    )
+                    ParsedTrack(qt.uri, info, needsFetch)
                 }
 
                 // Show immediately with what we have
@@ -965,7 +935,7 @@ class SpotifyViewModel : ViewModel() {
                             async {
                                 try {
                                     val trackId = pt.uri.removePrefix("spotify:track:")
-                                    songApi.getSong(trackId).let { parseTrackUnion(it) } ?: pt.info
+                                    songApi.getSong(trackId)?.toTrackInfo() ?: pt.info
                                 } catch (e: Exception) {
                                     LokiLogger.e(TAG, "refreshQueue fetch ${pt.uri}", e)
                                     pt.info
@@ -993,14 +963,13 @@ class SpotifyViewModel : ViewModel() {
             try {
                 val state = player?.getState() ?: return@launch
                 val track = state.track ?: return@launch
-                val metadata = track["metadata"] as? Map<*, *>
-                val albumUri = metadata?.get("album_uri")?.toString()
+                val albumUri = track.albumUri?.takeIf { it.isNotBlank() }
                     ?: state.context_uri?.takeIf { it.contains(":album:") }
                 if (albumUri != null) {
                     val albumId = albumUri.removePrefix("spotify:album:")
                     openAlbum(albumId)
                 } else {
-                    LokiLogger.w(TAG, "No album URI found in metadata: ${metadata?.keys}")
+                    LokiLogger.w(TAG, "No album URI on current track")
                 }
             } catch (e: Exception) { LokiLogger.e(TAG, "openAlbumFromCurrentTrack", e) }
         }
@@ -1022,12 +991,9 @@ class SpotifyViewModel : ViewModel() {
             try {
                 val sess = session ?: return@launch
                 val trackId = trackUri.removePrefix("spotify:track:")
-                val data = Song(sess).getSong(trackId)
-                val albumUri = (data["data"] as? Map<*, *>)
-                    ?.let { (it["trackUnion"] as? Map<*, *>) }
-                    ?.let { (it["albumOfTrack"] as? Map<*, *>) }
-                    ?.get("uri")?.toString()
-                if (albumUri != null) openAlbum(albumUri.substringAfterLast(":"))
+                val track = Song(sess).getSong(trackId) ?: return@launch
+                val albumUri = track.album.uri.takeIf { it.isNotBlank() } ?: return@launch
+                openAlbum(albumUri.substringAfterLast(":"))
             } catch (e: Exception) { LokiLogger.e(TAG, "openAlbumForTrack", e) }
         }
     }
@@ -1037,13 +1003,9 @@ class SpotifyViewModel : ViewModel() {
             try {
                 val sess = session ?: return@launch
                 val trackId = trackUri.removePrefix("spotify:track:")
-                val data = Song(sess).getSong(trackId)
-                val artistUri = (data["data"] as? Map<*, *>)
-                    ?.let { (it["trackUnion"] as? Map<*, *>) }
-                    ?.let { (it["firstArtist"] as? Map<*, *>) }
-                    ?.let { (it["items"] as? List<*>)?.firstOrNull() as? Map<*, *> }
-                    ?.get("uri")?.toString()
-                if (artistUri != null) openArtist(artistUri.substringAfterLast(":"))
+                val track = Song(sess).getSong(trackId) ?: return@launch
+                val artistUri = track.artists.firstOrNull()?.uri?.takeIf { it.isNotBlank() } ?: return@launch
+                openArtist(artistUri.substringAfterLast(":"))
             } catch (e: Exception) { LokiLogger.e(TAG, "openArtistForTrack", e) }
         }
     }
@@ -1053,8 +1015,7 @@ class SpotifyViewModel : ViewModel() {
             try {
                 val state = player?.getState() ?: return@launch
                 val track = state.track ?: return@launch
-                val metadata = track["metadata"] as? Map<*, *>
-                val artistUri = metadata?.get("artist_uri")?.toString()
+                val artistUri = track.artistUri?.takeIf { it.isNotBlank() }
                 if (artistUri != null) {
                     val artistId = artistUri.removePrefix("spotify:artist:")
                     openArtist(artistId)
@@ -1396,7 +1357,8 @@ class SpotifyViewModel : ViewModel() {
 
     private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent) {
         val resolveStart = System.currentTimeMillis()
-        val trackUri = event.current?.get("uri")?.toString() ?: return
+        val current = event.current ?: return
+        val trackUri = current.uri
         LokiLogger.i(TAG, "[Timing] resolveAndPlay start for $trackUri (${resolveStart - lastCommandTs}ms after CMD)")
         if (trackUri.startsWith("spotify:ad:")) {
             LokiLogger.i(TAG, "[AdSkip] Ad detected: $trackUri — skipping to next track")
@@ -1415,9 +1377,8 @@ class SpotifyViewModel : ViewModel() {
         }
         currentStreamUri = trackUri
 
-        val metadata = event.current?.get("metadata") as? Map<*, *>
-        val title = metadata?.get("title")?.toString() ?: "Unknown"
-        val artist = metadata?.get("artist_name")?.toString() ?: "Unknown"
+        val title = current.name.ifBlank { "Unknown" }
+        val artist = current.artistName ?: "Unknown"
 
         isStreamLoading.value = true
         isNextReady.value = false
@@ -1430,17 +1391,13 @@ class SpotifyViewModel : ViewModel() {
         if (preferredAudioSource.value != null) {
             try { player?.pause() } catch (_: Exception) {}
         }
-        val art = metadata?.let {
-            it["image_xlarge_url"]?.toString()
-                ?: it["image_large_url"]?.toString()
-                ?: it["image_url"]?.toString()
-        }
+        val art = current.imageLargeUrl ?: current.imageUrl
 
         // Update UI with new track info immediately — audio will follow in ~100ms
         val newTrack = TrackInfo(
             uri = trackUri, name = title, artist = artist, albumArt = art,
-            albumName = metadata?.get("album_title")?.toString(),
-            durationMs = (metadata?.get("duration")?.toString()?.toLongOrNull() ?: _playback.value.durationMs)
+            albumName = current.albumName,
+            durationMs = if (current.durationMs > 0) current.durationMs else _playback.value.durationMs
         )
         _playback.value = _playback.value.copy(track = newTrack, positionMs = 0)
         if (art != null && art != lastPaletteUrl) {
@@ -1579,7 +1536,7 @@ class SpotifyViewModel : ViewModel() {
 
     private fun resolveCurrentTrack(state: PlayerStateData) {
         val track = state.track ?: return
-        val uri = track["uri"]?.toString() ?: return
+        val uri = track.uri
         if (uri == currentStreamUri) return
         currentStreamUri = uri
         isStreamLoading.value = true
@@ -1590,18 +1547,13 @@ class SpotifyViewModel : ViewModel() {
 
         val shouldPlay = state.isActuallyPlaying
         val trackId = uri.removePrefix("spotify:track:")
-        val metadata = track["metadata"] as? Map<*, *>
-        val title = metadata?.get("title")?.toString()
-        val artist = metadata?.get("artist_name")?.toString()
+        val title = track.name.ifBlank { null }
+        val artist = track.artistName?.ifBlank { null }
         val searchQuery = listOfNotNull(artist, title).joinToString(" ").takeIf { it.isNotBlank() }
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val art = metadata?.let {
-                    it["image_xlarge_url"]?.toString()
-                        ?: it["image_large_url"]?.toString()
-                        ?: it["image_url"]?.toString()
-                }
+                val art = track.imageLargeUrl ?: track.imageUrl
 
                 val result = cdn.resolveStreamUrl(trackId, region = contentRegion.value, youtubeSearchQuery = searchQuery, preferredSource = preferredAudioSource.value)
                 when (result) {
@@ -1648,23 +1600,17 @@ class SpotifyViewModel : ViewModel() {
 
         try {
             val state = player?.getState() ?: return
-            val nextTracks = state.next_tracks as? List<Map<String, Any?>> ?: return
-            val nextTrack = nextTracks.firstOrNull() ?: return
-            val nextUri = nextTrack["uri"]?.toString() ?: return
+            val nextTrack = state.next_tracks.firstOrNull() ?: return
+            val nextUri = nextTrack.uri
             if (nextUri.startsWith("spotify:ad:")) {
                 LokiLogger.i(TAG, "[AdSkip] Skipping ad URI in preResolveNextTrack: $nextUri")
                 return
             }
             val nextId = nextUri.removePrefix("spotify:track:")
 
-            val metadata = nextTrack["metadata"] as? Map<*, *>
-            val title = metadata?.get("title")?.toString() ?: "Unknown"
-            val artist = metadata?.get("artist_name")?.toString() ?: "Unknown"
-            val art = metadata?.let {
-                it["image_xlarge_url"]?.toString()
-                    ?: it["image_large_url"]?.toString()
-                    ?: it["image_url"]?.toString()
-            }
+            val title = nextTrack.name ?: "Unknown"
+            val artist = nextTrack.artistName ?: "Unknown"
+            val art = nextTrack.imageUrl
             val searchQuery = listOfNotNull(artist.takeIf { it != "Unknown" }, title.takeIf { it != "Unknown" })
                 .joinToString(" ").takeIf { it.isNotBlank() }
 
@@ -1713,8 +1659,7 @@ class SpotifyViewModel : ViewModel() {
             try {
                 val sess = session ?: return@launch
                 val results = Song(sess).search(query, limit = 30)
-                val tracks = results["tracks"] as? Map<*, *>
-                val trackList = parseSearchTracks(tracks?.get("items"))
+                val trackList = results.tracks.items.map { it.toTrackInfo() }
                 _searchResults.value = trackList
                 LokiLogger.i(TAG, "Search '$query': ${trackList.size} results")
             } catch (e: CancellationException) { throw e }
@@ -1734,7 +1679,7 @@ class SpotifyViewModel : ViewModel() {
             try {
                 val sess = session ?: return@launch
                 val data = Playlist(sess).getLibrary(limit = 50)
-                _library.value = parseLibrary(data)
+                _library.value = data.toUiLibraryList()
             } catch (e: Exception) { LokiLogger.e(TAG, "loadLibrary", e) }
         }
     }
@@ -1752,7 +1697,7 @@ class SpotifyViewModel : ViewModel() {
             try {
                 val sess = session ?: return@launch
                 val data = Playlist(sess).getLikedSongs(limit = 50)
-                _detail.value = parseLikedSongsDetail(data, 0)
+                _detail.value = data.toDetailData(offset = 0)
             } catch (e: Exception) { LokiLogger.e(TAG, "openLikedSongs", e) }
             finally { isLoading.value = false }
         }
@@ -1770,7 +1715,7 @@ class SpotifyViewModel : ViewModel() {
                 val offset = current.tracks.size
                 if (uri == "spotify:collection:tracks") {
                     val data = Playlist(sess).getLikedSongs(limit = 50, offset = offset)
-                    val more = parseLikedSongsDetail(data, offset)
+                    val more = data.toDetailData(offset)
                     _detail.value = current.copy(
                         tracks = current.tracks + more.tracks,
                         totalCount = more.totalCount,
@@ -1778,12 +1723,11 @@ class SpotifyViewModel : ViewModel() {
                     )
                 } else if (uri.startsWith("spotify:playlist:")) {
                     val id = uri.removePrefix("spotify:playlist:")
-                    val data = Playlist(sess).getPlaylist(id, limit = 50, offset = offset)
-                    val more = parsePlaylistTracks(data)
-                    val total = parsePlaylistTotalCount(data)
+                    val info = Playlist(sess).getPlaylist(id, limit = 50, offset = offset)
+                    val more = info.tracks.map { it.toTrackInfo() }
                     _detail.value = current.copy(
                         tracks = current.tracks + more,
-                        totalCount = total,
+                        totalCount = info.totalTracks,
                         loadedOffset = offset + more.size
                     )
                 }
@@ -1799,28 +1743,7 @@ class SpotifyViewModel : ViewModel() {
             isLoading.value = true
             try {
                 val sess = session ?: return@launch
-                val info = Playlist(sess).getPlaylistInfo(playlistId, limit = 50)
-                _detail.value = DetailData(
-                    name = info.name,
-                    imageUrl = info.imageUrl,
-                    description = info.description.takeIf { it.isNotBlank() },
-                    uri = "spotify:playlist:$playlistId",
-                    type = "playlist",
-                    totalCount = info.totalTracks,
-                    loadedOffset = info.tracks.size,
-                    ownerName = info.owner.name,
-                    followers = info.followers,
-                    tracks = info.tracks.map { t ->
-                        TrackInfo(
-                            uri = t.uri,
-                            name = t.name,
-                            artist = t.artists.joinToString(", "),
-                            albumArt = t.coverArtUrl,
-                            durationMs = t.durationMs,
-                            uid = t.uid
-                        )
-                    }
-                )
+                _detail.value = Playlist(sess).getPlaylist(playlistId, limit = 50).toDetailData(playlistId)
             } catch (e: Exception) { LokiLogger.e(TAG, "openPlaylist", e) }
             finally { isLoading.value = false }
         }
@@ -1833,8 +1756,7 @@ class SpotifyViewModel : ViewModel() {
             isLoading.value = true
             try {
                 val sess = session ?: return@launch
-                val data = Album(sess).getAlbum(albumId, limit = 50)
-                _detail.value = parseAlbumDetail(data, albumId)
+                _detail.value = Album(sess).getAlbum(albumId, limit = 50).toDetailData(albumId)
             } catch (e: Exception) { LokiLogger.e(TAG, "openAlbum", e) }
             finally { isLoading.value = false }
         }
@@ -1847,41 +1769,7 @@ class SpotifyViewModel : ViewModel() {
             isLoading.value = true
             try {
                 val sess = session ?: return@launch
-                val info = Artist(sess).getArtistInfo(artistId)
-                _detail.value = DetailData(
-                    name = info.name,
-                    imageUrl = info.avatarUrl ?: info.headerImageUrl,
-                    uri = "spotify:artist:$artistId",
-                    type = "artist",
-                    monthlyListeners = info.monthlyListeners,
-                    biography = info.biography,
-                    tracks = info.topTracks.map { t ->
-                        TrackInfo(
-                            uri = t.uri,
-                            name = t.name,
-                            artist = info.name,
-                            albumArt = t.coverArtUrl,
-                            durationMs = t.durationMs
-                        )
-                    },
-                    topTrackPlaycounts = info.topTracks.map { it.playcount.toString() },
-                    popularReleases = info.popularReleases.map { r ->
-                        ch.snepilatch.app.data.RelatedAlbum(
-                            uri = r.uri,
-                            name = r.name,
-                            imageUrl = r.coverArtUrl,
-                            year = r.year?.toString(),
-                            albumType = r.type
-                        )
-                    },
-                    relatedArtists = info.relatedArtists.map { a ->
-                        ch.snepilatch.app.data.RelatedArtist(
-                            uri = a.uri,
-                            name = a.name,
-                            imageUrl = a.avatarUrl
-                        )
-                    }
-                )
+                _detail.value = Artist(sess).getArtist(artistId).toDetailData(artistId)
             } catch (e: Exception) { LokiLogger.e(TAG, "openArtist", e) }
             finally { isLoading.value = false }
         }

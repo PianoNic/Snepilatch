@@ -379,8 +379,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     }
 
     fun playDrmUrl(url: String, licenseUrl: String, licenseHeaders: Map<String, String>,
-                   title: String, artist: String, albumArtUrl: String?) {
-        LokiLogger.i(TAG, "Loading DRM: $title by $artist -> ${url.take(80)}")
+                   title: String, artist: String, albumArtUrl: String?,
+                   startPlaying: Boolean = true,
+                   startPositionMs: Long = 0L) {
+        LokiLogger.i(TAG, "Loading DRM: $title by $artist -> ${url.take(80)} (play=$startPlaying, pos=${startPositionMs}ms)")
         val meta = TrackMetadata(title, artist, albumArtUrl)
         metadataQueue.clear()
         metadataQueue.add(meta)
@@ -389,15 +391,18 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
         // Start audio IMMEDIATELY — don't wait for art
         mainHandler.post {
-            player.playWhenReady = false
-            player.setMediaItem(buildDrmMediaItem(url, licenseUrl, licenseHeaders))
+            // Seek-on-load: setMediaItem with a startPositionMs makes ExoPlayer prepare,
+            // seek, and reach STATE_READY at that exact position. No post-prepare seek
+            // dance — eliminates the race where the post-ready seek fails to actually
+            // produce audio (the bug in the cold-start sync).
+            player.setMediaItem(buildDrmMediaItem(url, licenseUrl, licenseHeaders), startPositionMs)
+            player.playWhenReady = startPlaying
             // Register listener BEFORE prepare() so we catch STATE_READY
             player.addListener(object : Player.Listener {
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     if (playbackState == Player.STATE_READY) {
                         player.removeListener(this)
-                        player.play()
-                        LokiLogger.i(TAG, "DRM stream ready, playback started")
+                        LokiLogger.i(TAG, "DRM stream ready (playWhenReady=$startPlaying, pos=${player.currentPosition}ms)")
                         onReady?.invoke()
                     }
                 }

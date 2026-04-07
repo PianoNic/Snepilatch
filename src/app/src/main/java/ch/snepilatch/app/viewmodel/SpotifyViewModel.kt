@@ -76,6 +76,17 @@ class SpotifyViewModel : ViewModel() {
     private var nextCdnFileId: String? = null   // File ID for the pre-resolved CDN track
     private var lastCommandTs: Long = 0L  // timing: when last user command was sent
     private var lastCommandName: String = ""
+    private var playUrlAt: Long = 0L      // timing: when playUrl/playDrmUrl was last called
+
+    // Cold-start sync: when the user taps play with nothing loaded in ExoPlayer,
+    // we call transferPlaybackHere(restorePaused=true) — claim the device on
+    // Spotify Connect WITHOUT emitting audio anywhere — and wait for Spotify's
+    // state machine to push the current track's file_id via the onPlaybackId
+    // callback. We then resolve a CDN URL for that file, load ExoPlayer paused,
+    // and the shared onReady callback seeks + starts ExoPlayer + Spotify in
+    // lock-step. This is the same protocol the open.spotify.com web player uses.
+    private var coldStartPending = false
+    private var coldStartFileId: kotlinx.coroutines.CompletableDeferred<String>? = null
     val isStreaming = MutableStateFlow(false)
     val streamProvider = MutableStateFlow<String?>(null)
     val isNextReady = MutableStateFlow(false)
@@ -261,6 +272,12 @@ class SpotifyViewModel : ViewModel() {
                 pc.onPlaybackId { fileId ->
                     LokiLogger.i(TAG, "Got file ID from state machine: $fileId")
                     latestFileId = fileId
+                    // Cold-start: complete the deferred so coldStartPlay can proceed
+                    // with resolving the CDN URL and loading ExoPlayer.
+                    val deferred = coldStartFileId
+                    if (coldStartPending && deferred != null && !deferred.isCompleted) {
+                        deferred.complete(fileId)
+                    }
                 }
 
                 pc.onNextPlaybackId { fileId, uri, name ->
@@ -301,6 +318,16 @@ class SpotifyViewModel : ViewModel() {
                     // Set latestFileId from cluster state so resolveAndPlay doesn't wait for onPlaybackId
                     if (event.currentFileId != null) {
                         latestFileId = event.currentFileId
+                    }
+                    // Only auto-resolve when we're already streaming (legit track changes
+                    // during active playback — skip-next, auto-advance, remote skip from
+                    // another device). Otherwise the very first WS push on init runs a
+                    // futile CDN resolve, eats 18s of SongLink retries on the third-party
+                    // fallback path, AND resets _playback.value.positionMs to 0 — clobbering
+                    // the saved snapshot position the user is supposed to resume at.
+                    if (!isStreaming.value) {
+                        LokiLogger.d(TAG, "Skipping resolveAndPlay: not streaming (idle WS push)")
+                        return@onTrackChange
                     }
                     // Cancel any in-flight resolve — only the latest track change matters
                     resolveJob?.cancel()
@@ -360,7 +387,10 @@ class SpotifyViewModel : ViewModel() {
                 val state = pc.getState()
                 if (state != null) {
                     updatePlaybackFromState(state)
-                    // Only resolve and play if our device is active and Spotify is actually playing
+                    // Only resolve and play if our device is active and Spotify is actually playing.
+                    // Idle preload is intentionally NOT done — pressing play sends resume to
+                    // Spotify, which pushes the file_id via the WS state machine, and
+                    // resolveAndPlay then loads ExoPlayer with the right CDN URL.
                     if (state.is_active_device && state.isActuallyPlaying) {
                         resolveCurrentTrack(state)
                     }
@@ -484,15 +514,20 @@ class SpotifyViewModel : ViewModel() {
         val isTrackMismatch = isStreaming.value && currentStreamUri != null && stateTrackUri != currentStreamUri
 
         // Detect remote seek: when streaming, if Spotify's position differs significantly
-        // from ExoPlayer's, someone seeked from the web player — sync ExoPlayer
-        // Skip during track transitions (mismatch) to avoid false seeks
+        // from ExoPlayer's, someone seeked from the web player — sync ExoPlayer.
+        // Skip during track transitions (mismatch) to avoid false seeks.
+        // Skip if the spotify timestamp is stale (>10s old) — the cluster snapshot's
+        // timestamp can be minutes in the past after the user resumes from idle, and
+        // interpolating against it produces a bogus position past the end of the track.
         val isSeekGuarded = System.currentTimeMillis() < seekGuardUntil
-        if (isStreaming.value && !isSeekGuarded && !isStreamLoading.value && !isTrackMismatch) {
+        val timestampAge = System.currentTimeMillis() - state.timestamp
+        val isStaleSnapshot = timestampAge > 10_000L
+        if (isStreaming.value && !isSeekGuarded && !isStreamLoading.value && !isTrackMismatch && !isStaleSnapshot) {
             val exoPos = withContext(Dispatchers.Main) {
                 MusicPlaybackService.instance?.getCurrentPosition()
             } ?: 0L
             // Interpolate Spotify's position using timestamp
-            val elapsed = (System.currentTimeMillis() - state.timestamp).coerceAtLeast(0)
+            val elapsed = timestampAge.coerceAtLeast(0)
             val spotifyPos = if (state.is_playing && !state.is_paused) {
                 state.position_as_of_timestamp + elapsed
             } else {
@@ -505,6 +540,8 @@ class SpotifyViewModel : ViewModel() {
                     MusicPlaybackService.instance?.syncSeek(spotifyPos)
                 }
             }
+        } else if (isStaleSnapshot && isStreaming.value) {
+            LokiLogger.d(TAG, "Skipping remote-seek sync: snapshot timestamp is ${timestampAge}ms old")
         }
 
         val posMs = when {
@@ -675,19 +712,28 @@ class SpotifyViewModel : ViewModel() {
                 val p = player ?: return@launch
                 val t0 = System.currentTimeMillis()
                 if (action == "resume") {
-                    _playback.value = _playback.value.copy(isPlaying = true, isPaused = false)
-                    startPositionTicker()
                     if (isStreaming.value) {
+                        // Hot path: ExoPlayer is already loaded — flip the UI to playing
+                        // and start audio locally + sync Spotify Connect.
+                        _playback.value = _playback.value.copy(isPlaying = true, isPaused = false)
+                        startPositionTicker()
                         withContext(Dispatchers.Main) { MusicPlaybackService.instance?.syncPlay(_playback.value.positionMs) }
-                    }
-                    try {
-                        p.resume()
-                    } catch (e: CancellationException) { throw e }
-                    catch (e: Exception) {
-                        LokiLogger.w(TAG, "resume failed, transferring playback and retrying: ${e.message}")
-                        p.transferPlaybackHere()
-                        delay(500)
-                        p.resume()
+                        try {
+                            p.resume()
+                        } catch (e: CancellationException) { throw e }
+                        catch (e: Exception) {
+                            LokiLogger.w(TAG, "resume failed, transferring playback and retrying: ${e.message}")
+                            p.transferPlaybackHere()
+                            delay(500)
+                            p.resume()
+                        }
+                    } else {
+                        // Cold start: nothing loaded in ExoPlayer yet. Mirror the Spotify
+                        // web player's protocol — fetch track metadata directly (no WS,
+                        // no Spotify state changes), claim the device with
+                        // restore_paused=true, load ExoPlayer paused, and only then
+                        // start Spotify+ExoPlayer in sync via the onReady callback.
+                        coldStartPlay()
                     }
                 } else {
                     _playback.value = _playback.value.copy(isPaused = true)
@@ -708,6 +754,151 @@ class SpotifyViewModel : ViewModel() {
                 LokiLogger.i(TAG, "[Timing] CMD $action API done in ${System.currentTimeMillis() - t0}ms")
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { LokiLogger.e(TAG, "togglePlayPause", e) }
+        }
+    }
+
+    /**
+     * Cold-start playback that mirrors the Spotify web player's protocol.
+     *
+     * The web player's HAR shows the file_id is NOT in the metadata API for most
+     * accounts — it comes from the state machine after the transfer call. So the
+     * actual sequence is:
+     *
+     *   1. transferPlaybackHere(restorePaused = true)
+     *      → POST /connect-state/v1/connect/transfer with `restore_paused: "pause"`
+     *      Spotify Connect claims this device as active WITHOUT emitting audio,
+     *      and the dealer pushes a cluster_update with the next track + file_id
+     *      via the WS state machine.
+     *   2. The existing onTrackChange listener fires resolveAndPlay; it reads
+     *      coldStartPending and calls playDrmUrl(startPlaying = false). ExoPlayer
+     *      buffers the track and prepares its Widevine session, but stays paused.
+     *   3. wireServiceControls.onReady sees coldStartPending, seeks ExoPlayer to
+     *      the saved position, syncPlay()s locally, and tells Spotify to resume.
+     *      Local audio and remote state start together — no ghost playback on
+     *      any other device.
+     *
+     * On any failure we reset state and fall back to the legacy path (p.resume()),
+     * so the user still gets audio just slower.
+     */
+    private suspend fun coldStartPlay() {
+        val p = player ?: return
+        val sp = spotifyPlayback
+        val sess = session
+        if (sp == null || sess == null) {
+            LokiLogger.w(TAG, "[ColdStart] SpotifyPlayback / Session not initialized, falling back to legacy resume")
+            try { p.resume() } catch (_: Exception) {}
+            return
+        }
+
+        // Capture the saved resume position NOW, before we kick off any async work
+        // that could overwrite _playback.value via WS state pushes. The transfer
+        // call below triggers cluster_update pushes that updatePlaybackFromState
+        // happily writes back into _playback.value.positionMs.
+        val savedPositionAtEntry = _playback.value.positionMs
+
+        coldStartPending = true
+        isStreamLoading.value = true
+        // Suppress remote-seek detection during the entire cold-start handoff so
+        // cluster_update pushes triggered by the transfer don't race-seek
+        // ExoPlayer before we explicitly position it in the onReady callback.
+        seekGuardUntil = System.currentTimeMillis() + 30_000L
+        // CompletableDeferred that gets completed when onPlaybackId fires with
+        // the current track's file id. Set up BEFORE the transfer call so we
+        // don't miss the push.
+        val fileIdDeferred = kotlinx.coroutines.CompletableDeferred<String>()
+        coldStartFileId = fileIdDeferred
+
+        LokiLogger.i(TAG, "[ColdStart] transfer to self with restore_paused=pause")
+        try {
+            p.transferPlaybackHere(restorePaused = true)
+        } catch (e: CancellationException) {
+            coldStartPending = false
+            coldStartFileId = null
+            isStreamLoading.value = false
+            seekGuardUntil = 0L
+            throw e
+        } catch (e: Exception) {
+            LokiLogger.e(TAG, "[ColdStart] transferPlaybackHere failed, falling back", e)
+            coldStartPending = false
+            coldStartFileId = null
+            isStreamLoading.value = false
+            seekGuardUntil = 0L
+            try { p.resume() } catch (_: Exception) {}
+            return
+        }
+
+        // Wait for Spotify's state machine to push the file id via onPlaybackId.
+        // Capped at 5s — typically arrives in <1s on a fast connection. If we
+        // already have a cached latestFileId from an earlier session it'll arrive
+        // even sooner because the cluster snapshot includes it.
+        val fileId = kotlinx.coroutines.withTimeoutOrNull(5_000L) { fileIdDeferred.await() }
+        coldStartFileId = null
+        if (fileId == null) {
+            LokiLogger.w(TAG, "[ColdStart] timed out waiting for file id, falling back to legacy resume")
+            coldStartPending = false
+            isStreamLoading.value = false
+            seekGuardUntil = 0L
+            try { p.resume() } catch (_: Exception) {}
+            return
+        }
+
+        // Read the current track from the snapshot (updatePlaybackFromState has
+        // updated it during the transfer's WS state pushes). Fall back to the
+        // saved snapshot track if needed.
+        val track = _playback.value.track
+        if (track == null || track.uri.isBlank()) {
+            LokiLogger.w(TAG, "[ColdStart] no track in playback state after transfer, falling back")
+            coldStartPending = false
+            isStreamLoading.value = false
+            seekGuardUntil = 0L
+            try { p.resume() } catch (_: Exception) {}
+            return
+        }
+        val trackUri = track.uri
+        val title = track.name.ifBlank { "Unknown" }
+        val artist = track.artist.ifBlank { "Unknown" }
+        val art = track.albumArt
+        LokiLogger.i(TAG, "[ColdStart] file id=$fileId for $trackUri — resolving CDN")
+
+        try {
+            // Resolve the Spotify CDN URL for this file id
+            val cdnUrls = sp.getCdnUrls(fileId)
+            val cdnUrl = cdnUrls.firstOrNull()
+                ?: throw IllegalStateException("No CDN mirrors")
+            LokiLogger.i(TAG, "[ColdStart] resolved ${cdnUrls.size} CDN mirrors")
+
+            // Load ExoPlayer paused. The Widevine session prepares in the background
+            // while the user still sees the loading spinner.
+            val licenseHeaders = mutableMapOf<String, String>()
+            sess.baseClient.accessToken?.let { licenseHeaders["Authorization"] = "Bearer $it" }
+            sess.baseClient.clientToken?.let { licenseHeaders["client-token"] = it }
+            val licenseUrl = sess.spclientUrl("widevine-license/v1/audio/license")
+
+            // Start ExoPlayer at the right position from the moment it's ready —
+            // no post-prepare seek dance. setMediaItem(item, startPositionMs)
+            // guarantees STATE_READY fires AT that position, and playWhenReady=true
+            // makes audio start immediately. The onReady callback then calls
+            // p.resume() to tell Spotify Connect we're now playing.
+            playUrlAt = System.currentTimeMillis()
+            withContext(Dispatchers.Main) {
+                MusicPlaybackService.instance?.playDrmUrl(
+                    cdnUrl, licenseUrl, licenseHeaders, title, artist, art,
+                    startPlaying = true,
+                    startPositionMs = savedPositionAtEntry,
+                )
+            }
+            currentStreamUri = trackUri
+            isStreaming.value = true
+            streamProvider.value = "Spotify CDN"
+            LokiLogger.i(TAG, "[ColdStart] ExoPlayer loading at ${savedPositionAtEntry}ms, will start on STATE_READY")
+        } catch (e: Exception) {
+            LokiLogger.e(TAG, "[ColdStart] CDN/playDrmUrl failed, falling back to legacy resume", e)
+            coldStartPending = false
+            currentStreamUri = null
+            isStreaming.value = false
+            isStreamLoading.value = false
+            seekGuardUntil = 0L
+            try { p.resume() } catch (_: Exception) {}
         }
     }
 
@@ -1329,9 +1520,16 @@ class SpotifyViewModel : ViewModel() {
                     LokiLogger.i(TAG, "ExoPlayer ended — waiting 1s for auto-advance...")
                     // Give TrackPlaybackHandler time to auto-advance via state machine
                     delay(1000)
-                    // Safety net: if no new track loaded after 1s, force skip
-                    if (!(_playback.value.isPlaying && !_playback.value.isPaused)) {
-                        LokiLogger.w(TAG, "Auto-advance didn't fire, forcing skipNext")
+                    // Safety net: check ExoPlayer's actual playback state, not the
+                    // cached _playback.value (which only updates on WS state pushes
+                    // and lags by tens of seconds when nothing's happening). If
+                    // ExoPlayer is still stopped after 1s, the state machine didn't
+                    // auto-advance — force skipNext to kick the next track.
+                    val exoPlaying = withContext(Dispatchers.Main) {
+                        MusicPlaybackService.instance?.isPlaying() == true
+                    }
+                    if (!exoPlaying) {
+                        LokiLogger.w(TAG, "Auto-advance didn't fire (ExoPlayer still stopped), forcing skipNext")
                         player?.skipNext()
                     }
                 } catch (e: CancellationException) { throw e }
@@ -1346,16 +1544,43 @@ class SpotifyViewModel : ViewModel() {
             }
         }
         svc.onReady = {
-            LokiLogger.i(TAG, "ExoPlayer ready — syncing Spotify")
-            _playback.value = _playback.value.copy(isPlaying = true, isPaused = false)
-            startPositionTicker()
-            viewModelScope.launch(Dispatchers.IO) {
-                try {
-                    // For Spotify CDN: resume Spotify so other clients show us as playing
-                    if (preferredAudioSource.value == null) {
-                        player?.resume()
+            val now = System.currentTimeMillis()
+            val playUrlToReady = if (playUrlAt > 0) now - playUrlAt else -1L
+            val cmdToReady = if (lastCommandTs > 0) now - lastCommandTs else -1L
+            LokiLogger.i(TAG, "[Timing-CDN] ExoPlayer ready — playUrl→ready=${playUrlToReady}ms, cmd→ready=${cmdToReady}ms")
+
+            if (coldStartPending) {
+                // Cold-start sync: ExoPlayer was loaded with startPositionMs and
+                // playWhenReady=true, so by the time onReady fires audio is already
+                // producing at the right position. We just need to:
+                //   1. Tell Spotify Connect to resume (so other clients show us playing)
+                //   2. Update the UI playing state and start the position ticker
+                //   3. Release the seek guard so normal remote-seek sync can take over
+                //   4. Hide the loading spinner
+                val pos = MusicPlaybackService.instance?.getCurrentPosition() ?: _playback.value.positionMs
+                LokiLogger.i(TAG, "[ColdStart] ExoPlayer producing at ${pos}ms — resuming Spotify Connect")
+                coldStartPending = false
+                _playback.value = _playback.value.copy(isPlaying = true, isPaused = false, positionMs = pos)
+                startPositionTicker()
+                viewModelScope.launch(Dispatchers.IO) {
+                    try {
+                        try { player?.resume() } catch (_: Exception) {}
+                        seekGuardUntil = System.currentTimeMillis() + 1500L
+                    } finally {
+                        isStreamLoading.value = false
                     }
-                } catch (_: Exception) {}
+                }
+            } else {
+                _playback.value = _playback.value.copy(isPlaying = true, isPaused = false)
+                startPositionTicker()
+                viewModelScope.launch(Dispatchers.IO) {
+                    try {
+                        // For Spotify CDN: resume Spotify so other clients show us as playing
+                        if (preferredAudioSource.value == null) {
+                            player?.resume()
+                        }
+                    } catch (_: Exception) {}
+                }
             }
         }
     }
@@ -1380,7 +1605,9 @@ class SpotifyViewModel : ViewModel() {
             isStreamLoading.value = false
             return
         }
-        currentStreamUri = trackUri
+        // NOTE: do NOT set currentStreamUri here. We commit to it on success only,
+        // otherwise a failed resolve poisons the cache and the next attempt at
+        // the same track short-circuits the equality check above and never loads.
 
         val title = current.name.ifBlank { "Unknown" }
         val artist = current.artistName ?: "Unknown"
@@ -1418,7 +1645,9 @@ class SpotifyViewModel : ViewModel() {
         if (nextTrackInfo?.uri == trackUri && preResolvedUrl != null) {
             LokiLogger.i(TAG, "Using pre-resolved stream for $trackUri")
             // Don't resume Spotify yet — onReady callback will sync after ExoPlayer buffers
+            playUrlAt = System.currentTimeMillis()
             MusicPlaybackService.instance?.playUrl(preResolvedUrl, title, artist, art)
+            currentStreamUri = trackUri
             isStreaming.value = true
             isStreamLoading.value = false
             streamProvider.value = preResolvedProvider
@@ -1493,9 +1722,15 @@ class SpotifyViewModel : ViewModel() {
                 sess.baseClient.accessToken?.let { licenseHeaders["Authorization"] = "Bearer $it" }
                 sess.baseClient.clientToken?.let { licenseHeaders["client-token"] = it }
                 val licenseUrl = sess.spclientUrl("widevine-license/v1/audio/license")
+                playUrlAt = System.currentTimeMillis()
+                val coldStart = coldStartPending
                 withContext(Dispatchers.Main) {
-                    MusicPlaybackService.instance?.playDrmUrl(cdnUrl, licenseUrl, licenseHeaders, title, artist, art)
+                    MusicPlaybackService.instance?.playDrmUrl(
+                        cdnUrl, licenseUrl, licenseHeaders, title, artist, art,
+                        startPlaying = !coldStart,
+                    )
                 }
+                currentStreamUri = trackUri
                 isStreaming.value = true
                 streamProvider.value = "Spotify CDN"
                 isStreamLoading.value = false
@@ -1512,7 +1747,9 @@ class SpotifyViewModel : ViewModel() {
             when (result) {
                 is StreamResult.Success -> {
                     // Don't resume Spotify yet — onReady callback will sync after ExoPlayer buffers
+                    playUrlAt = System.currentTimeMillis()
                     MusicPlaybackService.instance?.playUrl(result.info.url, title, artist, art)
+                    currentStreamUri = trackUri
                     isStreaming.value = true
                     streamProvider.value = result.info.provider
                     LokiLogger.i(TAG, "Streaming: ${result.info.provider} -> ${result.info.url.take(80)}")
@@ -1543,7 +1780,11 @@ class SpotifyViewModel : ViewModel() {
         val track = state.track ?: return
         val uri = track.uri
         if (uri == currentStreamUri) return
-        currentStreamUri = uri
+        // NOTE: do NOT set currentStreamUri here. Setting it before the resolve
+        // succeeds poisons future attempts: if the resolve fails (rate limit, no
+        // CDN match, network error) the URI sticks and the next time the user
+        // tries to play this track, resolveAndPlay's `if (trackUri == currentStreamUri)`
+        // short-circuits and nothing ever loads. Set it on success only.
         isStreamLoading.value = true
         isNextReady.value = false
         val startPositionMs = state.position_as_of_timestamp
@@ -1563,14 +1804,15 @@ class SpotifyViewModel : ViewModel() {
                 val result = cdn.resolveStreamUrl(trackId, region = contentRegion.value, youtubeSearchQuery = searchQuery, preferredSource = preferredAudioSource.value)
                 when (result) {
                     is StreamResult.Success -> {
-                        // playUrl will buffer, then onReady fires → syncs Spotify
+                        playUrlAt = System.currentTimeMillis()
                         MusicPlaybackService.instance?.playUrl(
                             result.info.url,
                             title ?: "Unknown",
                             artist ?: "Unknown",
                             art,
-                            startPlaying = shouldPlay
+                            startPlaying = shouldPlay,
                         )
+                        currentStreamUri = uri
                         isStreaming.value = true
                         streamProvider.value = result.info.provider
                         LokiLogger.i(TAG, "Initial stream: ${result.info.provider} (playing=$shouldPlay)")

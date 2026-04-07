@@ -17,6 +17,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
+import ch.snepilatch.app.playback.MusicPlaybackService
 import ch.snepilatch.app.ui.components.UpdateDialog
 import ch.snepilatch.app.ui.screens.LoadingScreen
 import ch.snepilatch.app.ui.screens.SpotifyApp

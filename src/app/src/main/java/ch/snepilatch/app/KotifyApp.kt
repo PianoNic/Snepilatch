@@ -2,6 +2,7 @@ package ch.snepilatch.app
 
 import android.app.Application
 import android.provider.Settings
+import ch.snepilatch.app.util.LokiLogger
 import kotify.utils.LogBackend
 import kotify.utils.Logger
 

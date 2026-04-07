@@ -1633,20 +1633,7 @@ class SpotifyViewModel : ViewModel() {
                     LokiLogger.i(TAG, "SpotifyCDN: Using pre-resolved CDN URL (fileId=$currentFileId)")
                     nextCdnUrl = null
                     nextCdnFileId = null
-                    // Build license metadata for the cached URL via a throwaway resolve-like call.
-                    // We already have the URL, so we just need the license bits — cheapest path
-                    // is to resolve fresh; but to avoid the double-roundtrip, reuse the cached URL
-                    // and the current session's license endpoint.
-                    val sess = session ?: throw IllegalStateException("Session not initialized")
-                    val licenseHeaders = mutableMapOf<String, String>()
-                    sess.baseClient.accessToken?.let { licenseHeaders["Authorization"] = "Bearer $it" }
-                    sess.baseClient.clientToken?.let { licenseHeaders["client-token"] = it }
-                    SpotifyStream(
-                        cdnUrl = cachedCdnUrl,
-                        licenseUrl = sess.spclientUrl("widevine-license/v1/audio/license"),
-                        licenseHeaders = licenseHeaders,
-                        mirrorCount = 1
-                    )
+                    resolver.buildStreamForCachedUrl(cachedCdnUrl)
                 } else {
                     // Use file ID from cluster state or from onPlaybackId (state machine)
                     var fileId = event.currentFileId ?: latestFileId

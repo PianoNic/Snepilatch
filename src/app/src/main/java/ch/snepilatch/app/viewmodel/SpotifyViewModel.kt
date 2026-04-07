@@ -286,117 +286,7 @@ class SpotifyViewModel : ViewModel() {
                     }
                 }
 
-                pc.onPlaybackId { fileId ->
-                    LokiLogger.i(TAG, "Got file ID from state machine: $fileId")
-                    latestFileId = fileId
-                    // Cold-start: complete the deferred so coldStartPlay can proceed
-                    // with resolving the CDN URL and loading ExoPlayer.
-                    val deferred = coldStartFileId
-                    if (coldStartPending && deferred != null && !deferred.isCompleted) {
-                        deferred.complete(fileId)
-                    }
-                }
-
-                pc.onNextPlaybackId { fileId, uri, name ->
-                    if (preferredAudioSource.value == null) {
-                        // Deduplicate — don't re-resolve if we already have this file ID cached
-                        if (fileId == nextCdnFileId && nextCdnUrl != null) return@onNextPlaybackId
-                        viewModelScope.launch(Dispatchers.IO) {
-                            try {
-                                val resolver = cdnResolver ?: return@launch
-                                // Double-check after coroutine dispatch (another callback may have resolved it)
-                                if (fileId == nextCdnFileId && nextCdnUrl != null) return@launch
-                                LokiLogger.d(TAG, "Pre-resolving next Spotify CDN: $name ($fileId)")
-                                val stream = resolver.resolveForFileId(fileId)
-                                // Cache the resolved CDN URL — DON'T queue in ExoPlayer.
-                                // DRM items can't be pre-queued because each needs its own
-                                // Widevine license session, and rapid transitions cause key mismatches.
-                                nextCdnUrl = stream.cdnUrl
-                                nextCdnFileId = fileId
-                                isNextReady.value = true
-                                LokiLogger.i(TAG, "Next Spotify CDN pre-resolved: $name")
-                            } catch (e: Exception) {
-                                LokiLogger.d(TAG, "Pre-resolve next CDN failed: ${e.message}")
-                            }
-                        }
-                    }
-                }
-
-                pc.onState { state ->
-                    val delta = if (lastCommandTs > 0) System.currentTimeMillis() - lastCommandTs else -1
-                    LokiLogger.i(TAG, "[Timing] WS onState arrived (${delta}ms after CMD '$lastCommandName')")
-                    viewModelScope.launch { updatePlaybackFromState(state) }
-                }
-
-                pc.onTrackChange { event ->
-                    val delta = if (lastCommandTs > 0) System.currentTimeMillis() - lastCommandTs else -1
-                    LokiLogger.i(TAG, "[Timing] WS onTrackChange arrived (${delta}ms after CMD '$lastCommandName') -> ${event.current?.uri} fileId=${event.currentFileId}")
-                    // Set latestFileId from cluster state so resolveAndPlay doesn't wait for onPlaybackId
-                    if (event.currentFileId != null) {
-                        latestFileId = event.currentFileId
-                    }
-                    // Only auto-resolve when we're already streaming (legit track changes
-                    // during active playback — skip-next, auto-advance, remote skip from
-                    // another device). Otherwise the very first WS push on init runs a
-                    // futile CDN resolve, eats 18s of SongLink retries on the third-party
-                    // fallback path, AND resets _playback.value.positionMs to 0 — clobbering
-                    // the saved snapshot position the user is supposed to resume at.
-                    if (!isStreaming.value) {
-                        LokiLogger.d(TAG, "Skipping resolveAndPlay: not streaming (idle WS push)")
-                        return@onTrackChange
-                    }
-                    // Cancel any in-flight resolve — only the latest track change matters
-                    resolveJob?.cancel()
-                    resolveJob = viewModelScope.launch(Dispatchers.IO) {
-                        resolveAndPlay(event)
-                        if (currentScreen.value == Screen.QUEUE) refreshQueue()
-                    }
-                }
-
-                pc.onPlay { state ->
-                    if (!isStreaming.value) {
-                        // Not streaming locally — Spotify controls ExoPlayer
-                        LokiLogger.i(TAG, "Spotify: play at ${state.position_as_of_timestamp}ms")
-                        MusicPlaybackService.instance?.syncPlay(state.position_as_of_timestamp)
-                    }
-                }
-
-                pc.onPause { state ->
-                    if (!isStreaming.value) {
-                        // Not streaming locally — Spotify controls ExoPlayer
-                        LokiLogger.i(TAG, "Spotify: pause at ${state.position_as_of_timestamp}ms")
-                        MusicPlaybackService.instance?.syncPause()
-                    } else if (suppressRemotePause) {
-                        LokiLogger.d(TAG, "Spotify: pause suppressed (reconnecting)")
-                    }
-                }
-
-                pc.onReconnected {
-                    viewModelScope.launch(Dispatchers.IO) {
-                        val wasPlaying = withContext(Dispatchers.Main) {
-                            MusicPlaybackService.instance?.isPlaying() == true
-                        }
-                        LokiLogger.i(TAG, "WebSocket reconnected, re-syncing state (wasPlaying=$wasPlaying)")
-                        // Suppress remote pause during reconnect so ExoPlayer keeps playing
-                        if (wasPlaying) suppressRemotePause = true
-                        try {
-                            val state = pc.getState()
-                            if (state != null) {
-                                updatePlaybackFromState(state)
-                            }
-                            loadDevices()
-                            // If we were playing locally, resume Spotify playback to re-sync
-                            if (wasPlaying) {
-                                try { pc.resume() } catch (_: Exception) {}
-                            }
-                        } catch (e: Exception) {
-                            LokiLogger.e(TAG, "Failed to re-sync after reconnect", e)
-                        } finally {
-                            suppressRemotePause = false
-                        }
-                    }
-                }
-
+                wirePlayerConnectCallbacks(pc)
                 wireServiceControls()
 
                 // Initial state
@@ -447,6 +337,114 @@ class SpotifyViewModel : ViewModel() {
                     }
                 } else {
                     initError.value = msg
+                }
+            }
+        }
+    }
+
+    /**
+     * Attach the ViewModel's reactions to a freshly created PlayerConnect.
+     *
+     * These callbacks are what keeps the UI in sync with whatever Spotify is
+     * doing on the account — track changes, pauses from other devices,
+     * WebSocket reconnects, and file-id pushes that feed the cold-start
+     * protocol.
+     */
+    private fun wirePlayerConnectCallbacks(pc: PlayerConnect) {
+        pc.onPlaybackId { fileId ->
+            LokiLogger.i(TAG, "Got file ID from state machine: $fileId")
+            latestFileId = fileId
+            // Cold-start: complete the deferred so coldStartPlay can proceed
+            // with resolving the CDN URL and loading ExoPlayer.
+            val deferred = coldStartFileId
+            if (coldStartPending && deferred != null && !deferred.isCompleted) {
+                deferred.complete(fileId)
+            }
+        }
+
+        pc.onNextPlaybackId { fileId, _, name ->
+            if (preferredAudioSource.value != null) return@onNextPlaybackId
+            // Deduplicate — don't re-resolve if we already have this file ID cached
+            if (fileId == nextCdnFileId && nextCdnUrl != null) return@onNextPlaybackId
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    val resolver = cdnResolver ?: return@launch
+                    // Double-check after coroutine dispatch
+                    if (fileId == nextCdnFileId && nextCdnUrl != null) return@launch
+                    LokiLogger.d(TAG, "Pre-resolving next Spotify CDN: $name ($fileId)")
+                    val stream = resolver.resolveForFileId(fileId)
+                    // Cache only — DRM items can't be pre-queued because each
+                    // needs its own Widevine license session.
+                    nextCdnUrl = stream.cdnUrl
+                    nextCdnFileId = fileId
+                    isNextReady.value = true
+                    LokiLogger.i(TAG, "Next Spotify CDN pre-resolved: $name")
+                } catch (e: Exception) {
+                    LokiLogger.d(TAG, "Pre-resolve next CDN failed: ${e.message}")
+                }
+            }
+        }
+
+        pc.onState { state ->
+            val delta = if (lastCommandTs > 0) System.currentTimeMillis() - lastCommandTs else -1
+            LokiLogger.i(TAG, "[Timing] WS onState arrived (${delta}ms after CMD '$lastCommandName')")
+            viewModelScope.launch { updatePlaybackFromState(state) }
+        }
+
+        pc.onTrackChange { event ->
+            val delta = if (lastCommandTs > 0) System.currentTimeMillis() - lastCommandTs else -1
+            LokiLogger.i(TAG, "[Timing] WS onTrackChange arrived (${delta}ms after CMD '$lastCommandName') -> ${event.current?.uri} fileId=${event.currentFileId}")
+            // Set latestFileId from cluster state so resolveAndPlay doesn't wait for onPlaybackId
+            if (event.currentFileId != null) latestFileId = event.currentFileId
+            // Only auto-resolve when we're already streaming (legit track changes
+            // during active playback). Otherwise the very first WS push on init
+            // runs a futile CDN resolve, eats 18s of SongLink retries on the
+            // third-party fallback path, AND resets _playback.value.positionMs
+            // to 0 — clobbering the saved snapshot position.
+            if (!isStreaming.value) {
+                LokiLogger.d(TAG, "Skipping resolveAndPlay: not streaming (idle WS push)")
+                return@onTrackChange
+            }
+            resolveJob?.cancel()
+            resolveJob = viewModelScope.launch(Dispatchers.IO) {
+                resolveAndPlay(event)
+                if (currentScreen.value == Screen.QUEUE) refreshQueue()
+            }
+        }
+
+        pc.onPlay { state ->
+            if (!isStreaming.value) {
+                LokiLogger.i(TAG, "Spotify: play at ${state.position_as_of_timestamp}ms")
+                MusicPlaybackService.instance?.syncPlay(state.position_as_of_timestamp)
+            }
+        }
+
+        pc.onPause { state ->
+            if (!isStreaming.value) {
+                LokiLogger.i(TAG, "Spotify: pause at ${state.position_as_of_timestamp}ms")
+                MusicPlaybackService.instance?.syncPause()
+            } else if (suppressRemotePause) {
+                LokiLogger.d(TAG, "Spotify: pause suppressed (reconnecting)")
+            }
+        }
+
+        pc.onReconnected {
+            viewModelScope.launch(Dispatchers.IO) {
+                val wasPlaying = withContext(Dispatchers.Main) {
+                    MusicPlaybackService.instance?.isPlaying() == true
+                }
+                LokiLogger.i(TAG, "WebSocket reconnected, re-syncing state (wasPlaying=$wasPlaying)")
+                if (wasPlaying) suppressRemotePause = true
+                try {
+                    pc.getState()?.let { updatePlaybackFromState(it) }
+                    loadDevices()
+                    if (wasPlaying) {
+                        try { pc.resume() } catch (_: Exception) {}
+                    }
+                } catch (e: Exception) {
+                    LokiLogger.e(TAG, "Failed to re-sync after reconnect", e)
+                } finally {
+                    suppressRemotePause = false
                 }
             }
         }

@@ -86,6 +86,16 @@
                 <action android:name="ch.snepilatch.app.RIGHT_ACTION" />
             </intent-filter>
         </receiver>
+
+        <!-- Cold-launch path for Bluetooth / wired / lockscreen media-button
+             presses when the app process is dead. See MediaButtonReceiver. -->
+        <receiver
+            android:name=".playback.MediaButtonReceiver"
+            android:exported="true">
+            <intent-filter android:priority="1000">
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

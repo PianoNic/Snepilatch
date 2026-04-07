@@ -1373,6 +1373,13 @@ class SpotifyViewModel : ViewModel() {
 
     fun wireServiceControls() {
         val svc = MusicPlaybackService.instance ?: return
+        wireTransportCallbacks(svc)
+        wireNotificationButtonCallbacks(svc)
+        wirePlaybackLifecycleCallbacks(svc)
+    }
+
+    /** Play / pause / skip / seek — simple commands forwarded to Spotify Connect. */
+    private fun wireTransportCallbacks(svc: MusicPlaybackService) {
         svc.onPlay = { togglePlayPause() }
         svc.onPause = { togglePlayPause() }
         svc.onSkipNext = {
@@ -1396,7 +1403,10 @@ class SpotifyViewModel : ViewModel() {
                 catch (e: Exception) { LokiLogger.e(TAG, "svc seek", e) }
             }
         }
-        // Load notification button preference
+    }
+
+    /** Like / shuffle / repeat buttons shown in the notification, plus their saved preferences. */
+    private fun wireNotificationButtonCallbacks(svc: MusicPlaybackService) {
         val prefs = svc.getSharedPreferences("kotify_prefs", android.content.Context.MODE_PRIVATE)
         svc.notificationLeftButton = prefs.getString("notification_left_button", "repeat") ?: "repeat"
         svc.notificationRightButton = prefs.getString("notification_right_button", "like") ?: "like"
@@ -1404,11 +1414,7 @@ class SpotifyViewModel : ViewModel() {
         svc.onLikeToggle = lambda@{
             val track = _playback.value.track ?: return@lambda
             val trackId = track.uri.removePrefix("spotify:track:")
-            if (currentTrackLiked.value) {
-                unlikeSong(trackId)
-            } else {
-                likeSong(trackId)
-            }
+            if (currentTrackLiked.value) unlikeSong(trackId) else likeSong(trackId)
             viewModelScope.launch {
                 kotlinx.coroutines.delay(300)
                 svc.isLiked = currentTrackLiked.value
@@ -1431,15 +1437,19 @@ class SpotifyViewModel : ViewModel() {
                 svc.updateNotification()
             }
         }
+    }
+
+    /**
+     * ExoPlayer lifecycle events — track transitions, errors, end-of-track,
+     * and the crucial onReady that completes the cold-start handoff.
+     */
+    private fun wirePlaybackLifecycleCallbacks(svc: MusicPlaybackService) {
         svc.onTrackTransition = {
-            // ExoPlayer auto-advanced to the pre-buffered next track.
-            // TrackPlaybackHandler already advanced the state machine on Spotify's side.
-            // Just refresh UI state and pre-resolve the new next track.
+            // ExoPlayer auto-advanced to the pre-buffered next track. The
+            // WebSocket will push the new state; just pre-resolve the next one.
             viewModelScope.launch(Dispatchers.IO) {
-                try {
-                    // WebSocket will push the new state — just pre-resolve next track
-                    preResolveNextTrack()
-                } catch (e: CancellationException) { throw e }
+                try { preResolveNextTrack() }
+                catch (e: CancellationException) { throw e }
                 catch (e: Exception) { LokiLogger.e(TAG, "svc trackTransition", e) }
             }
         }

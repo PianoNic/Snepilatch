@@ -87,7 +87,7 @@ fun QueueTrack.toTrackInfo() = TrackInfo(
     uri = uri,
     name = name ?: "Unknown",
     artist = artistName ?: "Unknown",
-    albumArt = imageUrl,
+    albumArt = ch.snepilatch.app.util.normalizeSpotifyImageUrl(imageUrl),
     durationMs = durationMs,
     uid = uid,
 )

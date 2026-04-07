@@ -590,7 +590,12 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
     private suspend fun loadBitmap(url: String): Bitmap? = withContext(Dispatchers.IO) {
         try {
-            URL(url).openStream().use { BitmapFactory.decodeStream(it) }
+            // Spotify's cluster API returns art as `spotify:image:<id>` URIs.
+            // Rewrite to the i.scdn.co CDN URL before handing to URL().
+            val resolved = if (url.startsWith("spotify:image:")) {
+                "https://i.scdn.co/image/" + url.removePrefix("spotify:image:")
+            } else url
+            URL(resolved).openStream().use { BitmapFactory.decodeStream(it) }
         } catch (e: Exception) {
             LokiLogger.e(TAG, "Failed to load art: $url", e)
             null

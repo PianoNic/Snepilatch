@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import ch.snepilatch.app.util.LokiLogger
 import ch.snepilatch.app.util.detectActiveAudioOutput
 import ch.snepilatch.app.util.extractThemeColorsFromArt
+import ch.snepilatch.app.util.normalizeSpotifyImageUrl
 import ch.snepilatch.app.playback.MusicPlaybackService
 import ch.snepilatch.app.playback.PositionInterpolator
 import ch.snepilatch.app.playback.SessionHolder
@@ -521,7 +522,9 @@ class SpotifyViewModel : ViewModel() {
 
     private suspend fun updatePlaybackFromState(state: PlayerStateData) {
         val track = state.track
-        val imageUrl = track?.imageLargeUrl ?: track?.imageUrl ?: track?.imageSmallUrl
+        val imageUrl = normalizeSpotifyImageUrl(
+            track?.imageLargeUrl ?: track?.imageUrl ?: track?.imageSmallUrl
+        )
         val trackInfo = if (track != null) {
             TrackInfo(
                 uri = track.uri,
@@ -1106,7 +1109,7 @@ class SpotifyViewModel : ViewModel() {
                     val needsFetch: Boolean
                 )
                 val parsed = state.next_tracks.map { qt ->
-                    val art = qt.imageUrl
+                    val art = normalizeSpotifyImageUrl(qt.imageUrl)
                     val needsFetch = qt.name.isNullOrEmpty() || qt.artistName.isNullOrEmpty() || art == null
                     val info = TrackInfo(
                         uri = qt.uri,
@@ -1582,7 +1585,7 @@ class SpotifyViewModel : ViewModel() {
         if (preferredAudioSource.value != null) {
             try { player?.pause() } catch (_: Exception) {}
         }
-        val art = current.imageLargeUrl ?: current.imageUrl
+        val art = normalizeSpotifyImageUrl(current.imageLargeUrl ?: current.imageUrl)
 
         // Update UI with new track info immediately — audio will follow in ~100ms
         val newTrack = TrackInfo(
@@ -1745,7 +1748,7 @@ class SpotifyViewModel : ViewModel() {
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val art = track.imageLargeUrl ?: track.imageUrl
+                val art = normalizeSpotifyImageUrl(track.imageLargeUrl ?: track.imageUrl)
 
                 val result = cdn.resolveStreamUrl(trackId, region = contentRegion.value, youtubeSearchQuery = searchQuery, preferredSource = preferredAudioSource.value)
                 when (result) {
@@ -1803,7 +1806,7 @@ class SpotifyViewModel : ViewModel() {
 
             val title = nextTrack.name ?: "Unknown"
             val artist = nextTrack.artistName ?: "Unknown"
-            val art = nextTrack.imageUrl
+            val art = normalizeSpotifyImageUrl(nextTrack.imageUrl)
             val searchQuery = listOfNotNull(artist.takeIf { it != "Unknown" }, title.takeIf { it != "Unknown" })
                 .joinToString(" ").takeIf { it.isNotBlank() }
 

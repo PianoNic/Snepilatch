@@ -555,16 +555,21 @@ class SpotifyViewModel : ViewModel() {
             )
         } else null
 
-        // When streaming locally, ExoPlayer is the source of truth for play state and position.
-        // Spotify is intentionally paused, so its state says "paused" — ignore that.
+        // When streaming locally, ExoPlayer is usually the source of truth for
+        // play/pause. BUT during a remote pause transition Spotify's state push
+        // can arrive BEFORE our posted `player.pause()` has actually paused
+        // ExoPlayer on the main thread — so reading ExoPlayer here would still
+        // see "playing" and we'd overwrite the paused state the onPause handler
+        // just set. Guard against the race by treating EITHER ExoPlayer-paused
+        // OR Spotify-reports-paused as "paused", never flipping back.
         val exoPlaying = if (isStreaming.value) {
             withContext(Dispatchers.Main) {
                 MusicPlaybackService.instance?.isPlaying() == true
             }
         } else false
 
-        val actuallyPlaying = if (isStreaming.value) exoPlaying else state.isActuallyPlaying
-        val actuallyPaused = if (isStreaming.value) !exoPlaying else state.is_paused
+        val actuallyPlaying = if (isStreaming.value) (exoPlaying && !state.is_paused) else state.isActuallyPlaying
+        val actuallyPaused = if (isStreaming.value) (!exoPlaying || state.is_paused) else state.is_paused
 
         // When streaming, the audio source of truth is ExoPlayer, not Spotify's state.
         // If Spotify's state says track B but we're still playing track A, keep showing track A.

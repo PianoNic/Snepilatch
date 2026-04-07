@@ -40,6 +40,19 @@ class SpotifyCdnResolver(
     }
 
     /**
+     * Wrap a previously-resolved CDN URL (from the pre-resolve cache) in the
+     * Widevine license metadata needed to hand it to ExoPlayer, without
+     * re-hitting getCdnUrls. Use when the caller already has a valid URL and
+     * only needs fresh license headers.
+     */
+    fun buildStreamForCachedUrl(cdnUrl: String): SpotifyStream = SpotifyStream(
+        cdnUrl = cdnUrl,
+        licenseUrl = session.spclientUrl("widevine-license/v1/audio/license"),
+        licenseHeaders = buildLicenseHeaders(),
+        mirrorCount = 1
+    )
+
+    /**
      * Fetch the file id for a track via the metadata API, preferring the
      * higher-quality MP4_256 variant and falling back to MP4_128.
      */

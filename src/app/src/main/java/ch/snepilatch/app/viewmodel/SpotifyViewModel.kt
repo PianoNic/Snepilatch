@@ -128,12 +128,7 @@ class SpotifyViewModel : ViewModel() {
     val homeData: StateFlow<HomeData?> = _homeData
     val isHomeLoading = MutableStateFlow(true)
 
-    // Search
-    val searchQuery = MutableStateFlow("")
-    private val _searchResults = MutableStateFlow<List<TrackInfo>>(emptyList())
-    val searchResults: StateFlow<List<TrackInfo>> = _searchResults
-    val isSearching = MutableStateFlow(false)
-    private var searchJob: Job? = null
+    // Search state was extracted into SearchViewModel — see viewmodel/SearchViewModel.kt
 
     // Library
     private val _library = MutableStateFlow<List<LibraryItem>>(emptyList())
@@ -1892,35 +1887,6 @@ class SpotifyViewModel : ViewModel() {
             }
         }
     }
-
-    // --- Search ---
-
-    fun updateSearchQuery(query: String) {
-        searchQuery.value = query
-        if (query.length < 2) {
-            _searchResults.value = emptyList()
-            searchJob?.cancel()
-            return
-        }
-        searchJob?.cancel()
-        searchJob = viewModelScope.launch(Dispatchers.IO) {
-            delay(400) // debounce
-            isSearching.value = true
-            try {
-                val sess = session ?: return@launch
-                val results = Song(sess).search(query, limit = 30)
-                val trackList = results.tracks.items.map { it.toTrackInfo() }
-                _searchResults.value = trackList
-                LokiLogger.i(TAG, "Search '$query': ${trackList.size} results")
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) {
-                LokiLogger.e(TAG, "search", e)
-            } finally {
-                isSearching.value = false
-            }
-        }
-    }
-
 
     // --- Library ---
 

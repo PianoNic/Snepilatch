@@ -120,7 +120,7 @@ fun SearchScreen(vm: SpotifyViewModel, searchVm: SearchViewModel = viewModel()) 
                 .padding(horizontal = 16.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .focusRequester(focusRequester),
-            placeholder = { Text("Songs, artists, albums, podcasts...", color = SpotifyLightGray.copy(alpha = 0.7f)) },
+            placeholder = { Text("Search", color = SpotifyLightGray.copy(alpha = 0.7f)) },
             leadingIcon = { Icon(Icons.Default.Search, null, tint = SpotifyBlack) },
             trailingIcon = {
                 if (query.isNotEmpty()) {

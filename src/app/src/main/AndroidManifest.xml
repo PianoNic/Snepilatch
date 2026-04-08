@@ -27,8 +27,12 @@
             android:label="@string/app_name"
             android:theme="@style/Theme.Snepilatch">
             <intent-filter>
+                <!-- Expose that we are a music player. The MUSIC_PLAYER action is
+                     what Samsung's "default music app" chooser filters by. -->
                 <action android:name="android.intent.action.MAIN" />
+                <action android:name="android.intent.action.MUSIC_PLAYER" />
 
+                <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.LAUNCHER" />
                 <category android:name="android.intent.category.APP_MUSIC" />
             </intent-filter>

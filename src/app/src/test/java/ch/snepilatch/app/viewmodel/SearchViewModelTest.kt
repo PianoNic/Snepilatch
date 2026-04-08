@@ -32,32 +32,56 @@ class SearchViewModelTest {
         Dispatchers.resetMain()
     }
 
-    @Test fun emptyQueryClearsResults() {
+    @Test fun emptyQueryClearsEverything() {
         vm.updateQuery("")
         assertEquals("", vm.query.value)
-        assertTrue(vm.results.value.isEmpty())
+        assertTrue(vm.suggestions.value.isEmpty())
+        assertEquals("", vm.submittedQuery.value)
+        assertEquals(null, vm.results.value)
     }
 
-    @Test fun shortQueryDoesNotTriggerSearch() {
-        vm.updateQuery("a") // below MIN_QUERY_LENGTH
+    @Test fun shortQueryDoesNotFireSuggestions() {
+        vm.updateQuery("a") // below MIN_SUGGEST_LENGTH
         assertEquals("a", vm.query.value)
-        assertTrue(vm.results.value.isEmpty())
-        // isSearching should never have flipped on for a query this short
-        assertEquals(false, vm.isSearching.value)
+        assertTrue(vm.suggestions.value.isEmpty())
+        assertEquals(false, vm.isSuggesting.value)
     }
 
-    @Test fun longQueryStoresQuery() {
+    @Test fun longerQueryStoresQuery() {
         vm.updateQuery("daft punk")
         assertEquals("daft punk", vm.query.value)
-        // No real session is bound — the launch returns immediately, but the
-        // query state must still be updated synchronously so the TextField
-        // reflects the user's input.
+        // We're not in submitted state yet
+        assertEquals("", vm.submittedQuery.value)
     }
 
-    @Test fun clearingAfterTypingResetsResults() {
+    @Test fun submitQueryEntersSubmittedState() {
+        vm.submitQuery("daft punk")
+        assertEquals("daft punk", vm.query.value)
+        assertEquals("daft punk", vm.submittedQuery.value)
+        // Suggestions cleared on submit
+        assertTrue(vm.suggestions.value.isEmpty())
+    }
+
+    @Test fun blankSubmitIsNoOp() {
+        vm.submitQuery("   ")
+        assertEquals("", vm.submittedQuery.value)
+    }
+
+    @Test fun clearSubmittedReturnsToSuggesting() {
+        vm.submitQuery("daft punk")
+        vm.clearSubmitted()
+        assertEquals("", vm.submittedQuery.value)
+        assertEquals(null, vm.results.value)
+        // Query is still set so the user can keep editing
+        assertEquals("daft punk", vm.query.value)
+    }
+
+    @Test fun clearingAfterTypingResetsAllState() {
         vm.updateQuery("daft")
         vm.updateQuery("")
         assertEquals("", vm.query.value)
-        assertTrue(vm.results.value.isEmpty())
+        assertTrue(vm.suggestions.value.isEmpty())
+        assertEquals("", vm.submittedQuery.value)
+        assertEquals(null, vm.results.value)
     }
 }

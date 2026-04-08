@@ -2,10 +2,10 @@ package ch.snepilatch.app.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import ch.snepilatch.app.data.TrackInfo
-import ch.snepilatch.app.data.toTrackInfo
 import ch.snepilatch.app.playback.SessionHolder
 import ch.snepilatch.app.util.LokiLogger
+import kotify.api.song.SearchResult
+import kotify.api.song.SearchSuggestion
 import kotify.api.song.Song
 import kotify.session.Session
 import kotlinx.coroutines.CancellationException
@@ -17,56 +17,122 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 /**
- * ViewModel for the search screen. Holds the current query, results, and an
- * "is searching" flag. Debounces the query by 400ms before hitting the API
- * so fast typists don't fire a request per keystroke.
+ * ViewModel for the Spotify-style search screen.
  *
- * Reads its [Session] from [SessionHolder] — there is no need to inject one,
- * the holder is process-scoped and exists for the entire app lifetime after
- * login.
- *
- * First feature-scoped ViewModel extracted from the monolithic
- * [SpotifyViewModel]. The pattern: own the feature's state, depend on
- * [SessionHolder] for the session, and forward unrelated actions (like
- * playing a track from a result row) to the main ViewModel via the screen.
+ * State machine:
+ *  - **Idle** (`query.isEmpty()`): show the browse-categories grid
+ *  - **Suggesting** (`query.isNotEmpty()` and `submittedQuery.isEmpty()`):
+ *    show the autocomplete dropdown driven by [suggestions]. New keystrokes
+ *    debounce SUGGEST_DEBOUNCE_MS before hitting Spotify so a fast typist
+ *    doesn't fire one request per character.
+ *  - **Submitted** (`submittedQuery.isNotEmpty()`): show the categorized
+ *    results from [results]. The user got here by tapping a suggestion or
+ *    pressing the keyboard's search action.
  */
 class SearchViewModel : ViewModel() {
 
     private val tag = "SearchVM"
 
     val query = MutableStateFlow("")
-    private val _results = MutableStateFlow<List<TrackInfo>>(emptyList())
-    val results: StateFlow<List<TrackInfo>> = _results
+
+    /** The query the user has actually committed to (via tap/IME action). */
+    val submittedQuery = MutableStateFlow("")
+
+    val suggestions = MutableStateFlow<List<SearchSuggestion>>(emptyList())
+    val isSuggesting = MutableStateFlow(false)
+
+    private val _results = MutableStateFlow<SearchResult?>(null)
+    val results: StateFlow<SearchResult?> = _results
     val isSearching = MutableStateFlow(false)
 
+    private var suggestJob: Job? = null
     private var searchJob: Job? = null
 
+    /**
+     * Called from the search TextField on every keystroke. Updates the
+     * displayed query and triggers a debounced suggestions fetch. Clearing
+     * the field also clears the submitted state so the screen returns to
+     * the browse view.
+     */
     fun updateQuery(text: String) {
         query.value = text
-        if (text.length < MIN_QUERY_LENGTH) {
-            _results.value = emptyList()
-            searchJob?.cancel()
+        if (text.isEmpty()) {
+            suggestJob?.cancel()
+            suggestions.value = emptyList()
+            submittedQuery.value = ""
+            _results.value = null
             return
         }
+        // Length-1 queries are too noisy and Spotify's suggestions for
+        // single letters are mostly garbage; wait for at least 2 chars.
+        if (text.length < MIN_SUGGEST_LENGTH) return
+        scheduleSuggest(text)
+    }
+
+    /**
+     * Called when the user picks a suggestion or hits the keyboard's
+     * "search" action. Fires the full categorized search.
+     */
+    fun submitQuery(text: String) {
+        if (text.isBlank()) return
+        query.value = text
+        submittedQuery.value = text
+        suggestJob?.cancel()
+        suggestions.value = emptyList()
+        scheduleFullSearch(text)
+    }
+
+    /**
+     * Step backward from the submitted state to the suggestions state — used
+     * when the user starts typing again after viewing results.
+     */
+    fun clearSubmitted() {
+        submittedQuery.value = ""
+        _results.value = null
+    }
+
+    private fun scheduleSuggest(text: String) {
+        suggestJob?.cancel()
+        suggestJob = launchWithSession("suggest") { sess ->
+            delay(SUGGEST_DEBOUNCE_MS)
+            isSuggesting.value = true
+            try {
+                val response = Song(sess).searchSuggestions(text, limit = SUGGEST_LIMIT)
+                // Drop the response if the query has moved on while we were waiting
+                if (query.value == text && submittedQuery.value.isEmpty()) {
+                    suggestions.value = response.items
+                }
+            } finally {
+                isSuggesting.value = false
+            }
+        }
+    }
+
+    private fun scheduleFullSearch(text: String) {
         searchJob?.cancel()
         searchJob = launchWithSession("search") { sess ->
-            delay(DEBOUNCE_MS)
+            delay(SEARCH_DEBOUNCE_MS)
             isSearching.value = true
             try {
                 val response = Song(sess).search(text, limit = SEARCH_LIMIT)
-                _results.value = response.tracks.items.map { it.toTrackInfo() }
-                LokiLogger.i(tag, "Search '$text': ${_results.value.size} results")
+                if (submittedQuery.value == text) {
+                    _results.value = response
+                    LokiLogger.i(
+                        tag,
+                        "Search '$text': tracks=${response.tracks.items.size}, " +
+                            "artists=${response.artists.items.size}, " +
+                            "albums=${response.albums.items.size}, " +
+                            "playlists=${response.playlists.items.size}, " +
+                            "podcasts=${response.podcasts.items.size}, " +
+                            "users=${response.users.items.size}"
+                    )
+                }
             } finally {
                 isSearching.value = false
             }
         }
     }
 
-    /**
-     * Same shape as [SpotifyViewModel.launchWithSession] but local to this
-     * ViewModel. When more feature ViewModels exist this will move into a
-     * shared base class or extension function.
-     */
     private fun launchWithSession(label: String, block: suspend (Session) -> Unit): Job =
         viewModelScope.launch(Dispatchers.IO) {
             val sess = SessionHolder.session ?: return@launch
@@ -80,8 +146,10 @@ class SearchViewModel : ViewModel() {
         }
 
     companion object {
-        private const val MIN_QUERY_LENGTH = 2
-        private const val DEBOUNCE_MS = 400L
-        private const val SEARCH_LIMIT = 30
+        private const val MIN_SUGGEST_LENGTH = 2
+        private const val SUGGEST_DEBOUNCE_MS = 150L
+        private const val SEARCH_DEBOUNCE_MS = 250L
+        private const val SUGGEST_LIMIT = 10
+        private const val SEARCH_LIMIT = 10
     }
 }

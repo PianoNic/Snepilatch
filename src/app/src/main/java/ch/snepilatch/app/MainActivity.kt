@@ -160,9 +160,10 @@ class MainActivity : ComponentActivity() {
                     !initialized -> {
                         val cooldown by vm.rateLimitCooldown.collectAsState()
                         val seconds by vm.cooldownSeconds.collectAsState()
-                        val displayError = if (cooldown) "Rate limited — retrying in ${seconds}s..." else error
                         LoadingScreen(
-                            error = displayError,
+                            error = error,
+                            isRateLimited = cooldown,
+                            cooldownSecondsRemaining = seconds,
                             onLogin = { if (!cooldown) vm.showLogin() },
                             onRetry = {
                                 if (!cooldown) {

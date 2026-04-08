@@ -60,6 +60,13 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     private var currentTitle = ""
     private var currentArtist = ""
     private var currentArt: Bitmap? = null
+    private var currentDurationMs: Long = 0L
+
+    /**
+     * The album-art URL most recently requested by setIdleMetadata. Used to
+     * discard stale background loads when the track changes before art arrives.
+     */
+    private var idleArtUrl: String? = null
     private var currentAudioSessionId: Int = 0
     private var openAudioEffectSession = false
 
@@ -328,9 +335,57 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
     fun stop() {
         metadataQueue.clear()
+        currentDurationMs = 0L
+        idleArtUrl = null
         mainHandler.post {
             player.stop()
             player.clearMediaItems()
+        }
+    }
+
+    /**
+     * Push idle metadata to the notification + MediaSession without loading
+     * anything into ExoPlayer. Used right after init to surface whatever
+     * track Spotify Connect's cluster reports as "current", so the system
+     * media notification shows the correct song before the user has pressed
+     * play. Pressing play / next / pause from the notification then runs the
+     * normal cold-start protocol.
+     *
+     * Skipped if a track is already loaded (we don't want to overwrite live
+     * playback metadata).
+     */
+    fun setIdleMetadata(title: String, artist: String, albumArtUrl: String?, durationMs: Long) {
+        if (player.mediaItemCount > 0) return
+        currentTitle = title
+        currentArtist = artist
+        currentDurationMs = durationMs
+        // Track the most recent idle art URL so we can ignore stale callbacks
+        // and only render the *current* track's art.
+        val expectedUrl = albumArtUrl
+        idleArtUrl = expectedUrl
+        if (expectedUrl == null) {
+            currentArt = null
+            mainHandler.post {
+                updateMediaSessionMetadata()
+                updateNotification()
+            }
+            return
+        }
+        // Update text + duration immediately; load art async and apply only if
+        // it's still the current idle URL when it returns.
+        mainHandler.post {
+            updateMediaSessionMetadata()
+            updateNotification()
+        }
+        serviceScope.launch {
+            val bitmap = loadBitmap(expectedUrl)
+            if (idleArtUrl == expectedUrl) {
+                currentArt = bitmap
+                mainHandler.post {
+                    updateMediaSessionMetadata()
+                    updateNotification()
+                }
+            }
         }
     }
 
@@ -436,7 +491,14 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     }
 
     private fun updateMediaSessionMetadata() {
-        val duration = if (player.duration > 0) player.duration else 0L
+        // Prefer ExoPlayer's reported duration when a media item is loaded;
+        // fall back to currentDurationMs which is set by setIdleMetadata so
+        // the system shows the right duration before the song actually loads.
+        val duration = when {
+            player.duration > 0 -> player.duration
+            currentDurationMs > 0 -> currentDurationMs
+            else -> 0L
+        }
         val metadata = MediaMetadataCompat.Builder()
             .putString(MediaMetadataCompat.METADATA_KEY_TITLE, currentTitle)
             .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, currentArtist)

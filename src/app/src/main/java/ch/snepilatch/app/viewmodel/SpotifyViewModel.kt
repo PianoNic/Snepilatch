@@ -675,6 +675,22 @@ class SpotifyViewModel : ViewModel() {
             volume = _playback.value.volume
         )
 
+        // While we're idle (not streaming locally), push the cluster's
+        // current track to the system media notification so the user sees
+        // what would play if they tap the play button — both in the app
+        // mini-player AND in the lockscreen / notification shade. The
+        // service ignores this call if a media item is already loaded.
+        if (!isStreaming.value && displayTrack != null) {
+            withContext(Dispatchers.Main) {
+                MusicPlaybackService.instance?.setIdleMetadata(
+                    title = displayTrack.name,
+                    artist = displayTrack.artist,
+                    albumArtUrl = displayTrack.albumArt,
+                    durationMs = displayDuration
+                )
+            }
+        }
+
         // Only update theme/liked/canvas for the track we're ACTUALLY displaying
         val displayUri = displayTrack?.uri
         if (!isTrackMismatch) {

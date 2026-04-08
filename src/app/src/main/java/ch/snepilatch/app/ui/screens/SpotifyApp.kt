@@ -223,51 +223,71 @@ fun SpotifyApp(vm: SpotifyViewModel) {
 // --- Loading Screen ---
 
 @Composable
-fun LoadingScreen(error: String?, onLogin: () -> Unit = {}, onRetry: () -> Unit = {}) {
+fun LoadingScreen(
+    error: String?,
+    isRateLimited: Boolean = false,
+    cooldownSecondsRemaining: Int = 0,
+    onLogin: () -> Unit = {},
+    onRetry: () -> Unit = {}
+) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            if (error != null) {
-                var countdown by remember(error) { mutableIntStateOf(20) }
-                LaunchedEffect(error) {
-                    countdown = 20
-                    while (countdown > 0) {
-                        kotlinx.coroutines.delay(1000)
-                        countdown--
-                    }
-                    onRetry()
-                }
+            when {
+                isRateLimited -> {
+                    // The cooldown total can vary (20s on first retry, 40s on
+                    // second, etc. — see SpotifyViewModel). Track the highest
+                    // value we've seen so the progress bar fills correctly
+                    // regardless of the starting length.
+                    var totalSeconds by remember { mutableIntStateOf(cooldownSecondsRemaining) }
+                    if (cooldownSecondsRemaining > totalSeconds) totalSeconds = cooldownSecondsRemaining
+                    val safeTotal = totalSeconds.coerceAtLeast(1)
+                    val progress = ((safeTotal - cooldownSecondsRemaining).toFloat() / safeTotal)
+                        .coerceIn(0f, 1f)
 
-                Icon(Icons.Default.CloudOff, null, tint = SpotifyLightGray, modifier = Modifier.size(48.dp))
-                Spacer(Modifier.height(16.dp))
-                Text("Rate limited", color = SpotifyWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(8.dp))
-                Text("Retrying in ${countdown}s", color = SpotifyLightGray, fontSize = 14.sp)
-                Spacer(Modifier.height(24.dp))
-                LinearProgressIndicator(
-                    progress = { (20 - countdown) / 20f },
-                    modifier = Modifier
-                        .width(200.dp)
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(2.dp)),
-                    color = SpotifyWhite,
-                    trackColor = SpotifyLightGray.copy(alpha = 0.2f)
-                )
-                Spacer(Modifier.height(24.dp))
-                Button(
-                    onClick = onRetry,
-                    colors = ButtonDefaults.buttonColors(containerColor = SpotifyWhite),
-                    shape = RoundedCornerShape(24.dp)
-                ) {
-                    Text("Retry now", fontWeight = FontWeight.Bold, color = Color.Black)
+                    Icon(Icons.Default.CloudOff, null, tint = SpotifyLightGray, modifier = Modifier.size(48.dp))
+                    Spacer(Modifier.height(16.dp))
+                    Text("Rate limited", color = SpotifyWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(8.dp))
+                    Text("Retrying in ${cooldownSecondsRemaining}s", color = SpotifyLightGray, fontSize = 14.sp)
+                    Spacer(Modifier.height(24.dp))
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier
+                            .width(200.dp)
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp)),
+                        color = SpotifyWhite,
+                        trackColor = SpotifyLightGray.copy(alpha = 0.2f)
+                    )
+                    Spacer(Modifier.height(24.dp))
+                    TextButton(onClick = onLogin) {
+                        Text("Login with different account", color = SpotifyLightGray, fontSize = 13.sp)
+                    }
                 }
-                Spacer(Modifier.height(8.dp))
-                TextButton(onClick = onLogin) {
-                    Text("Login with different account", color = SpotifyLightGray, fontSize = 13.sp)
+                error != null -> {
+                    Icon(Icons.Default.CloudOff, null, tint = SpotifyLightGray, modifier = Modifier.size(48.dp))
+                    Spacer(Modifier.height(16.dp))
+                    Text("Connection failed", color = SpotifyWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(8.dp))
+                    Text(error, color = SpotifyLightGray, fontSize = 13.sp)
+                    Spacer(Modifier.height(24.dp))
+                    Button(
+                        onClick = onRetry,
+                        colors = ButtonDefaults.buttonColors(containerColor = SpotifyWhite),
+                        shape = RoundedCornerShape(24.dp)
+                    ) {
+                        Text("Retry", fontWeight = FontWeight.Bold, color = Color.Black)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    TextButton(onClick = onLogin) {
+                        Text("Login with different account", color = SpotifyLightGray, fontSize = 13.sp)
+                    }
                 }
-            } else {
-                CircularProgressIndicator(color = SpotifyWhite, strokeWidth = 3.dp)
-                Spacer(Modifier.height(20.dp))
-                Text("Connecting to Spotify...", color = SpotifyLightGray, fontSize = 15.sp)
+                else -> {
+                    CircularProgressIndicator(color = SpotifyWhite, strokeWidth = 3.dp)
+                    Spacer(Modifier.height(20.dp))
+                    Text("Connecting to Spotify...", color = SpotifyLightGray, fontSize = 15.sp)
+                }
             }
         }
     }

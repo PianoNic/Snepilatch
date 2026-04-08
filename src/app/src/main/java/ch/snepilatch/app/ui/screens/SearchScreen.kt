@@ -5,7 +5,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -21,7 +23,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -54,9 +55,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import ch.snepilatch.app.data.TrackInfo
 import ch.snepilatch.app.ui.components.SpotifyImage
-import ch.snepilatch.app.ui.components.TrackRow
 import ch.snepilatch.app.ui.theme.SpotifyBlack
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
 import ch.snepilatch.app.ui.theme.SpotifyWhite
@@ -173,7 +172,13 @@ fun SearchScreen(vm: SpotifyViewModel, searchVm: SearchViewModel = viewModel()) 
                         )
                     }
                 }
-                CategorizedResults(results, vm)
+                val selectedFilter by searchVm.selectedFilter.collectAsState()
+                CategorizedResults(
+                    results = results,
+                    vm = vm,
+                    selectedFilter = selectedFilter,
+                    onFilterChange = { searchVm.setFilter(it) }
+                )
             }
         }
     }
@@ -254,81 +259,126 @@ private fun SuggestionsList(
     }
 }
 
+/**
+ * One unified row representing any search result. Used for songs, albums,
+ * playlists, podcasts, profiles — same template throughout, only the image
+ * shape (circular for artists/users) and the right-side action vary.
+ */
+private data class UnifiedResult(
+    val uri: String,
+    val title: String,
+    val subtitle: String,
+    val imageUrl: String?,
+    val circular: Boolean,
+    val onClick: () -> Unit
+)
+
+private fun SearchTrack.toUnified(vm: SpotifyViewModel) = UnifiedResult(
+    uri = uri,
+    title = name,
+    subtitle = "Song · ${artists.joinToString(", ") { it.name }}",
+    imageUrl = album.coverArtUrl,
+    circular = false,
+    onClick = { vm.playTrack(uri) }
+)
+
+private fun SearchArtist.toUnified(vm: SpotifyViewModel) = UnifiedResult(
+    uri = uri,
+    title = name,
+    subtitle = "Artist",
+    imageUrl = avatarUrl,
+    circular = true,
+    onClick = { vm.openArtist(idFromUri(uri)) }
+)
+
+private fun SearchAlbum.toUnified(vm: SpotifyViewModel): UnifiedResult {
+    val typeLabel = type.lowercase().replaceFirstChar { it.uppercase() }
+    val artistName = artists.firstOrNull()?.name
+    return UnifiedResult(
+        uri = uri,
+        title = name,
+        subtitle = listOfNotNull(typeLabel.takeIf { it.isNotBlank() }, artistName).joinToString(" · "),
+        imageUrl = coverArtUrl,
+        circular = false,
+        onClick = { vm.openAlbum(idFromUri(uri)) }
+    )
+}
+
+private fun SearchPlaylist.toUnified(vm: SpotifyViewModel) = UnifiedResult(
+    uri = uri,
+    title = name,
+    subtitle = listOfNotNull("Playlist", ownerName).joinToString(" · "),
+    imageUrl = coverArtUrl,
+    circular = false,
+    onClick = { vm.openPlaylist(idFromUri(uri)) }
+)
+
+private fun SearchPodcast.toUnified() = UnifiedResult(
+    uri = uri,
+    title = name,
+    subtitle = listOfNotNull("Podcast", publisher).joinToString(" · "),
+    imageUrl = coverArtUrl,
+    circular = false,
+    onClick = { /* podcast detail not implemented yet */ }
+)
+
+private fun SearchUser.toUnified() = UnifiedResult(
+    uri = uri,
+    title = displayName,
+    subtitle = "Profile",
+    imageUrl = avatarUrl,
+    circular = true,
+    onClick = { /* user profile not implemented yet */ }
+)
+
 @Composable
 private fun CategorizedResults(
     results: kotify.api.song.SearchResult?,
-    vm: SpotifyViewModel
+    vm: SpotifyViewModel,
+    selectedFilter: SearchViewModel.SearchFilter,
+    onFilterChange: (SearchViewModel.SearchFilter) -> Unit
 ) {
     if (results == null) return
-    LazyColumn(
-        Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = LocalBottomOverlayHeight.current.value + 16.dp)
-    ) {
-        if (results.tracks.items.isNotEmpty()) {
-            item { SectionHeader("Songs") }
-            itemsIndexed(results.tracks.items) { _, t ->
-                TrackRow(t.toUiTrackInfo(), vm)
+
+    Column(Modifier.fillMaxSize()) {
+        FilterChipRow(
+            selected = selectedFilter,
+            onSelect = onFilterChange,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+
+        // Build the unified list based on the selected filter.
+        val rows: List<UnifiedResult> = when (selectedFilter) {
+            SearchViewModel.SearchFilter.ALL -> buildList {
+                // Top result is the first artist (Spotify usually features an
+                // artist as the top result for entity queries). Falls back to
+                // the first available item if there's no artist.
+                results.artists.items.forEach { add(it.toUnified(vm)) }
+                results.tracks.items.forEach { add(it.toUnified(vm)) }
+                results.albums.items.forEach { add(it.toUnified(vm)) }
+                results.playlists.items.forEach { add(it.toUnified(vm)) }
+                results.podcasts.items.forEach { add(it.toUnified()) }
+                results.users.items.forEach { add(it.toUnified()) }
             }
+            SearchViewModel.SearchFilter.ARTISTS -> results.artists.items.map { it.toUnified(vm) }
+            SearchViewModel.SearchFilter.ALBUMS -> results.albums.items.map { it.toUnified(vm) }
+            SearchViewModel.SearchFilter.SONGS -> results.tracks.items.map { it.toUnified(vm) }
+            SearchViewModel.SearchFilter.PLAYLISTS -> results.playlists.items.map { it.toUnified(vm) }
+            SearchViewModel.SearchFilter.PODCASTS -> results.podcasts.items.map { it.toUnified() }
+            SearchViewModel.SearchFilter.PROFILES -> results.users.items.map { it.toUnified() }
         }
-        if (results.artists.items.isNotEmpty()) {
-            item { SectionHeader("Artists") }
-            items(results.artists.items, key = { it.uri }) {
+
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = LocalBottomOverlayHeight.current.value + 16.dp)
+        ) {
+            items(rows, key = { it.uri }) { row ->
                 ResultRow(
-                    title = it.name,
-                    subtitle = "Artist",
-                    imageUrl = it.avatarUrl,
-                    circular = true,
-                    onClick = { vm.openArtist(idFromUri(it.uri)) }
-                )
-            }
-        }
-        if (results.albums.items.isNotEmpty()) {
-            item { SectionHeader("Albums") }
-            items(results.albums.items, key = { it.uri }) {
-                val subtitle = listOfNotNull(
-                    it.type.lowercase().replaceFirstChar { c -> c.uppercase() }.takeIf { s -> s.isNotBlank() },
-                    it.releaseYear?.toString(),
-                    it.artists.firstOrNull()?.name
-                ).joinToString(" • ")
-                ResultRow(
-                    title = it.name,
-                    subtitle = subtitle,
-                    imageUrl = it.coverArtUrl,
-                    onClick = { vm.openAlbum(idFromUri(it.uri)) }
-                )
-            }
-        }
-        if (results.playlists.items.isNotEmpty()) {
-            item { SectionHeader("Playlists") }
-            items(results.playlists.items, key = { it.uri }) {
-                ResultRow(
-                    title = it.name,
-                    subtitle = listOfNotNull("Playlist", it.ownerName).joinToString(" • "),
-                    imageUrl = it.coverArtUrl,
-                    onClick = { vm.openPlaylist(idFromUri(it.uri)) }
-                )
-            }
-        }
-        if (results.podcasts.items.isNotEmpty()) {
-            item { SectionHeader("Podcasts & Shows") }
-            items(results.podcasts.items, key = { it.uri }) {
-                ResultRow(
-                    title = it.name,
-                    subtitle = listOfNotNull("Podcast", it.publisher).joinToString(" • "),
-                    imageUrl = it.coverArtUrl,
-                    onClick = { /* podcast detail not implemented yet */ }
-                )
-            }
-        }
-        if (results.users.items.isNotEmpty()) {
-            item { SectionHeader("Profiles") }
-            items(results.users.items, key = { it.uri }) {
-                ResultRow(
-                    title = it.displayName,
-                    subtitle = "Profile",
-                    imageUrl = it.avatarUrl,
-                    circular = true,
-                    onClick = { /* user profile not implemented yet */ }
+                    title = row.title,
+                    subtitle = row.subtitle,
+                    imageUrl = row.imageUrl,
+                    circular = row.circular,
+                    onClick = row.onClick
                 )
             }
         }
@@ -336,14 +386,62 @@ private fun CategorizedResults(
 }
 
 @Composable
-private fun SectionHeader(label: String) {
-    Text(
-        label,
-        color = SpotifyWhite,
-        fontSize = 18.sp,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-    )
+private fun FilterChipRow(
+    selected: SearchViewModel.SearchFilter,
+    onSelect: (SearchViewModel.SearchFilter) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val all = SearchViewModel.SearchFilter.entries
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        if (selected != SearchViewModel.SearchFilter.ALL) {
+            // Show the X-clear pill on the left when a filter is active.
+            IconButton(
+                onClick = { onSelect(SearchViewModel.SearchFilter.ALL) },
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(SpotifyLightGray.copy(alpha = 0.18f))
+            ) {
+                Icon(Icons.Default.Close, "Filter zurücksetzen", tint = SpotifyWhite, modifier = Modifier.size(18.dp))
+            }
+            // Render only the active chip when one is selected, matching Spotify.
+            FilterChip(label = labelFor(selected), isSelected = true, onClick = {})
+        } else {
+            all.filter { it != SearchViewModel.SearchFilter.ALL }.forEach { f ->
+                FilterChip(label = labelFor(f), isSelected = false, onClick = { onSelect(f) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun FilterChip(label: String, isSelected: Boolean, onClick: () -> Unit) {
+    val bg = if (isSelected) Color(0xFF1DB954) else SpotifyLightGray.copy(alpha = 0.18f)
+    val fg = if (isSelected) SpotifyBlack else SpotifyWhite
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(bg)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+    ) {
+        Text(label, color = fg, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+private fun labelFor(filter: SearchViewModel.SearchFilter): String = when (filter) {
+    SearchViewModel.SearchFilter.ALL -> "All"
+    SearchViewModel.SearchFilter.ARTISTS -> "Artists"
+    SearchViewModel.SearchFilter.ALBUMS -> "Albums"
+    SearchViewModel.SearchFilter.SONGS -> "Songs"
+    SearchViewModel.SearchFilter.PLAYLISTS -> "Playlists"
+    SearchViewModel.SearchFilter.PODCASTS -> "Podcasts"
+    SearchViewModel.SearchFilter.PROFILES -> "Profiles"
 }
 
 @Composable
@@ -388,14 +486,5 @@ private fun ResultRow(
         }
     }
 }
-
-private fun SearchTrack.toUiTrackInfo(): TrackInfo = TrackInfo(
-    uri = uri,
-    name = name,
-    artist = artists.joinToString(", ") { it.name },
-    albumArt = album.coverArtUrl,
-    durationMs = durationMs,
-    albumName = album.name
-)
 
 private fun idFromUri(uri: String): String = uri.substringAfterLast(':')

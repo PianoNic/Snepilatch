@@ -504,6 +504,23 @@ class SpotifyViewModel : ViewModel() {
             }
         }
 
+    /**
+     * Same shape as [launchWithSession] but receives the live [PlayerConnect].
+     * Used by transport commands (shuffle, repeat, volume, ...) that don't
+     * need to touch the session object directly.
+     */
+    private fun launchWithPlayer(tag: String, block: suspend (PlayerConnect) -> Unit): Job =
+        viewModelScope.launch(Dispatchers.IO) {
+            val pc = player ?: return@launch
+            try {
+                block(pc)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                LokiLogger.e(TAG, tag, e)
+            }
+        }
+
     fun showLogin() {
         needsLogin.value = true
     }
@@ -978,34 +995,26 @@ class SpotifyViewModel : ViewModel() {
             MusicPlaybackService.instance?.syncSeek(positionMs)
         }
         // Seek Spotify in background
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                player?.seek(positionMs.toInt())
-            } catch (e: Exception) { LokiLogger.e(TAG, "seek", e) }
-        }
+        launchWithPlayer("seek") { it.seek(positionMs.toInt()) }
     }
 
     fun toggleShuffle() {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val newMode = if (_playback.value.isShuffling) "off" else "on"
-                player?.setShuffle(newMode)
-                _playback.value = _playback.value.copy(isShuffling = newMode != "off")
-            } catch (e: Exception) { LokiLogger.e(TAG, "shuffle", e) }
+        launchWithPlayer("shuffle") { pc ->
+            val newMode = if (_playback.value.isShuffling) "off" else "on"
+            pc.setShuffle(newMode)
+            _playback.value = _playback.value.copy(isShuffling = newMode != "off")
         }
     }
 
     fun cycleRepeat() {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val newMode = when (_playback.value.repeatMode) {
-                    "off" -> "context"
-                    "context" -> "track"
-                    else -> "off"
-                }
-                player?.setRepeat(newMode)
-                _playback.value = _playback.value.copy(repeatMode = newMode)
-            } catch (e: Exception) { LokiLogger.e(TAG, "repeat", e) }
+        launchWithPlayer("repeat") { pc ->
+            val newMode = when (_playback.value.repeatMode) {
+                "off" -> "context"
+                "context" -> "track"
+                else -> "off"
+            }
+            pc.setRepeat(newMode)
+            _playback.value = _playback.value.copy(repeatMode = newMode)
         }
     }
 
@@ -1021,11 +1030,7 @@ class SpotifyViewModel : ViewModel() {
 
     fun setSpotifyVolume(volumePercent: Double) {
         _playback.value = _playback.value.copy(volume = volumePercent)
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                player?.setVolume(volumePercent)
-            } catch (e: Exception) { LokiLogger.e(TAG, "setSpotifyVolume", e) }
-        }
+        launchWithPlayer("setSpotifyVolume") { it.setVolume(volumePercent) }
     }
 
     fun playTrack(trackUri: String, contextUri: String? = null) {
@@ -1247,22 +1252,18 @@ class SpotifyViewModel : ViewModel() {
     }
 
     fun likeSong(trackId: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                session?.let { Song(it).likeSong(trackId) }
-                currentTrackLiked.value = true
-                _snackbarMessage.tryEmit("Added to Liked Songs")
-            } catch (e: Exception) { LokiLogger.e(TAG, "likeSong", e) }
+        launchWithSession("likeSong") { sess ->
+            Song(sess).likeSong(trackId)
+            currentTrackLiked.value = true
+            _snackbarMessage.tryEmit("Added to Liked Songs")
         }
     }
 
     fun unlikeSong(trackId: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                session?.let { Song(it).unlikeSong(trackId) }
-                currentTrackLiked.value = false
-                _snackbarMessage.tryEmit("Removed from Liked Songs")
-            } catch (e: Exception) { LokiLogger.e(TAG, "unlikeSong", e) }
+        launchWithSession("unlikeSong") { sess ->
+            Song(sess).unlikeSong(trackId)
+            currentTrackLiked.value = false
+            _snackbarMessage.tryEmit("Removed from Liked Songs")
         }
     }
 
@@ -2089,42 +2090,31 @@ class SpotifyViewModel : ViewModel() {
     }
 
     fun transferPlayback(deviceId: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                player?.transferPlaybackTo(deviceId)
-                delay(500)
-                refreshState()
-                loadDevices()
-                showDevices.value = false
-            } catch (e: Exception) { LokiLogger.e(TAG, "transferPlayback", e) }
+        launchWithPlayer("transferPlayback") { pc ->
+            pc.transferPlaybackTo(deviceId)
+            delay(500)
+            refreshState()
+            loadDevices()
+            showDevices.value = false
         }
     }
 
     // --- Playlist Management ---
 
     fun createPlaylist(name: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val sess = session ?: return@launch
-                Playlist(sess).createPlaylist(name, username)
-                delay(1000)
-                loadLibrary()
-            } catch (e: Exception) { LokiLogger.e(TAG, "createPlaylist", e) }
+        launchWithSession("createPlaylist") { sess ->
+            Playlist(sess).createPlaylist(name, username)
+            delay(1000)
+            loadLibrary()
         }
     }
 
     fun followArtist(artistId: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try { session?.let { Artist(it).follow(artistId) } }
-            catch (e: Exception) { LokiLogger.e(TAG, "follow", e) }
-        }
+        launchWithSession("followArtist") { sess -> Artist(sess).follow(artistId) }
     }
 
     fun unfollowArtist(artistId: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try { session?.let { Artist(it).unfollow(artistId) } }
-            catch (e: Exception) { LokiLogger.e(TAG, "unfollow", e) }
-        }
+        launchWithSession("unfollowArtist") { sess -> Artist(sess).unfollow(artistId) }
     }
 
     private fun extractColorsFromArt(imageUrl: String) {

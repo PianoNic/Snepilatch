@@ -20,13 +20,49 @@ import kotify.api.playlist.Library as KLibrary
 import kotify.api.playlist.LibraryItem as KLibraryItem
 
 /**
- * Spotify returns release dates in several shapes — "2026", "2026-02-20",
- * or "2026-02-20T00:00:00Z" depending on the precision and the endpoint.
- * Reduce them all to the leading year, which matches what Spotify shows
- * on its own album pages.
+ * Spotify returns release dates in several shapes:
+ *   - "2026"
+ *   - "2026-02-20"
+ *   - "2026-02-20T00:00:00Z"
+ *
+ * Format the richest available form: "Feb 20, 2026" when month + day are
+ * present, "Feb 2026" when only year + month, "2026" when only year.
  */
-private fun formatReleaseYear(raw: String): String =
-    raw.take(4).takeIf { it.length == 4 && it.all { c -> c.isDigit() } } ?: raw
+private val MONTHS = arrayOf(
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+)
+
+private fun formatReleaseDate(raw: String): String {
+    // Strip any time component and trim
+    val datePart = raw.substringBefore('T').trim()
+    val parts = datePart.split('-')
+    return when (parts.size) {
+        3 -> {
+            val year = parts[0].toIntOrNull()
+            val month = parts[1].toIntOrNull()
+            val day = parts[2].toIntOrNull()
+            if (year != null && month in 1..12 && day != null) {
+                "${MONTHS[month!! - 1]} $day, $year"
+            } else {
+                raw
+            }
+        }
+        2 -> {
+            val year = parts[0].toIntOrNull()
+            val month = parts[1].toIntOrNull()
+            if (year != null && month in 1..12) {
+                "${MONTHS[month!! - 1]} $year"
+            } else {
+                raw
+            }
+        }
+        1 -> {
+            if (parts[0].length == 4 && parts[0].all { it.isDigit() }) parts[0] else raw
+        }
+        else -> raw
+    }
+}
 
 /**
  * Conversion helpers from KotifyClient typed DTOs into snepilatch's UI models.
@@ -153,7 +189,7 @@ fun AlbumInfo.toDetailData(albumId: String): DetailData {
         artistName = firstArtist?.name,
         artistUri = firstArtist?.uri,
         albumType = type,
-        releaseDate = releaseDate?.let { formatReleaseYear(it) },
+        releaseDate = releaseDate?.let { formatReleaseDate(it) },
         copyright = copyrights.joinToString("\n").takeIf { it.isNotBlank() },
         moreByArtist = moreByArtist.map { r ->
             RelatedAlbum(

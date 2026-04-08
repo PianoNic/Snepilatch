@@ -89,7 +89,6 @@ class SpotifyViewModel : ViewModel() {
     private var nextStreamProvider: String? = null
     private var nextCdnUrl: String? = null      // Pre-resolved Spotify CDN URL (DRM)
     private var nextCdnFileId: String? = null   // File ID for the pre-resolved CDN track
-    private var nextCdnUri: String? = null      // Track URI the pre-resolved CDN is for
     private var lastCommandTs: Long = 0L  // timing: when last user command was sent
     private var lastCommandName: String = ""
     private var playUrlAt: Long = 0L      // timing: when playUrl/playDrmUrl was last called
@@ -371,20 +370,23 @@ class SpotifyViewModel : ViewModel() {
             }
         }
 
-        pc.onNextPlaybackId { fileId, uri, name ->
+        pc.onNextPlaybackId { fileId, _, name ->
             if (preferredAudioSource.value != null) return@onNextPlaybackId
+            // Deduplicate — don't re-resolve if we already have this file ID cached
             if (fileId == nextCdnFileId && nextCdnUrl != null) return@onNextPlaybackId
             viewModelScope.launch(Dispatchers.IO) {
                 try {
                     val resolver = cdnResolver ?: return@launch
+                    // Double-check after coroutine dispatch
                     if (fileId == nextCdnFileId && nextCdnUrl != null) return@launch
                     LokiLogger.d(TAG, "Pre-resolving next Spotify CDN: $name ($fileId)")
                     val stream = resolver.resolveForFileId(fileId)
+                    // Cache only — DRM items can't be pre-queued because each
+                    // needs its own Widevine license session.
                     nextCdnUrl = stream.cdnUrl
                     nextCdnFileId = fileId
-                    nextCdnUri = uri
                     isNextReady.value = true
-                    LokiLogger.i(TAG, "Next Spotify CDN pre-resolved: $name ($uri)")
+                    LokiLogger.i(TAG, "Next Spotify CDN pre-resolved: $name")
                 } catch (e: Exception) {
                     LokiLogger.d(TAG, "Pre-resolve next CDN failed: ${e.message}")
                 }
@@ -1542,47 +1544,6 @@ class SpotifyViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Find a Spotify file id for [trackUri]. Checks the event, then the
-     * URI-tagged cache, then waits up to 5 seconds for onPlaybackId, then
-     * falls back to the metadata API. Returns null only if every path fails.
-     */
-    private suspend fun resolveFileIdForTrack(
-        resolver: SpotifyCdnResolver,
-        event: kotify.api.playerstatus.TrackChangeEvent,
-        trackUri: String
-    ): String? {
-        event.currentFileId?.let { return it }
-        if (latestFileIdUri == trackUri) latestFileId?.let { return it }
-        // onPlaybackId can take several seconds to arrive on some accounts.
-        // Poll up to 5s for it before the metadata fallback.
-        repeat(50) {
-            delay(100)
-            if (latestFileIdUri == trackUri) latestFileId?.let { return it }
-        }
-        return resolver.fetchFileIdFromMetadata(trackUri)?.also {
-            latestFileId = it
-            latestFileIdUri = trackUri
-        }
-    }
-
-    /** Stop the old DRM session and load [stream] into ExoPlayer. */
-    private suspend fun loadDrmStream(
-        stream: SpotifyStream,
-        title: String,
-        artist: String,
-        art: String?
-    ) {
-        val coldStart = coldStartPending
-        withContext(Dispatchers.Main) {
-            MusicPlaybackService.instance?.stop()
-            MusicPlaybackService.instance?.playDrmUrl(
-                stream.cdnUrl, stream.licenseUrl, stream.licenseHeaders, title, artist, art,
-                startPlaying = !coldStart,
-            )
-        }
-    }
-
     private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent) {
         val resolveStart = System.currentTimeMillis()
         val current = event.current ?: return
@@ -1663,27 +1624,84 @@ class SpotifyViewModel : ViewModel() {
             try {
                 val resolver = cdnResolver ?: throw IllegalStateException("CdnResolver not initialized")
 
-                // Fast path: onNextPlaybackId pre-resolved this URI already.
-                val stream = if (nextCdnUri == trackUri && nextCdnUrl != null) {
+                // Resolve a file id that belongs to THIS track. We only accept:
+                //  1. event.currentFileId if the event carries it
+                //  2. the latestFileId cache IF it's tagged with this track's URI
+                //  3. onPlaybackId arriving in a short window after us
+                //  4. the metadata API as a last resort
+                // Previously we used latestFileId regardless of which track it
+                // was for, which poisoned rapid skips (all tracks played the
+                // previous track's audio).
+                var fileId: String? = event.currentFileId
+                if (fileId == null && latestFileIdUri == trackUri) {
+                    fileId = latestFileId
+                }
+                if (fileId == null) {
+                    // onPlaybackId can take several seconds to arrive after a
+                    // track change on this account. Wait up to 5 seconds
+                    // before falling back — that's long enough to catch
+                    // almost all arrivals without making the user wait
+                    // forever on a dead track.
+                    LokiLogger.d(TAG, "SpotifyCDN: Waiting for file ID (up to 5s)...")
+                    for (attempt in 1..50) {
+                        delay(100)
+                        if (latestFileIdUri == trackUri) {
+                            fileId = latestFileId
+                            if (fileId != null) break
+                        }
+                    }
+                }
+                if (fileId == null) {
+                    LokiLogger.i(TAG, "SpotifyCDN: No state-machine file id, fetching from metadata API...")
+                    fileId = resolver.fetchFileIdFromMetadata(trackUri)
+                    if (fileId != null) {
+                        LokiLogger.i(TAG, "SpotifyCDN: Got file ID from metadata: $fileId")
+                        latestFileId = fileId
+                        latestFileIdUri = trackUri
+                    }
+                }
+                if (fileId == null) throw IllegalStateException("No file ID available for $trackUri")
+
+                // Use the pre-resolved cache only if the cached id matches.
+                val stream: SpotifyStream = if (fileId == nextCdnFileId && nextCdnUrl != null) {
+                    LokiLogger.i(TAG, "SpotifyCDN: Using pre-resolved CDN URL (fileId=$fileId)")
                     val url = nextCdnUrl!!
-                    nextCdnFileId?.let { latestFileId = it; latestFileIdUri = trackUri }
-                    nextCdnUrl = null; nextCdnFileId = null; nextCdnUri = null
-                    LokiLogger.i(TAG, "SpotifyCDN: instant (pre-resolved) for $trackUri")
+                    nextCdnUrl = null
+                    nextCdnFileId = null
                     resolver.buildStreamForCachedUrl(url)
                 } else {
-                    // Slow path: find a file id for this track.
-                    val fileId = resolveFileIdForTrack(resolver, event, trackUri)
-                        ?: throw IllegalStateException("No file ID available for $trackUri")
-                    LokiLogger.i(TAG, "SpotifyCDN: resolving fileId=$fileId")
-                    resolver.resolveForFileId(fileId)
+                    LokiLogger.i(TAG, "SpotifyCDN: Resolving fileId=$fileId")
+                    val resolved = resolver.resolveForFileId(fileId)
+                    LokiLogger.i(TAG, "SpotifyCDN: Resolved ${resolved.mirrorCount} mirrors")
+                    resolved
                 }
-
-                loadDrmStream(stream, title, artist, art)
+                // DRM: must stop old player to close the Widevine session cleanly.
+                // Unlike non-DRM, we can't seamlessly replace — each track needs its own license.
+                withContext(Dispatchers.Main) {
+                    MusicPlaybackService.instance?.stop()
+                }
+                playUrlAt = System.currentTimeMillis()
+                val coldStart = coldStartPending
+                // Extend the seek guard across the entire DRM load + ready
+                // window. playDrmUrl posts to the main handler and returns
+                // instantly; the actual STATE_READY fires 1-2s later. Between
+                // those two points ExoPlayer reports position 0, and if a
+                // stale cluster snapshot interpolates tens of seconds forward
+                // the remote-seek detector would yank ExoPlayer past the
+                // start of the new track — the song would effectively be
+                // skipped because STATE_READY would fire at the seeked
+                // position, not at 0.
+                withContext(Dispatchers.Main) {
+                    MusicPlaybackService.instance?.playDrmUrl(
+                        stream.cdnUrl, stream.licenseUrl, stream.licenseHeaders, title, artist, art,
+                        startPlaying = !coldStart,
+                    )
+                }
                 currentStreamUri = trackUri
                 isStreaming.value = true
                 streamProvider.value = "Spotify CDN"
                 isStreamLoading.value = false
-                LokiLogger.i(TAG, "[Timing] resolveAndPlay loaded in ${System.currentTimeMillis() - resolveStart}ms")
+                LokiLogger.i(TAG, "[Timing] resolveAndPlay DRM loaded in ${System.currentTimeMillis() - resolveStart}ms (${System.currentTimeMillis() - lastCommandTs}ms total from CMD)")
                 preResolveNextTrack()
                 return
             } catch (e: Exception) {

@@ -391,30 +391,18 @@ private fun FilterChipRow(
     onSelect: (SearchViewModel.SearchFilter) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val all = SearchViewModel.SearchFilter.entries
     Row(
         modifier = modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        if (selected != SearchViewModel.SearchFilter.ALL) {
-            // Show the X-clear pill on the left when a filter is active.
-            IconButton(
-                onClick = { onSelect(SearchViewModel.SearchFilter.ALL) },
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(SpotifyLightGray.copy(alpha = 0.18f))
-            ) {
-                Icon(Icons.Default.Close, "Filter zurücksetzen", tint = SpotifyWhite, modifier = Modifier.size(18.dp))
-            }
-            // Render only the active chip when one is selected, matching Spotify.
-            FilterChip(label = labelFor(selected), isSelected = true, onClick = {})
-        } else {
-            all.filter { it != SearchViewModel.SearchFilter.ALL }.forEach { f ->
-                FilterChip(label = labelFor(f), isSelected = false, onClick = { onSelect(f) })
-            }
+        SearchViewModel.SearchFilter.entries.forEach { f ->
+            FilterChip(
+                label = labelFor(f),
+                isSelected = selected == f,
+                onClick = { onSelect(f) }
+            )
         }
     }
 }

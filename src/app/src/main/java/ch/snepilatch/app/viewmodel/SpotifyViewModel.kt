@@ -1503,21 +1503,23 @@ class SpotifyViewModel : ViewModel() {
             }
         }
         svc.onPlaybackEnded = {
+            // Snapshot the URI that JUST ended. If a new track gets loaded
+            // (currentStreamUri changes) before our 1s timer fires, Spotify
+            // already auto-advanced naturally — do NOT force-skip, that would
+            // skip a song ahead and the audio/UI desync.
+            val endedUri = currentStreamUri
             viewModelScope.launch(Dispatchers.IO) {
                 try {
                     LokiLogger.i(TAG, "ExoPlayer ended — waiting 1s for auto-advance...")
-                    // Give TrackPlaybackHandler time to auto-advance via state machine
                     delay(1000)
-                    // Safety net: check ExoPlayer's actual playback state, not the
-                    // cached _playback.value (which only updates on WS state pushes
-                    // and lags by tens of seconds when nothing's happening). If
-                    // ExoPlayer is still stopped after 1s, the state machine didn't
-                    // auto-advance — force skipNext to kick the next track.
+                    val newTrackLoaded = currentStreamUri != null && currentStreamUri != endedUri
                     val exoPlaying = withContext(Dispatchers.Main) {
                         MusicPlaybackService.instance?.isPlaying() == true
                     }
-                    if (!exoPlaying) {
-                        LokiLogger.w(TAG, "Auto-advance didn't fire (ExoPlayer still stopped), forcing skipNext")
+                    if (newTrackLoaded || exoPlaying) {
+                        LokiLogger.d(TAG, "Auto-advance fired naturally (newTrackLoaded=$newTrackLoaded, exoPlaying=$exoPlaying)")
+                    } else {
+                        LokiLogger.w(TAG, "Auto-advance didn't fire (still on $endedUri), forcing skipNext")
                         player?.skipNext()
                     }
                 } catch (e: CancellationException) { throw e }

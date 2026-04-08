@@ -1,0 +1,93 @@
+# Detekt configuration. Builds upon the default ruleset (buildUponDefaultConfig=true)
+# and tunes the rules that are too noisy for this project.
+#
+# Run: ./gradlew detekt
+# Generate baseline: ./gradlew detektBaseline (and commit detekt-baseline.xml)
+
+build:
+  maxIssues: 0
+  excludeCorrectable: false
+
+complexity:
+  LongMethod:
+    threshold: 80          # SpotifyViewModel has long methods we know about; baseline tracks them
+  LongParameterList:
+    functionThreshold: 8
+    constructorThreshold: 10
+  TooManyFunctions:
+    thresholdInClasses: 80 # SpotifyViewModel is large; baselined
+    thresholdInFiles: 80
+    thresholdInObjects: 30
+  CyclomaticComplexMethod:
+    threshold: 25
+  LargeClass:
+    threshold: 2500        # SpotifyViewModel
+  NestedBlockDepth:
+    threshold: 6
+
+style:
+  MagicNumber:
+    active: false          # too noisy in Compose layout / playback timing constants
+  ReturnCount:
+    max: 6
+  WildcardImport:
+    active: false          # ch.snepilatch.app.data.* is intentional
+  MaxLineLength:
+    maxLineLength: 160
+    excludeCommentStatements: true
+    excludeImportStatements: true
+    excludePackageStatements: true
+  UnusedPrivateMember:
+    active: true
+  ForbiddenComment:
+    active: false          # we have legitimate TODO/FIXME notes
+  NewLineAtEndOfFile:
+    active: true
+  UseDataClass:
+    active: false
+
+formatting:
+  active: true
+  android: true
+  autoCorrect: false
+  MaximumLineLength:
+    maxLineLength: 160
+  Indentation:
+    indentSize: 4
+  NoWildcardImports:
+    active: false
+  ArgumentListWrapping:
+    active: false          # detekt-formatting is overly aggressive on Compose
+  ParameterListWrapping:
+    active: false
+  ImportOrdering:
+    active: false          # editor-managed; not worth fighting
+
+naming:
+  FunctionNaming:
+    functionPattern: '[a-z][a-zA-Z0-9]*|[A-Z][a-zA-Z0-9]*'  # Compose @Composable functions are PascalCase
+  TopLevelPropertyNaming:
+    constantPattern: '[A-Z][_A-Z0-9]*|[a-z][a-zA-Z0-9]*'
+
+empty-blocks:
+  EmptyFunctionBlock:
+    active: true
+    ignoreOverridden: true
+
+performance:
+  SpreadOperator:
+    active: false          # used for vararg in PendingIntent etc.
+
+potential-bugs:
+  ImplicitDefaultLocale:
+    active: false          # the deprecated Locale ctor we know about
+  UnsafeCallOnNullableType:
+    active: true
+
+exceptions:
+  TooGenericExceptionCaught:
+    active: false          # network code intentionally catches Exception
+  SwallowedException:
+    active: false          # we silence noisy ones intentionally
+  PrintStackTrace:
+    active: true

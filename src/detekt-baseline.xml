@@ -1,0 +1,180 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues></ManuallySuppressedIssues>
+  <CurrentIssues>
+    <ID>AnnotationOnSeparateLine:MediaButtonReceiver.kt$MediaButtonReceiver$@Suppress("DEPRECATION") intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT)</ID>
+    <ID>BlockCommentInitialStarAlignment:Theme.kt$/* Other default colors to override background = Color(0xFFFFFBFE), surface = Color(0xFFFFFBFE), onPrimary = Color.White, onSecondary = Color.White, onTertiary = Color.White, onBackground = Color(0xFF1C1B1F), onSurface = Color(0xFF1C1B1F), */</ID>
+    <ID>BlockCommentInitialStarAlignment:Type.kt$/* Other default text styles to override titleLarge = TextStyle( fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal, fontSize = 22.sp, lineHeight = 28.sp, letterSpacing = 0.sp ), labelSmall = TextStyle( fontFamily = FontFamily.Default, fontWeight = FontWeight.Medium, fontSize = 11.sp, lineHeight = 16.sp, letterSpacing = 0.5.sp ) */</ID>
+    <ID>ComplexCondition:NowPlayingScreen.kt$&lt;no name provided&gt;$viewW == 0f || viewH == 0f || videoW == 0f || videoH == 0f</ID>
+    <ID>ComplexCondition:SpotifyViewModel.kt$SpotifyViewModel$isStreaming.value &amp;&amp; !isSeekGuarded &amp;&amp; !isStreamLoading.value &amp;&amp; !isTrackMismatch &amp;&amp; !isStaleSnapshot</ID>
+    <ID>CyclomaticComplexMethod:AccountScreen.kt$@Composable fun AccountScreen(vm: SpotifyViewModel)</ID>
+    <ID>CyclomaticComplexMethod:DetailScreen.kt$@Composable fun DetailScreen(vm: SpotifyViewModel)</ID>
+    <ID>CyclomaticComplexMethod:LyricsScreen.kt$@Composable fun LyricsScreen(vm: SpotifyViewModel)</ID>
+    <ID>CyclomaticComplexMethod:NowPlayingScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun NowPlayingScreen(vm: SpotifyViewModel)</ID>
+    <ID>CyclomaticComplexMethod:SpotifyViewModel.kt$SpotifyViewModel$private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent)</ID>
+    <ID>CyclomaticComplexMethod:SpotifyViewModel.kt$SpotifyViewModel$private suspend fun updatePlaybackFromState(state: PlayerStateData)</ID>
+    <ID>Filename:AudioOutputDetector.kt$ch.snepilatch.app.util.AudioOutputDetector.kt</ID>
+    <ID>FinalNewline:ExampleUnitTest.kt$ch.snepilatch.app.ExampleUnitTest.kt</ID>
+    <ID>FinalNewline:Theme.kt$ch.snepilatch.app.ui.theme.Theme.kt</ID>
+    <ID>FinalNewline:Type.kt$ch.snepilatch.app.ui.theme.Type.kt</ID>
+    <ID>Indentation:AudioOutputDetector.kt$ </ID>
+    <ID>Indentation:DetailScreen.kt$ </ID>
+    <ID>Indentation:LibraryScreen.kt$ </ID>
+    <ID>Indentation:LyricsScreen.kt$ </ID>
+    <ID>Indentation:MediaButtonReceiver.kt$MediaButtonReceiver$ </ID>
+    <ID>Indentation:MusicPlaybackService.kt$MusicPlaybackService$ </ID>
+    <ID>Indentation:NowPlayingScreen.kt$ </ID>
+    <ID>Indentation:NowPlayingScreen.kt$&lt;no name provided&gt;$ </ID>
+    <ID>Indentation:SpotifyApp.kt$ </ID>
+    <ID>LongMethod:AccountScreen.kt$@Composable fun AccountScreen(vm: SpotifyViewModel)</ID>
+    <ID>LongMethod:DetailScreen.kt$@Composable fun DetailScreen(vm: SpotifyViewModel)</ID>
+    <ID>LongMethod:DetailScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun AlbumTrackRow( track: ch.snepilatch.app.data.TrackInfo, vm: SpotifyViewModel, contextUri: String )</ID>
+    <ID>LongMethod:DetailScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun ArtistTrackRow( number: Int, track: ch.snepilatch.app.data.TrackInfo, vm: SpotifyViewModel, contextUri: String, playcount: String? = null )</ID>
+    <ID>LongMethod:DevicesDialog.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun DevicesDialog(vm: SpotifyViewModel)</ID>
+    <ID>LongMethod:LibraryScreen.kt$@Composable fun LibraryScreen(vm: SpotifyViewModel)</ID>
+    <ID>LongMethod:LyricsScreen.kt$@Composable fun LyricsScreen(vm: SpotifyViewModel)</ID>
+    <ID>LongMethod:MainActivity.kt$MainActivity$override fun onCreate(savedInstanceState: Bundle?)</ID>
+    <ID>LongMethod:NowPlayingScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun NowPlayingScreen(vm: SpotifyViewModel)</ID>
+    <ID>LongMethod:NowPlayingScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun NowPlayingMenu( showMore: Boolean, onShowMore: (Boolean) -&gt; Unit, onShowPlaylistPicker: () -&gt; Unit, vm: SpotifyViewModel, track: ch.snepilatch.app.data.TrackInfo?, shareContext: android.content.Context, buttonBg: Color )</ID>
+    <ID>LongMethod:SearchScreen.kt$@Composable fun SearchScreen(vm: SpotifyViewModel)</ID>
+    <ID>LongMethod:SharedComponents.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun TrackRow(track: TrackInfo, vm: SpotifyViewModel, contextUri: String? = null)</ID>
+    <ID>LongMethod:SpotifyApp.kt$@Composable fun SpotifyApp(vm: SpotifyViewModel)</ID>
+    <ID>LongMethod:SpotifyViewModel.kt$SpotifyViewModel$fun initialize(cookies: Map&lt;String, String&gt;)</ID>
+    <ID>LongMethod:SpotifyViewModel.kt$SpotifyViewModel$private suspend fun coldStartPlay()</ID>
+    <ID>LongMethod:SpotifyViewModel.kt$SpotifyViewModel$private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent)</ID>
+    <ID>LongMethod:SpotifyViewModel.kt$SpotifyViewModel$private suspend fun updatePlaybackFromState(state: PlayerStateData)</ID>
+    <ID>LongMethod:UpdateDialog.kt$@Composable fun UpdateDialog( updateInfo: UpdateInfo, onDismiss: () -&gt; Unit )</ID>
+    <ID>LongParameterList:MusicPlaybackService.kt$MusicPlaybackService$(url: String, licenseUrl: String, licenseHeaders: Map&lt;String, String&gt;, title: String, artist: String, albumArtUrl: String?, startPlaying: Boolean = true, startPositionMs: Long = 0L)</ID>
+    <ID>LoopWithTooManyJumpStatements:LyricsScreen.kt$for</ID>
+    <ID>MatchingDeclarationName:AudioOutputDetector.kt$AudioOutput</ID>
+    <ID>MatchingDeclarationName:ReleaseNotesScreen.kt$ReleaseNote</ID>
+    <ID>MaxLineLength:DetailScreen.kt$Text(track.name, color = SpotifyWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)</ID>
+    <ID>MaxLineLength:MusicPlaybackService.kt$MusicPlaybackService.&lt;no name provided&gt;$LokiLogger.i(TAG, "Audio session ID changed: $currentAudioSessionId -&gt; $audioSessionId, playWhenReady=${player.playWhenReady}, openSession=$openAudioEffectSession")</ID>
+    <ID>MaxLineLength:NowPlayingScreen.kt$eqIntent.putExtra(android.media.audiofx.AudioEffect.EXTRA_CONTENT_TYPE, android.media.audiofx.AudioEffect.CONTENT_TYPE_MUSIC)</ID>
+    <ID>MaxLineLength:QueueScreen.kt$LazyColumn</ID>
+    <ID>MaxLineLength:SpotifyViewModel.kt$SpotifyViewModel$?:</ID>
+    <ID>MaxLineLength:SpotifyViewModel.kt$SpotifyViewModel$LokiLogger.i(TAG, "[Timing] WS onTrackChange arrived (${delta}ms after CMD '$lastCommandName') -&gt; ${event.current?.uri} fileId=${event.currentFileId}")</ID>
+    <ID>MaxLineLength:SpotifyViewModel.kt$SpotifyViewModel$LokiLogger.i(TAG, "[Timing] resolveAndPlay DRM loaded in ${System.currentTimeMillis() - resolveStart}ms (${System.currentTimeMillis() - lastCommandTs}ms total from CMD)")</ID>
+    <ID>MaxLineLength:SpotifyViewModel.kt$SpotifyViewModel$val result = cdn.resolveStreamUrl(nextId, region = contentRegion.value, youtubeSearchQuery = searchQuery, preferredSource = preferredAudioSource.value)</ID>
+    <ID>MaxLineLength:SpotifyViewModel.kt$SpotifyViewModel$val result = cdn.resolveStreamUrl(trackId, region = contentRegion.value, youtubeSearchQuery = searchQuery, preferredSource = preferredAudioSource.value)</ID>
+    <ID>MaximumLineLength:DetailScreen.kt$ </ID>
+    <ID>MaximumLineLength:MusicPlaybackService.kt$MusicPlaybackService.&lt;no name provided&gt;$ </ID>
+    <ID>MaximumLineLength:NowPlayingScreen.kt$ </ID>
+    <ID>MaximumLineLength:QueueScreen.kt$ </ID>
+    <ID>MaximumLineLength:SpotifyViewModel.kt$SpotifyViewModel$ </ID>
+    <ID>MultiLineIfElse:AccountScreen.kt$"FLAC via ${if (audioSource == "tidal") "Tidal" else "Qobuz"}"</ID>
+    <ID>MultiLineIfElse:AccountScreen.kt$"Qobuz — FLAC up to 9216kbps"</ID>
+    <ID>MultiLineIfElse:AccountScreen.kt$"Standard quality (Spotify)"</ID>
+    <ID>MultiLineIfElse:AccountScreen.kt$"Tidal — FLAC up to 1411kbps"</ID>
+    <ID>MultiLineIfElse:BottomNav.kt$Modifier</ID>
+    <ID>MultiLineIfElse:BottomNav.kt$Modifier.border(2.dp, SpotifyWhite, CircleShape)</ID>
+    <ID>MultiLineIfElse:DetailScreen.kt$String.format("%,d", detail.followers)</ID>
+    <ID>MultiLineIfElse:DetailScreen.kt$String.format("%.1fM", detail.followers!! / 1_000_000.0)</ID>
+    <ID>MultiLineIfElse:DetailScreen.kt$detail.followers.toString()</ID>
+    <ID>MultiLineIfElse:LibraryScreen.kt$filteredLibrary</ID>
+    <ID>MultiLineIfElse:LibraryScreen.kt$filteredLibrary.filter { it.name.contains(searchQuery, ignoreCase = true) || (it.owner?.contains(searchQuery, ignoreCase = true) == true) }</ID>
+    <ID>MultiLineIfElse:LyricsScreen.kt$-1</ID>
+    <ID>MultiLineIfElse:LyricsScreen.kt$PaddingValues(top = 40.dp, bottom = 80.dp)</ID>
+    <ID>MultiLineIfElse:LyricsScreen.kt$PaddingValues(top = 80.dp, bottom = 300.dp)</ID>
+    <ID>MultiLineIfElse:LyricsScreen.kt$remember(posMs / 100) { lines.indexOfLast { posMs &gt;= it.startTimeMs }.coerceAtLeast(0) }</ID>
+    <ID>MultiLineIfElse:MusicPlaybackService.kt$MusicPlaybackService$android.R.drawable.ic_media_pause</ID>
+    <ID>MultiLineIfElse:MusicPlaybackService.kt$MusicPlaybackService$android.R.drawable.ic_media_play</ID>
+    <ID>MultiLineIfElse:MusicPlaybackService.kt$MusicPlaybackService$url</ID>
+    <ID>MultiLineIfElse:NowPlayingScreen.kt$seekDragValue</ID>
+    <ID>MultiLineIfElse:ReleaseNotesScreen.kt$MaterialTheme.colorScheme.primary</ID>
+    <ID>MultiLineIfElse:ReleaseNotesScreen.kt$SpotifyGray</ID>
+    <ID>MultiLineIfElse:SpotifyImageUrl.kt$raw</ID>
+    <ID>MultiLineIfElse:SpotifyViewModel.kt$SpotifyViewModel$false</ID>
+    <ID>MultiLineIfElse:SpotifyViewModel.kt$SpotifyViewModel$null</ID>
+    <ID>MultiLineIfElse:SpotifyViewModel.kt$SpotifyViewModel$pt.info</ID>
+    <ID>MultiLineIfElse:SpotifyViewModel.kt$SpotifyViewModel$throw e</ID>
+    <ID>NestedBlockDepth:SpotifyViewModel.kt$SpotifyViewModel$private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent)</ID>
+    <ID>NewLineAtEndOfFile:ExampleUnitTest.kt$ch.snepilatch.app.ExampleUnitTest.kt</ID>
+    <ID>NewLineAtEndOfFile:Theme.kt$ch.snepilatch.app.ui.theme.Theme.kt</ID>
+    <ID>NewLineAtEndOfFile:Type.kt$ch.snepilatch.app.ui.theme.Type.kt</ID>
+    <ID>NoConsecutiveBlankLines:SpotifyViewModel.kt$SpotifyViewModel$ </ID>
+    <ID>NoMultipleSpaces:MusicPlaybackService.kt$MusicPlaybackService$ </ID>
+    <ID>NoMultipleSpaces:ReleaseNotesScreen.kt$ </ID>
+    <ID>NoMultipleSpaces:SpotifyViewModel.kt$SpotifyViewModel$ </ID>
+    <ID>NoUnusedImports:AccountScreen.kt$ch.snepilatch.app.ui.screens.AccountScreen.kt</ID>
+    <ID>NoUnusedImports:BottomNav.kt$ch.snepilatch.app.ui.components.BottomNav.kt</ID>
+    <ID>NoUnusedImports:DevicesDialog.kt$ch.snepilatch.app.ui.components.DevicesDialog.kt</ID>
+    <ID>NoUnusedImports:HomeScreen.kt$ch.snepilatch.app.ui.screens.HomeScreen.kt</ID>
+    <ID>NoUnusedImports:KotifyMappers.kt$ch.snepilatch.app.data.KotifyMappers.kt</ID>
+    <ID>NoUnusedImports:LibraryScreen.kt$ch.snepilatch.app.ui.screens.LibraryScreen.kt</ID>
+    <ID>NoUnusedImports:LyricsScreen.kt$ch.snepilatch.app.ui.screens.LyricsScreen.kt</ID>
+    <ID>NoUnusedImports:MusicPlaybackService.kt$ch.snepilatch.app.playback.MusicPlaybackService.kt</ID>
+    <ID>NoUnusedImports:NowPlayingScreen.kt$ch.snepilatch.app.ui.screens.NowPlayingScreen.kt</ID>
+    <ID>NoUnusedImports:QueueScreen.kt$import androidx.compose.ui.draw.clip</ID>
+    <ID>NoUnusedImports:ReleaseNotesScreen.kt$ch.snepilatch.app.ui.screens.ReleaseNotesScreen.kt</ID>
+    <ID>NoUnusedImports:SearchScreen.kt$ch.snepilatch.app.ui.screens.SearchScreen.kt</ID>
+    <ID>NoUnusedImports:SearchScreen.kt$import androidx.compose.foundation.layout.Spacer</ID>
+    <ID>NoUnusedImports:SharedComponents.kt$ch.snepilatch.app.ui.components.SharedComponents.kt</ID>
+    <ID>NoUnusedImports:SpotifyApp.kt$ch.snepilatch.app.ui.screens.SpotifyApp.kt</ID>
+    <ID>NoUnusedImports:SpotifyViewModel.kt$ch.snepilatch.app.viewmodel.SpotifyViewModel.kt</ID>
+    <ID>NoUnusedImports:Theme.kt$ch.snepilatch.app.ui.theme.Theme.kt</ID>
+    <ID>SpacingAroundKeyword:SpotifyViewModel.kt$SpotifyViewModel$catch</ID>
+    <ID>SpacingAroundKeyword:SpotifyViewModel.kt$SpotifyViewModel$finally</ID>
+    <ID>SpacingBetweenDeclarationsWithAnnotations:SessionHolder.kt$SessionHolder$@Volatile var cdnResolver: SpotifyCdnResolver? = null</ID>
+    <ID>SpacingBetweenDeclarationsWithAnnotations:SessionHolder.kt$SessionHolder$@Volatile var player: PlayerConnect? = null</ID>
+    <ID>SpacingBetweenDeclarationsWithAnnotations:SessionHolder.kt$SessionHolder$@Volatile var spotifyPlayback: SpotifyPlayback? = null</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:MusicPlaybackService.kt$MusicPlaybackService$// Which extra buttons to show: "like", "shuffle", "repeat"</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:PositionInterpolator.kt$PositionInterpolator.Companion$// Report every 30s (60 * 500ms)</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:SpotifyViewModel.kt$SpotifyViewModel$// Canvas background</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:SpotifyViewModel.kt$SpotifyViewModel$// Content region for CDN resolution</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:SpotifyViewModel.kt$SpotifyViewModel$// Language preference: "system", "en", "de", "ru", "gsw"</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:SpotifyViewModel.kt$SpotifyViewModel$// Lyrics animation direction for line-synced (non word-synced): "vertical" or "horizontal"</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:SpotifyViewModel.kt$SpotifyViewModel$// Next track info (always available from WebSocket state for mini player swipe)</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:SpotifyViewModel.kt$SpotifyViewModel$// Notification button preferences: "like", "shuffle", "repeat"</ID>
+    <ID>StringTemplate:DetailScreen.kt$${totalMin}</ID>
+    <ID>ThrowsCount:SpotifyViewModel.kt$SpotifyViewModel$fun togglePlayPause()</ID>
+    <ID>ThrowsCount:SpotifyViewModel.kt$SpotifyViewModel$private fun wireTransportCallbacks(svc: MusicPlaybackService)</ID>
+    <ID>TooGenericExceptionThrown:ReleaseNotesScreen.kt$throw Exception("HTTP ${response.code}")</ID>
+    <ID>UnusedParameter:SharedComponents.kt$baseDelay: Int = 30</ID>
+    <ID>UnusedParameter:SharedComponents.kt$index: Int</ID>
+    <ID>UnusedPrivateProperty:DevicesDialog.kt$val context = LocalContext.current</ID>
+    <ID>UnusedPrivateProperty:NowPlayingScreen.kt$val activeDevice by vm.activeDeviceName.collectAsState()</ID>
+    <ID>UnusedPrivateProperty:NowPlayingScreen.kt$val animatedGradientBottom by animateColorAsState(theme.gradientBottom, tween(800), label = "gradBot")</ID>
+    <ID>UnusedPrivateProperty:NowPlayingScreen.kt$val animatedGradientTop by animateColorAsState(theme.gradientTop, tween(800), label = "gradTop")</ID>
+    <ID>UnusedPrivateProperty:SpotifyViewModel.kt$SpotifyViewModel$attempt</ID>
+    <ID>UseCheckOrError:SpotifyCdnResolver.kt$SpotifyCdnResolver$throw IllegalStateException("No CDN mirrors for fileId=$fileId")</ID>
+    <ID>UseCheckOrError:SpotifyViewModel.kt$SpotifyViewModel$throw IllegalStateException("CdnResolver not initialized")</ID>
+    <ID>UseCheckOrError:SpotifyViewModel.kt$SpotifyViewModel$throw IllegalStateException("No file ID available")</ID>
+    <ID>VariableNaming:SpotifyViewModel.kt$SpotifyViewModel$// Playback (internal so tests can seed state without going through the // network-dependent initialize/resolve paths) internal val _playback = MutableStateFlow(PlaybackUiState())</ID>
+    <ID>VariableNaming:SpotifyViewModel.kt$SpotifyViewModel$private val TAG = "SpotifyVM"</ID>
+    <ID>Wrapping:AccountScreen.kt$(</ID>
+    <ID>Wrapping:AccountScreen.kt$;</ID>
+    <ID>Wrapping:AccountScreen.kt$Text( if (audioSource == "tidal") "Tidal — FLAC up to 1411kbps" else "Qobuz — FLAC up to 9216kbps", color = SpotifyLightGray )</ID>
+    <ID>Wrapping:AccountScreen.kt$Text( if (canvasOn) "Looping video behind album art" else "Off", color = SpotifyLightGray )</ID>
+    <ID>Wrapping:AccountScreen.kt$Text( if (isLossless) "FLAC via ${if (audioSource == "tidal") "Tidal" else "Qobuz"}" else "Standard quality (Spotify)", color = SpotifyLightGray )</ID>
+    <ID>Wrapping:AccountScreen.kt$Text( when { isChecking -&gt; "Checking..." upToDate -&gt; "You're on the latest version" else -&gt; "Tap to check for new versions" }, color = if (upToDate) animatedPrimary else SpotifyLightGray )</ID>
+    <ID>Wrapping:DetailScreen.kt$(</ID>
+    <ID>Wrapping:DetailScreen.kt$;</ID>
+    <ID>Wrapping:DetailScreen.kt$showMenu = false; vm.showPlaylistPickerForTrack(track.uri)</ID>
+    <ID>Wrapping:DetailScreen.kt$stripHtml(it)</ID>
+    <ID>Wrapping:LibraryScreen.kt$(</ID>
+    <ID>Wrapping:LibraryScreen.kt$;</ID>
+    <ID>Wrapping:LokiLogger.kt$LokiLogger$(</ID>
+    <ID>Wrapping:LokiLogger.kt$LokiLogger$("stream", JSONObject().apply { put("app", appName) put("device_id", deviceId) put("device_model", Build.MODEL) put("os_version", "Android ${Build.VERSION.RELEASE}") put("app_version", appVersion) put("session", sessionId) put("level", level) put("tag", tag) })</ID>
+    <ID>Wrapping:LyricsScreen.kt$( initialValue = 0.35f, targetValue = 1f, animationSpec = infiniteRepeatable( animation = tween(600, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse, initialStartOffset = StartOffset(i * 200) ), label = "dotAlpha$i" )</ID>
+    <ID>Wrapping:LyricsScreen.kt$( initialValue = 0.6f, targetValue = 1.1f, animationSpec = infiniteRepeatable( animation = tween(600, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse, initialStartOffset = StartOffset(i * 200) ), label = "dot$i" )</ID>
+    <ID>Wrapping:LyricsScreen.kt$;</ID>
+    <ID>Wrapping:MainActivity.kt$MainActivity$(</ID>
+    <ID>Wrapping:MiniPlayer.kt$(</ID>
+    <ID>Wrapping:MusicPlaybackService.kt$MusicPlaybackService$(</ID>
+    <ID>Wrapping:NowPlayingScreen.kt$(</ID>
+    <ID>Wrapping:NowPlayingScreen.kt$;</ID>
+    <ID>Wrapping:NowPlayingScreen.kt$&lt;no name provided&gt;${ vm.updateAudioOutput(audioCtx) }</ID>
+    <ID>Wrapping:NowPlayingScreen.kt$&lt;no name provided&gt;${ vm.updateAudioOutput(audioCtx2) }</ID>
+    <ID>Wrapping:NowPlayingScreen.kt$track?.uri?.let { vm.addToQueue(it) }; onShowMore(false)</ID>
+    <ID>Wrapping:NowPlayingScreen.kt$vm.addToQueue(it)</ID>
+    <ID>Wrapping:ReleaseNotesScreen.kt$(</ID>
+    <ID>Wrapping:SharedComponents.kt$(</ID>
+    <ID>Wrapping:SharedComponents.kt$;</ID>
+    <ID>Wrapping:SharedComponents.kt$showMenu = false; vm.showPlaylistPickerForTrack(track.uri)</ID>
+    <ID>Wrapping:SpotifyApp.kt$;</ID>
+    <ID>Wrapping:SpotifyViewModel.kt$SpotifyViewModel$(</ID>
+    <ID>Wrapping:SpotifyViewModel.kt$SpotifyViewModel$;</ID>
+    <ID>Wrapping:SpotifyViewModel.kt$SpotifyViewModel$it.key == activeId || it.key == "hobs_$activeId" || "hobs_${it.key}" == activeId</ID>
+  </CurrentIssues>
+</SmellBaseline>

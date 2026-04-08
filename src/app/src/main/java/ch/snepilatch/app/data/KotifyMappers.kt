@@ -20,6 +20,15 @@ import kotify.api.playlist.Library as KLibrary
 import kotify.api.playlist.LibraryItem as KLibraryItem
 
 /**
+ * Spotify returns release dates in several shapes — "2026", "2026-02-20",
+ * or "2026-02-20T00:00:00Z" depending on the precision and the endpoint.
+ * Reduce them all to the leading year, which matches what Spotify shows
+ * on its own album pages.
+ */
+private fun formatReleaseYear(raw: String): String =
+    raw.take(4).takeIf { it.length == 4 && it.all { c -> c.isDigit() } } ?: raw
+
+/**
  * Conversion helpers from KotifyClient typed DTOs into snepilatch's UI models.
  *
  * KotifyClient returns rich DTOs across the entire HTTP and WebSocket surface
@@ -144,7 +153,7 @@ fun AlbumInfo.toDetailData(albumId: String): DetailData {
         artistName = firstArtist?.name,
         artistUri = firstArtist?.uri,
         albumType = type,
-        releaseDate = releaseDate,
+        releaseDate = releaseDate?.let { formatReleaseYear(it) },
         copyright = copyrights.joinToString("\n").takeIf { it.isNotBlank() },
         moreByArtist = moreByArtist.map { r ->
             RelatedAlbum(

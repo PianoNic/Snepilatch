@@ -270,15 +270,28 @@ class SpotifyViewModel : ViewModel() {
                 LokiLogger.i(TAG, "Player ready, device: ${pc.ourDeviceId()}")
                 loadDevices()
 
-                // Refresh access token periodically to prevent stale credentials
+                // Refresh the access token a couple of minutes before it
+                // actually expires. KotifyClient now exposes the absolute
+                // expiration timestamp via baseClient.accessTokenExpirationTimestampMs;
+                // we wake up REFRESH_LEAD_MS before it, refresh, repeat.
+                // Falls back to a 50-minute interval if the timestamp isn't
+                // available (e.g. older Kotify or unexpected response shape).
                 viewModelScope.launch(Dispatchers.IO) {
                     while (true) {
-                        delay(50 * 60 * 1000L) // Every 50 minutes
+                        val expiresAt = sess.baseClient.accessTokenExpirationTimestampMs
+                        val sleepMs = if (expiresAt != null) {
+                            (expiresAt - System.currentTimeMillis() - REFRESH_LEAD_MS)
+                                .coerceAtLeast(MIN_REFRESH_DELAY_MS)
+                        } else {
+                            FALLBACK_REFRESH_INTERVAL_MS
+                        }
+                        delay(sleepMs)
                         try {
                             sess.baseClient.refreshAccessToken()
-                            LokiLogger.i(TAG, "Access token refreshed")
+                            LokiLogger.i(TAG, "Access token refreshed (next in ~${sleepMs / 60_000}m)")
                         } catch (e: Exception) {
                             LokiLogger.w(TAG, "Token refresh failed: ${e.message}")
+                            delay(REFRESH_RETRY_DELAY_MS)
                         }
                     }
                 }
@@ -2113,5 +2126,14 @@ class SpotifyViewModel : ViewModel() {
                 }
             }.start()
         }
+    }
+
+    companion object {
+        // Token refresh: wake up this many ms BEFORE the actual expiry so the
+        // refresh completes before any in-flight request hits an expired token.
+        private const val REFRESH_LEAD_MS = 2 * 60 * 1000L
+        private const val MIN_REFRESH_DELAY_MS = 5 * 1000L
+        private const val FALLBACK_REFRESH_INTERVAL_MS = 50 * 60 * 1000L
+        private const val REFRESH_RETRY_DELAY_MS = 60 * 1000L
     }
 }

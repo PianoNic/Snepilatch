@@ -36,7 +36,7 @@
     <ID>LongMethod:MainActivity.kt$MainActivity$override fun onCreate(savedInstanceState: Bundle?)</ID>
     <ID>LongMethod:NowPlayingScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun NowPlayingScreen(vm: SpotifyViewModel)</ID>
     <ID>LongMethod:NowPlayingScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun NowPlayingMenu( showMore: Boolean, onShowMore: (Boolean) -&gt; Unit, onShowPlaylistPicker: () -&gt; Unit, vm: SpotifyViewModel, track: ch.snepilatch.app.data.TrackInfo?, shareContext: android.content.Context, buttonBg: Color )</ID>
-    <ID>LongMethod:SearchScreen.kt$@Composable fun SearchScreen(vm: SpotifyViewModel)</ID>
+    <ID>LongMethod:SearchScreen.kt$@Composable fun SearchScreen(vm: SpotifyViewModel, searchVm: SearchViewModel = viewModel())</ID>
     <ID>LongMethod:SharedComponents.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun TrackRow(track: TrackInfo, vm: SpotifyViewModel, contextUri: String? = null)</ID>
     <ID>LongMethod:SpotifyApp.kt$@Composable fun SpotifyApp(vm: SpotifyViewModel)</ID>
     <ID>LongMethod:SpotifyViewModel.kt$SpotifyViewModel$fun initialize(cookies: Map&lt;String, String&gt;)</ID>

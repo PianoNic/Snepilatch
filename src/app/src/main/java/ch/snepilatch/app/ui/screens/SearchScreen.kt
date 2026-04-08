@@ -40,6 +40,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -55,6 +56,7 @@ import ch.snepilatch.app.ui.components.TrackRow
 import ch.snepilatch.app.ui.components.itemAppearModifier
 import ch.snepilatch.app.ui.theme.SpotifyBlack
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
+import ch.snepilatch.app.viewmodel.SearchViewModel
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
 
 private data class BrowseCategory(val name: String, val color: Color)
@@ -82,10 +84,10 @@ private val browseCategories = listOf(
 // --- Search Screen ---
 
 @Composable
-fun SearchScreen(vm: SpotifyViewModel) {
-    val query by vm.searchQuery.collectAsState()
-    val results by vm.searchResults.collectAsState()
-    val isSearching by vm.isSearching.collectAsState()
+fun SearchScreen(vm: SpotifyViewModel, searchVm: SearchViewModel = viewModel()) {
+    val query by searchVm.query.collectAsState()
+    val results by searchVm.results.collectAsState()
+    val isSearching by searchVm.isSearching.collectAsState()
     val focusManager = LocalFocusManager.current
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
@@ -101,7 +103,7 @@ fun SearchScreen(vm: SpotifyViewModel) {
 
         TextField(
             value = query,
-            onValueChange = { vm.updateSearchQuery(it) },
+            onValueChange = { searchVm.updateQuery(it) },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
@@ -111,7 +113,7 @@ fun SearchScreen(vm: SpotifyViewModel) {
             leadingIcon = { Icon(Icons.Default.Search, null, tint = SpotifyBlack) },
             trailingIcon = {
                 if (query.isNotEmpty()) {
-                    IconButton(onClick = { vm.updateSearchQuery("") }) {
+                    IconButton(onClick = { searchVm.updateQuery("") }) {
                         Icon(Icons.Default.Close, "Clear", tint = SpotifyBlack)
                     }
                 }
@@ -156,7 +158,7 @@ fun SearchScreen(vm: SpotifyViewModel) {
                             .height(90.dp)
                             .clip(RoundedCornerShape(8.dp))
                             .background(cat.color)
-                            .clickable { vm.updateSearchQuery(cat.name) }
+                            .clickable { searchVm.updateQuery(cat.name) }
                             .padding(14.dp),
                         contentAlignment = Alignment.BottomStart
                     ) {

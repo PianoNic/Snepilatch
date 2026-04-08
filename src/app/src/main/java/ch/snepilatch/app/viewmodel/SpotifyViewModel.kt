@@ -109,8 +109,9 @@ class SpotifyViewModel : ViewModel() {
     private val _account = MutableStateFlow(AccountInfo())
     val account: StateFlow<AccountInfo> = _account
 
-    // Playback
-    private val _playback = MutableStateFlow(PlaybackUiState())
+    // Playback (internal so tests can seed state without going through the
+    // network-dependent initialize/resolve paths)
+    internal val _playback = MutableStateFlow(PlaybackUiState())
     val playback: StateFlow<PlaybackUiState> = _playback
     private val positionInterpolator = PositionInterpolator(
         scope = viewModelScope,
@@ -413,40 +414,9 @@ class SpotifyViewModel : ViewModel() {
             }
         }
 
-        pc.onPlay { state ->
-            if (!isStreaming.value) {
-                LokiLogger.i(TAG, "Spotify: play at ${state.position_as_of_timestamp}ms")
-                MusicPlaybackService.instance?.syncPlay(state.position_as_of_timestamp)
-            } else if (_playback.value.isPaused) {
-                // We're streaming locally and were paused — the user just hit
-                // play from another Spotify client. Resume ExoPlayer in lock-step.
-                LokiLogger.i(TAG, "Remote play while streaming: resuming ExoPlayer")
-                MusicPlaybackService.instance?.syncPlay(_playback.value.positionMs)
-                _playback.value = _playback.value.copy(isPlaying = true, isPaused = false)
-                startPositionTicker()
-            }
-        }
+        pc.onPlay { state -> handleRemotePlay(state.position_as_of_timestamp) }
 
-        pc.onPause { state ->
-            if (suppressRemotePause) {
-                LokiLogger.d(TAG, "Spotify: pause suppressed (reconnecting)")
-                return@onPause
-            }
-            if (!isStreaming.value) {
-                LokiLogger.i(TAG, "Spotify: pause at ${state.position_as_of_timestamp}ms")
-                MusicPlaybackService.instance?.syncPause()
-            } else {
-                // We're streaming locally and the user hit pause from another
-                // Spotify client (browser, desktop, another phone). Mirror the
-                // pause on ExoPlayer so audio actually stops. Without this the
-                // browser pause event is silently dropped and music keeps
-                // playing here.
-                LokiLogger.i(TAG, "Remote pause while streaming: pausing ExoPlayer")
-                MusicPlaybackService.instance?.syncPause()
-                _playback.value = _playback.value.copy(isPlaying = false, isPaused = true)
-                stopPositionTicker()
-            }
-        }
+        pc.onPause { state -> handleRemotePause(state.position_as_of_timestamp) }
 
         pc.onReconnected {
             viewModelScope.launch(Dispatchers.IO) {
@@ -467,6 +437,42 @@ class SpotifyViewModel : ViewModel() {
                     suppressRemotePause = false
                 }
             }
+        }
+    }
+
+    /**
+     * Handle a remote "play" event from Spotify Connect (lockscreen, browser,
+     * other device). Public for unit tests so they can fire the event without
+     * needing a real PlayerConnect.
+     */
+    internal fun handleRemotePlay(positionMs: Long) {
+        if (!isStreaming.value) {
+            LokiLogger.i(TAG, "Spotify: play at ${positionMs}ms")
+            MusicPlaybackService.instance?.syncPlay(positionMs)
+        } else if (_playback.value.isPaused) {
+            LokiLogger.i(TAG, "Remote play while streaming: resuming ExoPlayer")
+            MusicPlaybackService.instance?.syncPlay(_playback.value.positionMs)
+            _playback.value = _playback.value.copy(isPlaying = true, isPaused = false)
+            startPositionTicker()
+        }
+    }
+
+    /**
+     * Handle a remote "pause" event from Spotify Connect. Public for unit tests.
+     */
+    internal fun handleRemotePause(positionMs: Long) {
+        if (suppressRemotePause) {
+            LokiLogger.d(TAG, "Spotify: pause suppressed (reconnecting)")
+            return
+        }
+        if (!isStreaming.value) {
+            LokiLogger.i(TAG, "Spotify: pause at ${positionMs}ms")
+            MusicPlaybackService.instance?.syncPause()
+        } else {
+            LokiLogger.i(TAG, "Remote pause while streaming: pausing ExoPlayer")
+            MusicPlaybackService.instance?.syncPause()
+            _playback.value = _playback.value.copy(isPlaying = false, isPaused = true)
+            stopPositionTicker()
         }
     }
 

@@ -45,6 +45,10 @@ class SearchViewModel : ViewModel() {
     val results: StateFlow<SearchResult?> = _results
     val isSearching = MutableStateFlow(false)
 
+    val selectedFilter = MutableStateFlow(SearchFilter.ALL)
+
+    enum class SearchFilter { ALL, ARTISTS, ALBUMS, SONGS, PLAYLISTS, PODCASTS, PROFILES }
+
     private var suggestJob: Job? = null
     private var searchJob: Job? = null
 
@@ -77,9 +81,14 @@ class SearchViewModel : ViewModel() {
         if (text.isBlank()) return
         query.value = text
         submittedQuery.value = text
+        selectedFilter.value = SearchFilter.ALL
         suggestJob?.cancel()
         suggestions.value = emptyList()
         scheduleFullSearch(text)
+    }
+
+    fun setFilter(filter: SearchFilter) {
+        selectedFilter.value = filter
     }
 
     /**

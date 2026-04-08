@@ -1336,10 +1336,8 @@ class SpotifyViewModel : ViewModel() {
         // Apply locale change
         val locale = if (language == "system") {
             java.util.Locale.getDefault()
-        } else if (language == "gsw") {
-            java.util.Locale.Builder().setLanguageTag("gsw").build()
         } else {
-            java.util.Locale(language)
+            java.util.Locale.forLanguageTag(language)
         }
         val config = context.resources.configuration
         config.setLocale(locale)
@@ -1362,7 +1360,7 @@ class SpotifyViewModel : ViewModel() {
         // Apply saved language on startup
         val lang = appLanguage.value
         if (lang != "system") {
-            val locale = if (lang == "gsw") java.util.Locale.Builder().setLanguageTag("gsw").build() else java.util.Locale(lang)
+            val locale = java.util.Locale.forLanguageTag(lang)
             val config = context.resources.configuration
             config.setLocale(locale)
             @Suppress("DEPRECATION")

@@ -2,6 +2,14 @@
 
 Living notes about non-obvious things in this repo. Keep this short and only add things that are noteworthy enough to matter for future work. Read [ARCHITECTURE.md](ARCHITECTURE.md) first for the layout.
 
+## Native TLS binary lives in `jniLibs/` and must match KotifyClient
+
+KotifyClient's JAR is code only — the JNA-loaded `libtls_client_go.so` ships separately from [`PianoNic/kotlin-tls-client-natives`](https://github.com/PianoNic/kotlin-tls-client-natives/releases/latest). We commit one `.so` per ABI under `src/app/src/main/jniLibs/<abi>/` so local debug builds work without a network step.
+
+CI (`.github/workflows/build-and-release.yml`) re-fetches the latest natives release on every release build, overwriting whatever is in the tree, so production APKs always ship matching binaries even if the committed copies have drifted.
+
+**When you bump KotifyClient locally**, refresh the four ABIs (`arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64`) from the natives release matching the kotlin-tls-client version your new KotifyClient depends on. Otherwise you'll get `UnsatisfiedLinkError` for any FFI symbol added since your last refresh (e.g. `wsOpen` after the WebSocket migration).
+
 ## Verification before merging anything
 
 ```sh

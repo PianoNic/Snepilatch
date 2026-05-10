@@ -90,6 +90,7 @@ When you fix a playback bug, **add a test that would have caught it.** The "brow
 - `./gradlew :app:assembleDebug` — debug APK
 - `./gradlew :app:testDebugUnitTest` — unit tests
 - KotifyClient is consumed as a local jar: `app/libs/KotifyClient.jar`. Rebuild with `cd ../KotifyClient && ./gradlew obfuscate` and copy `build/libs/KotifyClient-obfuscated.jar` over.
+- Two `.so` files per ABI in `app/src/main/jniLibs/<abi>/` are required at runtime: `libtls_client_go.so` (the Go TLS engine) and `libjnidispatch.so` (JNA's native dispatcher — JNA can't extract its own `.so` at runtime on Android due to W^X). CI re-fetches both on every release build; for local dev, the committed copies are fine unless KotifyClient bumps its kotlin-tls-client or JNA version. See `CLAUDE.md` for the bump procedure.
 - Local logs go to Loki when `loki.endpoint` is set in `local.properties` (gitignored). Otherwise logs are local.
 
 ## Conventions

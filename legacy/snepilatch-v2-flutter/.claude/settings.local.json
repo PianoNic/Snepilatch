@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter logs:*)",
+      "Bash(del \"c:\\\\Coding\\\\snepilatchV2\\\\lib\\\\services\\\\spotify_auth_service.dart\")",
+      "Bash(flutter pub get:*)",
+      "Bash(flutter clean:*)",
+      "Bash(ls -la \"c:\\\\GithubProjects\\\\snepilatchV2\\\\lib\\\\components\"\" 2>/dev/null || echo \"Directory check failed \")",
+      "Bash(find:*)",
+      "WebFetch(domain:pub.dev)",
+      "WebFetch(domain:screenrant.com)",
+      "WebFetch(domain:9to5mac.com)",
+      "WebFetch(domain:www.androidpolice.com)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:newsroom.spotify.com)",
+      "WebFetch(domain:deepwiki.com)",
+      "WebFetch(domain:spicetify.app)",
+      "WebFetch(domain:github.com)",
+      "Bash(curl:*)",
+      "Bash(gh search code:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(npm run build:*)",
+      "Bash(npx vite build)",
+      "Bash(npm install)",
+      "Bash(flutter analyze:*)",
+      "Bash(gh api:*)",
+      "WebFetch(domain:ixd.prattsi.org)",
+      "Bash(flutter pub add:*)",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(where:*)",
+      "WebFetch(domain:developer.spotify.com)",
+      "Bash(ls:*)",
+      "Bash(Select-String -Pattern \"error\")"
+    ]
+  }
+}

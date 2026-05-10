@@ -10,6 +10,8 @@ CI (`.github/workflows/build-and-release.yml`) re-fetches the latest natives rel
 
 **When you bump KotifyClient locally**, refresh the four ABIs (`arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64`) from the natives release matching the kotlin-tls-client version your new KotifyClient depends on. Otherwise you'll get `UnsatisfiedLinkError` for any FFI symbol added since your last refresh (e.g. `wsOpen` after the WebSocket migration).
 
+`libjnidispatch.so` (JNA's own dispatcher) sits next to `libtls_client_go.so` in each ABI directory. KotifyClient's shadow jar bundles JNA's Java classes but not its per-ABI native — Android's W^X rules forbid extracting `.so` files from inside a jar at runtime, so the file must be on disk in `jniLibs/`. CI re-extracts the latest from the JNA AAR alongside the natives step; locally, the committed copies are fine unless KotifyClient bumps its JNA dependency.
+
 ## Verification before merging anything
 
 ```sh

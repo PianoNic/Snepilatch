@@ -77,6 +77,25 @@ jobs:
           echo "Natives in place:"
           ls -lh src/app/src/main/jniLibs/*/libtls_client_go.so
 
+      - name: Refresh JNA jnidispatch native (latest)
+        run: |
+          # KotifyClient's shadow jar bundles JNA's Java classes, but Android
+          # can't extract JNA's per-ABI libjnidispatch.so from inside the jar at
+          # runtime (W^X). Pull the latest JNA AAR from Maven Central and drop
+          # the four Android .so files into jniLibs/ alongside libtls_client_go.so.
+          set -e
+          JNA_META=$(curl -fsSL https://repo1.maven.org/maven2/net/java/dev/jna/jna/maven-metadata.xml)
+          JNA_VERSION=$(echo "$JNA_META" | grep -oP '(?<=<release>)[^<]+' | head -1)
+          echo "Using JNA $JNA_VERSION"
+          curl -fsSL -o /tmp/jna.aar "https://repo1.maven.org/maven2/net/java/dev/jna/jna/${JNA_VERSION}/jna-${JNA_VERSION}.aar"
+          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
+            target="src/app/src/main/jniLibs/${abi}"
+            mkdir -p "$target"
+            unzip -j -o /tmp/jna.aar "jni/${abi}/libjnidispatch.so" -d "$target"
+          done
+          echo "jnidispatch in place:"
+          ls -lh src/app/src/main/jniLibs/*/libjnidispatch.so
+
       - name: Build Android APK
         working-directory: ./src
         run: |

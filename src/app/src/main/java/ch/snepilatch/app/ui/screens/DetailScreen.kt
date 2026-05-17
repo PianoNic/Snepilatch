@@ -219,18 +219,19 @@ fun DetailScreen(vm: SpotifyViewModel) {
                     }
                 }
 
-                // 3-dot menu
-                IconButton(onClick = {
-                    val id = detail.uri.substringAfterLast(":")
-                    val type = detail.type
-                    val shareUrl = "https://open.spotify.com/$type/$id"
-                    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                        this.type = "text/plain"
-                        putExtra(android.content.Intent.EXTRA_TEXT, shareUrl)
-                    }
-                    context.startActivity(android.content.Intent.createChooser(intent, "Share"))
-                }) {
+                // 3-dot menu — opens a bottom sheet with every action
+                // KotifyClient supports for the current detail type.
+                var showHeaderMenu by remember { mutableStateOf(false) }
+                IconButton(onClick = { showHeaderMenu = true }) {
                     Icon(Icons.Default.MoreVert, "More", tint = SpotifyLightGray, modifier = Modifier.size(24.dp))
+                }
+                if (showHeaderMenu) {
+                    DetailHeaderMenu(
+                        detail = detail,
+                        vm = vm,
+                        context = context,
+                        onDismiss = { showHeaderMenu = false }
+                    )
                 }
 
                 Spacer(Modifier.weight(1f))
@@ -706,5 +707,102 @@ private fun AlbumTrackRow(
                 Spacer(Modifier.navigationBarsPadding().height(12.dp))
             }
         }
+    }
+}
+
+/**
+ * Bottom-sheet menu opened from the 3-dot button on the detail header
+ * (album, playlist, artist, Liked Songs). Each row is a single action that
+ * KotifyClient actually supports — no Premium-gated entries, no UI-only
+ * "show Spotify Code" filler. Action set adapts to the detail type.
+ *
+ * Skips "Remove from Library" because the like/save toggle already lives
+ * elsewhere in the header.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DetailHeaderMenu(
+    detail: ch.snepilatch.app.data.DetailData,
+    vm: ch.snepilatch.app.viewmodel.SpotifyViewModel,
+    context: android.content.Context,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val trackUris = detail.tracks.map { it.uri }
+    val type = detail.type
+    val isAlbum = type == "album"
+    val isCollection = type == "collection"
+    val isArtist = type == "artist"
+    val hasTracks = trackUris.isNotEmpty()
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = SpotifyElevated,
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            ch.snepilatch.app.ui.components.SpotifyImage(
+                url = detail.imageUrl,
+                modifier = Modifier.size(48.dp),
+                shape = RoundedCornerShape(8.dp)
+            )
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(detail.name, color = SpotifyWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                val subtitle = detail.artistName ?: detail.ownerName ?: type.replaceFirstChar { it.uppercase() }
+                Text(subtitle, color = SpotifyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        HorizontalDivider(color = SpotifyLightGray.copy(alpha = 0.15f))
+
+        val items = buildList<Triple<androidx.compose.ui.graphics.vector.ImageVector, String, () -> Unit>> {
+            if (!isCollection) {
+                val id = detail.uri.substringAfterLast(":")
+                add(Triple(Icons.Default.Share, "Share") {
+                    onDismiss()
+                    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        this.type = "text/plain"
+                        putExtra(android.content.Intent.EXTRA_TEXT, "https://open.spotify.com/$type/$id")
+                    }
+                    context.startActivity(android.content.Intent.createChooser(intent, "Share"))
+                })
+            }
+            if (hasTracks && !isArtist) {
+                add(Triple(Icons.AutoMirrored.Filled.QueueMusic, "Add to Queue") {
+                    onDismiss()
+                    vm.addAllToQueue(trackUris)
+                })
+                add(Triple(Icons.AutoMirrored.Filled.PlaylistAdd, "Add to Playlist") {
+                    onDismiss()
+                    vm.showPlaylistPickerForTracks(trackUris)
+                })
+            }
+            if (isAlbum && detail.artistUri != null) {
+                add(Triple(Icons.Default.Person, "Visit Artist") {
+                    onDismiss()
+                    val artistId = detail.artistUri.substringAfterLast(":")
+                    vm.openArtist(artistId)
+                })
+            }
+        }
+
+        items.forEach { (icon, label, onClick) ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onClick() }
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(icon, null, tint = SpotifyWhite, modifier = Modifier.size(24.dp))
+                Spacer(Modifier.width(16.dp))
+                Text(label, color = SpotifyWhite, fontSize = 15.sp)
+            }
+        }
+        Spacer(Modifier.navigationBarsPadding().height(12.dp))
     }
 }

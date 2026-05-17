@@ -185,8 +185,9 @@ fun SpotifyApp(vm: SpotifyViewModel) {
                                 Modifier
                                     .fillMaxWidth()
                                     .clickable {
-                                        val trackUri = vm.pendingPlaylistTrackUri.value ?: return@clickable
-                                        vm.addTrackToPlaylist(playlist.uri.substringAfterLast(":"), trackUri)
+                                        val trackUris = vm.pendingPlaylistTrackUris.value
+                                        if (trackUris.isEmpty()) return@clickable
+                                        vm.addTracksToPlaylist(playlist.uri.substringAfterLast(":"), trackUris)
                                         vm.showPlaylistPicker.value = false
                                     }
                                     .padding(vertical = 10.dp),

@@ -44,6 +44,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.cancellation.CancellationException
 
+@Suppress("TooManyFunctions") // central view-model; split-by-feature is tracked separately
 class SpotifyViewModel : ViewModel() {
 
     private val TAG = "SpotifyVM"
@@ -1110,19 +1111,38 @@ class SpotifyViewModel : ViewModel() {
     }
 
     fun addTrackToPlaylist(playlistId: String, trackUri: String) {
-        launchWithSession("addTrackToPlaylist") { sess ->
-            kotify.api.playlist.Playlist(sess).addToPlaylist(playlistId, listOf(trackUri))
-            LokiLogger.i(TAG, "Added $trackUri to playlist $playlistId")
-            _snackbarMessage.tryEmit("Added to playlist")
+        addTracksToPlaylist(playlistId, listOf(trackUri))
+    }
+
+    /**
+     * Add many tracks to a playlist in a single API call. Used by the detail
+     * header's "Add to Playlist" action when the user adds an entire album,
+     * playlist, or the Liked Songs collection to another playlist.
+     */
+    fun addTracksToPlaylist(playlistId: String, trackUris: List<String>) {
+        if (trackUris.isEmpty()) return
+        launchWithSession("addTracksToPlaylist") { sess ->
+            kotify.api.playlist.Playlist(sess).addToPlaylist(playlistId, trackUris)
+            LokiLogger.i(TAG, "Added ${trackUris.size} tracks to playlist $playlistId")
+            _snackbarMessage.tryEmit(
+                if (trackUris.size == 1) "Added to playlist" else "Added ${trackUris.size} tracks to playlist"
+            )
         }
     }
 
-    // Track URI pending playlist picker
-    val pendingPlaylistTrackUri = MutableStateFlow<String?>(null)
+    // Tracks pending playlist picker. Always treated as a list so the same
+    // picker dialog covers single-track adds (from TrackRow) and bulk adds
+    // (from the album/playlist detail header).
+    val pendingPlaylistTrackUris = MutableStateFlow<List<String>>(emptyList())
     val showPlaylistPicker = MutableStateFlow(false)
 
     fun showPlaylistPickerForTrack(trackUri: String) {
-        pendingPlaylistTrackUri.value = trackUri
+        showPlaylistPickerForTracks(listOf(trackUri))
+    }
+
+    fun showPlaylistPickerForTracks(trackUris: List<String>) {
+        if (trackUris.isEmpty()) return
+        pendingPlaylistTrackUris.value = trackUris
         showPlaylistPicker.value = true
     }
 
@@ -1145,12 +1165,23 @@ class SpotifyViewModel : ViewModel() {
     }
 
     fun addToQueue(trackUri: String) {
+        addAllToQueue(listOf(trackUri))
+    }
+
+    /**
+     * Queue multiple tracks in a single Connect call. Used by the detail
+     * header's "Add to Queue" action.
+     */
+    fun addAllToQueue(trackUris: List<String>) {
+        if (trackUris.isEmpty()) return
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                player?.addToQueue(listOf(trackUri))
-                _snackbarMessage.tryEmit("Added to queue")
+                player?.addToQueue(trackUris)
+                _snackbarMessage.tryEmit(
+                    if (trackUris.size == 1) "Added to queue" else "Added ${trackUris.size} tracks to queue"
+                )
             }
-            catch (e: Exception) { LokiLogger.e(TAG, "addToQueue", e) }
+            catch (e: Exception) { LokiLogger.e(TAG, "addAllToQueue", e) }
         }
     }
 

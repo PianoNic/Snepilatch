@@ -1673,14 +1673,21 @@ class SpotifyViewModel : ViewModel() {
         }
         svc.onPlaybackEnded = {
             // Snapshot the URI that JUST ended. If a new track gets loaded
-            // (currentStreamUri changes) before our 1s timer fires, Spotify
+            // (currentStreamUri changes) before our timer fires, Spotify
             // already auto-advanced naturally — do NOT force-skip, that would
             // skip a song ahead and the audio/UI desync.
+            //
+            // Spotify's natural onTrackChange typically lands 0.9-1.5s after
+            // ExoPlayer's STATE_ENDED. A 1s window was racing it by 50-150ms
+            // and causing a double-skip when the natural advance arrived just
+            // after the forced skipNext. AUTO_ADVANCE_GRACE_MS gives generous
+            // headroom; the silent fallback only fires when Spotify Connect
+            // genuinely fails to advance.
             val endedUri = currentStreamUri
             viewModelScope.launch(Dispatchers.IO) {
                 try {
-                    LokiLogger.i(TAG, "ExoPlayer ended — waiting 1s for auto-advance...")
-                    delay(1000)
+                    LokiLogger.i(TAG, "ExoPlayer ended — waiting ${AUTO_ADVANCE_GRACE_MS}ms for auto-advance...")
+                    delay(AUTO_ADVANCE_GRACE_MS)
                     val newTrackLoaded = currentStreamUri != null && currentStreamUri != endedUri
                     val exoPlaying = withContext(Dispatchers.Main) {
                         MusicPlaybackService.instance?.isPlaying() == true
@@ -2321,6 +2328,12 @@ class SpotifyViewModel : ViewModel() {
         private const val MIN_REFRESH_DELAY_MS = 5 * 1000L
         private const val FALLBACK_REFRESH_INTERVAL_MS = 50 * 60 * 1000L
         private const val REFRESH_RETRY_DELAY_MS = 60 * 1000L
+
+        /** How long to wait after ExoPlayer's STATE_ENDED before falling back to
+         *  a forced player.skipNext(). Spotify's natural onTrackChange reliably
+         *  lands within ~1.5s; 5s gives generous headroom so we don't double-skip
+         *  when the natural advance arrives just past a tighter timeout. */
+        private const val AUTO_ADVANCE_GRACE_MS = 5000L
 
         /** How many init attempts we make before showing the user a hard fail.
          *  Matches the 3-attempt cap in KotifyClient's HttpClient 401 retry path

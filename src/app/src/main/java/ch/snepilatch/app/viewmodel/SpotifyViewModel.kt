@@ -29,7 +29,6 @@ import kotify.api.user.User
 import kotify.api.canvas.Canvas
 import kotify.cdn.CdnPlayback
 import kotify.cdn.SpotifyPlayback
-import kotify.cdn.StreamInfo
 import kotify.cdn.StreamResult
 import kotify.session.Session
 import kotify.session.SessionConfig
@@ -1715,10 +1714,11 @@ class SpotifyViewModel : ViewModel() {
                     if (fileId == null) {
                         // Brief wait — onPlaybackId may fire slightly after onTrackChange
                         LokiLogger.d(TAG, "SpotifyCDN: Waiting briefly for file ID...")
-                        for (attempt in 1..5) {
+                        for (i in 1..5) {
                             delay(100)
                             fileId = latestFileId
                             if (fileId != null) break
+                            LokiLogger.d(TAG, "SpotifyCDN: file ID still null after attempt $i")
                         }
                     }
                     // If still null, fetch file ID from track metadata API

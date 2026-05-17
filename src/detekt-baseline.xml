@@ -97,23 +97,6 @@
     <ID>NoMultipleSpaces:MusicPlaybackService.kt$MusicPlaybackService$ </ID>
     <ID>NoMultipleSpaces:ReleaseNotesScreen.kt$ </ID>
     <ID>NoMultipleSpaces:SpotifyViewModel.kt$SpotifyViewModel$ </ID>
-    <ID>NoUnusedImports:AccountScreen.kt$ch.snepilatch.app.ui.screens.AccountScreen.kt</ID>
-    <ID>NoUnusedImports:BottomNav.kt$ch.snepilatch.app.ui.components.BottomNav.kt</ID>
-    <ID>NoUnusedImports:DevicesDialog.kt$ch.snepilatch.app.ui.components.DevicesDialog.kt</ID>
-    <ID>NoUnusedImports:HomeScreen.kt$ch.snepilatch.app.ui.screens.HomeScreen.kt</ID>
-    <ID>NoUnusedImports:KotifyMappers.kt$ch.snepilatch.app.data.KotifyMappers.kt</ID>
-    <ID>NoUnusedImports:LibraryScreen.kt$ch.snepilatch.app.ui.screens.LibraryScreen.kt</ID>
-    <ID>NoUnusedImports:LyricsScreen.kt$ch.snepilatch.app.ui.screens.LyricsScreen.kt</ID>
-    <ID>NoUnusedImports:MusicPlaybackService.kt$ch.snepilatch.app.playback.MusicPlaybackService.kt</ID>
-    <ID>NoUnusedImports:NowPlayingScreen.kt$ch.snepilatch.app.ui.screens.NowPlayingScreen.kt</ID>
-    <ID>NoUnusedImports:QueueScreen.kt$import androidx.compose.ui.draw.clip</ID>
-    <ID>NoUnusedImports:ReleaseNotesScreen.kt$ch.snepilatch.app.ui.screens.ReleaseNotesScreen.kt</ID>
-    <ID>NoUnusedImports:SearchScreen.kt$ch.snepilatch.app.ui.screens.SearchScreen.kt</ID>
-    <ID>NoUnusedImports:SearchScreen.kt$import androidx.compose.foundation.layout.Spacer</ID>
-    <ID>NoUnusedImports:SharedComponents.kt$ch.snepilatch.app.ui.components.SharedComponents.kt</ID>
-    <ID>NoUnusedImports:SpotifyApp.kt$ch.snepilatch.app.ui.screens.SpotifyApp.kt</ID>
-    <ID>NoUnusedImports:SpotifyViewModel.kt$ch.snepilatch.app.viewmodel.SpotifyViewModel.kt</ID>
-    <ID>NoUnusedImports:Theme.kt$ch.snepilatch.app.ui.theme.Theme.kt</ID>
     <ID>SpacingAroundKeyword:SpotifyViewModel.kt$SpotifyViewModel$catch</ID>
     <ID>SpacingAroundKeyword:SpotifyViewModel.kt$SpotifyViewModel$finally</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:SessionHolder.kt$SessionHolder$@Volatile var cdnResolver: SpotifyCdnResolver? = null</ID>
@@ -131,13 +114,6 @@
     <ID>ThrowsCount:SpotifyViewModel.kt$SpotifyViewModel$fun togglePlayPause()</ID>
     <ID>ThrowsCount:SpotifyViewModel.kt$SpotifyViewModel$private fun wireTransportCallbacks(svc: MusicPlaybackService)</ID>
     <ID>TooGenericExceptionThrown:ReleaseNotesScreen.kt$throw Exception("HTTP ${response.code}")</ID>
-    <ID>UnusedParameter:SharedComponents.kt$baseDelay: Int = 30</ID>
-    <ID>UnusedParameter:SharedComponents.kt$index: Int</ID>
-    <ID>UnusedPrivateProperty:DevicesDialog.kt$val context = LocalContext.current</ID>
-    <ID>UnusedPrivateProperty:NowPlayingScreen.kt$val activeDevice by vm.activeDeviceName.collectAsState()</ID>
-    <ID>UnusedPrivateProperty:NowPlayingScreen.kt$val animatedGradientBottom by animateColorAsState(theme.gradientBottom, tween(800), label = "gradBot")</ID>
-    <ID>UnusedPrivateProperty:NowPlayingScreen.kt$val animatedGradientTop by animateColorAsState(theme.gradientTop, tween(800), label = "gradTop")</ID>
-    <ID>UnusedPrivateProperty:SpotifyViewModel.kt$SpotifyViewModel$attempt</ID>
     <ID>UseCheckOrError:SpotifyCdnResolver.kt$SpotifyCdnResolver$throw IllegalStateException("No CDN mirrors for fileId=$fileId")</ID>
     <ID>UseCheckOrError:SpotifyViewModel.kt$SpotifyViewModel$throw IllegalStateException("CdnResolver not initialized")</ID>
     <ID>UseCheckOrError:SpotifyViewModel.kt$SpotifyViewModel$throw IllegalStateException("No file ID available")</ID>

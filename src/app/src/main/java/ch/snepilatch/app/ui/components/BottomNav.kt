@@ -1,7 +1,6 @@
 package ch.snepilatch.app.ui.components
 
 import ch.snepilatch.app.ui.theme.SpotifyWhite
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,7 +30,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.data.Screen
 import ch.snepilatch.app.ui.theme.SpotifyBlack
-import ch.snepilatch.app.ui.theme.SpotifyGray
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
 import coil.compose.AsyncImage

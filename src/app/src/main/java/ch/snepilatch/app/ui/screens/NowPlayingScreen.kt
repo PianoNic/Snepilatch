@@ -10,9 +10,7 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -54,8 +52,6 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
     val streamLoading by vm.isStreamLoading.collectAsState()
     val theme by vm.themeColors.collectAsState()
 
-    val animatedGradientTop by animateColorAsState(theme.gradientTop, tween(800), label = "gradTop")
-    val animatedGradientBottom by animateColorAsState(theme.gradientBottom, tween(800), label = "gradBot")
     val animatedPrimary by animateColorAsState(theme.primary, tween(800), label = "primary")
     val buttonBg = Color.White.copy(alpha = 0.12f)
 
@@ -447,7 +443,6 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                         Spacer(Modifier.weight(0.2f))
 
                         // Bottom bar: device button + stacked pills (left), share + queue (right)
-                        val activeDevice by vm.activeDeviceName.collectAsState()
                         val provider by vm.streamProvider.collectAsState()
                         val streaming by vm.isStreaming.collectAsState()
                         val audioOutput by vm.audioOutputName.collectAsState()
@@ -825,7 +820,6 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                     Spacer(Modifier.weight(0.2f))
 
                     // Bottom bar: device button + stacked pills (left), share + queue (right)
-                    val activeDevice by vm.activeDeviceName.collectAsState()
                     val provider by vm.streamProvider.collectAsState()
                     val streaming by vm.isStreaming.collectAsState()
                     val audioOutput by vm.audioOutputName.collectAsState()

@@ -25,7 +25,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.CircularProgressIndicator
@@ -58,9 +57,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import ch.snepilatch.app.data.TrackInfo
 import ch.snepilatch.app.ui.theme.SpotifyElevated
 import ch.snepilatch.app.ui.theme.SpotifyGray
@@ -262,6 +259,7 @@ fun ProfileInfoItem(label: String, value: String, icon: ImageVector) {
 fun itemAppearModifier(index: Int, baseDelay: Int = 30): Modifier {
     val offsetY = remember { Animatable(16f) }
     LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay((index * baseDelay).toLong())
         offsetY.animateTo(0f, tween(200))
     }
     return Modifier

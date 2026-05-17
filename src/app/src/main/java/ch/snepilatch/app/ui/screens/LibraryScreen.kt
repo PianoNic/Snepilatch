@@ -60,7 +60,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -73,7 +72,6 @@ import ch.snepilatch.app.ui.theme.SpotifyElevated
 import ch.snepilatch.app.ui.theme.SpotifyGray
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
-import coil.compose.AsyncImage
 
 private const val PREFS_NAME = "kotify_prefs"
 private const val LIKED_SONGS_IMAGE = "https://image-cdn-ak.spotifycdn.com/image/ab67706c0000da84587ecba4a27774b2f6f07174"

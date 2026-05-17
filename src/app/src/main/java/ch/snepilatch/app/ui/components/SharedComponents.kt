@@ -156,24 +156,17 @@ fun TrackRow(track: TrackInfo, vm: SpotifyViewModel, contextUri: String? = null)
             .padding(horizontal = 16.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Album art — tap to open album
         SpotifyImage(
             url = track.albumArt,
-            modifier = Modifier
-                .size(48.dp)
-                .clickable { vm.openAlbumForTrack(track.uri) },
+            modifier = Modifier.size(48.dp),
             shape = RoundedCornerShape(4.dp)
         )
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            // Song name — tap to open album
             Text(track.name, color = if (isPlaying) accent else SpotifyWhite, fontSize = 15.sp, fontWeight = FontWeight.Medium,
-                maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.clickable { vm.openAlbumForTrack(track.uri) })
-            // Artist — tap to open artist
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(track.artist, color = SpotifyLightGray, fontSize = 13.sp,
-                maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.clickable { vm.openArtistForTrack(track.uri) })
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (track.durationMs > 0) {
             Text(formatTime(track.durationMs), color = SpotifyLightGray, fontSize = 12.sp)

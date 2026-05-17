@@ -66,7 +66,14 @@ class SpotifyViewModel : ViewModel() {
     private var username: String = ""
     val isInitialized = MutableStateFlow(false)
     val initError = MutableStateFlow<String?>(null)
-    val rateLimitCooldown = MutableStateFlow(false)
+
+    /**
+     * True while we're sitting through a backoff after Spotify rejected the
+     * auth handshake (typically a 400 "Unauthorized request" from `/api/token`,
+     * which is bot-detection / anti-abuse rather than a real rate limit).
+     * The LoadingScreen reads this to show a countdown.
+     */
+    val authBackoffActive = MutableStateFlow(false)
     val cooldownSeconds = MutableStateFlow(0)
     private var initRetryCount = 0
 
@@ -225,41 +232,81 @@ class SpotifyViewModel : ViewModel() {
                     initialCookies = cookies,
                     deviceProfile = kotify.config.DeviceProfile.CHROME_WINDOWS
                 ))
-                sess.load()
+
+                // Warm-start path: if we have a persisted snapshot with a
+                // still-valid access token, hydrate from disk and skip
+                // initSession's apresolve/token/client-token network round-trips.
+                // On 401 from any subsequent call, HttpClient.onAuthRefreshNeeded
+                // transparently refreshes; on hard auth failure we fall through
+                // to the cold-init catch block below.
+                val ctx = appContext
+                val cachedSnapshot = ctx?.let { ch.snepilatch.app.auth.SessionSnapshotStore.load(it) }
+                val hydrated = cachedSnapshot != null &&
+                    ch.snepilatch.app.auth.SessionSnapshotStore.isTokenValid(cachedSnapshot)
+                if (hydrated && cachedSnapshot != null) {
+                    sess.hydrate(cachedSnapshot)
+                    LokiLogger.i(TAG, "Session hydrated from snapshot (cold-start fast path)")
+                } else {
+                    sess.load()
+                    LokiLogger.i(TAG, "Session loaded via full initSession")
+                    if (ctx != null) {
+                        ch.snepilatch.app.auth.SessionSnapshotStore.save(ctx, sess.snapshot())
+                    }
+                }
                 session = sess
                 val sp = SpotifyPlayback(sess)
                 spotifyPlayback = sp
                 cdnResolver = SpotifyCdnResolver(sess, sp)
-                LokiLogger.i(TAG, "Session loaded")
+
+                // Show cached account immediately so the home screen renders the
+                // user's name/avatar from frame 1. The live profile fetch below
+                // overwrites this once it returns.
+                ctx?.let {
+                    ch.snepilatch.app.auth.AccountCacheStore.load(it)?.let { cached ->
+                        _account.value = cached
+                        username = cached.username
+                    }
+                }
+
+                // Unblock the UI gate now — the home screen can render with
+                // cached account (or empty defaults) while loadHome / loadLibrary
+                // / profile fetches finish in the background.
+                isInitialized.value = true
+                initRetryCount = 0
 
                 // Start loading home and library immediately after session is ready
                 // These run in parallel with user profile and player setup
                 loadHome()
                 loadLibrary()
 
-                val userApi = User(sess)
-                val me = userApi.getCurrentUser()
-                username = me.username
-                val isPremium = userApi.hasPremium()
-                // Get public profile (display name + avatar) from user-profile-view API
-                val pubProfile = userApi.getProfile(username)
-                val displayName = pubProfile.displayName.ifEmpty { username }
-                val userId = username
-                val imageUrl = pubProfile.imageUrl
-                LokiLogger.i(TAG, "Profile: display=$displayName, user=$username, image=${imageUrl?.take(40)}")
-                _account.value = AccountInfo(
-                    username = username,
-                    displayName = displayName,
-                    isPremium = isPremium,
-                    profileImageUrl = imageUrl,
-                    userId = username,
-                    followers = pubProfile.followers,
-                    playlistCount = pubProfile.publicPlaylists
-                )
-                LokiLogger.i(TAG, "User: $username ($displayName), premium: $isPremium")
-
-                isInitialized.value = true
-                initRetryCount = 0
+                // Live profile refresh — fire-and-forget. Overwrites the cached
+                // AccountInfo when it returns, and persists the fresh copy to disk.
+                viewModelScope.launch(Dispatchers.IO) {
+                    try {
+                        val userApi = User(sess)
+                        val me = userApi.getCurrentUser()
+                        username = me.username
+                        val isPremium = userApi.hasPremium()
+                        val pubProfile = userApi.getProfile(username)
+                        val displayName = pubProfile.displayName.ifEmpty { username }
+                        val imageUrl = pubProfile.imageUrl
+                        LokiLogger.i(TAG, "Profile: display=$displayName, user=$username, image=${imageUrl?.take(40)}")
+                        val fresh = AccountInfo(
+                            username = username,
+                            displayName = displayName,
+                            isPremium = isPremium,
+                            profileImageUrl = imageUrl,
+                            userId = username,
+                            followers = pubProfile.followers,
+                            playlistCount = pubProfile.publicPlaylists,
+                        )
+                        _account.value = fresh
+                        ctx?.let { ch.snepilatch.app.auth.AccountCacheStore.save(it, fresh) }
+                        LokiLogger.i(TAG, "User: $username ($displayName), premium: $isPremium")
+                    } catch (e: Exception) {
+                        LokiLogger.w(TAG, "Profile refresh failed (cached value still shown): ${e.message?.take(120)}")
+                    }
+                }
 
                 // Disconnect any existing player before creating a new one
                 // This prevents duplicate device registrations
@@ -295,6 +342,7 @@ class SpotifyViewModel : ViewModel() {
                     if (backgroundTokenRefreshEnabled.value) {
                         appContext?.let { ch.snepilatch.app.auth.TokenRefreshWorker.enable(it) }
                     }
+                    var consecutiveRefreshFailures = 0
                     while (true) {
                         val expiresAt = sess.baseClient.accessTokenExpirationTimestampMs
                         val sleepMs = if (expiresAt != null) {
@@ -307,8 +355,23 @@ class SpotifyViewModel : ViewModel() {
                         try {
                             sess.baseClient.refreshAccessToken()
                             LokiLogger.i(TAG, "Access token refreshed (next in ~${sleepMs / 60_000}m)")
+                            consecutiveRefreshFailures = 0
+                            appContext?.let {
+                                ch.snepilatch.app.auth.SessionSnapshotStore.save(it, sess.snapshot())
+                            }
                         } catch (e: Exception) {
-                            LokiLogger.w(TAG, "Token refresh failed: ${e.message}")
+                            consecutiveRefreshFailures++
+                            LokiLogger.w(TAG, "Token refresh failed (#$consecutiveRefreshFailures): ${e.message?.take(120)}")
+                            if (consecutiveRefreshFailures >= MAX_CONSECUTIVE_REFRESH_FAILURES) {
+                                // Persistent auth failure — Spotify is rejecting our /api/token
+                                // even with backoff. Drop the UI back to the loading/error screen
+                                // so the user can re-login or wait it out, instead of silently
+                                // failing every interaction.
+                                LokiLogger.e(TAG, "Session auth lost after $consecutiveRefreshFailures consecutive refresh failures")
+                                initError.value = "Lost Spotify session — sign in again to continue"
+                                isInitialized.value = false
+                                return@launch
+                            }
                             delay(REFRESH_RETRY_DELAY_MS)
                         }
                     }
@@ -334,21 +397,21 @@ class SpotifyViewModel : ViewModel() {
                 val msg = e.message ?: "Unknown error"
                 if (msg.contains("Unauthorized") || msg.contains("401") || msg.contains("code\":400")) {
                     initRetryCount++
-                    if (initRetryCount > 5) {
-                        LokiLogger.e(TAG, "Rate limited — 5 retries exhausted, giving up")
-                        initError.value = "Connection failed after 5 attempts. Please try again later."
-                        rateLimitCooldown.value = false
+                    if (initRetryCount > MAX_INIT_RETRIES) {
+                        LokiLogger.e(TAG, "Auth handshake rejected — $MAX_INIT_RETRIES retries exhausted, giving up")
+                        initError.value = "Couldn't reach Spotify after $MAX_INIT_RETRIES attempts. Try again later."
+                        authBackoffActive.value = false
                         return@launch
                     }
                     val cooldownSecs = 20 * initRetryCount // 20s, 40s, 60s...
-                    LokiLogger.w(TAG, "Rate limited, attempt $initRetryCount/5, cooling down ${cooldownSecs}s...")
-                    initError.value = "Rate limited — attempt $initRetryCount/5"
-                    rateLimitCooldown.value = true
+                    LokiLogger.w(TAG, "Auth handshake rejected, attempt $initRetryCount/$MAX_INIT_RETRIES, retrying in ${cooldownSecs}s")
+                    initError.value = "Spotify is throttling sign-in — attempt $initRetryCount/$MAX_INIT_RETRIES"
+                    authBackoffActive.value = true
                     for (i in cooldownSecs downTo 1) {
                         cooldownSeconds.value = i
                         delay(1000)
                     }
-                    rateLimitCooldown.value = false
+                    authBackoffActive.value = false
                     cooldownSeconds.value = 0
                     initError.value = null
                     // Retry after cooldown
@@ -2246,5 +2309,17 @@ class SpotifyViewModel : ViewModel() {
         private const val MIN_REFRESH_DELAY_MS = 5 * 1000L
         private const val FALLBACK_REFRESH_INTERVAL_MS = 50 * 60 * 1000L
         private const val REFRESH_RETRY_DELAY_MS = 60 * 1000L
+
+        /** How many init attempts we make before showing the user a hard fail.
+         *  Matches the 3-attempt cap in KotifyClient's HttpClient 401 retry path
+         *  so the two layers are consistent. */
+        private const val MAX_INIT_RETRIES = 3
+
+        /** How many back-to-back foreground refresh failures we tolerate before
+         *  dropping the UI back to the loading screen and forcing user action.
+         *  Three with a 60s gap ≈ 3 minutes of failed retries — enough that
+         *  transient Spotify 4xx blips don't kick the user out, but persistent
+         *  rejection does. */
+        private const val MAX_CONSECUTIVE_REFRESH_FAILURES = 3
     }
 }

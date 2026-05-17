@@ -158,11 +158,11 @@ class MainActivity : ComponentActivity() {
                 when {
                     needsLogin -> SpotifyLoginScreen(vm)
                     !initialized -> {
-                        val cooldown by vm.rateLimitCooldown.collectAsState()
+                        val cooldown by vm.authBackoffActive.collectAsState()
                         val seconds by vm.cooldownSeconds.collectAsState()
                         LoadingScreen(
                             error = error,
-                            isRateLimited = cooldown,
+                            isAuthBackoff = cooldown,
                             cooldownSecondsRemaining = seconds,
                             onLogin = { if (!cooldown) vm.showLogin() },
                             onRetry = {

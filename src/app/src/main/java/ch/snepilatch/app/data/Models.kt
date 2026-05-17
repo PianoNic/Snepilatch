@@ -74,6 +74,7 @@ data class RelatedAlbum(
     val albumType: String?
 )
 
+@kotlinx.serialization.Serializable
 data class AccountInfo(
     val username: String = "",
     val displayName: String = "",

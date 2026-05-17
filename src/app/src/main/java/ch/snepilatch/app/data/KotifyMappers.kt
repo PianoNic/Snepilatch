@@ -153,12 +153,18 @@ fun PlaylistInfo.toDetailData(playlistId: String) = DetailData(
     description = description.takeIf { it.isNotBlank() },
     uri = "spotify:playlist:$playlistId",
     type = "playlist",
-    totalCount = totalTracks,
+    // KotifyClient's PlaylistMapper returns 0 when content.totalCount isn't
+    // where it expects in the GraphQL response. If we received a full page
+    // but the server didn't tell us the total, treat it as unknown (-1) so
+    // pagination keeps going until a short page proves we're at the end.
+    totalCount = if (totalTracks <= 0 && tracks.size >= PLAYLIST_PAGE_SIZE) -1 else totalTracks,
     loadedOffset = tracks.size,
     ownerName = owner.name,
     followers = followers,
     tracks = tracks.map { it.toTrackInfo() },
 )
+
+private const val PLAYLIST_PAGE_SIZE = 50
 
 fun LikedSongsPage.toDetailData(offset: Int) = DetailData(
     name = "Liked Songs",

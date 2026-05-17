@@ -31,4 +31,9 @@ fun loadCookies(context: Context): Map<String, String>? {
 fun clearCookies(context: Context) {
     context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         .edit().remove(COOKIES_KEY).apply()
+    // The session snapshot and account cache are bound to whichever sp_dc
+    // cookie produced them; wipe so the next launch goes through the webview
+    // cleanly with no stale identity bleeding into the new account.
+    ch.snepilatch.app.auth.SessionSnapshotStore.clear(context)
+    ch.snepilatch.app.auth.AccountCacheStore.clear(context)
 }

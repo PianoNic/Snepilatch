@@ -2134,12 +2134,22 @@ class SpotifyViewModel : ViewModel() {
                     )
                 } else if (uri.startsWith("spotify:playlist:")) {
                     val id = uri.removePrefix("spotify:playlist:")
-                    val info = Playlist(sess).getPlaylist(id, limit = 50, offset = offset)
+                    val info = Playlist(sess).getPlaylist(id, limit = DETAIL_PAGE_SIZE, offset = offset)
                     val more = info.tracks.map { it.toTrackInfo() }
+                    val newSize = current.tracks.size + more.size
+                    // Server-reported totalTracks is unreliable (PlaylistMapper
+                    // returns 0 when content.totalCount is missing). Use the
+                    // page-shorter-than-limit signal as the authoritative
+                    // "we're at the end" indicator instead.
+                    val newTotalCount = when {
+                        more.size < DETAIL_PAGE_SIZE -> newSize
+                        info.totalTracks > 0 -> info.totalTracks
+                        else -> -1
+                    }
                     _detail.value = current.copy(
                         tracks = current.tracks + more,
-                        totalCount = info.totalTracks,
-                        loadedOffset = offset + more.size
+                        totalCount = newTotalCount,
+                        loadedOffset = newSize
                     )
                 } else if (uri.startsWith("spotify:album:")) {
                     val id = uri.removePrefix("spotify:album:")
@@ -2334,6 +2344,12 @@ class SpotifyViewModel : ViewModel() {
          *  lands within ~1.5s; 5s gives generous headroom so we don't double-skip
          *  when the natural advance arrives just past a tighter timeout. */
         private const val AUTO_ADVANCE_GRACE_MS = 5000L
+
+        /** Page size for playlist/album detail pagination. Matches the limit
+         *  passed to [kotify.api.playlist.Playlist.getPlaylist] in
+         *  [loadMoreDetail]; when a page returns fewer rows than this we've
+         *  reached the end regardless of any server-reported total. */
+        private const val DETAIL_PAGE_SIZE = 50
 
         /** How many init attempts we make before showing the user a hard fail.
          *  Matches the 3-attempt cap in KotifyClient's HttpClient 401 retry path

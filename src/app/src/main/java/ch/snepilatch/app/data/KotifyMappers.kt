@@ -200,7 +200,7 @@ fun AlbumInfo.toDetailData(albumId: String): DetailData {
                 albumType = r.type,
             )
         },
-        totalCount = mappedTracks.size,
+        totalCount = totalTracks,
         loadedOffset = mappedTracks.size,
     )
 }

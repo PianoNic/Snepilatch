@@ -49,6 +49,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -82,7 +83,9 @@ private const val LIKED_SONGS_IMAGE = "https://image-cdn-ak.spotifycdn.com/image
 @Composable
 fun LibraryScreen(vm: SpotifyViewModel) {
     val library by vm.library.collectAsState()
+    val libraryTotal by vm.libraryTotal.collectAsState()
     val account by vm.account.collectAsState()
+    val libraryHasMore = libraryTotal < 0 || library.size < libraryTotal
     var showCreateDialog by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = remember { context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE) }
@@ -245,6 +248,9 @@ fun LibraryScreen(vm: SpotifyViewModel) {
                     Box(itemAppearModifier(index)) {
                         LibraryGridCard(item, vm)
                     }
+                    if (libraryHasMore && index >= library.size - 10) {
+                        LaunchedEffect(library.size) { vm.loadMoreLibrary() }
+                    }
                 }
             }
         } else {
@@ -255,6 +261,9 @@ fun LibraryScreen(vm: SpotifyViewModel) {
                 itemsIndexed(sortedLibrary) { index, item ->
                     Box(itemAppearModifier(index)) {
                         LibraryListItem(item, vm)
+                    }
+                    if (libraryHasMore && index >= library.size - 10) {
+                        LaunchedEffect(library.size) { vm.loadMoreLibrary() }
                     }
                 }
             }

@@ -133,6 +133,10 @@ class SpotifyViewModel : ViewModel() {
     // Library
     private val _library = MutableStateFlow<List<LibraryItem>>(emptyList())
     val library: StateFlow<List<LibraryItem>> = _library
+    private val _libraryTotal = MutableStateFlow(-1)
+    val libraryTotal: StateFlow<Int> = _libraryTotal
+    private val _isLoadingMoreLibrary = MutableStateFlow(false)
+    val isLoadingMoreLibrary: StateFlow<Boolean> = _isLoadingMoreLibrary
 
     // Queue
     private val _queue = MutableStateFlow<List<TrackInfo>>(emptyList())
@@ -1921,7 +1925,27 @@ class SpotifyViewModel : ViewModel() {
 
     fun loadLibrary() {
         launchWithSession("loadLibrary") { sess ->
-            _library.value = Playlist(sess).getLibrary(limit = 50).toUiLibraryList()
+            val page = Playlist(sess).getLibrary(limit = 50, offset = 0)
+            _library.value = page.toUiLibraryList()
+            _libraryTotal.value = page.total
+        }
+    }
+
+    fun loadMoreLibrary() {
+        if (_isLoadingMoreLibrary.value) return
+        val loaded = _library.value.size
+        val total = _libraryTotal.value
+        if (total in 0..loaded) return
+        _isLoadingMoreLibrary.value = true
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val sess = session ?: return@launch
+                val page = Playlist(sess).getLibrary(limit = 50, offset = loaded)
+                val more = page.toUiLibraryList()
+                _library.value = _library.value + more
+                _libraryTotal.value = page.total
+            } catch (e: Exception) { LokiLogger.e(TAG, "loadMoreLibrary", e) }
+            finally { _isLoadingMoreLibrary.value = false }
         }
     }
 
@@ -1966,6 +1990,15 @@ class SpotifyViewModel : ViewModel() {
                     val id = uri.removePrefix("spotify:playlist:")
                     val info = Playlist(sess).getPlaylist(id, limit = 50, offset = offset)
                     val more = info.tracks.map { it.toTrackInfo() }
+                    _detail.value = current.copy(
+                        tracks = current.tracks + more,
+                        totalCount = info.totalTracks,
+                        loadedOffset = offset + more.size
+                    )
+                } else if (uri.startsWith("spotify:album:")) {
+                    val id = uri.removePrefix("spotify:album:")
+                    val info = Album(sess).getAlbum(id, limit = 50, offset = offset)
+                    val more = info.tracks.map { it.toTrackInfo(info.coverArtUrl) }
                     _detail.value = current.copy(
                         tracks = current.tracks + more,
                         totalCount = info.totalTracks,

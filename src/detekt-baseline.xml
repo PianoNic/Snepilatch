@@ -9,6 +9,7 @@
     <ID>ComplexCondition:SpotifyViewModel.kt$SpotifyViewModel$isStreaming.value &amp;&amp; !isSeekGuarded &amp;&amp; !isStreamLoading.value &amp;&amp; !isTrackMismatch &amp;&amp; !isStaleSnapshot</ID>
     <ID>CyclomaticComplexMethod:AccountScreen.kt$@Composable fun AccountScreen(vm: SpotifyViewModel)</ID>
     <ID>CyclomaticComplexMethod:DetailScreen.kt$@Composable fun DetailScreen(vm: SpotifyViewModel)</ID>
+    <ID>CyclomaticComplexMethod:LibraryScreen.kt$@Composable fun LibraryScreen(vm: SpotifyViewModel)</ID>
     <ID>CyclomaticComplexMethod:LyricsScreen.kt$@Composable fun LyricsScreen(vm: SpotifyViewModel)</ID>
     <ID>CyclomaticComplexMethod:NowPlayingScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun NowPlayingScreen(vm: SpotifyViewModel)</ID>
     <ID>CyclomaticComplexMethod:SpotifyViewModel.kt$SpotifyViewModel$private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent)</ID>

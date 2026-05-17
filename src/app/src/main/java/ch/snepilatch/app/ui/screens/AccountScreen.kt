@@ -310,6 +310,32 @@ fun AccountScreen(vm: SpotifyViewModel) {
             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
         )
 
+        // Background token refresh (opt-in, Doze-tolerant)
+        val backgroundRefreshOn by vm.backgroundTokenRefreshEnabled.collectAsState()
+        val backgroundRefreshLabel = if (backgroundRefreshOn) {
+            "Wakes device hourly to keep playback ready"
+        } else {
+            "Off — token may expire while phone sleeps"
+        }
+        ListItem(
+            headlineContent = { Text("Background Token Refresh", color = SpotifyWhite) },
+            supportingContent = { Text(backgroundRefreshLabel, color = SpotifyLightGray) },
+            leadingContent = { Icon(Icons.Default.Refresh, null, tint = SpotifyLightGray) },
+            trailingContent = {
+                Switch(
+                    checked = backgroundRefreshOn,
+                    onCheckedChange = { vm.setBackgroundTokenRefreshEnabled(it, audioContext) },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = animatedPrimary,
+                        checkedTrackColor = animatedPrimary.copy(alpha = 0.5f),
+                        uncheckedThumbColor = SpotifyLightGray,
+                        uncheckedTrackColor = SpotifyLightGray.copy(alpha = 0.3f)
+                    )
+                )
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+        )
+
         // Lyrics animation direction
         val lyricsAnim by vm.lyricsAnimDirection.collectAsState()
         var showLyricsPicker by remember { mutableStateOf(false) }

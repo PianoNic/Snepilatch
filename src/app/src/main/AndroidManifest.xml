@@ -102,6 +102,13 @@
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>
         </receiver>
+
+        <!-- Opt-in Doze-tolerant token refresh. Fired by AlarmManager from
+             TokenRefreshScheduler; not exported because only our own
+             setAndAllowWhileIdle targets it. -->
+        <receiver
+            android:name=".auth.TokenRefreshAlarmReceiver"
+            android:exported="false" />
     </application>
 
 </manifest>

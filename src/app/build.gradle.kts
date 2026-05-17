@@ -106,6 +106,7 @@ dependencies {
     implementation("androidx.media:media:1.7.0")
     implementation("androidx.palette:palette-ktx:1.0.0")
     implementation("dev.chrisbanes.haze:haze:1.5.3")
+    implementation("androidx.work:work-runtime-ktx:2.10.1")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

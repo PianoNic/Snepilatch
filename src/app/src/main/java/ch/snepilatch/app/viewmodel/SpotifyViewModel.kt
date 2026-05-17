@@ -253,6 +253,18 @@ class SpotifyViewModel : ViewModel() {
                         ch.snepilatch.app.auth.SessionSnapshotStore.save(ctx, sess.snapshot())
                     }
                 }
+
+                // Fast-path detection of persistent auth failure: when any API
+                // call's 401-refresh retry path gives up MAX_AUTH_REFRESH_FAILURES
+                // times in a row, the foreground refresh loop's 3-strikes guard
+                // would eventually catch it ~3 min later. This callback drops the
+                // UI back to the loading gate immediately instead.
+                sess.onAuthLost = {
+                    LokiLogger.e(TAG, "Session auth lost (HttpClient onAuthLost fired)")
+                    initError.value = "Lost Spotify session — sign in again to continue"
+                    isInitialized.value = false
+                }
+
                 session = sess
                 val sp = SpotifyPlayback(sess)
                 spotifyPlayback = sp

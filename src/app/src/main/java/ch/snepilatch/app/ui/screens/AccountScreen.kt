@@ -697,7 +697,7 @@ fun AccountScreen(vm: SpotifyViewModel) {
             headlineContent = { Text("Cinnabar \uD83E\uDDFC", color = SpotifyWhite) },
             leadingContent = {
                 AsyncImage(
-                    model = "https://cdn.discordapp.com/avatars/823656705350565898/ac6e931b67dfe978c899af4eea5ed051.webp?size=1024",
+                    model = "https://cdn.discordapp.com/avatars/823656705350565898/02562d1feab0425121ca6fabc7f1d66e.webp?size=1024",
                     contentDescription = "Cinnabar",
                     modifier = Modifier.size(40.dp).clip(CircleShape),
                     contentScale = ContentScale.Crop

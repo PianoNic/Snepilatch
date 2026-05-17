@@ -1,9 +1,5 @@
 package ch.snepilatch.app.data
 
-import ch.snepilatch.app.data.DetailData
-import ch.snepilatch.app.data.RelatedAlbum
-import ch.snepilatch.app.data.RelatedArtist
-import ch.snepilatch.app.data.TrackInfo
 import kotify.api.album.AlbumInfo
 import kotify.api.album.AlbumTrack
 import kotify.api.artist.ArtistInfo

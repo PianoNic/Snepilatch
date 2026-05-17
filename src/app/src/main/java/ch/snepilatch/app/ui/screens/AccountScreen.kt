@@ -23,8 +23,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import android.content.Intent
-import android.net.Uri
 import ch.snepilatch.app.BuildConfig
 import ch.snepilatch.app.ui.components.ProfileInfoItem
 import ch.snepilatch.app.ui.components.UpdateDialog

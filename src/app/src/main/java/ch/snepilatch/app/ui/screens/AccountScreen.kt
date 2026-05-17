@@ -310,10 +310,10 @@ fun AccountScreen(vm: SpotifyViewModel) {
             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
         )
 
-        // Background token refresh (opt-in, Doze-tolerant)
+        // Background token refresh (opt-in, WorkManager-scheduled)
         val backgroundRefreshOn by vm.backgroundTokenRefreshEnabled.collectAsState()
         val backgroundRefreshLabel = if (backgroundRefreshOn) {
-            "Wakes device hourly to keep playback ready"
+            "Refreshes auth in the background so playback is instant when you open the app"
         } else {
             "Off — token may expire while phone sleeps"
         }

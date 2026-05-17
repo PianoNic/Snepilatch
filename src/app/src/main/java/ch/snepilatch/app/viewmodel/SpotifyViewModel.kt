@@ -288,17 +288,12 @@ class SpotifyViewModel : ViewModel() {
                 // Falls back to a 50-minute interval if the timestamp isn't
                 // available (e.g. older Kotify or unexpected response shape).
                 viewModelScope.launch(Dispatchers.IO) {
-                    // Initial arm: if the user already had the background-refresh
-                    // toggle on at last launch, set the alarm against the initial
-                    // expiry right now. The receiver will reschedule itself
-                    // thereafter, and the loop below also re-arms on every
-                    // foreground refresh.
+                    // If the user has background refresh enabled, hand the
+                    // periodic ticking off to WorkManager so it survives process
+                    // death and Doze. KEEP policy means re-enqueueing is a no-op
+                    // when work is already scheduled.
                     if (backgroundTokenRefreshEnabled.value) {
-                        val initialExpiresAt = sess.baseClient.accessTokenExpirationTimestampMs
-                        val ctx = appContext
-                        if (initialExpiresAt != null && ctx != null) {
-                            ch.snepilatch.app.auth.TokenRefreshScheduler.enable(ctx, initialExpiresAt)
-                        }
+                        appContext?.let { ch.snepilatch.app.auth.TokenRefreshWorker.enable(it) }
                     }
                     while (true) {
                         val expiresAt = sess.baseClient.accessTokenExpirationTimestampMs
@@ -312,16 +307,6 @@ class SpotifyViewModel : ViewModel() {
                         try {
                             sess.baseClient.refreshAccessToken()
                             LokiLogger.i(TAG, "Access token refreshed (next in ~${sleepMs / 60_000}m)")
-                            // If the user opted into background refresh, re-arm
-                            // the alarm against the new expiry so it survives
-                            // Doze the next time the screen goes off.
-                            if (backgroundTokenRefreshEnabled.value) {
-                                val newExpiresAt = sess.baseClient.accessTokenExpirationTimestampMs
-                                val ctx = appContext
-                                if (newExpiresAt != null && ctx != null) {
-                                    ch.snepilatch.app.auth.TokenRefreshScheduler.enable(ctx, newExpiresAt)
-                                }
-                            }
                         } catch (e: Exception) {
                             LokiLogger.w(TAG, "Token refresh failed: ${e.message}")
                             delay(REFRESH_RETRY_DELAY_MS)
@@ -1465,24 +1450,19 @@ class SpotifyViewModel : ViewModel() {
     }
 
     /**
-     * Toggle the AlarmManager-based token refresh. When enabled, schedules an
-     * alarm to fire LEAD_MS before the current access token expires, even
-     * during Android Doze. When disabled, cancels any pending alarm. Persists
-     * the choice across launches.
+     * Toggle WorkManager-driven periodic token refresh. When enabled, enqueues
+     * a unique periodic work request that survives process death and reboots;
+     * WorkManager batches the tick into Doze maintenance windows. When
+     * disabled, cancels the unique work. Persists the choice across launches.
      */
     fun setBackgroundTokenRefreshEnabled(enabled: Boolean, context: Context) {
         backgroundTokenRefreshEnabled.value = enabled
         context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
             .edit().putBoolean("background_token_refresh", enabled).apply()
         if (enabled) {
-            val expiresAt = session?.baseClient?.accessTokenExpirationTimestampMs
-            if (expiresAt != null) {
-                ch.snepilatch.app.auth.TokenRefreshScheduler.enable(context, expiresAt)
-            } else {
-                LokiLogger.w(TAG, "Background refresh toggled on but no expiry available yet; will schedule on next refresh")
-            }
+            ch.snepilatch.app.auth.TokenRefreshWorker.enable(context)
         } else {
-            ch.snepilatch.app.auth.TokenRefreshScheduler.disable(context)
+            ch.snepilatch.app.auth.TokenRefreshWorker.disable(context)
         }
     }
 

@@ -407,28 +407,12 @@ class SpotifyViewModel : ViewModel() {
             } catch (e: Exception) {
                 LokiLogger.e(TAG, "Init failed", e)
                 val msg = e.message ?: "Unknown error"
-                // The instant-home work flips isInitialized=true after the
-                // session is hydrated, before pc.ready() runs. If pc.ready()
-                // (the dealer WebSocket) then throws, we'd otherwise leave the
-                // UI in a half-booted state — visible but with no player.
-                // Roll it back so the loading screen re-engages and the user
-                // sees the auth-backoff / retry UI instead of a frozen home.
-                isInitialized.value = false
-                val isTransientAuth = msg.contains("Unauthorized") ||
-                    msg.contains("401") ||
-                    msg.contains("code\":400") ||
-                    msg.contains("bad handshake") ||
-                    msg.contains("websocket")
-                if (isTransientAuth) {
+                if (msg.contains("Unauthorized") || msg.contains("401") || msg.contains("code\":400")) {
                     initRetryCount++
                     if (initRetryCount > MAX_INIT_RETRIES) {
                         LokiLogger.e(TAG, "Auth handshake rejected — $MAX_INIT_RETRIES retries exhausted, giving up")
                         initError.value = "Couldn't reach Spotify after $MAX_INIT_RETRIES attempts. Try again later."
                         authBackoffActive.value = false
-                        // Cached session snapshot may be the cause (stale deviceId
-                        // / clientToken). Drop it so the next manual retry goes
-                        // through full initSession instead of re-hydrating.
-                        appContext?.let { ch.snepilatch.app.auth.SessionSnapshotStore.clear(it) }
                         return@launch
                     }
                     val cooldownSecs = 20 * initRetryCount // 20s, 40s, 60s...

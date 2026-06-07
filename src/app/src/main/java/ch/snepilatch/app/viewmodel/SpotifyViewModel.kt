@@ -1010,6 +1010,11 @@ class SpotifyViewModel : ViewModel() {
     }
 
     fun skipPrevious() {
+        // If we're more than 3s into the track, restart it instead of going to previous.
+        if (_playback.value.positionMs > PREV_RESTART_THRESHOLD_MS) {
+            seekTo(0)
+            return
+        }
         commandJob?.cancel()
         lastCommandTs = System.currentTimeMillis()
         lastCommandName = "skipPrevious"
@@ -1501,13 +1506,7 @@ class SpotifyViewModel : ViewModel() {
                 catch (e: Exception) { LokiLogger.e(TAG, "svc next", e) }
             }
         }
-        svc.onSkipPrevious = {
-            viewModelScope.launch(Dispatchers.IO) {
-                try { player?.skipPrevious() }
-                catch (e: CancellationException) { throw e }
-                catch (e: Exception) { LokiLogger.e(TAG, "svc prev", e) }
-            }
-        }
+        svc.onSkipPrevious = { skipPrevious() }
         svc.onSeek = { posMs ->
             viewModelScope.launch(Dispatchers.IO) {
                 try { player?.seek(posMs.toInt()) }
@@ -2253,5 +2252,10 @@ class SpotifyViewModel : ViewModel() {
          *  [loadMoreDetail]; when a page returns fewer rows than this we've
          *  reached the end regardless of any server-reported total. */
         private const val DETAIL_PAGE_SIZE = 50
+
+        /** If skipPrevious is invoked after this many ms into the current track,
+         *  restart the track instead of going to the previous one. Matches the
+         *  behavior most music players use. */
+        private const val PREV_RESTART_THRESHOLD_MS = 3000L
     }
 }

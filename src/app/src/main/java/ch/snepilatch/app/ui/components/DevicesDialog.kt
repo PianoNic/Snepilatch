@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package ch.snepilatch.app.ui.components
 
 import ch.snepilatch.app.ui.theme.SpotifyWhite
@@ -16,14 +18,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeDown
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.Computer
-import androidx.compose.material.icons.filled.Smartphone
-import androidx.compose.material.icons.filled.Speaker
-import androidx.compose.material.icons.filled.Tv
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.automirrored.rounded.VolumeDown
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
+import androidx.compose.material.icons.rounded.Computer
+import androidx.compose.material.icons.rounded.Smartphone
+import androidx.compose.material.icons.rounded.Speaker
+import androidx.compose.material.icons.rounded.Tv
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
@@ -97,7 +99,7 @@ fun DevicesDialog(vm: SpotifyViewModel) {
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    CircularProgressIndicator(color = SpotifyWhite, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                    LoadingIndicator(color = SpotifyWhite, modifier = Modifier.size(24.dp))
                     Spacer(Modifier.width(12.dp))
                     Text(stringResource(R.string.searching_devices), color = SpotifyLightGray, fontSize = 14.sp)
                 }
@@ -116,10 +118,10 @@ fun DevicesDialog(vm: SpotifyViewModel) {
                 ) {
                     Icon(
                         when (activeDevice.type.lowercase()) {
-                            "smartphone" -> Icons.Default.Smartphone
-                            "speaker" -> Icons.Default.Speaker
-                            "tv" -> Icons.Default.Tv
-                            else -> Icons.Default.Computer
+                            "smartphone" -> Icons.Rounded.Smartphone
+                            "speaker" -> Icons.Rounded.Speaker
+                            "tv" -> Icons.Rounded.Tv
+                            else -> Icons.Rounded.Computer
                         },
                         null,
                         tint = accentColor,
@@ -146,7 +148,7 @@ fun DevicesDialog(vm: SpotifyViewModel) {
                             .padding(horizontal = 20.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.VolumeDown, null, tint = SpotifyLightGray, modifier = Modifier.size(20.dp))
+                        Icon(Icons.AutoMirrored.Rounded.VolumeDown, null, tint = SpotifyLightGray, modifier = Modifier.size(20.dp))
                         var volumeValue by remember { mutableFloatStateOf(playback.volume.toFloat()) }
                         Slider(
                             value = volumeValue,
@@ -159,7 +161,7 @@ fun DevicesDialog(vm: SpotifyViewModel) {
                                 inactiveTrackColor = SpotifyGray
                             )
                         )
-                        Icon(Icons.AutoMirrored.Filled.VolumeUp, null, tint = SpotifyLightGray, modifier = Modifier.size(20.dp))
+                        Icon(Icons.AutoMirrored.Rounded.VolumeUp, null, tint = SpotifyLightGray, modifier = Modifier.size(20.dp))
                     }
                 }
 
@@ -179,10 +181,10 @@ fun DevicesDialog(vm: SpotifyViewModel) {
                 ) {
                     Icon(
                         when (device.type.lowercase()) {
-                            "smartphone" -> Icons.Default.Smartphone
-                            "speaker" -> Icons.Default.Speaker
-                            "tv" -> Icons.Default.Tv
-                            else -> Icons.Default.Computer
+                            "smartphone" -> Icons.Rounded.Smartphone
+                            "speaker" -> Icons.Rounded.Speaker
+                            "tv" -> Icons.Rounded.Tv
+                            else -> Icons.Rounded.Computer
                         },
                         null,
                         tint = SpotifyLightGray,

@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package ch.snepilatch.app.ui.components
 
 import ch.snepilatch.app.R
@@ -21,18 +23,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.runtime.collectAsState
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
-import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material3.*
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.material.icons.filled.Album
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.Text
@@ -94,7 +95,7 @@ fun SpotifyImage(
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
     shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(8.dp),
-    icon: ImageVector = Icons.Default.MusicNote
+    icon: ImageVector = Icons.Rounded.MusicNote
 ) {
     SubcomposeAsyncImage(
         model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
@@ -111,10 +112,9 @@ fun SpotifyImage(
                     .background(SpotifyGray),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(
+                LoadingIndicator(
                     color = SpotifyLightGray.copy(alpha = 0.5f),
-                    modifier = Modifier.size(24.dp),
-                    strokeWidth = 2.dp
+                    modifier = Modifier.size(24.dp)
                 )
             }
         },
@@ -167,7 +167,7 @@ fun TrackRow(track: TrackInfo, vm: SpotifyViewModel, contextUri: String? = null)
             Spacer(Modifier.width(4.dp))
         }
         IconButton(onClick = { showMenu = true }, modifier = Modifier.size(36.dp)) {
-            Icon(Icons.Default.MoreVert, stringResource(R.string.more), tint = SpotifyLightGray, modifier = Modifier.size(20.dp))
+            Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SpotifyLightGray, modifier = Modifier.size(20.dp))
         }
     }
 
@@ -210,22 +210,22 @@ fun TrackRow(track: TrackInfo, vm: SpotifyViewModel, contextUri: String? = null)
             val visitAlbumLabel = stringResource(R.string.visit_album)
             val visitArtistLabel = stringResource(R.string.visit_artist)
             val items = listOf(
-                Triple(Icons.AutoMirrored.Filled.QueueMusic, addToQueueLabel) {
+                Triple(Icons.AutoMirrored.Rounded.QueueMusic, addToQueueLabel) {
                     vm.addToQueue(track.uri); showMenu = false
                 },
-                Triple(Icons.AutoMirrored.Filled.PlaylistAdd, addToPlaylistLabel) {
+                Triple(Icons.AutoMirrored.Rounded.PlaylistAdd, addToPlaylistLabel) {
                     showMenu = false; vm.showPlaylistPickerForTrack(track.uri)
                 },
-                Triple(Icons.Default.Favorite, likeLabel) {
+                Triple(Icons.Rounded.Favorite, likeLabel) {
                     vm.likeSong(track.uri.removePrefix("spotify:track:")); showMenu = false
                 },
-                Triple(Icons.Default.Album, visitAlbumLabel) {
+                Triple(Icons.Rounded.Album, visitAlbumLabel) {
                     showMenu = false; vm.openAlbumForTrack(track.uri)
                 },
-                Triple(Icons.Default.Person, visitArtistLabel) {
+                Triple(Icons.Rounded.Person, visitArtistLabel) {
                     showMenu = false; vm.openArtistForTrack(track.uri)
                 },
-                Triple(Icons.Default.Share, shareLabel) {
+                Triple(Icons.Rounded.Share, shareLabel) {
                     showMenu = false
                     val id = track.uri.removePrefix("spotify:track:")
                     val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {

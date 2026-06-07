@@ -8,10 +8,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -63,10 +63,10 @@ fun BottomNav(screen: Screen, vm: SpotifyViewModel, hazeState: HazeState) {
         ) {
             data class NavItem(val s: Screen, val icon: ImageVector, val label: String)
             val items = listOf(
-                NavItem(Screen.HOME, Icons.Default.Home, stringResource(R.string.nav_home)),
-                NavItem(Screen.SEARCH, Icons.Default.Search, stringResource(R.string.nav_search)),
-                NavItem(Screen.LIBRARY, Icons.AutoMirrored.Filled.QueueMusic, stringResource(R.string.nav_library)),
-                NavItem(Screen.ACCOUNT, Icons.Default.Person, stringResource(R.string.nav_account))
+                NavItem(Screen.HOME, Icons.Rounded.Home, stringResource(R.string.nav_home)),
+                NavItem(Screen.SEARCH, Icons.Rounded.Search, stringResource(R.string.nav_search)),
+                NavItem(Screen.LIBRARY, Icons.AutoMirrored.Rounded.QueueMusic, stringResource(R.string.nav_library)),
+                NavItem(Screen.ACCOUNT, Icons.Rounded.Person, stringResource(R.string.nav_account))
             )
             val accountDesc = stringResource(R.string.account_image)
             items.forEach { nav ->

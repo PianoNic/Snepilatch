@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -40,7 +40,7 @@ fun SpotifyLoginScreen(vm: SpotifyViewModel) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = { vm.needsLogin.value = false }) {
-                Icon(Icons.Default.Close, stringResource(R.string.close), tint = SpotifyWhite)
+                Icon(Icons.Rounded.Close, stringResource(R.string.close), tint = SpotifyWhite)
             }
             Spacer(Modifier.width(8.dp))
             Text(stringResource(R.string.login_title), color = SpotifyWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)

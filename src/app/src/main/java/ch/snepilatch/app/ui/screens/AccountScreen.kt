@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package ch.snepilatch.app.ui.screens
 
 import androidx.compose.animation.animateColorAsState
@@ -10,8 +12,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.ExitToApp
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,6 +29,7 @@ import coil.compose.AsyncImage
 import ch.snepilatch.app.BuildConfig
 import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.components.ProfileInfoItem
+import ch.snepilatch.app.ui.components.TightAlertDialog
 import ch.snepilatch.app.ui.components.UpdateDialog
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.util.UpdateInfo
@@ -72,7 +75,7 @@ fun AccountScreen(vm: SpotifyViewModel) {
                         contentScale = ContentScale.Crop
                     )
                 } else {
-                    Icon(Icons.Default.Person, null, tint = SpotifyLightGray, modifier = Modifier.size(64.dp))
+                    Icon(Icons.Rounded.Person, null, tint = SpotifyLightGray, modifier = Modifier.size(64.dp))
                 }
             }
 
@@ -103,7 +106,7 @@ fun AccountScreen(vm: SpotifyViewModel) {
                         Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Star, null, tint = animatedPrimary, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Rounded.Star, null, tint = animatedPrimary, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(stringResource(R.string.premium), color = animatedPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     }
@@ -111,16 +114,7 @@ fun AccountScreen(vm: SpotifyViewModel) {
             }
         }
 
-        HorizontalDivider(color = SpotifyGray, modifier = Modifier.padding(horizontal = 16.dp))
-
-        // Account details
-        Text(
-            stringResource(R.string.account),
-            color = SpotifyWhite,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp)
-        )
+        AccountSectionHeader(stringResource(R.string.account_section_profile))
 
         val dots = stringResource(R.string.placeholder_dots)
         val premiumLabel = stringResource(R.string.premium)
@@ -128,30 +122,21 @@ fun AccountScreen(vm: SpotifyViewModel) {
         ProfileInfoItem(
             stringResource(R.string.username),
             account.displayName.ifEmpty { account.username.ifEmpty { dots } },
-            Icons.Default.Person
+            Icons.Rounded.Person
         )
         ProfileInfoItem(
             stringResource(R.string.user_id),
             account.username.ifEmpty { dots },
-            Icons.Default.Badge
+            Icons.Rounded.Badge
         )
         ProfileInfoItem(
             stringResource(R.string.plan),
             if (account.isPremium) premiumLabel else freeLabel,
-            Icons.Default.CreditCard
+            Icons.Rounded.CreditCard
         )
 
         Spacer(Modifier.height(24.dp))
-
-        HorizontalDivider(color = SpotifyGray, modifier = Modifier.padding(horizontal = 16.dp))
-
-        Text(
-            stringResource(R.string.settings),
-            color = SpotifyWhite,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp)
-        )
+        AccountSectionHeader(stringResource(R.string.account_section_appearance))
 
         val audioContext = androidx.compose.ui.platform.LocalContext.current
 
@@ -170,13 +155,13 @@ fun AccountScreen(vm: SpotifyViewModel) {
         ListItem(
             headlineContent = { Text(stringResource(R.string.language), color = SpotifyWhite) },
             supportingContent = { Text(currentLanguageLabel, color = SpotifyLightGray) },
-            leadingContent = { Icon(Icons.Default.Language, null, tint = SpotifyLightGray) },
-            trailingContent = { Icon(Icons.Default.ChevronRight, null, tint = SpotifyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.Language, null, tint = SpotifyLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpotifyLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { showLanguagePicker = true }
         )
         if (showLanguagePicker) {
-            AlertDialog(
+            TightAlertDialog(
                 onDismissRequest = { showLanguagePicker = false },
                 title = { Text(stringResource(R.string.language), color = SpotifyWhite) },
                 text = {
@@ -204,6 +189,71 @@ fun AccountScreen(vm: SpotifyViewModel) {
             )
         }
 
+        // Lyrics animation direction (Appearance)
+        val lyricsAnim by vm.lyricsAnimDirection.collectAsState()
+        var showLyricsPicker by remember { mutableStateOf(false) }
+        val lyricsLabel = if (lyricsAnim == "horizontal") stringResource(R.string.lyrics_horizontal) else stringResource(R.string.lyrics_vertical)
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.lyrics_animation), color = SpotifyWhite) },
+            supportingContent = { Text(lyricsLabel, color = SpotifyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.MusicNote, null, tint = SpotifyLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpotifyLightGray) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable { showLyricsPicker = true }
+        )
+        if (showLyricsPicker) {
+            TightAlertDialog(
+                onDismissRequest = { showLyricsPicker = false },
+                title = { Text(stringResource(R.string.lyrics_animation), color = SpotifyWhite) },
+                text = {
+                    Column {
+                        Text(stringResource(R.string.lyrics_anim_desc),
+                            color = SpotifyLightGray, fontSize = 13.sp)
+                        Spacer(Modifier.height(12.dp))
+                        listOf(
+                            "vertical" to stringResource(R.string.lyrics_vertical),
+                            "horizontal" to stringResource(R.string.lyrics_horizontal)
+                        ).forEach { (value, label) ->
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        vm.setLyricsAnimDirection(value, audioContext)
+                                        showLyricsPicker = false
+                                    }
+                                    .padding(vertical = 12.dp, horizontal = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = lyricsAnim == value,
+                                    onClick = {
+                                        vm.setLyricsAnimDirection(value, audioContext)
+                                        showLyricsPicker = false
+                                    },
+                                    colors = RadioButtonDefaults.colors(
+                                        selectedColor = animatedPrimary,
+                                        unselectedColor = SpotifyLightGray
+                                    )
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(label, color = SpotifyWhite, fontSize = 15.sp)
+                            }
+                        }
+                    }
+                },
+                containerColor = SpotifyGray,
+                confirmButton = {},
+                dismissButton = {
+                    TextButton(onClick = { showLyricsPicker = false }) {
+                        Text(stringResource(R.string.cancel), color = SpotifyLightGray)
+                    }
+                }
+            )
+        }
+
+        Spacer(Modifier.height(24.dp))
+        AccountSectionHeader(stringResource(R.string.account_section_playback))
+
         // Audio settings
         val audioSource by vm.preferredAudioSource.collectAsState()
         val isLossless = audioSource == "tidal" || audioSource == "qobuz"
@@ -219,7 +269,7 @@ fun AccountScreen(vm: SpotifyViewModel) {
                 if (isLossless) losslessOnText else losslessOffText,
                 color = SpotifyLightGray
             ) },
-            leadingContent = { Icon(Icons.Default.MusicNote, null, tint = SpotifyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.MusicNote, null, tint = SpotifyLightGray) },
             trailingContent = {
                 Switch(
                     checked = isLossless,
@@ -251,12 +301,12 @@ fun AccountScreen(vm: SpotifyViewModel) {
                     color = SpotifyLightGray
                 ) },
                 leadingContent = { Spacer(Modifier.width(24.dp)) },
-                trailingContent = { Icon(Icons.Default.ChevronRight, null, tint = SpotifyLightGray) },
+                trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpotifyLightGray) },
                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 modifier = Modifier.clickable { showProviderPicker = true }
             )
             if (showProviderPicker) {
-                AlertDialog(
+                TightAlertDialog(
                     onDismissRequest = { showProviderPicker = false },
                     title = { Text(stringResource(R.string.lossless_provider), color = SpotifyWhite) },
                     text = {
@@ -315,7 +365,7 @@ fun AccountScreen(vm: SpotifyViewModel) {
                 if (canvasOn) stringResource(R.string.canvas_on) else stringResource(R.string.canvas_off),
                 color = SpotifyLightGray
             ) },
-            leadingContent = { Icon(Icons.Default.PlayCircle, null, tint = SpotifyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.PlayCircle, null, tint = SpotifyLightGray) },
             trailingContent = {
                 Switch(
                     checked = canvasOn,
@@ -331,81 +381,19 @@ fun AccountScreen(vm: SpotifyViewModel) {
             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
         )
 
-        // Lyrics animation direction
-        val lyricsAnim by vm.lyricsAnimDirection.collectAsState()
-        var showLyricsPicker by remember { mutableStateOf(false) }
-        val lyricsLabel = if (lyricsAnim == "horizontal") stringResource(R.string.lyrics_horizontal) else stringResource(R.string.lyrics_vertical)
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.lyrics_animation), color = SpotifyWhite) },
-            supportingContent = { Text(lyricsLabel, color = SpotifyLightGray) },
-            leadingContent = { Icon(Icons.Default.MusicNote, null, tint = SpotifyLightGray) },
-            trailingContent = { Icon(Icons.Default.ChevronRight, null, tint = SpotifyLightGray) },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            modifier = Modifier.clickable { showLyricsPicker = true }
-        )
-        if (showLyricsPicker) {
-            AlertDialog(
-                onDismissRequest = { showLyricsPicker = false },
-                title = { Text(stringResource(R.string.lyrics_animation), color = SpotifyWhite) },
-                text = {
-                    Column {
-                        Text(stringResource(R.string.lyrics_anim_desc),
-                            color = SpotifyLightGray, fontSize = 13.sp)
-                        Spacer(Modifier.height(12.dp))
-                        listOf(
-                            "vertical" to stringResource(R.string.lyrics_vertical),
-                            "horizontal" to stringResource(R.string.lyrics_horizontal)
-                        ).forEach { (value, label) ->
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        vm.setLyricsAnimDirection(value, audioContext)
-                                        showLyricsPicker = false
-                                    }
-                                    .padding(vertical = 12.dp, horizontal = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(
-                                    selected = lyricsAnim == value,
-                                    onClick = {
-                                        vm.setLyricsAnimDirection(value, audioContext)
-                                        showLyricsPicker = false
-                                    },
-                                    colors = RadioButtonDefaults.colors(
-                                        selectedColor = animatedPrimary,
-                                        unselectedColor = SpotifyLightGray
-                                    )
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text(label, color = SpotifyWhite, fontSize = 15.sp)
-                            }
-                        }
-                    }
-                },
-                containerColor = SpotifyGray,
-                confirmButton = {},
-                dismissButton = {
-                    TextButton(onClick = { showLyricsPicker = false }) {
-                        Text(stringResource(R.string.cancel), color = SpotifyLightGray)
-                    }
-                }
-            )
-        }
-
         // Content region picker
         val currentRegion by vm.contentRegion.collectAsState()
         var showRegionPicker by remember { mutableStateOf(false) }
         ListItem(
             headlineContent = { Text(stringResource(R.string.content_region), color = SpotifyWhite) },
             supportingContent = { Text(currentRegion, color = SpotifyLightGray) },
-            leadingContent = { Icon(Icons.Default.Language, null, tint = SpotifyLightGray) },
-            trailingContent = { Icon(Icons.Default.ChevronRight, null, tint = SpotifyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.Language, null, tint = SpotifyLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpotifyLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { showRegionPicker = true }
         )
         if (showRegionPicker) {
-            AlertDialog(
+            TightAlertDialog(
                 onDismissRequest = { showRegionPicker = false },
                 title = { Text(stringResource(R.string.content_region), color = SpotifyWhite) },
                 text = {
@@ -463,6 +451,18 @@ fun AccountScreen(vm: SpotifyViewModel) {
             )
         }
 
+        // Connect to device (Playback)
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.connect_to_device), color = SpotifyWhite) },
+            leadingContent = { Icon(Icons.Rounded.Devices, null, tint = SpotifyLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpotifyLightGray) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable { vm.loadDevices(); vm.showDevices.value = true }
+        )
+
+        Spacer(Modifier.height(24.dp))
+        AccountSectionHeader(stringResource(R.string.account_section_notifications))
+
         // Notification button options
         val notifLikeLabel = stringResource(R.string.notif_like)
         val notifShuffleLabel = stringResource(R.string.notif_shuffle)
@@ -485,13 +485,13 @@ fun AccountScreen(vm: SpotifyViewModel) {
         ListItem(
             headlineContent = { Text(stringResource(R.string.notification_left_button), color = SpotifyWhite) },
             supportingContent = { Text(buttonLabel(leftButton), color = SpotifyLightGray) },
-            leadingContent = { Icon(Icons.Default.Notifications, null, tint = SpotifyLightGray) },
-            trailingContent = { Icon(Icons.Default.ChevronRight, null, tint = SpotifyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.Notifications, null, tint = SpotifyLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpotifyLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { showLeftPicker = true }
         )
         if (showLeftPicker) {
-            AlertDialog(
+            TightAlertDialog(
                 onDismissRequest = { showLeftPicker = false },
                 title = { Text(stringResource(R.string.notification_button_left), color = SpotifyWhite) },
                 text = {
@@ -526,13 +526,13 @@ fun AccountScreen(vm: SpotifyViewModel) {
         ListItem(
             headlineContent = { Text(stringResource(R.string.notification_right_button), color = SpotifyWhite) },
             supportingContent = { Text(buttonLabel(rightButton), color = SpotifyLightGray) },
-            leadingContent = { Icon(Icons.Default.Notifications, null, tint = SpotifyLightGray) },
-            trailingContent = { Icon(Icons.Default.ChevronRight, null, tint = SpotifyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.Notifications, null, tint = SpotifyLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpotifyLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { showRightPicker = true }
         )
         if (showRightPicker) {
-            AlertDialog(
+            TightAlertDialog(
                 onDismissRequest = { showRightPicker = false },
                 title = { Text(stringResource(R.string.notification_button_right), color = SpotifyWhite) },
                 text = {
@@ -561,31 +561,13 @@ fun AccountScreen(vm: SpotifyViewModel) {
             )
         }
 
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.connect_to_device), color = SpotifyWhite) },
-            leadingContent = { Icon(Icons.Default.Devices, null, tint = SpotifyLightGray) },
-            trailingContent = { Icon(Icons.Default.ChevronRight, null, tint = SpotifyLightGray) },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            modifier = Modifier.clickable { vm.loadDevices(); vm.showDevices.value = true }
-        )
-
         Spacer(Modifier.height(24.dp))
-
-        HorizontalDivider(color = SpotifyGray, modifier = Modifier.padding(horizontal = 16.dp))
-
-        // About section
-        Text(
-            stringResource(R.string.about),
-            color = SpotifyWhite,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp)
-        )
+        AccountSectionHeader(stringResource(R.string.about))
 
         ListItem(
             headlineContent = { Text(stringResource(R.string.app_version), color = SpotifyWhite) },
             supportingContent = { Text(BuildConfig.VERSION_NAME, color = SpotifyLightGray) },
-            leadingContent = { Icon(Icons.Default.Info, null, tint = SpotifyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.Info, null, tint = SpotifyLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
         )
 
@@ -608,16 +590,15 @@ fun AccountScreen(vm: SpotifyViewModel) {
             ) },
             leadingContent = {
                 if (isChecking) {
-                    CircularProgressIndicator(
+                    LoadingIndicator(
                         modifier = Modifier.size(24.dp),
-                        strokeWidth = 2.dp,
                         color = animatedPrimary
                     )
                 } else {
-                    Icon(Icons.Default.SystemUpdate, null, tint = SpotifyLightGray)
+                    Icon(Icons.Rounded.SystemUpdate, null, tint = SpotifyLightGray)
                 }
             },
-            trailingContent = { if (!isChecking) Icon(Icons.Default.ChevronRight, null, tint = SpotifyLightGray) },
+            trailingContent = { if (!isChecking) Icon(Icons.Rounded.ChevronRight, null, tint = SpotifyLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable(enabled = !isChecking) {
                 isChecking = true
@@ -649,8 +630,8 @@ fun AccountScreen(vm: SpotifyViewModel) {
         ListItem(
             headlineContent = { Text(stringResource(R.string.release_notes), color = SpotifyWhite) },
             supportingContent = { Text(stringResource(R.string.view_changelog), color = SpotifyLightGray) },
-            leadingContent = { Icon(Icons.Default.Description, null, tint = SpotifyLightGray) },
-            trailingContent = { Icon(Icons.Default.ChevronRight, null, tint = SpotifyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.Description, null, tint = SpotifyLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpotifyLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { showReleaseNotes = true }
         )
@@ -660,19 +641,10 @@ fun AccountScreen(vm: SpotifyViewModel) {
         }
 
         Spacer(Modifier.height(24.dp))
-
-        HorizontalDivider(color = SpotifyGray, modifier = Modifier.padding(horizontal = 16.dp))
-
-        Text(
-            stringResource(R.string.special_thanks),
-            color = SpotifyWhite,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp)
-        )
+        AccountSectionHeader(stringResource(R.string.special_thanks))
 
         ListItem(
-            headlineContent = { Text("Cinnabar \uD83E\uDDFC", color = SpotifyWhite) },
+            headlineContent = { Text("Cinnabar 🧼", color = SpotifyWhite) },
             leadingContent = {
                 AsyncImage(
                     model = "https://cdn.discordapp.com/avatars/823656705350565898/02562d1feab0425121ca6fabc7f1d66e.webp?size=1024",
@@ -702,8 +674,8 @@ fun AccountScreen(vm: SpotifyViewModel) {
         val context = androidx.compose.ui.platform.LocalContext.current
         ListItem(
             headlineContent = { Text(stringResource(R.string.log_out), color = Color(0xFFE57373)) },
-            leadingContent = { Icon(Icons.AutoMirrored.Filled.ExitToApp, null, tint = Color(0xFFE57373)) },
-            trailingContent = { Icon(Icons.Default.ChevronRight, null, tint = SpotifyLightGray) },
+            leadingContent = { Icon(Icons.AutoMirrored.Rounded.ExitToApp, null, tint = Color(0xFFE57373)) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpotifyLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable {
                 clearCookies(context)
@@ -711,4 +683,16 @@ fun AccountScreen(vm: SpotifyViewModel) {
             }
         )
     }
+}
+
+@Composable
+private fun AccountSectionHeader(title: String) {
+    HorizontalDivider(color = SpotifyGray, modifier = Modifier.padding(horizontal = 16.dp))
+    Text(
+        title,
+        color = SpotifyWhite,
+        fontSize = 16.sp,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp)
+    )
 }

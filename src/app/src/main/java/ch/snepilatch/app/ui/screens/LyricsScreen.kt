@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package ch.snepilatch.app.ui.screens
 
 import androidx.compose.animation.animateColorAsState
@@ -12,7 +14,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -158,7 +161,7 @@ fun LyricsScreen(vm: SpotifyViewModel) {
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    when (playback.repeatMode) { "track" -> Icons.Default.RepeatOne; else -> Icons.Default.Repeat },
+                                    when (playback.repeatMode) { "track" -> Icons.Rounded.RepeatOne; else -> Icons.Rounded.Repeat },
                                     stringResource(R.string.repeat),
                                     tint = if (playback.repeatMode != "off") animatedPrimary else SpotifyWhite.copy(alpha = 0.7f),
                                     modifier = Modifier.size(18.dp)
@@ -168,7 +171,7 @@ fun LyricsScreen(vm: SpotifyViewModel) {
                                 Modifier.size(36.dp).background(buttonBg, CircleShape).clip(CircleShape).clickable { vm.skipPrevious() },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.SkipPrevious, stringResource(R.string.previous), tint = SpotifyWhite, modifier = Modifier.size(20.dp))
+                                Icon(Icons.Rounded.SkipPrevious, stringResource(R.string.previous), tint = SpotifyWhite, modifier = Modifier.size(20.dp))
                             }
                             Box(
                                 Modifier
@@ -179,10 +182,10 @@ fun LyricsScreen(vm: SpotifyViewModel) {
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (streamLoading) {
-                                    CircularProgressIndicator(color = SpotifyWhite, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+                                    LoadingIndicator(color = SpotifyWhite, modifier = Modifier.size(20.dp))
                                 } else {
                                     Icon(
-                                        if (playback.isPaused || !playback.isPlaying) Icons.Default.PlayArrow else Icons.Default.Pause,
+                                        if (playback.isPaused || !playback.isPlaying) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
                                         stringResource(R.string.play_pause), tint = SpotifyWhite, modifier = Modifier.size(26.dp)
                                     )
                                 }
@@ -191,7 +194,7 @@ fun LyricsScreen(vm: SpotifyViewModel) {
                                 Modifier.size(36.dp).background(buttonBg, CircleShape).clip(CircleShape).clickable { vm.skipNext() },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.SkipNext, stringResource(R.string.next), tint = SpotifyWhite, modifier = Modifier.size(20.dp))
+                                Icon(Icons.Rounded.SkipNext, stringResource(R.string.next), tint = SpotifyWhite, modifier = Modifier.size(20.dp))
                             }
                             Box(
                                 Modifier.size(36.dp).background(buttonBg, CircleShape).clip(CircleShape).clickable {
@@ -201,7 +204,7 @@ fun LyricsScreen(vm: SpotifyViewModel) {
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                    if (isLiked) Icons.Rounded.Favorite else Icons.Filled.FavoriteBorder,
                                     stringResource(R.string.like),
                                     tint = if (isLiked) animatedPrimary else SpotifyWhite.copy(alpha = 0.7f),
                                     modifier = Modifier.size(18.dp)
@@ -221,13 +224,13 @@ fun LyricsScreen(vm: SpotifyViewModel) {
                         when {
                             isLoading -> {
                                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    CircularProgressIndicator(color = animatedPrimary, strokeWidth = 3.dp)
+                                    LoadingIndicator(color = animatedPrimary)
                                 }
                             }
                             lyrics == null || lyrics?.lines.isNullOrEmpty() -> {
                                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Icon(Icons.Default.MusicNote, null, tint = SpotifyLightGray.copy(alpha = 0.5f), modifier = Modifier.size(48.dp))
+                                        Icon(Icons.Rounded.MusicNote, null, tint = SpotifyLightGray.copy(alpha = 0.5f), modifier = Modifier.size(48.dp))
                                         Spacer(Modifier.height(12.dp))
                                         Text(stringResource(R.string.lyrics_not_available), color = SpotifyLightGray, fontSize = 16.sp)
                                     }
@@ -270,7 +273,7 @@ fun LyricsScreen(vm: SpotifyViewModel) {
                                 .clickable { vm.goBack() },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.KeyboardArrowDown, stringResource(R.string.close), tint = SpotifyWhite, modifier = Modifier.size(24.dp))
+                            Icon(Icons.Rounded.KeyboardArrowDown, stringResource(R.string.close), tint = SpotifyWhite, modifier = Modifier.size(24.dp))
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(track?.name ?: "", color = SpotifyWhite, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
@@ -282,13 +285,13 @@ fun LyricsScreen(vm: SpotifyViewModel) {
                     when {
                         isLoading -> {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                CircularProgressIndicator(color = animatedPrimary, strokeWidth = 3.dp)
+                                LoadingIndicator(color = animatedPrimary)
                             }
                         }
                         lyrics == null || lyrics?.lines.isNullOrEmpty() -> {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(Icons.Default.MusicNote, null, tint = SpotifyLightGray.copy(alpha = 0.5f), modifier = Modifier.size(48.dp))
+                                    Icon(Icons.Rounded.MusicNote, null, tint = SpotifyLightGray.copy(alpha = 0.5f), modifier = Modifier.size(48.dp))
                                     Spacer(Modifier.height(12.dp))
                                     Text(stringResource(R.string.lyrics_not_available), color = SpotifyLightGray, fontSize = 16.sp)
                                 }

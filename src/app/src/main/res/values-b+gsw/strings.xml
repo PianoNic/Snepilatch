@@ -241,4 +241,10 @@
 
     <!-- Login -->
     <string name="login_title">Bi Spotify aamelde</string>
+
+    <!-- Account section headers -->
+    <string name="account_section_profile">Profil &amp; Konto</string>
+    <string name="account_section_playback">Abspilig</string>
+    <string name="account_section_appearance">Usgsee</string>
+    <string name="account_section_notifications">Benachrichtigunge</string>
 </resources>

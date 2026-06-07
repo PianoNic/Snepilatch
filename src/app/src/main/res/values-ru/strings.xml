@@ -241,4 +241,10 @@
 
     <!-- Login -->
     <string name="login_title">Войти в Spotify</string>
+
+    <!-- Account section headers -->
+    <string name="account_section_profile">Профиль и аккаунт</string>
+    <string name="account_section_playback">Воспроизведение</string>
+    <string name="account_section_appearance">Внешний вид</string>
+    <string name="account_section_notifications">Уведомления</string>
 </resources>

@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import ch.snepilatch.app.BuildConfig
-import ch.snepilatch.app.auth.BatteryOptimizationHelper
 import ch.snepilatch.app.ui.components.ProfileInfoItem
 import ch.snepilatch.app.ui.components.UpdateDialog
 import ch.snepilatch.app.ui.theme.*
@@ -310,51 +309,6 @@ fun AccountScreen(vm: SpotifyViewModel) {
             },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
         )
-
-        // Background token refresh (opt-in, WorkManager-scheduled)
-        val backgroundRefreshOn by vm.backgroundTokenRefreshEnabled.collectAsState()
-        val backgroundRefreshLabel = if (backgroundRefreshOn) {
-            "Refreshes auth in the background so playback is instant when you open the app"
-        } else {
-            "Off — token may expire while phone sleeps"
-        }
-        ListItem(
-            headlineContent = { Text("Background Token Refresh", color = SpotifyWhite) },
-            supportingContent = { Text(backgroundRefreshLabel, color = SpotifyLightGray) },
-            leadingContent = { Icon(Icons.Default.Refresh, null, tint = SpotifyLightGray) },
-            trailingContent = {
-                Switch(
-                    checked = backgroundRefreshOn,
-                    onCheckedChange = { enabled ->
-                        vm.setBackgroundTokenRefreshEnabled(enabled, audioContext)
-                        if (enabled) {
-                            BatteryOptimizationHelper.requestIgnoreBatteryOptimizations(audioContext)
-                        }
-                    },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = animatedPrimary,
-                        checkedTrackColor = animatedPrimary.copy(alpha = 0.5f),
-                        uncheckedThumbColor = SpotifyLightGray,
-                        uncheckedTrackColor = SpotifyLightGray.copy(alpha = 0.3f)
-                    )
-                )
-            },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-        )
-
-        // Per-OEM autostart / background-restrict deep link — only shown if
-        // the device exposes one (Xiaomi, Huawei, Oppo, Vivo, OnePlus, Samsung, …).
-        if (backgroundRefreshOn && BatteryOptimizationHelper.hasOemAutostartScreen(audioContext)) {
-            ListItem(
-                headlineContent = { Text("Open device background settings", color = SpotifyWhite) },
-                supportingContent = { Text("Allow Snepilatch to run in the background on your phone", color = SpotifyLightGray) },
-                leadingContent = { Icon(Icons.Default.Settings, null, tint = SpotifyLightGray) },
-                modifier = Modifier.clickable {
-                    BatteryOptimizationHelper.openOemAutostartSettings(audioContext)
-                },
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-            )
-        }
 
         // Lyrics animation direction
         val lyricsAnim by vm.lyricsAnimDirection.collectAsState()

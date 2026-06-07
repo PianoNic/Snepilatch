@@ -66,7 +66,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.data.LibraryItem
 import ch.snepilatch.app.ui.components.SpotifyImage
-import ch.snepilatch.app.ui.components.itemAppearModifier
 import ch.snepilatch.app.ui.theme.SpotifyBlack
 import ch.snepilatch.app.ui.theme.SpotifyElevated
 import ch.snepilatch.app.ui.theme.SpotifyGray
@@ -243,9 +242,7 @@ fun LibraryScreen(vm: SpotifyViewModel) {
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 itemsIndexed(sortedLibrary) { index, item ->
-                    Box(itemAppearModifier(index)) {
-                        LibraryGridCard(item, vm)
-                    }
+                    LibraryGridCard(item, vm)
                     if (libraryHasMore && index >= library.size - 10) {
                         LaunchedEffect(library.size) { vm.loadMoreLibrary() }
                     }
@@ -257,9 +254,7 @@ fun LibraryScreen(vm: SpotifyViewModel) {
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
                 itemsIndexed(sortedLibrary) { index, item ->
-                    Box(itemAppearModifier(index)) {
-                        LibraryListItem(item, vm)
-                    }
+                    LibraryListItem(item, vm)
                     if (libraryHasMore && index >= library.size - 10) {
                         LaunchedEffect(library.size) { vm.loadMoreLibrary() }
                     }

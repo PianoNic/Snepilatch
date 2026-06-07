@@ -18,7 +18,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.ui.components.SpotifyImage
-import ch.snepilatch.app.ui.components.itemAppearModifier
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
 
@@ -75,19 +74,17 @@ fun QueueScreen(vm: SpotifyViewModel) {
 
         LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = LocalBottomOverlayHeight.current.value + 16.dp)) {
             itemsIndexed(queue) { index, track ->
-                Box(itemAppearModifier(index)) {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { vm.skipToQueueIndex(index) }
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        SpotifyImage(track.albumArt, Modifier.size(48.dp).clip(RoundedCornerShape(4.dp)))
-                        Column(Modifier.padding(start = 12.dp).weight(1f)) {
-                            Text(track.name, color = SpotifyWhite, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(track.artist, color = SpotifyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { vm.skipToQueueIndex(index) }
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SpotifyImage(track.albumArt, Modifier.size(48.dp).clip(RoundedCornerShape(4.dp)))
+                    Column(Modifier.padding(start = 12.dp).weight(1f)) {
+                        Text(track.name, color = SpotifyWhite, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(track.artist, color = SpotifyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }

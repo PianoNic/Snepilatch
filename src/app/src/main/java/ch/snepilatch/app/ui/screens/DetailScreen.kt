@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import ch.snepilatch.app.ui.components.itemAppearModifier
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.clickable
@@ -291,12 +290,10 @@ fun DetailScreen(vm: SpotifyViewModel) {
             if (hasMore && index >= detail.tracks.size - 5) {
                 LaunchedEffect(detail.tracks.size) { vm.loadMoreDetail() }
             }
-            Box(itemAppearModifier(index)) {
-                when {
-                    isArtist -> ArtistTrackRow(index + 1, track, vm, detail.uri, detail.topTrackPlaycounts.getOrNull(index))
-                    detail.type == "album" -> AlbumTrackRow(track, vm, detail.uri)
-                    else -> TrackRow(track, vm, contextUri = detail.uri)
-                }
+            when {
+                isArtist -> ArtistTrackRow(index + 1, track, vm, detail.uri, detail.topTrackPlaycounts.getOrNull(index))
+                detail.type == "album" -> AlbumTrackRow(track, vm, detail.uri)
+                else -> TrackRow(track, vm, contextUri = detail.uri)
             }
         }
 

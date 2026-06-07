@@ -89,6 +89,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     var notificationLeftButton: String = "repeat"
     var notificationRightButton: String = "like"
 
+    /** True while playback is paused because another app holds transient audio focus.
+     *  Used to auto-resume Spotify when focus returns. */
+    private var wasSuppressedByFocus = false
+
     override fun onCreate() {
         super.onCreate()
 
@@ -145,6 +149,35 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                     LokiLogger.i(TAG, "Closing audio effect session")
                     broadcastAudioEffectAction(AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION)
                     openAudioEffectSession = false
+                }
+
+                // Full (permanent) audio focus loss — e.g. phone call answered.
+                // ExoPlayer flips playWhenReady to false. Mirror to Spotify side.
+                if (!playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS) {
+                    LokiLogger.i(TAG, "Pausing Spotify side due to audio focus loss")
+                    onPause?.invoke()
+                }
+            }
+
+            override fun onPlaybackSuppressionReasonChanged(playbackSuppressionReason: Int) {
+                // Transient focus loss (e.g. Instagram video starts) — ExoPlayer keeps
+                // playWhenReady = true but suppresses playback. Spotify's cloud position
+                // keeps advancing though, so we must mirror the pause to the Spotify side
+                // — otherwise the muted track ends and the next one auto-plays over the
+                // focus-stealing app. Resume both sides when focus returns.
+                when (playbackSuppressionReason) {
+                    Player.PLAYBACK_SUPPRESSION_REASON_TRANSIENT_AUDIO_FOCUS_LOSS -> {
+                        LokiLogger.i(TAG, "Pausing Spotify side due to transient focus loss")
+                        wasSuppressedByFocus = true
+                        onPause?.invoke()
+                    }
+                    Player.PLAYBACK_SUPPRESSION_REASON_NONE -> {
+                        if (wasSuppressedByFocus) {
+                            wasSuppressedByFocus = false
+                            LokiLogger.i(TAG, "Resuming Spotify side — transient focus restored")
+                            onPlay?.invoke()
+                        }
+                    }
                 }
             }
 

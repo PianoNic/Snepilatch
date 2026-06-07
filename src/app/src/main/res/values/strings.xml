@@ -106,4 +106,139 @@
 
     <!-- Playback -->
     <string name="playback_ended">Playback ended</string>
+
+    <!-- Common (added) -->
+    <string name="close">Close</string>
+    <string name="retry">Retry</string>
+    <string name="placeholder_dots">…</string>
+    <string name="loading_dots">Loading…</string>
+
+    <!-- Account (added) -->
+    <string name="profile_image">Profile</string>
+    <string name="account_image">Account</string>
+
+    <!-- Language -->
+    <string name="language">Language</string>
+    <string name="language_system_default">System Default</string>
+
+    <!-- Settings (added) -->
+    <string name="lossless_off_spotify">Standard quality (Spotify)</string>
+    <string name="tidal">Tidal</string>
+    <string name="qobuz">Qobuz</string>
+    <string name="tidal_short_desc">FLAC up to 1411kbps</string>
+    <string name="qobuz_short_desc">FLAC up to 9216kbps</string>
+    <string name="notification_button_left">Left Button</string>
+    <string name="notification_button_right">Right Button</string>
+    <string name="notif_like_short_desc">Toggle liked state</string>
+
+    <!-- Regions -->
+    <string name="region_us">United States</string>
+    <string name="region_gb">United Kingdom</string>
+    <string name="region_de">Germany</string>
+    <string name="region_ch">Switzerland</string>
+    <string name="region_fr">France</string>
+    <string name="region_jp">Japan</string>
+    <string name="region_kr">South Korea</string>
+    <string name="region_au">Australia</string>
+    <string name="region_br">Brazil</string>
+    <string name="region_ca">Canada</string>
+    <string name="region_se">Sweden</string>
+
+    <!-- Release Notes (added) -->
+    <string name="release_load_failed">Failed to load release notes</string>
+    <string name="release_load_failed_short">Failed to load: %s</string>
+    <string name="release_load_generic_error">Failed to load</string>
+    <string name="release_latest_badge">LATEST</string>
+    <string name="release_fallback_title">Release %s</string>
+
+    <!-- Loading / Connection -->
+    <string name="rate_limited">Rate limited</string>
+    <string name="retrying_in">Retrying in %ds</string>
+    <string name="login_different_account">Login with different account</string>
+    <string name="connection_failed">Connection failed</string>
+    <string name="connecting_to_spotify">Connecting to Spotify…</string>
+
+    <!-- Update Dialog (added) -->
+    <string name="update_download_failed">Download failed. Please try again.</string>
+
+    <!-- Devices (added) -->
+    <string name="connect">Connect</string>
+    <string name="this_smartphone">This Smartphone</string>
+
+    <!-- Common Actions -->
+    <string name="search">Search</string>
+    <string name="back">Back</string>
+    <string name="clear">Clear</string>
+    <string name="more">More</string>
+    <string name="play">Play</string>
+    <string name="play_pause">Play/Pause</string>
+    <string name="previous">Previous</string>
+    <string name="next">Next</string>
+    <string name="save">Save</string>
+    <string name="shuffle">Shuffle</string>
+    <string name="repeat">Repeat</string>
+    <string name="queue">Queue</string>
+    <string name="audio_output">Audio Output</string>
+    <string name="equalizer">Equalizer</string>
+    <string name="lyrics">Lyrics</string>
+    <string name="view_queue">View Queue</string>
+    <string name="visit_artist">Visit Artist</string>
+    <string name="devices">Devices</string>
+    <string name="share_track_chooser">Share track</string>
+
+    <!-- Library Screen -->
+    <string name="library_title">Your Library</string>
+    <string name="library_create">Create</string>
+    <string name="library_toggle_view">Toggle view</string>
+    <string name="library_filter_playlists">Playlists</string>
+    <string name="library_filter_artists">Artists</string>
+    <string name="library_filter_albums">Albums</string>
+    <string name="library_sort">Sort</string>
+    <string name="library_sort_recent">Recent</string>
+    <string name="library_sort_alpha">Alphabetical</string>
+    <string name="library_sort_by_type">By Type</string>
+    <string name="library_create_playlist">Create Playlist</string>
+    <string name="library_playlist_name_hint">Playlist name</string>
+    <string name="library_create_button">Create</string>
+    <string name="library_remove_title">Remove from Library</string>
+    <string name="library_remove_message">Remove \"%s\" from your library?</string>
+    <string name="library_remove_button">Remove</string>
+
+    <!-- Detail Screen extras -->
+    <string name="detail_likes">%s likes</string>
+    <string name="detail_songs">%d songs</string>
+    <string name="detail_minutes">%d min</string>
+    <string name="detail_monthly_listeners">%s monthly listeners</string>
+
+    <!-- Queue Screen -->
+    <string name="queue_next_up">Next up</string>
+    <string name="queue_empty">Queue is empty</string>
+
+    <!-- Lyrics Screen -->
+    <string name="lyrics_not_available">No lyrics available</string>
+
+    <!-- Now Playing -->
+    <string name="now_playing_playing_from">Playing from %s</string>
+    <string name="now_playing_not_playing">Not Playing</string>
+
+    <!-- Search (added) -->
+    <string name="search_title">Search</string>
+    <string name="search_field_placeholder">Search</string>
+    <string name="search_clear">Clear</string>
+    <string name="search_browse_all">Browse All</string>
+    <string name="search_subtitle_song">Song · %s</string>
+    <string name="search_subtitle_artist">Artist</string>
+    <string name="search_subtitle_playlist">Playlist</string>
+    <string name="search_subtitle_podcast">Podcast</string>
+    <string name="search_subtitle_profile">Profile</string>
+    <string name="search_filter_all">All</string>
+    <string name="search_filter_artists">Artists</string>
+    <string name="search_filter_albums">Albums</string>
+    <string name="search_filter_songs">Songs</string>
+    <string name="search_filter_playlists">Playlists</string>
+    <string name="search_filter_podcasts">Podcasts</string>
+    <string name="search_filter_profiles">Profiles</string>
+
+    <!-- Login -->
+    <string name="login_title">Login to Spotify</string>
 </resources>

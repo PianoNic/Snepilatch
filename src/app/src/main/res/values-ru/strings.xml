@@ -99,4 +99,146 @@
     <!-- Notification -->
     <string name="added_to_liked">Добавлено в любимые песни</string>
     <string name="removed_from_liked">Удалено из любимых песен</string>
+
+    <!-- Playback -->
+    <string name="playback_ended">Воспроизведение завершено</string>
+
+    <!-- Backfill -->
+    <string name="tidal_desc">Tidal — FLAC до 1411 кбит/с</string>
+    <string name="qobuz_desc">Qobuz — FLAC до 9216 кбит/с</string>
+
+    <!-- Common (added) -->
+    <string name="close">Закрыть</string>
+    <string name="retry">Повторить</string>
+    <string name="placeholder_dots">…</string>
+    <string name="loading_dots">Загрузка…</string>
+
+    <!-- Account (added) -->
+    <string name="profile_image">Профиль</string>
+    <string name="account_image">Аккаунт</string>
+
+    <!-- Language -->
+    <string name="language">Язык</string>
+    <string name="language_system_default">Системный</string>
+
+    <!-- Settings (added) -->
+    <string name="lossless_off_spotify">Стандартное качество (Spotify)</string>
+    <string name="tidal">Tidal</string>
+    <string name="qobuz">Qobuz</string>
+    <string name="tidal_short_desc">FLAC до 1411 кбит/с</string>
+    <string name="qobuz_short_desc">FLAC до 9216 кбит/с</string>
+    <string name="notification_button_left">Левая кнопка</string>
+    <string name="notification_button_right">Правая кнопка</string>
+    <string name="notif_like_short_desc">Переключить «нравится»</string>
+
+    <!-- Regions -->
+    <string name="region_us">США</string>
+    <string name="region_gb">Великобритания</string>
+    <string name="region_de">Германия</string>
+    <string name="region_ch">Швейцария</string>
+    <string name="region_fr">Франция</string>
+    <string name="region_jp">Япония</string>
+    <string name="region_kr">Южная Корея</string>
+    <string name="region_au">Австралия</string>
+    <string name="region_br">Бразилия</string>
+    <string name="region_ca">Канада</string>
+    <string name="region_se">Швеция</string>
+
+    <!-- Release Notes (added) -->
+    <string name="release_load_failed">Не удалось загрузить примечания к выпуску</string>
+    <string name="release_load_failed_short">Ошибка загрузки: %s</string>
+    <string name="release_load_generic_error">Не удалось загрузить</string>
+    <string name="release_latest_badge">ПОСЛЕДНЕЕ</string>
+    <string name="release_fallback_title">Версия %s</string>
+
+    <!-- Loading / Connection -->
+    <string name="rate_limited">Превышен лимит запросов</string>
+    <string name="retrying_in">Повтор через %d с</string>
+    <string name="login_different_account">Войти под другим аккаунтом</string>
+    <string name="connection_failed">Ошибка соединения</string>
+    <string name="connecting_to_spotify">Подключение к Spotify…</string>
+
+    <!-- Update Dialog (added) -->
+    <string name="update_download_failed">Загрузка не удалась. Попробуйте ещё раз.</string>
+
+    <!-- Devices (added) -->
+    <string name="connect">Подключение</string>
+    <string name="this_smartphone">Этот смартфон</string>
+
+    <!-- Common Actions -->
+    <string name="search">Поиск</string>
+    <string name="back">Назад</string>
+    <string name="clear">Очистить</string>
+    <string name="more">Ещё</string>
+    <string name="play">Играть</string>
+    <string name="play_pause">Играть/Пауза</string>
+    <string name="previous">Назад</string>
+    <string name="next">Вперёд</string>
+    <string name="save">Сохранить</string>
+    <string name="shuffle">Перемешать</string>
+    <string name="repeat">Повтор</string>
+    <string name="queue">Очередь</string>
+    <string name="audio_output">Аудиовыход</string>
+    <string name="equalizer">Эквалайзер</string>
+    <string name="lyrics">Текст</string>
+    <string name="view_queue">Показать очередь</string>
+    <string name="visit_artist">Перейти к исполнителю</string>
+    <string name="devices">Устройства</string>
+    <string name="share_track_chooser">Поделиться треком</string>
+
+    <!-- Library Screen -->
+    <string name="library_title">Ваша библиотека</string>
+    <string name="library_create">Создать</string>
+    <string name="library_toggle_view">Сменить вид</string>
+    <string name="library_filter_playlists">Плейлисты</string>
+    <string name="library_filter_artists">Исполнители</string>
+    <string name="library_filter_albums">Альбомы</string>
+    <string name="library_sort">Сортировка</string>
+    <string name="library_sort_recent">Недавние</string>
+    <string name="library_sort_alpha">По алфавиту</string>
+    <string name="library_sort_by_type">По типу</string>
+    <string name="library_create_playlist">Создать плейлист</string>
+    <string name="library_playlist_name_hint">Название плейлиста</string>
+    <string name="library_create_button">Создать</string>
+    <string name="library_remove_title">Удалить из библиотеки</string>
+    <string name="library_remove_message">Удалить «%s» из вашей библиотеки?</string>
+    <string name="library_remove_button">Удалить</string>
+
+    <!-- Detail Screen extras -->
+    <string name="detail_likes">%s лайков</string>
+    <string name="detail_songs">%d песен</string>
+    <string name="detail_minutes">%d мин</string>
+    <string name="detail_monthly_listeners">%s слушателей в месяц</string>
+
+    <!-- Queue Screen -->
+    <string name="queue_next_up">Далее</string>
+    <string name="queue_empty">Очередь пуста</string>
+
+    <!-- Lyrics Screen -->
+    <string name="lyrics_not_available">Текст недоступен</string>
+
+    <!-- Now Playing -->
+    <string name="now_playing_playing_from">Играет из %s</string>
+    <string name="now_playing_not_playing">Ничего не играет</string>
+
+    <!-- Search (added) -->
+    <string name="search_title">Поиск</string>
+    <string name="search_field_placeholder">Поиск</string>
+    <string name="search_clear">Очистить</string>
+    <string name="search_browse_all">Все категории</string>
+    <string name="search_subtitle_song">Песня · %s</string>
+    <string name="search_subtitle_artist">Исполнитель</string>
+    <string name="search_subtitle_playlist">Плейлист</string>
+    <string name="search_subtitle_podcast">Подкаст</string>
+    <string name="search_subtitle_profile">Профиль</string>
+    <string name="search_filter_all">Все</string>
+    <string name="search_filter_artists">Исполнители</string>
+    <string name="search_filter_albums">Альбомы</string>
+    <string name="search_filter_songs">Песни</string>
+    <string name="search_filter_playlists">Плейлисты</string>
+    <string name="search_filter_podcasts">Подкасты</string>
+    <string name="search_filter_profiles">Профили</string>
+
+    <!-- Login -->
+    <string name="login_title">Войти в Spotify</string>
 </resources>

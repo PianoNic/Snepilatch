@@ -1,5 +1,6 @@
 package ch.snepilatch.app.ui.components
 
+import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.theme.SpotifyWhite
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
@@ -49,6 +50,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -165,7 +167,7 @@ fun TrackRow(track: TrackInfo, vm: SpotifyViewModel, contextUri: String? = null)
             Spacer(Modifier.width(4.dp))
         }
         IconButton(onClick = { showMenu = true }, modifier = Modifier.size(36.dp)) {
-            Icon(Icons.Default.MoreVert, "More", tint = SpotifyLightGray, modifier = Modifier.size(20.dp))
+            Icon(Icons.Default.MoreVert, stringResource(R.string.more), tint = SpotifyLightGray, modifier = Modifier.size(20.dp))
         }
     }
 
@@ -201,20 +203,36 @@ fun TrackRow(track: TrackInfo, vm: SpotifyViewModel, contextUri: String? = null)
             Spacer(Modifier.height(8.dp))
             HorizontalDivider(color = SpotifyLightGray.copy(alpha = 0.15f))
 
+            val shareLabel = stringResource(R.string.share)
+            val addToQueueLabel = stringResource(R.string.add_to_queue)
+            val addToPlaylistLabel = stringResource(R.string.add_to_playlist)
+            val likeLabel = stringResource(R.string.like)
+            val visitAlbumLabel = stringResource(R.string.visit_album)
+            val visitArtistLabel = stringResource(R.string.visit_artist)
             val items = listOf(
-                Triple(Icons.AutoMirrored.Filled.QueueMusic, "Add to Queue") { vm.addToQueue(track.uri); showMenu = false },
-                Triple(Icons.AutoMirrored.Filled.PlaylistAdd, "Add to Playlist") { showMenu = false; vm.showPlaylistPickerForTrack(track.uri) },
-                Triple(Icons.Default.Favorite, "Like") { vm.likeSong(track.uri.removePrefix("spotify:track:")); showMenu = false },
-                Triple(Icons.Default.Album, "Visit Album") { showMenu = false; vm.openAlbumForTrack(track.uri) },
-                Triple(Icons.Default.Person, "Visit Artist") { showMenu = false; vm.openArtistForTrack(track.uri) },
-                Triple(Icons.Default.Share, "Share") {
+                Triple(Icons.AutoMirrored.Filled.QueueMusic, addToQueueLabel) {
+                    vm.addToQueue(track.uri); showMenu = false
+                },
+                Triple(Icons.AutoMirrored.Filled.PlaylistAdd, addToPlaylistLabel) {
+                    showMenu = false; vm.showPlaylistPickerForTrack(track.uri)
+                },
+                Triple(Icons.Default.Favorite, likeLabel) {
+                    vm.likeSong(track.uri.removePrefix("spotify:track:")); showMenu = false
+                },
+                Triple(Icons.Default.Album, visitAlbumLabel) {
+                    showMenu = false; vm.openAlbumForTrack(track.uri)
+                },
+                Triple(Icons.Default.Person, visitArtistLabel) {
+                    showMenu = false; vm.openArtistForTrack(track.uri)
+                },
+                Triple(Icons.Default.Share, shareLabel) {
                     showMenu = false
                     val id = track.uri.removePrefix("spotify:track:")
                     val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                         type = "text/plain"
                         putExtra(android.content.Intent.EXTRA_TEXT, "https://open.spotify.com/track/$id")
                     }
-                    context.startActivity(android.content.Intent.createChooser(intent, "Share"))
+                    context.startActivity(android.content.Intent.createChooser(intent, shareLabel))
                 }
             )
 

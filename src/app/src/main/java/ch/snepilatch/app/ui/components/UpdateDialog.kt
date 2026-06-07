@@ -9,8 +9,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import ch.snepilatch.app.R
 import ch.snepilatch.app.util.UpdateInfo
 import ch.snepilatch.app.util.UpdateService
 import kotlinx.coroutines.launch
@@ -35,7 +37,7 @@ fun UpdateDialog(
                 tint = MaterialTheme.colorScheme.primary
             )
         },
-        title = { Text("Update Available") },
+        title = { Text(stringResource(R.string.update_available)) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -55,7 +57,7 @@ fun UpdateDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text("Current", style = MaterialTheme.typography.labelSmall)
+                            Text(stringResource(R.string.current_version), style = MaterialTheme.typography.labelSmall)
                             Text(
                                 updateInfo.currentVersion,
                                 style = MaterialTheme.typography.bodyLarge,
@@ -64,7 +66,7 @@ fun UpdateDialog(
                         }
                         Text("→", style = MaterialTheme.typography.titleLarge)
                         Column(horizontalAlignment = Alignment.End) {
-                            Text("New", style = MaterialTheme.typography.labelSmall)
+                            Text(stringResource(R.string.new_version), style = MaterialTheme.typography.labelSmall)
                             Text(
                                 updateInfo.latestVersion,
                                 style = MaterialTheme.typography.bodyLarge,
@@ -114,7 +116,7 @@ fun UpdateDialog(
 
                 // Release notes
                 if (!isDownloading && updateInfo.releaseNotes.isNotBlank()) {
-                    Text("What's new:", style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(R.string.whats_new), style = MaterialTheme.typography.titleSmall)
                     Card(
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
@@ -142,11 +144,11 @@ fun UpdateDialog(
                             UpdateService.installApk(context, file)
                         } else {
                             isDownloading = false
-                            error = "Download failed. Please try again."
+                            error = context.getString(R.string.update_download_failed)
                         }
                     }
                 }) {
-                    Text("Update Now")
+                    Text(stringResource(R.string.update_now))
                 }
             }
         },
@@ -156,11 +158,11 @@ fun UpdateDialog(
                     UpdateService.dismissVersion(context, updateInfo.latestVersion)
                     onDismiss()
                 }) {
-                    Text("Later")
+                    Text(stringResource(R.string.later))
                 }
             } else {
                 TextButton(onClick = onDismiss) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         }

@@ -12,9 +12,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -34,19 +37,21 @@ data class ReleaseNote(
 @Composable
 fun ReleaseNotesScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var releases by remember { mutableStateOf<List<ReleaseNote>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    val genericError = stringResource(R.string.release_load_generic_error)
 
     fun load() {
         isLoading = true
         error = null
         scope.launch {
             try {
-                val notes = withContext(Dispatchers.IO) { fetchReleaseNotes() }
+                val notes = withContext(Dispatchers.IO) { fetchReleaseNotes(context) }
                 releases = notes
             } catch (e: Exception) {
-                error = e.message ?: "Failed to load"
+                error = e.message ?: genericError
             }
             isLoading = false
         }
@@ -58,7 +63,7 @@ fun ReleaseNotesScreen(onBack: () -> Unit) {
         containerColor = SpotifyBlack,
         topBar = {
             TopAppBar(
-                title = { Text("Release Notes", color = SpotifyWhite) },
+                title = { Text(stringResource(R.string.release_notes), color = SpotifyWhite) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = SpotifyWhite)
@@ -79,14 +84,14 @@ fun ReleaseNotesScreen(onBack: () -> Unit) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Icons.Default.ErrorOutline, null, tint = SpotifyLightGray, modifier = Modifier.size(64.dp))
                         Spacer(Modifier.height(16.dp))
-                        Text("Failed to load release notes", color = SpotifyWhite, fontSize = 18.sp)
+                        Text(stringResource(R.string.release_load_failed), color = SpotifyWhite, fontSize = 18.sp)
                         Spacer(Modifier.height(8.dp))
                         Text(error!!, color = SpotifyLightGray, fontSize = 13.sp)
                         Spacer(Modifier.height(24.dp))
                         Button(onClick = { load() }) {
                             Icon(Icons.Default.Refresh, null)
                             Spacer(Modifier.width(8.dp))
-                            Text("Retry")
+                            Text(stringResource(R.string.retry))
                         }
                     }
                 }
@@ -139,7 +144,7 @@ private fun ReleaseNoteCard(note: ReleaseNote, isLatest: Boolean) {
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
-                            "LATEST",
+                            stringResource(R.string.release_latest_badge),
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
@@ -221,13 +226,14 @@ private fun String.cleanMarkdown(): String {
 @Composable
 fun ReleaseNotesDialog(onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var releases by remember { mutableStateOf<List<ReleaseNote>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         try {
-            releases = withContext(Dispatchers.IO) { fetchReleaseNotes() }
+            releases = withContext(Dispatchers.IO) { fetchReleaseNotes(context) }
         } catch (e: Exception) {
             error = e.message
         }
@@ -237,14 +243,14 @@ fun ReleaseNotesDialog(onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = SpotifyDarkGray,
-        title = { Text("Release Notes", color = SpotifyWhite) },
+        title = { Text(stringResource(R.string.release_notes), color = SpotifyWhite) },
         text = {
             Box(Modifier.heightIn(max = 500.dp)) {
                 when {
                     isLoading -> Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(color = SpotifyLightGray)
                     }
-                    error != null -> Text("Failed to load: $error", color = SpotifyLightGray)
+                    error != null -> Text(stringResource(R.string.release_load_failed_short, error ?: ""), color = SpotifyLightGray)
                     else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         itemsIndexed(releases) { index, note ->
                             ReleaseNoteCard(note, isLatest = index == 0)
@@ -255,13 +261,13 @@ fun ReleaseNotesDialog(onDismiss: () -> Unit) {
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Close", color = SpotifyLightGray)
+                Text(stringResource(R.string.close), color = SpotifyLightGray)
             }
         }
     )
 }
 
-private suspend fun fetchReleaseNotes(): List<ReleaseNote> {
+private suspend fun fetchReleaseNotes(context: android.content.Context): List<ReleaseNote> {
     val client = OkHttpClient()
     val request = Request.Builder()
         .url("https://api.github.com/repos/PianoNic/Snepilatch/releases")
@@ -278,7 +284,7 @@ private suspend fun fetchReleaseNotes(): List<ReleaseNote> {
         val date = if (published.length >= 10) published.substring(0, 10) else published
         notes.add(ReleaseNote(
             version = tag,
-            title = obj.optString("name", "Release $tag"),
+            title = obj.optString("name", context.getString(R.string.release_fallback_title, tag)),
             body = obj.optString("body", ""),
             date = date
         ))

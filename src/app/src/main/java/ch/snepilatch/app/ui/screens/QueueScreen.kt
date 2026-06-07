@@ -13,10 +13,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.components.SpotifyImage
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
@@ -32,15 +34,15 @@ fun QueueScreen(vm: SpotifyViewModel) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = { vm.goBack() }) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = SpotifyWhite)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back), tint = SpotifyWhite)
             }
-            Text("Queue", color = SpotifyWhite, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.queue), color = SpotifyWhite, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         }
 
         // Now playing
         playback.track?.let { track ->
             Text(
-                "Now playing",
+                stringResource(R.string.now_playing),
                 color = SpotifyLightGray,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
@@ -64,7 +66,7 @@ fun QueueScreen(vm: SpotifyViewModel) {
         // Next up
         if (queue.isNotEmpty()) {
             Text(
-                "Next up",
+                stringResource(R.string.queue_next_up),
                 color = SpotifyLightGray,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
@@ -92,7 +94,7 @@ fun QueueScreen(vm: SpotifyViewModel) {
 
         if (queue.isEmpty() && playback.track == null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Queue is empty", color = SpotifyLightGray, fontSize = 16.sp)
+                Text(stringResource(R.string.queue_empty), color = SpotifyLightGray, fontSize = 16.sp)
             }
         }
     }

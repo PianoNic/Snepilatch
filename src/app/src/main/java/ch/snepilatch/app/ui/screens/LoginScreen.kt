@@ -1,5 +1,6 @@
 package ch.snepilatch.app.ui.screens
 
+import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.theme.SpotifyWhite
 import android.webkit.CookieManager
 import android.webkit.WebView
@@ -20,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -38,10 +40,10 @@ fun SpotifyLoginScreen(vm: SpotifyViewModel) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = { vm.needsLogin.value = false }) {
-                Icon(Icons.Default.Close, "Close", tint = SpotifyWhite)
+                Icon(Icons.Default.Close, stringResource(R.string.close), tint = SpotifyWhite)
             }
             Spacer(Modifier.width(8.dp))
-            Text("Login to Spotify", color = SpotifyWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.login_title), color = SpotifyWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         }
 
         AndroidView(

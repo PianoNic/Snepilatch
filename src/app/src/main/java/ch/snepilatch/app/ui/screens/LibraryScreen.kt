@@ -60,10 +60,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ch.snepilatch.app.R
 import ch.snepilatch.app.data.LibraryItem
 import ch.snepilatch.app.ui.components.SpotifyImage
 import ch.snepilatch.app.ui.theme.SpotifyBlack
@@ -118,13 +120,13 @@ fun LibraryScreen(vm: SpotifyViewModel) {
                 .padding(horizontal = 12.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Your Library", color = SpotifyWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold,
+            Text(stringResource(R.string.library_title), color = SpotifyWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f))
             IconButton(onClick = { searchActive = !searchActive; if (!searchActive) searchQuery = "" }) {
-                Icon(Icons.Default.Search, "Search", tint = SpotifyWhite, modifier = Modifier.size(24.dp))
+                Icon(Icons.Default.Search, stringResource(R.string.search), tint = SpotifyWhite, modifier = Modifier.size(24.dp))
             }
             IconButton(onClick = { showCreateDialog = true }) {
-                Icon(Icons.Default.Add, "Create", tint = SpotifyWhite, modifier = Modifier.size(26.dp))
+                Icon(Icons.Default.Add, stringResource(R.string.library_create), tint = SpotifyWhite, modifier = Modifier.size(26.dp))
             }
         }
 
@@ -137,12 +139,17 @@ fun LibraryScreen(vm: SpotifyViewModel) {
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 4.dp)
                     .clip(RoundedCornerShape(8.dp)),
-                placeholder = { Text("Search in Your Library", color = SpotifyLightGray.copy(alpha = 0.7f)) },
+                placeholder = {
+                    Text(
+                        stringResource(R.string.library_search_placeholder),
+                        color = SpotifyLightGray.copy(alpha = 0.7f)
+                    )
+                },
                 leadingIcon = { Icon(Icons.Default.Search, null, tint = SpotifyLightGray) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Close, "Clear", tint = SpotifyLightGray)
+                            Icon(Icons.Default.Close, stringResource(R.string.clear), tint = SpotifyLightGray)
                         }
                     }
                 },
@@ -160,19 +167,23 @@ fun LibraryScreen(vm: SpotifyViewModel) {
         }
 
         // Filter chips row
+        val filters = listOf(
+            "Playlists" to stringResource(R.string.library_filter_playlists),
+            "Artists" to stringResource(R.string.library_filter_artists),
+            "Albums" to stringResource(R.string.library_filter_albums)
+        )
         LazyRow(
             contentPadding = PaddingValues(horizontal = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(vertical = 8.dp)
         ) {
-            val filters = listOf("Playlists", "Artists", "Albums")
             items(filters.size) { i ->
                 FilterChip(
-                    selected = selectedFilter == filters[i],
+                    selected = selectedFilter == filters[i].first,
                     onClick = {
-                        selectedFilter = if (selectedFilter == filters[i]) null else filters[i]
+                        selectedFilter = if (selectedFilter == filters[i].first) null else filters[i].first
                     },
-                    label = { Text(filters[i], fontSize = 13.sp) },
+                    label = { Text(filters[i].second, fontSize = 13.sp) },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = SpotifyWhite,
                         selectedLabelColor = SpotifyBlack,
@@ -197,12 +208,12 @@ fun LibraryScreen(vm: SpotifyViewModel) {
                     Modifier.clickable { showSortMenu = true }.padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.SwapVert, "Sort", tint = SpotifyLightGray, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.SwapVert, stringResource(R.string.library_sort), tint = SpotifyLightGray, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
                     val sortLabel = when (sortMode) {
-                        "alpha" -> "Alphabetical"
-                        "type" -> "By Type"
-                        else -> "Recent"
+                        "alpha" -> stringResource(R.string.library_sort_alpha)
+                        "type" -> stringResource(R.string.library_sort_by_type)
+                        else -> stringResource(R.string.library_sort_recent)
                     }
                     Text(sortLabel, color = SpotifyLightGray, fontSize = 13.sp)
                 }
@@ -211,7 +222,11 @@ fun LibraryScreen(vm: SpotifyViewModel) {
                     onDismissRequest = { showSortMenu = false },
                     containerColor = SpotifyGray
                 ) {
-                    listOf("recent" to "Recent", "alpha" to "Alphabetical", "type" to "By Type").forEach { (value, label) ->
+                    listOf(
+                        "recent" to stringResource(R.string.library_sort_recent),
+                        "alpha" to stringResource(R.string.library_sort_alpha),
+                        "type" to stringResource(R.string.library_sort_by_type)
+                    ).forEach { (value, label) ->
                         DropdownMenuItem(
                             text = { Text(label, color = if (sortMode == value) SpotifyWhite else SpotifyLightGray) },
                             onClick = { sortMode = value; prefs.edit().putString("library_sort", value).apply(); showSortMenu = false }
@@ -225,7 +240,7 @@ fun LibraryScreen(vm: SpotifyViewModel) {
             ) {
                 Icon(
                     if (gridView) Icons.AutoMirrored.Filled.List else Icons.Default.GridView,
-                    "Toggle view",
+                    stringResource(R.string.library_toggle_view),
                     tint = SpotifyLightGray,
                     modifier = Modifier.size(20.dp)
                 )
@@ -391,12 +406,12 @@ fun CreatePlaylistDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = SpotifyElevated,
-        title = { Text("Create Playlist", color = SpotifyWhite, fontWeight = FontWeight.Bold) },
+        title = { Text(stringResource(R.string.library_create_playlist), color = SpotifyWhite, fontWeight = FontWeight.Bold) },
         text = {
             TextField(
                 value = name,
                 onValueChange = { name = it },
-                placeholder = { Text("Playlist name", color = SpotifyLightGray) },
+                placeholder = { Text(stringResource(R.string.library_playlist_name_hint), color = SpotifyLightGray) },
                 colors = TextFieldDefaults.colors(
                     focusedTextColor = SpotifyWhite,
                     unfocusedTextColor = SpotifyWhite,
@@ -412,11 +427,11 @@ fun CreatePlaylistDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
         },
         confirmButton = {
             TextButton(onClick = { if (name.isNotBlank()) onCreate(name) }) {
-                Text("Create", color = SpotifyWhite, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.library_create_button), color = SpotifyWhite, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel", color = SpotifyLightGray) }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel), color = SpotifyLightGray) }
         }
     )
 }
@@ -425,20 +440,20 @@ fun CreatePlaylistDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
 private fun LibraryRemoveDialog(item: LibraryItem, vm: SpotifyViewModel, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Remove from Library", color = SpotifyWhite) },
-        text = { Text("Remove \"${item.name}\" from your library?", color = SpotifyLightGray) },
+        title = { Text(stringResource(R.string.library_remove_title), color = SpotifyWhite) },
+        text = { Text(stringResource(R.string.library_remove_message, item.name), color = SpotifyLightGray) },
         containerColor = SpotifyGray,
         confirmButton = {
             TextButton(onClick = {
                 vm.removeFromLibrary(item)
                 onDismiss()
             }) {
-                Text("Remove", color = Color.Red)
+                Text(stringResource(R.string.library_remove_button), color = Color.Red)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel", color = SpotifyLightGray)
+                Text(stringResource(R.string.cancel), color = SpotifyLightGray)
             }
         }
     )

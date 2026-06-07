@@ -1,5 +1,6 @@
 package ch.snepilatch.app.ui.screens
 
+import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -48,13 +49,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.components.SpotifyImage
 import ch.snepilatch.app.ui.theme.SpotifyBlack
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
@@ -105,7 +109,7 @@ fun SearchScreen(vm: SpotifyViewModel, searchVm: SearchViewModel = viewModel()) 
 
     Column(Modifier.fillMaxSize().padding(top = 12.dp)) {
         Text(
-            "Search",
+            stringResource(R.string.search_title),
             color = SpotifyWhite,
             fontSize = 26.sp,
             fontWeight = FontWeight.Bold,
@@ -120,12 +124,12 @@ fun SearchScreen(vm: SpotifyViewModel, searchVm: SearchViewModel = viewModel()) 
                 .padding(horizontal = 16.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .focusRequester(focusRequester),
-            placeholder = { Text("Search", color = SpotifyLightGray.copy(alpha = 0.7f)) },
+            placeholder = { Text(stringResource(R.string.search_field_placeholder), color = SpotifyLightGray.copy(alpha = 0.7f)) },
             leadingIcon = { Icon(Icons.Default.Search, null, tint = SpotifyBlack) },
             trailingIcon = {
                 if (query.isNotEmpty()) {
                     IconButton(onClick = { searchVm.updateQuery("") }) {
-                        Icon(Icons.Default.Close, "Clear", tint = SpotifyBlack)
+                        Icon(Icons.Default.Close, stringResource(R.string.search_clear), tint = SpotifyBlack)
                     }
                 }
             },
@@ -188,7 +192,7 @@ fun SearchScreen(vm: SpotifyViewModel, searchVm: SearchViewModel = viewModel()) 
 private fun BrowseCategoriesGrid(onCategoryTap: (String) -> Unit) {
     Column {
         Text(
-            "Browse All",
+            stringResource(R.string.search_browse_all),
             color = SpotifyWhite,
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
@@ -273,19 +277,19 @@ private data class UnifiedResult(
     val onClick: () -> Unit
 )
 
-private fun SearchTrack.toUnified(vm: SpotifyViewModel) = UnifiedResult(
+private fun SearchTrack.toUnified(vm: SpotifyViewModel, ctx: Context) = UnifiedResult(
     uri = uri,
     title = name,
-    subtitle = "Song · ${artists.joinToString(", ") { it.name }}",
+    subtitle = ctx.getString(R.string.search_subtitle_song, artists.joinToString(", ") { it.name }),
     imageUrl = album.coverArtUrl,
     circular = false,
     onClick = { vm.playTrack(uri) }
 )
 
-private fun SearchArtist.toUnified(vm: SpotifyViewModel) = UnifiedResult(
+private fun SearchArtist.toUnified(vm: SpotifyViewModel, ctx: Context) = UnifiedResult(
     uri = uri,
     title = name,
-    subtitle = "Artist",
+    subtitle = ctx.getString(R.string.search_subtitle_artist),
     imageUrl = avatarUrl,
     circular = true,
     onClick = { vm.openArtist(idFromUri(uri)) }
@@ -304,28 +308,28 @@ private fun SearchAlbum.toUnified(vm: SpotifyViewModel): UnifiedResult {
     )
 }
 
-private fun SearchPlaylist.toUnified(vm: SpotifyViewModel) = UnifiedResult(
+private fun SearchPlaylist.toUnified(vm: SpotifyViewModel, ctx: Context) = UnifiedResult(
     uri = uri,
     title = name,
-    subtitle = listOfNotNull("Playlist", ownerName).joinToString(" · "),
+    subtitle = listOfNotNull(ctx.getString(R.string.search_subtitle_playlist), ownerName).joinToString(" · "),
     imageUrl = coverArtUrl,
     circular = false,
     onClick = { vm.openPlaylist(idFromUri(uri)) }
 )
 
-private fun SearchPodcast.toUnified() = UnifiedResult(
+private fun SearchPodcast.toUnified(ctx: Context) = UnifiedResult(
     uri = uri,
     title = name,
-    subtitle = listOfNotNull("Podcast", publisher).joinToString(" · "),
+    subtitle = listOfNotNull(ctx.getString(R.string.search_subtitle_podcast), publisher).joinToString(" · "),
     imageUrl = coverArtUrl,
     circular = false,
     onClick = { /* podcast detail not implemented yet */ }
 )
 
-private fun SearchUser.toUnified() = UnifiedResult(
+private fun SearchUser.toUnified(ctx: Context) = UnifiedResult(
     uri = uri,
     title = displayName,
-    subtitle = "Profile",
+    subtitle = ctx.getString(R.string.search_subtitle_profile),
     imageUrl = avatarUrl,
     circular = true,
     onClick = { /* user profile not implemented yet */ }
@@ -339,6 +343,7 @@ private fun CategorizedResults(
     onFilterChange: (SearchViewModel.SearchFilter) -> Unit
 ) {
     if (results == null) return
+    val ctx = LocalContext.current
 
     Column(Modifier.fillMaxSize()) {
         FilterChipRow(
@@ -353,19 +358,19 @@ private fun CategorizedResults(
                 // Top result is the first artist (Spotify usually features an
                 // artist as the top result for entity queries). Falls back to
                 // the first available item if there's no artist.
-                results.artists.items.forEach { add(it.toUnified(vm)) }
-                results.tracks.items.forEach { add(it.toUnified(vm)) }
+                results.artists.items.forEach { add(it.toUnified(vm, ctx)) }
+                results.tracks.items.forEach { add(it.toUnified(vm, ctx)) }
                 results.albums.items.forEach { add(it.toUnified(vm)) }
-                results.playlists.items.forEach { add(it.toUnified(vm)) }
-                results.podcasts.items.forEach { add(it.toUnified()) }
-                results.users.items.forEach { add(it.toUnified()) }
+                results.playlists.items.forEach { add(it.toUnified(vm, ctx)) }
+                results.podcasts.items.forEach { add(it.toUnified(ctx)) }
+                results.users.items.forEach { add(it.toUnified(ctx)) }
             }
-            SearchViewModel.SearchFilter.ARTISTS -> results.artists.items.map { it.toUnified(vm) }
+            SearchViewModel.SearchFilter.ARTISTS -> results.artists.items.map { it.toUnified(vm, ctx) }
             SearchViewModel.SearchFilter.ALBUMS -> results.albums.items.map { it.toUnified(vm) }
-            SearchViewModel.SearchFilter.SONGS -> results.tracks.items.map { it.toUnified(vm) }
-            SearchViewModel.SearchFilter.PLAYLISTS -> results.playlists.items.map { it.toUnified(vm) }
-            SearchViewModel.SearchFilter.PODCASTS -> results.podcasts.items.map { it.toUnified() }
-            SearchViewModel.SearchFilter.PROFILES -> results.users.items.map { it.toUnified() }
+            SearchViewModel.SearchFilter.SONGS -> results.tracks.items.map { it.toUnified(vm, ctx) }
+            SearchViewModel.SearchFilter.PLAYLISTS -> results.playlists.items.map { it.toUnified(vm, ctx) }
+            SearchViewModel.SearchFilter.PODCASTS -> results.podcasts.items.map { it.toUnified(ctx) }
+            SearchViewModel.SearchFilter.PROFILES -> results.users.items.map { it.toUnified(ctx) }
         }
 
         LazyColumn(
@@ -399,7 +404,7 @@ private fun FilterChipRow(
     ) {
         SearchViewModel.SearchFilter.entries.forEach { f ->
             FilterChip(
-                label = labelFor(f),
+                label = stringResource(labelFor(f)),
                 isSelected = selected == f,
                 onClick = { onSelect(f) }
             )
@@ -422,14 +427,14 @@ private fun FilterChip(label: String, isSelected: Boolean, onClick: () -> Unit) 
     }
 }
 
-private fun labelFor(filter: SearchViewModel.SearchFilter): String = when (filter) {
-    SearchViewModel.SearchFilter.ALL -> "All"
-    SearchViewModel.SearchFilter.ARTISTS -> "Artists"
-    SearchViewModel.SearchFilter.ALBUMS -> "Albums"
-    SearchViewModel.SearchFilter.SONGS -> "Songs"
-    SearchViewModel.SearchFilter.PLAYLISTS -> "Playlists"
-    SearchViewModel.SearchFilter.PODCASTS -> "Podcasts"
-    SearchViewModel.SearchFilter.PROFILES -> "Profiles"
+private fun labelFor(filter: SearchViewModel.SearchFilter): Int = when (filter) {
+    SearchViewModel.SearchFilter.ALL -> R.string.search_filter_all
+    SearchViewModel.SearchFilter.ARTISTS -> R.string.search_filter_artists
+    SearchViewModel.SearchFilter.ALBUMS -> R.string.search_filter_albums
+    SearchViewModel.SearchFilter.SONGS -> R.string.search_filter_songs
+    SearchViewModel.SearchFilter.PLAYLISTS -> R.string.search_filter_playlists
+    SearchViewModel.SearchFilter.PODCASTS -> R.string.search_filter_podcasts
+    SearchViewModel.SearchFilter.PROFILES -> R.string.search_filter_profiles
 }
 
 @Composable

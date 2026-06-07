@@ -26,8 +26,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ch.snepilatch.app.R
 import ch.snepilatch.app.data.Screen
 import ch.snepilatch.app.ui.theme.SpotifyBlack
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
@@ -61,11 +63,12 @@ fun BottomNav(screen: Screen, vm: SpotifyViewModel, hazeState: HazeState) {
         ) {
             data class NavItem(val s: Screen, val icon: ImageVector, val label: String)
             val items = listOf(
-                NavItem(Screen.HOME, Icons.Default.Home, "Home"),
-                NavItem(Screen.SEARCH, Icons.Default.Search, "Search"),
-                NavItem(Screen.LIBRARY, Icons.AutoMirrored.Filled.QueueMusic, "Library"),
-                NavItem(Screen.ACCOUNT, Icons.Default.Person, "Account")
+                NavItem(Screen.HOME, Icons.Default.Home, stringResource(R.string.nav_home)),
+                NavItem(Screen.SEARCH, Icons.Default.Search, stringResource(R.string.nav_search)),
+                NavItem(Screen.LIBRARY, Icons.AutoMirrored.Filled.QueueMusic, stringResource(R.string.nav_library)),
+                NavItem(Screen.ACCOUNT, Icons.Default.Person, stringResource(R.string.nav_account))
             )
+            val accountDesc = stringResource(R.string.account_image)
             items.forEach { nav ->
                 val selected = screen == nav.s
                 NavigationBarItem(
@@ -85,7 +88,7 @@ fun BottomNav(screen: Screen, vm: SpotifyViewModel, hazeState: HazeState) {
                             ) {
                                 AsyncImage(
                                     model = account.profileImageUrl,
-                                    contentDescription = "Account",
+                                    contentDescription = accountDesc,
                                     modifier = Modifier.size(24.dp).clip(CircleShape),
                                     contentScale = ContentScale.Crop
                                 )

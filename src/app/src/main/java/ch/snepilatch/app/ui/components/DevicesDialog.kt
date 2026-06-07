@@ -38,9 +38,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.theme.SpotifyElevated
 import ch.snepilatch.app.ui.theme.SpotifyGray
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
@@ -82,7 +84,7 @@ fun DevicesDialog(vm: SpotifyViewModel) {
         ) {
             // Title
             Text(
-                "Connect",
+                stringResource(R.string.connect),
                 color = SpotifyWhite,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
@@ -97,7 +99,7 @@ fun DevicesDialog(vm: SpotifyViewModel) {
                 ) {
                     CircularProgressIndicator(color = SpotifyWhite, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                     Spacer(Modifier.width(12.dp))
-                    Text("Searching for devices...", color = SpotifyLightGray, fontSize = 14.sp)
+                    Text(stringResource(R.string.searching_devices), color = SpotifyLightGray, fontSize = 14.sp)
                 }
             }
 
@@ -127,7 +129,7 @@ fun DevicesDialog(vm: SpotifyViewModel) {
                     Column(Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                if (isOurDevice) "This Smartphone" else activeDevice.name,
+                                if (isOurDevice) stringResource(R.string.this_smartphone) else activeDevice.name,
                                 color = accentColor,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold
@@ -188,7 +190,7 @@ fun DevicesDialog(vm: SpotifyViewModel) {
                     )
                     Spacer(Modifier.width(16.dp))
                     Text(
-                        if (isOurDevice) "This Smartphone" else device.name,
+                        if (isOurDevice) stringResource(R.string.this_smartphone) else device.name,
                         color = SpotifyWhite,
                         fontSize = 16.sp,
                         modifier = Modifier.weight(1f)

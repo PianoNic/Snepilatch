@@ -1,5 +1,6 @@
 package ch.snepilatch.app.ui.screens
 
+import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.theme.SpotifyWhite
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -37,6 +38,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -71,7 +73,7 @@ fun HomeScreen(vm: SpotifyViewModel) {
     ) {
         item {
             Text(
-                homeData?.greeting ?: "Good evening",
+                homeData?.greeting ?: stringResource(R.string.greeting_fallback),
                 color = SpotifyWhite,
                 fontSize = 26.sp,
                 fontWeight = FontWeight.Bold,

@@ -29,12 +29,14 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.components.SpotifyImage
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
@@ -157,7 +159,7 @@ fun LyricsScreen(vm: SpotifyViewModel) {
                             ) {
                                 Icon(
                                     when (playback.repeatMode) { "track" -> Icons.Default.RepeatOne; else -> Icons.Default.Repeat },
-                                    "Repeat",
+                                    stringResource(R.string.repeat),
                                     tint = if (playback.repeatMode != "off") animatedPrimary else SpotifyWhite.copy(alpha = 0.7f),
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -166,7 +168,7 @@ fun LyricsScreen(vm: SpotifyViewModel) {
                                 Modifier.size(36.dp).background(buttonBg, CircleShape).clip(CircleShape).clickable { vm.skipPrevious() },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.SkipPrevious, "Previous", tint = SpotifyWhite, modifier = Modifier.size(20.dp))
+                                Icon(Icons.Default.SkipPrevious, stringResource(R.string.previous), tint = SpotifyWhite, modifier = Modifier.size(20.dp))
                             }
                             Box(
                                 Modifier
@@ -181,7 +183,7 @@ fun LyricsScreen(vm: SpotifyViewModel) {
                                 } else {
                                     Icon(
                                         if (playback.isPaused || !playback.isPlaying) Icons.Default.PlayArrow else Icons.Default.Pause,
-                                        "Play/Pause", tint = SpotifyWhite, modifier = Modifier.size(26.dp)
+                                        stringResource(R.string.play_pause), tint = SpotifyWhite, modifier = Modifier.size(26.dp)
                                     )
                                 }
                             }
@@ -189,7 +191,7 @@ fun LyricsScreen(vm: SpotifyViewModel) {
                                 Modifier.size(36.dp).background(buttonBg, CircleShape).clip(CircleShape).clickable { vm.skipNext() },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.SkipNext, "Next", tint = SpotifyWhite, modifier = Modifier.size(20.dp))
+                                Icon(Icons.Default.SkipNext, stringResource(R.string.next), tint = SpotifyWhite, modifier = Modifier.size(20.dp))
                             }
                             Box(
                                 Modifier.size(36.dp).background(buttonBg, CircleShape).clip(CircleShape).clickable {
@@ -200,7 +202,7 @@ fun LyricsScreen(vm: SpotifyViewModel) {
                             ) {
                                 Icon(
                                     if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                    "Like",
+                                    stringResource(R.string.like),
                                     tint = if (isLiked) animatedPrimary else SpotifyWhite.copy(alpha = 0.7f),
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -227,7 +229,7 @@ fun LyricsScreen(vm: SpotifyViewModel) {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                         Icon(Icons.Default.MusicNote, null, tint = SpotifyLightGray.copy(alpha = 0.5f), modifier = Modifier.size(48.dp))
                                         Spacer(Modifier.height(12.dp))
-                                        Text("No lyrics available", color = SpotifyLightGray, fontSize = 16.sp)
+                                        Text(stringResource(R.string.lyrics_not_available), color = SpotifyLightGray, fontSize = 16.sp)
                                     }
                                 }
                             }
@@ -268,7 +270,7 @@ fun LyricsScreen(vm: SpotifyViewModel) {
                                 .clickable { vm.goBack() },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.KeyboardArrowDown, "Close", tint = SpotifyWhite, modifier = Modifier.size(24.dp))
+                            Icon(Icons.Default.KeyboardArrowDown, stringResource(R.string.close), tint = SpotifyWhite, modifier = Modifier.size(24.dp))
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(track?.name ?: "", color = SpotifyWhite, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
@@ -288,7 +290,7 @@ fun LyricsScreen(vm: SpotifyViewModel) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Icon(Icons.Default.MusicNote, null, tint = SpotifyLightGray.copy(alpha = 0.5f), modifier = Modifier.size(48.dp))
                                     Spacer(Modifier.height(12.dp))
-                                    Text("No lyrics available", color = SpotifyLightGray, fontSize = 16.sp)
+                                    Text(stringResource(R.string.lyrics_not_available), color = SpotifyLightGray, fontSize = 16.sp)
                                 }
                             }
                         }

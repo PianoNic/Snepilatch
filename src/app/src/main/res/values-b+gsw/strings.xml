@@ -99,4 +99,146 @@
     <!-- Notification -->
     <string name="added_to_liked">Zu de Lieblingssongs dezue</string>
     <string name="removed_from_liked">Vo de Lieblingssongs weg</string>
+
+    <!-- Playback -->
+    <string name="playback_ended">Wiedergab fertig</string>
+
+    <!-- Backfill -->
+    <string name="tidal_desc">Tidal — FLAC bis 1411 kbps</string>
+    <string name="qobuz_desc">Qobuz — FLAC bis 9216 kbps</string>
+
+    <!-- Common (added) -->
+    <string name="close">Zuetue</string>
+    <string name="retry">Nomal probiere</string>
+    <string name="placeholder_dots">…</string>
+    <string name="loading_dots">Am Lade…</string>
+
+    <!-- Account (added) -->
+    <string name="profile_image">Profil</string>
+    <string name="account_image">Konto</string>
+
+    <!-- Language -->
+    <string name="language">Sproch</string>
+    <string name="language_system_default">Systemstandard</string>
+
+    <!-- Settings (added) -->
+    <string name="lossless_off_spotify">Standardqualität (Spotify)</string>
+    <string name="tidal">Tidal</string>
+    <string name="qobuz">Qobuz</string>
+    <string name="tidal_short_desc">FLAC bis 1411 kbps</string>
+    <string name="qobuz_short_desc">FLAC bis 9216 kbps</string>
+    <string name="notification_button_left">Linki Taste</string>
+    <string name="notification_button_right">Rächti Taste</string>
+    <string name="notif_like_short_desc">Gfallt-mer umschalte</string>
+
+    <!-- Regions -->
+    <string name="region_us">Vereinigti Staate</string>
+    <string name="region_gb">Vereinigts Königriich</string>
+    <string name="region_de">Dütschland</string>
+    <string name="region_ch">Schwiiz</string>
+    <string name="region_fr">Frankriich</string>
+    <string name="region_jp">Japan</string>
+    <string name="region_kr">Südkorea</string>
+    <string name="region_au">Auschtralie</string>
+    <string name="region_br">Brasilie</string>
+    <string name="region_ca">Kanada</string>
+    <string name="region_se">Schwede</string>
+
+    <!-- Release Notes (added) -->
+    <string name="release_load_failed">Versionshinwiis chönd nöd glade werde</string>
+    <string name="release_load_failed_short">Lade gschiitered: %s</string>
+    <string name="release_load_generic_error">Lade gschiitered</string>
+    <string name="release_latest_badge">NÖISCHT</string>
+    <string name="release_fallback_title">Version %s</string>
+
+    <!-- Loading / Connection -->
+    <string name="rate_limited">Z viel Aafrage</string>
+    <string name="retrying_in">Nomal i %ds</string>
+    <string name="login_different_account">Mit anderem Konto aamälde</string>
+    <string name="connection_failed">Verbindig gschiitered</string>
+    <string name="connecting_to_spotify">Am Spotify verbinde…</string>
+
+    <!-- Update Dialog (added) -->
+    <string name="update_download_failed">Download gschiitered. Probier nomal.</string>
+
+    <!-- Devices (added) -->
+    <string name="connect">Verbinde</string>
+    <string name="this_smartphone">Das Händy</string>
+
+    <!-- Common Actions -->
+    <string name="search">Sueche</string>
+    <string name="back">Zrugg</string>
+    <string name="clear">Lösche</string>
+    <string name="more">Meh</string>
+    <string name="play">Abspiele</string>
+    <string name="play_pause">Abspiele/Pause</string>
+    <string name="previous">Vorhärige</string>
+    <string name="next">Nächschti</string>
+    <string name="save">Spichere</string>
+    <string name="shuffle">Zuefallswiedergab</string>
+    <string name="repeat">Wiederhole</string>
+    <string name="queue">Wartelischte</string>
+    <string name="audio_output">Audio-Uusgab</string>
+    <string name="equalizer">Equalizer</string>
+    <string name="lyrics">Lyrics</string>
+    <string name="view_queue">Wartelischte aaluege</string>
+    <string name="visit_artist">Künstler aaluege</string>
+    <string name="devices">Gräti</string>
+    <string name="share_track_chooser">Song teile</string>
+
+    <!-- Library Screen -->
+    <string name="library_title">Dini Bibliothek</string>
+    <string name="library_create">Mache</string>
+    <string name="library_toggle_view">Asicht wächsle</string>
+    <string name="library_filter_playlists">Playlists</string>
+    <string name="library_filter_artists">Künstler</string>
+    <string name="library_filter_albums">Albä</string>
+    <string name="library_sort">Sortiere</string>
+    <string name="library_sort_recent">Nöischti</string>
+    <string name="library_sort_alpha">Alphabetisch</string>
+    <string name="library_sort_by_type">Nach Typ</string>
+    <string name="library_create_playlist">Playlist mache</string>
+    <string name="library_playlist_name_hint">Playlist-Name</string>
+    <string name="library_create_button">Mache</string>
+    <string name="library_remove_title">Us Bibliothek näh</string>
+    <string name="library_remove_message">\"%s\" us dinere Bibliothek näh?</string>
+    <string name="library_remove_button">Näh</string>
+
+    <!-- Detail Screen extras -->
+    <string name="detail_likes">%s Likes</string>
+    <string name="detail_songs">%d Songs</string>
+    <string name="detail_minutes">%d Min</string>
+    <string name="detail_monthly_listeners">%s monatlichi Lostere</string>
+
+    <!-- Queue Screen -->
+    <string name="queue_next_up">Als Nächschts</string>
+    <string name="queue_empty">Wartelischte isch leer</string>
+
+    <!-- Lyrics Screen -->
+    <string name="lyrics_not_available">Kei Lyrics verfüegbar</string>
+
+    <!-- Now Playing -->
+    <string name="now_playing_playing_from">Lauft vo %s</string>
+    <string name="now_playing_not_playing">Nüt lauft</string>
+
+    <!-- Search (added) -->
+    <string name="search_title">Suechi</string>
+    <string name="search_field_placeholder">Sueche</string>
+    <string name="search_clear">Lösche</string>
+    <string name="search_browse_all">Alles aaluege</string>
+    <string name="search_subtitle_song">Song · %s</string>
+    <string name="search_subtitle_artist">Künstler</string>
+    <string name="search_subtitle_playlist">Playlist</string>
+    <string name="search_subtitle_podcast">Podcast</string>
+    <string name="search_subtitle_profile">Profil</string>
+    <string name="search_filter_all">Alli</string>
+    <string name="search_filter_artists">Künstler</string>
+    <string name="search_filter_albums">Albä</string>
+    <string name="search_filter_songs">Songs</string>
+    <string name="search_filter_playlists">Playlists</string>
+    <string name="search_filter_podcasts">Podcasts</string>
+    <string name="search_filter_profiles">Profil</string>
+
+    <!-- Login -->
+    <string name="login_title">Bi Spotify aamelde</string>
 </resources>

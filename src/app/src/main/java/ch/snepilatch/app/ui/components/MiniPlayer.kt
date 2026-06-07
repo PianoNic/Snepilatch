@@ -33,10 +33,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ch.snepilatch.app.R
 import ch.snepilatch.app.data.Screen
 import ch.snepilatch.app.ui.theme.SpotifyElevated
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
@@ -101,12 +103,12 @@ fun MiniPlayer(vm: SpotifyViewModel) {
                 } else {
                     Icon(
                         if (playback.isPaused || !playback.isPlaying) Icons.Default.PlayArrow else Icons.Default.Pause,
-                        "Play/Pause", tint = SpotifyWhite, modifier = Modifier.size(28.dp)
+                        stringResource(R.string.play_pause), tint = SpotifyWhite, modifier = Modifier.size(28.dp)
                     )
                 }
             }
             IconButton(onClick = { vm.skipNext() }, modifier = Modifier.size(40.dp)) {
-                Icon(Icons.Default.SkipNext, "Next", tint = SpotifyWhite, modifier = Modifier.size(24.dp))
+                Icon(Icons.Default.SkipNext, stringResource(R.string.next), tint = SpotifyWhite, modifier = Modifier.size(24.dp))
             }
         }
         if (playback.durationMs > 0) {

@@ -30,10 +30,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.components.SpotifyImage
 import ch.snepilatch.app.ui.components.TrackRow
 import ch.snepilatch.app.ui.theme.*
@@ -86,7 +88,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
                         .clickable { vm.goBack() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = SpotifyWhite, modifier = Modifier.size(20.dp))
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back), tint = SpotifyWhite, modifier = Modifier.size(20.dp))
                 }
                 Column(Modifier.align(Alignment.BottomStart).padding(16.dp)) {
                     Text(
@@ -114,12 +116,12 @@ fun DetailScreen(vm: SpotifyViewModel) {
                         val f = if (detail.followers!! >= 1_000_000) String.format("%.1fM", detail.followers!! / 1_000_000.0)
                             else if (detail.followers!! >= 1_000) String.format("%,d", detail.followers)
                             else detail.followers.toString()
-                        meta.add("$f likes")
+                        meta.add(stringResource(R.string.detail_likes, f))
                     }
                     if (detail.tracks.isNotEmpty()) {
                         val totalMin = detail.tracks.sumOf { it.durationMs } / 60000
-                        meta.add("${detail.totalCount.takeIf { it > 0 } ?: detail.tracks.size} songs")
-                        meta.add("${totalMin} min")
+                        meta.add(stringResource(R.string.detail_songs, detail.totalCount.takeIf { it > 0 } ?: detail.tracks.size))
+                        meta.add(stringResource(R.string.detail_minutes, totalMin.toInt()))
                     }
                     if (meta.isNotEmpty()) {
                         Text(meta.joinToString(" · "), color = SpotifyLightGray, fontSize = 13.sp)
@@ -162,7 +164,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
                     else -> detail.monthlyListeners.toString()
                 }
                 Text(
-                    "$formatted monthly listeners",
+                    stringResource(R.string.detail_monthly_listeners, formatted),
                     color = SpotifyLightGray,
                     fontSize = 13.sp,
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 0.dp)
@@ -201,7 +203,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
                             modifier = Modifier.height(32.dp)
                         ) {
                             Text(
-                                if (saved) "Following" else "Follow",
+                                if (saved) stringResource(R.string.following) else stringResource(R.string.follow),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -210,7 +212,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
                         IconButton(onClick = { vm.toggleDetailSaved(detail.type, detailId) }) {
                             Icon(
                                 if (saved) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                "Save",
+                                stringResource(R.string.save),
                                 tint = if (saved) accentColor else SpotifyWhite,
                                 modifier = Modifier.size(28.dp)
                             )
@@ -222,7 +224,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
                 // KotifyClient supports for the current detail type.
                 var showHeaderMenu by remember { mutableStateOf(false) }
                 IconButton(onClick = { showHeaderMenu = true }) {
-                    Icon(Icons.Default.MoreVert, "More", tint = SpotifyLightGray, modifier = Modifier.size(24.dp))
+                    Icon(Icons.Default.MoreVert, stringResource(R.string.more), tint = SpotifyLightGray, modifier = Modifier.size(24.dp))
                 }
                 if (showHeaderMenu) {
                     DetailHeaderMenu(
@@ -238,7 +240,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
                 // Shuffle
                 IconButton(onClick = { vm.toggleShuffle() }) {
                     Icon(
-                        Icons.Default.Shuffle, "Shuffle",
+                        Icons.Default.Shuffle, stringResource(R.string.shuffle),
                         tint = if (shuffling) accentColor else SpotifyWhite,
                         modifier = Modifier.size(24.dp)
                     )
@@ -264,7 +266,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
                 ) {
                     Icon(
                         if (isPlayingThis) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        "Play",
+                        stringResource(R.string.play),
                         tint = Color.Black,
                         modifier = Modifier.size(28.dp)
                     )
@@ -276,7 +278,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
         if (isArtist) {
             item {
                 Text(
-                    "Popular",
+                    stringResource(R.string.popular),
                     color = SpotifyWhite,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
@@ -310,7 +312,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
             item {
                 Spacer(Modifier.height(16.dp))
                 Text(
-                    "Popular Releases",
+                    stringResource(R.string.popular_releases),
                     color = SpotifyWhite,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
@@ -355,7 +357,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
             item {
                 Spacer(Modifier.height(16.dp))
                 Text(
-                    "Fans also like",
+                    stringResource(R.string.fans_also_like),
                     color = SpotifyWhite,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
@@ -399,7 +401,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
             item {
                 Spacer(Modifier.height(16.dp))
                 Text(
-                    "About",
+                    stringResource(R.string.about),
                     color = SpotifyWhite,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
@@ -421,7 +423,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
             item {
                 Spacer(Modifier.height(16.dp))
                 Text(
-                    "More by ${detail.artistName ?: "Artist"}",
+                    stringResource(R.string.more_by, detail.artistName ?: stringResource(R.string.unknown)),
                     color = SpotifyWhite,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
@@ -532,7 +534,7 @@ private fun ArtistTrackRow(
         // 3-dot menu
         var showMenu by remember { mutableStateOf(false) }
         IconButton(onClick = { showMenu = true }, modifier = Modifier.size(36.dp)) {
-            Icon(Icons.Default.MoreVert, "More", tint = SpotifyLightGray, modifier = Modifier.size(20.dp))
+            Icon(Icons.Default.MoreVert, stringResource(R.string.more), tint = SpotifyLightGray, modifier = Modifier.size(20.dp))
         }
         if (showMenu) {
             val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -566,19 +568,32 @@ private fun ArtistTrackRow(
                 HorizontalDivider(color = SpotifyLightGray.copy(alpha = 0.15f))
 
                 val menuContext = androidx.compose.ui.platform.LocalContext.current
+                val shareLabel = stringResource(R.string.share)
+                val addQueueLabel = stringResource(R.string.add_to_queue)
+                val addPlaylistLabel = stringResource(R.string.add_to_playlist)
+                val likeLabel = stringResource(R.string.like)
+                val visitAlbumLabel = stringResource(R.string.visit_album)
                 val items = listOf(
-                    Triple(Icons.AutoMirrored.Filled.QueueMusic, "Add to Queue") { vm.addToQueue(track.uri); showMenu = false },
-                    Triple(Icons.AutoMirrored.Filled.PlaylistAdd, "Add to Playlist") { showMenu = false; vm.showPlaylistPickerForTrack(track.uri) },
-                    Triple(Icons.Default.Favorite, "Like") { vm.likeSong(track.uri.removePrefix("spotify:track:")); showMenu = false },
-                    Triple(Icons.Default.Album, "Visit Album") { showMenu = false; vm.openAlbumForTrack(track.uri) },
-                    Triple(Icons.Default.Share, "Share") {
+                    Triple(Icons.AutoMirrored.Filled.QueueMusic, addQueueLabel) {
+                        vm.addToQueue(track.uri); showMenu = false
+                    },
+                    Triple(Icons.AutoMirrored.Filled.PlaylistAdd, addPlaylistLabel) {
+                        showMenu = false; vm.showPlaylistPickerForTrack(track.uri)
+                    },
+                    Triple(Icons.Default.Favorite, likeLabel) {
+                        vm.likeSong(track.uri.removePrefix("spotify:track:")); showMenu = false
+                    },
+                    Triple(Icons.Default.Album, visitAlbumLabel) {
+                        showMenu = false; vm.openAlbumForTrack(track.uri)
+                    },
+                    Triple(Icons.Default.Share, shareLabel) {
                         showMenu = false
                         val id = track.uri.removePrefix("spotify:track:")
                         val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                             type = "text/plain"
                             putExtra(android.content.Intent.EXTRA_TEXT, "https://open.spotify.com/track/$id")
                         }
-                        menuContext.startActivity(android.content.Intent.createChooser(intent, "Share"))
+                        menuContext.startActivity(android.content.Intent.createChooser(intent, shareLabel))
                     }
                 )
 
@@ -641,7 +656,7 @@ private fun AlbumTrackRow(
         }
         var showMenu by remember { mutableStateOf(false) }
         IconButton(onClick = { showMenu = true }, modifier = Modifier.size(36.dp)) {
-            Icon(Icons.Default.MoreVert, "More", tint = SpotifyLightGray, modifier = Modifier.size(20.dp))
+            Icon(Icons.Default.MoreVert, stringResource(R.string.more), tint = SpotifyLightGray, modifier = Modifier.size(20.dp))
         }
         if (showMenu) {
             val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -673,19 +688,32 @@ private fun AlbumTrackRow(
                 Spacer(Modifier.height(8.dp))
                 HorizontalDivider(color = SpotifyLightGray.copy(alpha = 0.15f))
                 val menuContext = androidx.compose.ui.platform.LocalContext.current
+                val shareLabel = stringResource(R.string.share)
+                val addQueueLabel = stringResource(R.string.add_to_queue)
+                val addPlaylistLabel = stringResource(R.string.add_to_playlist)
+                val likeLabel = stringResource(R.string.like)
+                val visitArtistLabel = stringResource(R.string.visit_artist)
                 val items = listOf(
-                    Triple(Icons.AutoMirrored.Filled.QueueMusic, "Add to Queue") { vm.addToQueue(track.uri); showMenu = false },
-                    Triple(Icons.AutoMirrored.Filled.PlaylistAdd, "Add to Playlist") { showMenu = false; vm.showPlaylistPickerForTrack(track.uri) },
-                    Triple(Icons.Default.Favorite, "Like") { vm.likeSong(track.uri.removePrefix("spotify:track:")); showMenu = false },
-                    Triple(Icons.Default.Person, "Visit Artist") { showMenu = false; vm.openArtistForTrack(track.uri) },
-                    Triple(Icons.Default.Share, "Share") {
+                    Triple(Icons.AutoMirrored.Filled.QueueMusic, addQueueLabel) {
+                        vm.addToQueue(track.uri); showMenu = false
+                    },
+                    Triple(Icons.AutoMirrored.Filled.PlaylistAdd, addPlaylistLabel) {
+                        showMenu = false; vm.showPlaylistPickerForTrack(track.uri)
+                    },
+                    Triple(Icons.Default.Favorite, likeLabel) {
+                        vm.likeSong(track.uri.removePrefix("spotify:track:")); showMenu = false
+                    },
+                    Triple(Icons.Default.Person, visitArtistLabel) {
+                        showMenu = false; vm.openArtistForTrack(track.uri)
+                    },
+                    Triple(Icons.Default.Share, shareLabel) {
                         showMenu = false
                         val id = track.uri.removePrefix("spotify:track:")
                         val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                             type = "text/plain"
                             putExtra(android.content.Intent.EXTRA_TEXT, "https://open.spotify.com/track/$id")
                         }
-                        menuContext.startActivity(android.content.Intent.createChooser(intent, "Share"))
+                        menuContext.startActivity(android.content.Intent.createChooser(intent, shareLabel))
                     }
                 )
                 items.forEach { (icon, label, onClick) ->
@@ -727,11 +755,12 @@ private fun DetailHeaderMenu(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val trackUris = detail.tracks.map { it.uri }
     val type = detail.type
-    val isAlbum = type == "album"
-    val isCollection = type == "collection"
-    val isArtist = type == "artist"
+    val isAlbum = type == "album"; val isCollection = type == "collection"; val isArtist = type == "artist"
     val hasTracks = trackUris.isNotEmpty()
-
+    val shareLabel = stringResource(R.string.share)
+    val addToQueueLabel = stringResource(R.string.add_to_queue)
+    val addToPlaylistLabel = stringResource(R.string.add_to_playlist)
+    val visitArtistLabel = stringResource(R.string.visit_artist)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -755,38 +784,36 @@ private fun DetailHeaderMenu(
         }
         Spacer(Modifier.height(8.dp))
         HorizontalDivider(color = SpotifyLightGray.copy(alpha = 0.15f))
-
         val items = buildList<Triple<androidx.compose.ui.graphics.vector.ImageVector, String, () -> Unit>> {
             if (!isCollection) {
                 val id = detail.uri.substringAfterLast(":")
-                add(Triple(Icons.Default.Share, "Share") {
+                add(Triple(Icons.Default.Share, shareLabel) {
                     onDismiss()
                     val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                         this.type = "text/plain"
                         putExtra(android.content.Intent.EXTRA_TEXT, "https://open.spotify.com/$type/$id")
                     }
-                    context.startActivity(android.content.Intent.createChooser(intent, "Share"))
+                    context.startActivity(android.content.Intent.createChooser(intent, shareLabel))
                 })
             }
             if (hasTracks && !isArtist) {
-                add(Triple(Icons.AutoMirrored.Filled.QueueMusic, "Add to Queue") {
+                add(Triple(Icons.AutoMirrored.Filled.QueueMusic, addToQueueLabel) {
                     onDismiss()
                     vm.addAllToQueue(trackUris)
                 })
-                add(Triple(Icons.AutoMirrored.Filled.PlaylistAdd, "Add to Playlist") {
+                add(Triple(Icons.AutoMirrored.Filled.PlaylistAdd, addToPlaylistLabel) {
                     onDismiss()
                     vm.showPlaylistPickerForTracks(trackUris)
                 })
             }
             if (isAlbum && detail.artistUri != null) {
-                add(Triple(Icons.Default.Person, "Visit Artist") {
+                add(Triple(Icons.Default.Person, visitArtistLabel) {
                     onDismiss()
                     val artistId = detail.artistUri.substringAfterLast(":")
                     vm.openArtist(artistId)
                 })
             }
         }
-
         items.forEach { (icon, label, onClick) ->
             Row(
                 Modifier

@@ -38,9 +38,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ch.snepilatch.app.R
 import ch.snepilatch.app.data.Screen
 import ch.snepilatch.app.ui.components.BottomNav
 import ch.snepilatch.app.ui.components.DevicesDialog
@@ -176,7 +178,7 @@ fun SpotifyApp(vm: SpotifyViewModel) {
             val playlists = library.filter { it.type == "playlist" }
             AlertDialog(
                 onDismissRequest = { vm.showPlaylistPicker.value = false },
-                title = { Text("Add to Playlist", color = SpotifyWhite) },
+                title = { Text(stringResource(R.string.add_to_playlist), color = SpotifyWhite) },
                 text = {
                     LazyColumn {
                         items(playlists.size) { i ->
@@ -211,7 +213,7 @@ fun SpotifyApp(vm: SpotifyViewModel) {
                 confirmButton = {},
                 dismissButton = {
                     TextButton(onClick = { vm.showPlaylistPicker.value = false }) {
-                        Text("Cancel", color = SpotifyLightGray)
+                        Text(stringResource(R.string.cancel), color = SpotifyLightGray)
                     }
                 }
             )
@@ -246,9 +248,9 @@ fun LoadingScreen(
 
                     Icon(Icons.Default.CloudOff, null, tint = SpotifyLightGray, modifier = Modifier.size(48.dp))
                     Spacer(Modifier.height(16.dp))
-                    Text("Rate limited", color = SpotifyWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.rate_limited), color = SpotifyWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(8.dp))
-                    Text("Retrying in ${cooldownSecondsRemaining}s", color = SpotifyLightGray, fontSize = 14.sp)
+                    Text(stringResource(R.string.retrying_in, cooldownSecondsRemaining), color = SpotifyLightGray, fontSize = 14.sp)
                     Spacer(Modifier.height(24.dp))
                     LinearProgressIndicator(
                         progress = { progress },
@@ -261,13 +263,13 @@ fun LoadingScreen(
                     )
                     Spacer(Modifier.height(24.dp))
                     TextButton(onClick = onLogin) {
-                        Text("Login with different account", color = SpotifyLightGray, fontSize = 13.sp)
+                        Text(stringResource(R.string.login_different_account), color = SpotifyLightGray, fontSize = 13.sp)
                     }
                 }
                 error != null -> {
                     Icon(Icons.Default.CloudOff, null, tint = SpotifyLightGray, modifier = Modifier.size(48.dp))
                     Spacer(Modifier.height(16.dp))
-                    Text("Connection failed", color = SpotifyWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.connection_failed), color = SpotifyWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(8.dp))
                     Text(error, color = SpotifyLightGray, fontSize = 13.sp)
                     Spacer(Modifier.height(24.dp))
@@ -276,17 +278,17 @@ fun LoadingScreen(
                         colors = ButtonDefaults.buttonColors(containerColor = SpotifyWhite),
                         shape = RoundedCornerShape(24.dp)
                     ) {
-                        Text("Retry", fontWeight = FontWeight.Bold, color = Color.Black)
+                        Text(stringResource(R.string.retry), fontWeight = FontWeight.Bold, color = Color.Black)
                     }
                     Spacer(Modifier.height(8.dp))
                     TextButton(onClick = onLogin) {
-                        Text("Login with different account", color = SpotifyLightGray, fontSize = 13.sp)
+                        Text(stringResource(R.string.login_different_account), color = SpotifyLightGray, fontSize = 13.sp)
                     }
                 }
                 else -> {
                     CircularProgressIndicator(color = SpotifyWhite, strokeWidth = 3.dp)
                     Spacer(Modifier.height(20.dp))
-                    Text("Connecting to Spotify...", color = SpotifyLightGray, fontSize = 15.sp)
+                    Text(stringResource(R.string.connecting_to_spotify), color = SpotifyLightGray, fontSize = 15.sp)
                 }
             }
         }

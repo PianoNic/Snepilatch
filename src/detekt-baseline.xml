@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <SmellBaseline>
-  <ManuallySuppressedIssues></ManuallySuppressedIssues>
+  <ManuallySuppressedIssues/>
   <CurrentIssues>
     <ID>AnnotationOnSeparateLine:MediaButtonReceiver.kt$MediaButtonReceiver$@Suppress("DEPRECATION") intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT)</ID>
     <ID>BlockCommentInitialStarAlignment:Theme.kt$/* Other default colors to override background = Color(0xFFFFFBFE), surface = Color(0xFFFFFBFE), onPrimary = Color.White, onSecondary = Color.White, onTertiary = Color.White, onBackground = Color(0xFF1C1B1F), onSurface = Color(0xFF1C1B1F), */</ID>
@@ -63,10 +63,8 @@
     <ID>MaximumLineLength:NowPlayingScreen.kt$ </ID>
     <ID>MaximumLineLength:QueueScreen.kt$ </ID>
     <ID>MaximumLineLength:SpotifyViewModel.kt$SpotifyViewModel$ </ID>
-    <ID>MultiLineIfElse:AccountScreen.kt$"FLAC via ${if (audioSource == "tidal") "Tidal" else "Qobuz"}"</ID>
-    <ID>MultiLineIfElse:AccountScreen.kt$"Qobuz — FLAC up to 9216kbps"</ID>
-    <ID>MultiLineIfElse:AccountScreen.kt$"Standard quality (Spotify)"</ID>
-    <ID>MultiLineIfElse:AccountScreen.kt$"Tidal — FLAC up to 1411kbps"</ID>
+    <ID>MultiLineIfElse:AccountScreen.kt$stringResource(R.string.qobuz_desc)</ID>
+    <ID>MultiLineIfElse:AccountScreen.kt$stringResource(R.string.tidal_desc)</ID>
     <ID>MultiLineIfElse:BottomNav.kt$Modifier</ID>
     <ID>MultiLineIfElse:BottomNav.kt$Modifier.border(2.dp, SpotifyWhite, CircleShape)</ID>
     <ID>MultiLineIfElse:DetailScreen.kt$String.format("%,d", detail.followers)</ID>
@@ -97,6 +95,7 @@
     <ID>NoMultipleSpaces:MusicPlaybackService.kt$MusicPlaybackService$ </ID>
     <ID>NoMultipleSpaces:ReleaseNotesScreen.kt$ </ID>
     <ID>NoMultipleSpaces:SpotifyViewModel.kt$SpotifyViewModel$ </ID>
+    <ID>PropertyWrapping:AccountScreen.kt$val losslessOnText = stringResource(R.string.lossless_on, if (audioSource == "tidal") tidalLabel else qobuzLabel)</ID>
     <ID>SpacingAroundKeyword:SpotifyViewModel.kt$SpotifyViewModel$catch</ID>
     <ID>SpacingAroundKeyword:SpotifyViewModel.kt$SpotifyViewModel$finally</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:SessionHolder.kt$SessionHolder$@Volatile var cdnResolver: SpotifyCdnResolver? = null</ID>
@@ -112,7 +111,6 @@
     <ID>SpacingBetweenDeclarationsWithComments:SpotifyViewModel.kt$SpotifyViewModel$// Notification button preferences: "like", "shuffle", "repeat"</ID>
     <ID>StringTemplate:DetailScreen.kt$${totalMin}</ID>
     <ID>ThrowsCount:SpotifyViewModel.kt$SpotifyViewModel$fun togglePlayPause()</ID>
-    <ID>ThrowsCount:SpotifyViewModel.kt$SpotifyViewModel$private fun wireTransportCallbacks(svc: MusicPlaybackService)</ID>
     <ID>TooGenericExceptionThrown:ReleaseNotesScreen.kt$throw Exception("HTTP ${response.code}")</ID>
     <ID>UseCheckOrError:SpotifyCdnResolver.kt$SpotifyCdnResolver$throw IllegalStateException("No CDN mirrors for fileId=$fileId")</ID>
     <ID>UseCheckOrError:SpotifyViewModel.kt$SpotifyViewModel$throw IllegalStateException("CdnResolver not initialized")</ID>
@@ -121,10 +119,17 @@
     <ID>VariableNaming:SpotifyViewModel.kt$SpotifyViewModel$private val TAG = "SpotifyVM"</ID>
     <ID>Wrapping:AccountScreen.kt$(</ID>
     <ID>Wrapping:AccountScreen.kt$;</ID>
-    <ID>Wrapping:AccountScreen.kt$Text( if (audioSource == "tidal") "Tidal — FLAC up to 1411kbps" else "Qobuz — FLAC up to 9216kbps", color = SpotifyLightGray )</ID>
-    <ID>Wrapping:AccountScreen.kt$Text( if (canvasOn) "Looping video behind album art" else "Off", color = SpotifyLightGray )</ID>
-    <ID>Wrapping:AccountScreen.kt$Text( if (isLossless) "FLAC via ${if (audioSource == "tidal") "Tidal" else "Qobuz"}" else "Standard quality (Spotify)", color = SpotifyLightGray )</ID>
-    <ID>Wrapping:AccountScreen.kt$Text( when { isChecking -&gt; "Checking..." upToDate -&gt; "You're on the latest version" else -&gt; "Tap to check for new versions" }, color = if (upToDate) animatedPrimary else SpotifyLightGray )</ID>
+    <ID>Wrapping:AccountScreen.kt$Text( if (audioSource == "tidal") stringResource(R.string.tidal_desc) else stringResource(R.string.qobuz_desc), color = SpotifyLightGray )</ID>
+    <ID>Wrapping:AccountScreen.kt$Text( if (canvasOn) stringResource(R.string.canvas_on) else stringResource(R.string.canvas_off), color = SpotifyLightGray )</ID>
+    <ID>Wrapping:AccountScreen.kt$Text( if (isLossless) losslessOnText else losslessOffText, color = SpotifyLightGray )</ID>
+    <ID>Wrapping:AccountScreen.kt$Text( when { isChecking -&gt; stringResource(R.string.checking) upToDate -&gt; stringResource(R.string.up_to_date) else -&gt; stringResource(R.string.tap_to_check) }, color = if (upToDate) animatedPrimary else SpotifyLightGray )</ID>
+    <ID>Wrapping:AccountScreen.kt$Text(stringResource(R.string.cancel), color = SpotifyLightGray)</ID>
+    <ID>Wrapping:AccountScreen.kt$TextButton(onClick = { showLanguagePicker = false }) { Text(stringResource(R.string.cancel), color = SpotifyLightGray) }</ID>
+    <ID>Wrapping:AccountScreen.kt$TextButton(onClick = { showLeftPicker = false }) { Text(stringResource(R.string.cancel), color = SpotifyLightGray) }</ID>
+    <ID>Wrapping:AccountScreen.kt$TextButton(onClick = { showRightPicker = false }) { Text(stringResource(R.string.cancel), color = SpotifyLightGray) }</ID>
+    <ID>Wrapping:AccountScreen.kt$showLanguagePicker = false</ID>
+    <ID>Wrapping:AccountScreen.kt$showLeftPicker = false</ID>
+    <ID>Wrapping:AccountScreen.kt$showRightPicker = false</ID>
     <ID>Wrapping:DetailScreen.kt$(</ID>
     <ID>Wrapping:DetailScreen.kt$;</ID>
     <ID>Wrapping:DetailScreen.kt$showMenu = false; vm.showPlaylistPickerForTrack(track.uri)</ID>

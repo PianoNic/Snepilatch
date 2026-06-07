@@ -225,7 +225,7 @@ fun SpotifyApp(vm: SpotifyViewModel) {
 @Composable
 fun LoadingScreen(
     error: String?,
-    isAuthBackoff: Boolean = false,
+    isRateLimited: Boolean = false,
     cooldownSecondsRemaining: Int = 0,
     onLogin: () -> Unit = {},
     onRetry: () -> Unit = {}
@@ -233,7 +233,7 @@ fun LoadingScreen(
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             when {
-                isAuthBackoff -> {
+                isRateLimited -> {
                     // The cooldown total can vary (20s on first retry, 40s on
                     // second, etc. — see SpotifyViewModel). Track the highest
                     // value we've seen so the progress bar fills correctly
@@ -246,7 +246,7 @@ fun LoadingScreen(
 
                     Icon(Icons.Default.CloudOff, null, tint = SpotifyLightGray, modifier = Modifier.size(48.dp))
                     Spacer(Modifier.height(16.dp))
-                    Text("Reconnecting to Spotify", color = SpotifyWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Rate limited", color = SpotifyWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(8.dp))
                     Text("Retrying in ${cooldownSecondsRemaining}s", color = SpotifyLightGray, fontSize = 14.sp)
                     Spacer(Modifier.height(24.dp))

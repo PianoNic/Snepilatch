@@ -589,10 +589,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             PendingIntent.FLAG_IMMUTABLE
         )
 
-        val playPauseIcon = if (isPlaying)
-            android.R.drawable.ic_media_pause
-        else
-            android.R.drawable.ic_media_play
+        val playPauseIcon = if (isPlaying) R.drawable.ic_pause_rounded else R.drawable.ic_play_arrow_rounded
 
         fun buttonIcon(type: String) = when (type) {
             "like" -> if (isLiked) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline
@@ -622,9 +619,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             .setOngoing(isPlaying)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .addAction(buttonIcon(notificationLeftButton), buttonLabel(notificationLeftButton), leftIntent)
-            .addAction(android.R.drawable.ic_media_previous, "Previous", prevIntent)
+            .addAction(R.drawable.ic_skip_previous_rounded, "Previous", prevIntent)
             .addAction(playPauseIcon, if (isPlaying) "Pause" else "Play", playPauseIntent)
-            .addAction(android.R.drawable.ic_media_next, "Next", nextIntent)
+            .addAction(R.drawable.ic_skip_next_rounded, "Next", nextIntent)
             .addAction(buttonIcon(notificationRightButton), buttonLabel(notificationRightButton), rightIntent)
             .setStyle(
                 androidx.media.app.NotificationCompat.MediaStyle()

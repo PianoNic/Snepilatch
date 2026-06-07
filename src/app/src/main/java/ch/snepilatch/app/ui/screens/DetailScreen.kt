@@ -211,11 +211,17 @@ fun DetailScreen(vm: SpotifyViewModel) {
                             )
                         }
                     } else {
-                        IconButton(onClick = { vm.toggleDetailSaved(detail.type, detailId) }) {
+                        IconToggleButton(
+                            checked = saved,
+                            onCheckedChange = { vm.toggleDetailSaved(detail.type, detailId) },
+                            colors = IconButtonDefaults.iconToggleButtonColors(
+                                contentColor = SpotifyWhite,
+                                checkedContentColor = accentColor,
+                            ),
+                        ) {
                             Icon(
                                 if (saved) Icons.Rounded.Favorite else Icons.Filled.FavoriteBorder,
                                 stringResource(R.string.save),
-                                tint = if (saved) accentColor else SpotifyWhite,
                                 modifier = Modifier.size(28.dp)
                             )
                         }

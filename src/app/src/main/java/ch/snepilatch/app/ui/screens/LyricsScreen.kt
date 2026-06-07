@@ -196,18 +196,24 @@ fun LyricsScreen(vm: SpotifyViewModel) {
                             ) {
                                 Icon(Icons.Rounded.SkipNext, stringResource(R.string.next), tint = SpotifyWhite, modifier = Modifier.size(20.dp))
                             }
-                            Box(
-                                Modifier.size(36.dp).background(buttonBg, CircleShape).clip(CircleShape).clickable {
-                                    val id = track?.uri?.removePrefix("spotify:track:") ?: return@clickable
+                            FilledIconToggleButton(
+                                checked = isLiked,
+                                onCheckedChange = { _ ->
+                                    val id = track?.uri?.removePrefix("spotify:track:") ?: return@FilledIconToggleButton
                                     if (isLiked) vm.unlikeSong(id) else vm.likeSong(id)
                                 },
-                                contentAlignment = Alignment.Center
+                                modifier = Modifier.size(36.dp),
+                                colors = IconButtonDefaults.filledIconToggleButtonColors(
+                                    containerColor = buttonBg,
+                                    contentColor = SpotifyWhite.copy(alpha = 0.7f),
+                                    checkedContainerColor = buttonBg,
+                                    checkedContentColor = animatedPrimary,
+                                ),
                             ) {
                                 Icon(
                                     if (isLiked) Icons.Rounded.Favorite else Icons.Filled.FavoriteBorder,
                                     stringResource(R.string.like),
-                                    tint = if (isLiked) animatedPrimary else SpotifyWhite.copy(alpha = 0.7f),
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(18.dp),
                                 )
                             }
                         }

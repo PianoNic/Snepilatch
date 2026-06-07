@@ -13,7 +13,6 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
@@ -25,7 +24,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -253,15 +251,15 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(
-                                Modifier
-                                    .size(38.dp)
-                                    .background(buttonBg, CircleShape)
-                                    .clip(CircleShape)
-                                    .clickable { vm.goBack() },
-                                contentAlignment = Alignment.Center
+                            FilledTonalIconButton(
+                                onClick = { vm.goBack() },
+                                modifier = Modifier.size(38.dp),
+                                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = buttonBg,
+                                    contentColor = SpotifyWhite,
+                                ),
                             ) {
-                                Icon(Icons.Rounded.KeyboardArrowDown, stringResource(R.string.close), tint = SpotifyWhite, modifier = Modifier.size(24.dp))
+                                Icon(Icons.Rounded.KeyboardArrowDown, stringResource(R.string.close), modifier = Modifier.size(24.dp))
                             }
                             val ctx by vm.playingContext.collectAsState()
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -329,22 +327,24 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                                 }
                             }
                             val isLiked by vm.currentTrackLiked.collectAsState()
-                            Box(
-                                Modifier
-                                    .size(40.dp)
-                                    .background(buttonBg, CircleShape)
-                                    .clip(CircleShape)
-                                    .clickable {
-                                        val id = track?.uri?.removePrefix("spotify:track:") ?: return@clickable
-                                        if (isLiked) vm.unlikeSong(id) else vm.likeSong(id)
-                                    },
-                                contentAlignment = Alignment.Center
+                            FilledIconToggleButton(
+                                checked = isLiked,
+                                onCheckedChange = { _ ->
+                                    val id = track?.uri?.removePrefix("spotify:track:") ?: return@FilledIconToggleButton
+                                    if (isLiked) vm.unlikeSong(id) else vm.likeSong(id)
+                                },
+                                modifier = Modifier.size(40.dp),
+                                colors = IconButtonDefaults.filledIconToggleButtonColors(
+                                    containerColor = buttonBg,
+                                    contentColor = SpotifyWhite.copy(alpha = 0.7f),
+                                    checkedContainerColor = buttonBg,
+                                    checkedContentColor = animatedPrimary,
+                                ),
                             ) {
                                 Icon(
                                     if (isLiked) Icons.Rounded.Favorite else Icons.Filled.FavoriteBorder,
                                     stringResource(R.string.like),
-                                    tint = if (isLiked) animatedPrimary else SpotifyWhite.copy(alpha = 0.7f),
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(24.dp),
                                 )
                             }
                         }
@@ -390,58 +390,71 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                             horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(
-                                Modifier.size(44.dp).background(buttonBg, CircleShape).clip(CircleShape).clickable { vm.toggleShuffle() },
-                                contentAlignment = Alignment.Center
+                            FilledTonalIconToggleButton(
+                                checked = playback.isShuffling,
+                                onCheckedChange = { vm.toggleShuffle() },
+                                colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
+                                    containerColor = buttonBg,
+                                    contentColor = SpotifyWhite,
+                                    checkedContainerColor = buttonBg,
+                                    checkedContentColor = animatedPrimary,
+                                ),
+                                modifier = Modifier.size(44.dp),
                             ) {
-                                Icon(Icons.Rounded.Shuffle, stringResource(R.string.shuffle),
-                                    tint = if (playback.isShuffling) animatedPrimary else SpotifyWhite,
-                                    modifier = Modifier.size(20.dp))
+                                Icon(Icons.Rounded.Shuffle, stringResource(R.string.shuffle), modifier = Modifier.size(20.dp))
                             }
-                            Box(
-                                Modifier.size(48.dp).background(buttonBg, CircleShape).clip(CircleShape).clickable { vm.skipPrevious() },
-                                contentAlignment = Alignment.Center
+                            FilledTonalIconButton(
+                                onClick = { vm.skipPrevious() },
+                                colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = buttonBg, contentColor = SpotifyWhite),
+                                modifier = Modifier.size(48.dp),
                             ) {
-                                Icon(Icons.Rounded.SkipPrevious, stringResource(R.string.previous), tint = SpotifyWhite, modifier = Modifier.size(28.dp))
+                                Icon(Icons.Rounded.SkipPrevious, stringResource(R.string.previous), modifier = Modifier.size(28.dp))
                             }
-                            Box(
-                                Modifier
-                                    .size(60.dp)
-                                    .background(if (streamLoading) animatedPrimary.copy(alpha = 0.5f) else animatedPrimary, CircleShape)
-                                    .clip(CircleShape)
-                                    .clickable { if (!streamLoading) vm.togglePlayPause() },
-                                contentAlignment = Alignment.Center
+                            FilledIconButton(
+                                onClick = { if (!streamLoading) vm.togglePlayPause() },
+                                colors = IconButtonDefaults.filledIconButtonColors(
+                                    containerColor = if (streamLoading) animatedPrimary.copy(alpha = 0.5f) else animatedPrimary,
+                                    contentColor = SpotifyWhite,
+                                ),
+                                modifier = Modifier.size(60.dp),
                             ) {
                                 if (streamLoading) {
                                     LoadingIndicator(color = SpotifyWhite, modifier = Modifier.size(26.dp))
                                 } else {
                                     Icon(
                                         if (playback.isPaused || !playback.isPlaying) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
-                                        stringResource(R.string.play_pause), tint = SpotifyWhite, modifier = Modifier.size(32.dp)
+                                        stringResource(R.string.play_pause), modifier = Modifier.size(32.dp)
                                     )
                                 }
                             }
                             val nextReady by vm.isNextReady.collectAsState()
                             val isCurrentlyStreaming by vm.isStreaming.collectAsState()
                             val nextLoading = !nextReady && isCurrentlyStreaming
-                            Box(
-                                Modifier.size(48.dp).background(buttonBg, CircleShape).clip(CircleShape).clickable { vm.skipNext() },
-                                contentAlignment = Alignment.Center
+                            FilledTonalIconButton(
+                                onClick = { vm.skipNext() },
+                                colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = buttonBg, contentColor = SpotifyWhite),
+                                modifier = Modifier.size(48.dp),
                             ) {
                                 if (nextLoading) {
                                     LoadingIndicator(color = SpotifyWhite, modifier = Modifier.size(20.dp))
                                 } else {
-                                    Icon(Icons.Rounded.SkipNext, stringResource(R.string.next), tint = SpotifyWhite, modifier = Modifier.size(28.dp))
+                                    Icon(Icons.Rounded.SkipNext, stringResource(R.string.next), modifier = Modifier.size(28.dp))
                                 }
                             }
-                            Box(
-                                Modifier.size(44.dp).background(buttonBg, CircleShape).clip(CircleShape).clickable { vm.cycleRepeat() },
-                                contentAlignment = Alignment.Center
+                            FilledTonalIconToggleButton(
+                                checked = playback.repeatMode != "off",
+                                onCheckedChange = { vm.cycleRepeat() },
+                                colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
+                                    containerColor = buttonBg,
+                                    contentColor = SpotifyWhite,
+                                    checkedContainerColor = buttonBg,
+                                    checkedContentColor = animatedPrimary,
+                                ),
+                                modifier = Modifier.size(44.dp),
                             ) {
                                 Icon(
                                     when (playback.repeatMode) { "track" -> Icons.Rounded.RepeatOne; else -> Icons.Rounded.Repeat },
                                     stringResource(R.string.repeat),
-                                    tint = if (playback.repeatMode != "off") animatedPrimary else SpotifyWhite,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -481,15 +494,18 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Box(
-                                    Modifier
-                                        .size(38.dp)
-                                        .background(if (streaming) animatedPrimary else buttonBg, CircleShape)
-                                        .clip(CircleShape)
-                                        .clickable { vm.loadDevices(); vm.showDevices.value = true },
-                                    contentAlignment = Alignment.Center
+                                FilledTonalIconToggleButton(
+                                    checked = streaming,
+                                    onCheckedChange = { vm.loadDevices(); vm.showDevices.value = true },
+                                    modifier = Modifier.size(38.dp),
+                                    colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
+                                        containerColor = buttonBg,
+                                        contentColor = SpotifyWhite,
+                                        checkedContainerColor = animatedPrimary,
+                                        checkedContentColor = SpotifyWhite,
+                                    ),
                                 ) {
-                                    Icon(audioIcon, stringResource(R.string.audio_output), tint = SpotifyWhite, modifier = Modifier.size(20.dp))
+                                    Icon(audioIcon, stringResource(R.string.audio_output), modifier = Modifier.size(20.dp))
                                 }
                                 Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                     audioOutput?.let { InfoPill(audioIcon, it) }
@@ -500,36 +516,35 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Box(
-                                    Modifier
-                                        .size(38.dp)
-                                        .background(buttonBg, CircleShape)
-                                        .clip(CircleShape)
-                                        .clickable {
-                                            track?.uri?.removePrefix("spotify:track:")?.let { id ->
-                                                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                                    type = "text/plain"
-                                                    putExtra(android.content.Intent.EXTRA_TEXT, "https://open.spotify.com/track/$id")
-                                                }
-                                                shareContext.startActivity(android.content.Intent.createChooser(intent, shareTrackLabel))
+                                FilledTonalIconButton(
+                                    onClick = {
+                                        track?.uri?.removePrefix("spotify:track:")?.let { id ->
+                                            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                                type = "text/plain"
+                                                putExtra(android.content.Intent.EXTRA_TEXT, "https://open.spotify.com/track/$id")
                                             }
-                                        },
-                                    contentAlignment = Alignment.Center
+                                            shareContext.startActivity(android.content.Intent.createChooser(intent, shareTrackLabel))
+                                        }
+                                    },
+                                    modifier = Modifier.size(38.dp),
+                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                        containerColor = buttonBg,
+                                        contentColor = SpotifyWhite,
+                                    ),
                                 ) {
-                                    Icon(Icons.Rounded.Share, stringResource(R.string.share), tint = SpotifyWhite, modifier = Modifier.size(20.dp))
+                                    Icon(Icons.Rounded.Share, stringResource(R.string.share), modifier = Modifier.size(20.dp))
                                 }
-                                Box(
-                                    Modifier
-                                        .size(38.dp)
-                                        .background(buttonBg, CircleShape)
-                                        .clip(CircleShape)
-                                        .clickable { vm.openQueue() },
-                                    contentAlignment = Alignment.Center
+                                FilledTonalIconButton(
+                                    onClick = { vm.openQueue() },
+                                    modifier = Modifier.size(38.dp),
+                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                        containerColor = buttonBg,
+                                        contentColor = SpotifyWhite,
+                                    ),
                                 ) {
                                     Icon(
                                         Icons.AutoMirrored.Rounded.QueueMusic,
                                         stringResource(R.string.queue),
-                                        tint = SpotifyWhite,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
@@ -567,15 +582,15 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(
-                                Modifier
-                                    .size(44.dp)
-                                    .background(buttonBg, CircleShape)
-                                    .clip(CircleShape)
-                                    .clickable { vm.goBack() },
-                                contentAlignment = Alignment.Center
+                            FilledTonalIconButton(
+                                onClick = { vm.goBack() },
+                                modifier = Modifier.size(44.dp),
+                                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = buttonBg,
+                                    contentColor = SpotifyWhite,
+                                ),
                             ) {
-                                Icon(Icons.Rounded.KeyboardArrowDown, stringResource(R.string.close), tint = SpotifyWhite, modifier = Modifier.size(28.dp))
+                                Icon(Icons.Rounded.KeyboardArrowDown, stringResource(R.string.close), modifier = Modifier.size(28.dp))
                             }
                             val ctx by vm.playingContext.collectAsState()
                             Column(
@@ -599,24 +614,24 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                                 }
                             }
                             // EQ button — opens system equalizer
-                            Box(
-                                Modifier
-                                    .size(44.dp)
-                                    .background(buttonBg, CircleShape)
-                                    .clip(CircleShape)
-                                    .clickable {
-                                        try {
-                                            val eqIntent = android.content.Intent(android.media.audiofx.AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL)
-                                            eqIntent.putExtra(android.media.audiofx.AudioEffect.EXTRA_PACKAGE_NAME, shareContext.packageName)
-                                            eqIntent.putExtra(android.media.audiofx.AudioEffect.EXTRA_CONTENT_TYPE, android.media.audiofx.AudioEffect.CONTENT_TYPE_MUSIC)
-                                            shareContext.startActivity(eqIntent)
-                                        } catch (_: Exception) {
-                                            // No EQ app installed
-                                        }
-                                    },
-                                contentAlignment = Alignment.Center
+                            FilledTonalIconButton(
+                                onClick = {
+                                    try {
+                                        val eqIntent = android.content.Intent(android.media.audiofx.AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL)
+                                        eqIntent.putExtra(android.media.audiofx.AudioEffect.EXTRA_PACKAGE_NAME, shareContext.packageName)
+                                        eqIntent.putExtra(android.media.audiofx.AudioEffect.EXTRA_CONTENT_TYPE, android.media.audiofx.AudioEffect.CONTENT_TYPE_MUSIC)
+                                        shareContext.startActivity(eqIntent)
+                                    } catch (_: Exception) {
+                                        // No EQ app installed
+                                    }
+                                },
+                                modifier = Modifier.size(44.dp),
+                                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = buttonBg,
+                                    contentColor = SpotifyWhite,
+                                ),
                             ) {
-                                Icon(Icons.Rounded.Tune, stringResource(R.string.equalizer), tint = SpotifyWhite, modifier = Modifier.size(22.dp))
+                                Icon(Icons.Rounded.Tune, stringResource(R.string.equalizer), modifier = Modifier.size(22.dp))
                             }
                     }
 
@@ -673,22 +688,24 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             val isLiked by vm.currentTrackLiked.collectAsState()
-                            Box(
-                                Modifier
-                                    .size(48.dp)
-                                    .background(buttonBg, CircleShape)
-                                    .clip(CircleShape)
-                                    .clickable {
-                                        val id = track?.uri?.removePrefix("spotify:track:") ?: return@clickable
-                                        if (isLiked) vm.unlikeSong(id) else vm.likeSong(id)
-                                    },
-                                contentAlignment = Alignment.Center
+                            FilledIconToggleButton(
+                                checked = isLiked,
+                                onCheckedChange = { _ ->
+                                    val id = track?.uri?.removePrefix("spotify:track:") ?: return@FilledIconToggleButton
+                                    if (isLiked) vm.unlikeSong(id) else vm.likeSong(id)
+                                },
+                                modifier = Modifier.size(48.dp),
+                                colors = IconButtonDefaults.filledIconToggleButtonColors(
+                                    containerColor = buttonBg,
+                                    contentColor = SpotifyWhite.copy(alpha = 0.7f),
+                                    checkedContainerColor = buttonBg,
+                                    checkedContentColor = animatedPrimary,
+                                ),
                             ) {
                                 Icon(
                                     if (isLiked) Icons.Rounded.Favorite else Icons.Filled.FavoriteBorder,
                                     stringResource(R.string.like),
-                                    tint = if (isLiked) animatedPrimary else SpotifyWhite.copy(alpha = 0.7f),
-                                    modifier = Modifier.size(28.dp)
+                                    modifier = Modifier.size(28.dp),
                                 )
                             }
                             NowPlayingMenu(
@@ -745,40 +762,35 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Shuffle
-                        Box(
-                            Modifier
-                                .size(52.dp)
-                                .background(buttonBg, CircleShape)
-                                .clip(CircleShape)
-                                .clickable { vm.toggleShuffle() },
-                            contentAlignment = Alignment.Center
+                        FilledTonalIconToggleButton(
+                            checked = playback.isShuffling,
+                            onCheckedChange = { vm.toggleShuffle() },
+                            colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
+                                containerColor = buttonBg,
+                                contentColor = SpotifyWhite,
+                                checkedContainerColor = buttonBg,
+                                checkedContentColor = animatedPrimary,
+                            ),
+                            modifier = Modifier.size(52.dp),
                         ) {
-                            Icon(Icons.Rounded.Shuffle, stringResource(R.string.shuffle),
-                                tint = if (playback.isShuffling) animatedPrimary else SpotifyWhite,
-                                modifier = Modifier.size(22.dp))
+                            Icon(Icons.Rounded.Shuffle, stringResource(R.string.shuffle), modifier = Modifier.size(22.dp))
                         }
                         // Previous
-                        Box(
-                            Modifier
-                                .size(56.dp)
-                                .background(buttonBg, CircleShape)
-                                .clip(CircleShape)
-                                .clickable { vm.skipPrevious() },
-                            contentAlignment = Alignment.Center
+                        FilledTonalIconButton(
+                            onClick = { vm.skipPrevious() },
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = buttonBg, contentColor = SpotifyWhite),
+                            modifier = Modifier.size(56.dp),
                         ) {
-                            Icon(Icons.Rounded.SkipPrevious, stringResource(R.string.previous), tint = SpotifyWhite, modifier = Modifier.size(32.dp))
+                            Icon(Icons.Rounded.SkipPrevious, stringResource(R.string.previous), modifier = Modifier.size(32.dp))
                         }
                         // Play/Pause — large prominent button
-                        Box(
-                            Modifier
-                                .size(72.dp)
-                                .background(
-                                    if (streamLoading) animatedPrimary.copy(alpha = 0.5f) else animatedPrimary,
-                                    CircleShape
-                                )
-                                .clip(CircleShape)
-                                .clickable { if (!streamLoading) vm.togglePlayPause() },
-                            contentAlignment = Alignment.Center
+                        FilledIconButton(
+                            onClick = { if (!streamLoading) vm.togglePlayPause() },
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = if (streamLoading) animatedPrimary.copy(alpha = 0.5f) else animatedPrimary,
+                                contentColor = SpotifyWhite,
+                            ),
+                            modifier = Modifier.size(72.dp),
                         ) {
                             if (streamLoading) {
                                 LoadingIndicator(
@@ -788,7 +800,7 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                             } else {
                                 Icon(
                                     if (playback.isPaused || !playback.isPlaying) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
-                                    stringResource(R.string.play_pause), tint = SpotifyWhite, modifier = Modifier.size(38.dp)
+                                    stringResource(R.string.play_pause), modifier = Modifier.size(38.dp)
                                 )
                             }
                         }
@@ -796,33 +808,32 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                         val nextReady by vm.isNextReady.collectAsState()
                         val isCurrentlyStreaming by vm.isStreaming.collectAsState()
                         val nextLoading = !nextReady && isCurrentlyStreaming
-                        Box(
-                            Modifier
-                                .size(56.dp)
-                                .background(buttonBg, CircleShape)
-                                .clip(CircleShape)
-                                .clickable { vm.skipNext() },
-                            contentAlignment = Alignment.Center
+                        FilledTonalIconButton(
+                            onClick = { vm.skipNext() },
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = buttonBg, contentColor = SpotifyWhite),
+                            modifier = Modifier.size(56.dp),
                         ) {
                             if (nextLoading) {
                                 LoadingIndicator(color = SpotifyWhite, modifier = Modifier.size(22.dp))
                             } else {
-                                Icon(Icons.Rounded.SkipNext, stringResource(R.string.next), tint = SpotifyWhite, modifier = Modifier.size(32.dp))
+                                Icon(Icons.Rounded.SkipNext, stringResource(R.string.next), modifier = Modifier.size(32.dp))
                             }
                         }
                         // Repeat
-                        Box(
-                            Modifier
-                                .size(52.dp)
-                                .background(buttonBg, CircleShape)
-                                .clip(CircleShape)
-                                .clickable { vm.cycleRepeat() },
-                            contentAlignment = Alignment.Center
+                        FilledTonalIconToggleButton(
+                            checked = playback.repeatMode != "off",
+                            onCheckedChange = { vm.cycleRepeat() },
+                            colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
+                                containerColor = buttonBg,
+                                contentColor = SpotifyWhite,
+                                checkedContainerColor = buttonBg,
+                                checkedContentColor = animatedPrimary,
+                            ),
+                            modifier = Modifier.size(52.dp),
                         ) {
                             Icon(
                                 when (playback.repeatMode) { "track" -> Icons.Rounded.RepeatOne; else -> Icons.Rounded.Repeat },
                                 stringResource(R.string.repeat),
-                                tint = if (playback.repeatMode != "off") animatedPrimary else SpotifyWhite,
                                 modifier = Modifier.size(22.dp)
                             )
                         }
@@ -861,15 +872,18 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Box(
-                                Modifier
-                                    .size(44.dp)
-                                    .background(if (streaming) animatedPrimary else buttonBg, CircleShape)
-                                    .clip(CircleShape)
-                                    .clickable { vm.loadDevices(); vm.showDevices.value = true },
-                                contentAlignment = Alignment.Center
+                            FilledTonalIconToggleButton(
+                                checked = streaming,
+                                onCheckedChange = { vm.loadDevices(); vm.showDevices.value = true },
+                                modifier = Modifier.size(44.dp),
+                                colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
+                                    containerColor = buttonBg,
+                                    contentColor = SpotifyWhite,
+                                    checkedContainerColor = animatedPrimary,
+                                    checkedContentColor = SpotifyWhite,
+                                ),
                             ) {
-                                Icon(audioIcon, stringResource(R.string.audio_output), tint = SpotifyWhite, modifier = Modifier.size(22.dp))
+                                Icon(audioIcon, stringResource(R.string.audio_output), modifier = Modifier.size(22.dp))
                             }
                             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                 audioOutput?.let { InfoPill(audioIcon, it) }
@@ -880,36 +894,35 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Box(
-                                Modifier
-                                    .size(44.dp)
-                                    .background(buttonBg, CircleShape)
-                                    .clip(CircleShape)
-                                    .clickable {
-                                        track?.uri?.removePrefix("spotify:track:")?.let { id ->
-                                            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                                type = "text/plain"
-                                                putExtra(android.content.Intent.EXTRA_TEXT, "https://open.spotify.com/track/$id")
-                                            }
-                                            shareContext.startActivity(android.content.Intent.createChooser(intent, shareTrackLabel))
+                            FilledTonalIconButton(
+                                onClick = {
+                                    track?.uri?.removePrefix("spotify:track:")?.let { id ->
+                                        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                            type = "text/plain"
+                                            putExtra(android.content.Intent.EXTRA_TEXT, "https://open.spotify.com/track/$id")
                                         }
-                                    },
-                                contentAlignment = Alignment.Center
+                                        shareContext.startActivity(android.content.Intent.createChooser(intent, shareTrackLabel))
+                                    }
+                                },
+                                modifier = Modifier.size(44.dp),
+                                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = buttonBg,
+                                    contentColor = SpotifyWhite,
+                                ),
                             ) {
-                                Icon(Icons.Rounded.Share, stringResource(R.string.share), tint = SpotifyWhite, modifier = Modifier.size(22.dp))
+                                Icon(Icons.Rounded.Share, stringResource(R.string.share), modifier = Modifier.size(22.dp))
                             }
-                            Box(
-                                Modifier
-                                    .size(44.dp)
-                                    .background(buttonBg, CircleShape)
-                                    .clip(CircleShape)
-                                    .clickable { vm.openQueue() },
-                                contentAlignment = Alignment.Center
+                            FilledTonalIconButton(
+                                onClick = { vm.openQueue() },
+                                modifier = Modifier.size(44.dp),
+                                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = buttonBg,
+                                    contentColor = SpotifyWhite,
+                                ),
                             ) {
                                 Icon(
                                     Icons.AutoMirrored.Rounded.QueueMusic,
                                     stringResource(R.string.queue),
-                                    tint = SpotifyWhite,
                                     modifier = Modifier.size(22.dp)
                                 )
                             }
@@ -1019,15 +1032,15 @@ private fun NowPlayingMenu(
     shareContext: android.content.Context,
     buttonBg: Color
 ) {
-    Box(
-        Modifier
-            .size(44.dp)
-            .background(buttonBg, CircleShape)
-            .clip(CircleShape)
-            .clickable { onShowMore(true) },
-        contentAlignment = Alignment.Center
+    FilledTonalIconButton(
+        onClick = { onShowMore(true) },
+        modifier = Modifier.size(44.dp),
+        colors = IconButtonDefaults.filledTonalIconButtonColors(
+            containerColor = buttonBg,
+            contentColor = SpotifyWhite,
+        ),
     ) {
-        Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SpotifyWhite, modifier = Modifier.size(22.dp))
+        Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), modifier = Modifier.size(22.dp))
     }
 
     if (showMore) {

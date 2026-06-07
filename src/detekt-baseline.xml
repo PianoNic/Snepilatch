@@ -12,7 +12,6 @@
     <ID>CyclomaticComplexMethod:LibraryScreen.kt$@Composable fun LibraryScreen(vm: SpotifyViewModel)</ID>
     <ID>CyclomaticComplexMethod:LyricsScreen.kt$@Composable fun LyricsScreen(vm: SpotifyViewModel)</ID>
     <ID>CyclomaticComplexMethod:NowPlayingScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun NowPlayingScreen(vm: SpotifyViewModel)</ID>
-    <ID>CyclomaticComplexMethod:SpotifyViewModel.kt$SpotifyViewModel$fun initialize(cookies: Map&lt;String, String&gt;)</ID>
     <ID>CyclomaticComplexMethod:SpotifyViewModel.kt$SpotifyViewModel$private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent)</ID>
     <ID>CyclomaticComplexMethod:SpotifyViewModel.kt$SpotifyViewModel$private suspend fun updatePlaybackFromState(state: PlayerStateData)</ID>
     <ID>Filename:AudioOutputDetector.kt$ch.snepilatch.app.util.AudioOutputDetector.kt</ID>

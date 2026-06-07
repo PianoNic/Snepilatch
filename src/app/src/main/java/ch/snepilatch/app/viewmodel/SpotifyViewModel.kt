@@ -193,13 +193,6 @@ class SpotifyViewModel : ViewModel() {
     val notificationRightButton = MutableStateFlow("like")
     // Content region for CDN resolution
     val contentRegion = MutableStateFlow("US")
-
-    // Doze-tolerant background token refresh. Off by default — uses a wake-lock
-    // each hour. When enabled, AlarmManager wakes the device to refresh before
-    // the access token expires, so playback survives long screen-off periods.
-    val backgroundTokenRefreshEnabled = MutableStateFlow(false)
-
-
     // Canvas background
     val canvasEnabled = MutableStateFlow(false)
     val canvasUrl = MutableStateFlow<String?>(null)
@@ -299,18 +292,6 @@ class SpotifyViewModel : ViewModel() {
                 // Falls back to a 50-minute interval if the timestamp isn't
                 // available (e.g. older Kotify or unexpected response shape).
                 viewModelScope.launch(Dispatchers.IO) {
-                    // Initial arm: if the user already had the background-refresh
-                    // toggle on at last launch, set the alarm against the initial
-                    // expiry right now. The receiver will reschedule itself
-                    // thereafter, and the loop below also re-arms on every
-                    // foreground refresh.
-                    if (backgroundTokenRefreshEnabled.value) {
-                        val initialExpiresAt = sess.baseClient.accessTokenExpirationTimestampMs
-                        val ctx = appContext
-                        if (initialExpiresAt != null && ctx != null) {
-                            ch.snepilatch.app.auth.TokenRefreshScheduler.enable(ctx, initialExpiresAt)
-                        }
-                    }
                     while (true) {
                         val expiresAt = sess.baseClient.accessTokenExpirationTimestampMs
                         val sleepMs = if (expiresAt != null) {
@@ -323,16 +304,6 @@ class SpotifyViewModel : ViewModel() {
                         try {
                             sess.baseClient.refreshAccessToken()
                             LokiLogger.i(TAG, "Access token refreshed (next in ~${sleepMs / 60_000}m)")
-                            // If the user opted into background refresh, re-arm
-                            // the alarm against the new expiry so it survives
-                            // Doze the next time the screen goes off.
-                            if (backgroundTokenRefreshEnabled.value) {
-                                val newExpiresAt = sess.baseClient.accessTokenExpirationTimestampMs
-                                val ctx = appContext
-                                if (newExpiresAt != null && ctx != null) {
-                                    ch.snepilatch.app.auth.TokenRefreshScheduler.enable(ctx, newExpiresAt)
-                                }
-                            }
                         } catch (e: Exception) {
                             LokiLogger.w(TAG, "Token refresh failed: ${e.message}")
                             delay(REFRESH_RETRY_DELAY_MS)
@@ -1422,7 +1393,6 @@ class SpotifyViewModel : ViewModel() {
     }
 
     fun loadPreferences(context: Context) {
-        appContext = context.applicationContext
         val prefs = context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
         val savedSource = prefs.getString("audio_source", null)
         // Migrate: old "spotify" value → null (Spotify CDN is now the default)
@@ -1442,7 +1412,6 @@ class SpotifyViewModel : ViewModel() {
             context.resources.updateConfiguration(config, context.resources.displayMetrics)
         }
         canvasEnabled.value = prefs.getBoolean("canvas_enabled", false)
-        backgroundTokenRefreshEnabled.value = prefs.getBoolean("background_token_refresh", false)
         contentRegion.value = prefs.getString("content_region", "US") ?: "US"
         notificationLeftButton.value = prefs.getString("notification_left_button", "repeat") ?: "repeat"
         notificationRightButton.value = prefs.getString("notification_right_button", "like") ?: "like"
@@ -1473,28 +1442,6 @@ class SpotifyViewModel : ViewModel() {
         context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
             .edit().putBoolean("canvas_enabled", enabled).apply()
         if (!enabled) canvasUrl.value = null
-    }
-
-    /**
-     * Toggle the AlarmManager-based token refresh. When enabled, schedules an
-     * alarm to fire LEAD_MS before the current access token expires, even
-     * during Android Doze. When disabled, cancels any pending alarm. Persists
-     * the choice across launches.
-     */
-    fun setBackgroundTokenRefreshEnabled(enabled: Boolean, context: Context) {
-        backgroundTokenRefreshEnabled.value = enabled
-        context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
-            .edit().putBoolean("background_token_refresh", enabled).apply()
-        if (enabled) {
-            val expiresAt = session?.baseClient?.accessTokenExpirationTimestampMs
-            if (expiresAt != null) {
-                ch.snepilatch.app.auth.TokenRefreshScheduler.enable(context, expiresAt)
-            } else {
-                LokiLogger.w(TAG, "Background refresh toggled on but no expiry available yet; will schedule on next refresh")
-            }
-        } else {
-            ch.snepilatch.app.auth.TokenRefreshScheduler.disable(context)
-        }
     }
 
     private fun fetchCanvasForTrack(trackUri: String) {

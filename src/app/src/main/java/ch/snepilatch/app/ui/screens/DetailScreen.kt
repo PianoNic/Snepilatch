@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package ch.snepilatch.app.ui.screens
 
 import androidx.compose.foundation.background
@@ -8,18 +10,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
-import androidx.compose.material.icons.filled.Album
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
+import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.ui.draw.clip
 import androidx.compose.material3.*
 import androidx.compose.runtime.LaunchedEffect
@@ -53,7 +55,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
 
     if (isLoading) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = SpotifyLightGray, strokeWidth = 3.dp)
+            LoadingIndicator(color = SpotifyLightGray)
         }
         return
     }
@@ -88,7 +90,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
                         .clickable { vm.goBack() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back), tint = SpotifyWhite, modifier = Modifier.size(20.dp))
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back), tint = SpotifyWhite, modifier = Modifier.size(20.dp))
                 }
                 Column(Modifier.align(Alignment.BottomStart).padding(16.dp)) {
                     Text(
@@ -211,7 +213,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
                     } else {
                         IconButton(onClick = { vm.toggleDetailSaved(detail.type, detailId) }) {
                             Icon(
-                                if (saved) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                if (saved) Icons.Rounded.Favorite else Icons.Filled.FavoriteBorder,
                                 stringResource(R.string.save),
                                 tint = if (saved) accentColor else SpotifyWhite,
                                 modifier = Modifier.size(28.dp)
@@ -224,7 +226,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
                 // KotifyClient supports for the current detail type.
                 var showHeaderMenu by remember { mutableStateOf(false) }
                 IconButton(onClick = { showHeaderMenu = true }) {
-                    Icon(Icons.Default.MoreVert, stringResource(R.string.more), tint = SpotifyLightGray, modifier = Modifier.size(24.dp))
+                    Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SpotifyLightGray, modifier = Modifier.size(24.dp))
                 }
                 if (showHeaderMenu) {
                     DetailHeaderMenu(
@@ -240,7 +242,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
                 // Shuffle
                 IconButton(onClick = { vm.toggleShuffle() }) {
                     Icon(
-                        Icons.Default.Shuffle, stringResource(R.string.shuffle),
+                        Icons.Rounded.Shuffle, stringResource(R.string.shuffle),
                         tint = if (shuffling) accentColor else SpotifyWhite,
                         modifier = Modifier.size(24.dp)
                     )
@@ -265,7 +267,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        if (isPlayingThis) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        if (isPlayingThis) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                         stringResource(R.string.play),
                         tint = Color.Black,
                         modifier = Modifier.size(28.dp)
@@ -302,7 +304,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
         if (isLoadingMore) {
             item {
                 Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = SpotifyLightGray, strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
+                    LoadingIndicator(color = SpotifyLightGray, modifier = Modifier.size(24.dp))
                 }
             }
         }
@@ -534,7 +536,7 @@ private fun ArtistTrackRow(
         // 3-dot menu
         var showMenu by remember { mutableStateOf(false) }
         IconButton(onClick = { showMenu = true }, modifier = Modifier.size(36.dp)) {
-            Icon(Icons.Default.MoreVert, stringResource(R.string.more), tint = SpotifyLightGray, modifier = Modifier.size(20.dp))
+            Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SpotifyLightGray, modifier = Modifier.size(20.dp))
         }
         if (showMenu) {
             val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -574,19 +576,19 @@ private fun ArtistTrackRow(
                 val likeLabel = stringResource(R.string.like)
                 val visitAlbumLabel = stringResource(R.string.visit_album)
                 val items = listOf(
-                    Triple(Icons.AutoMirrored.Filled.QueueMusic, addQueueLabel) {
+                    Triple(Icons.AutoMirrored.Rounded.QueueMusic, addQueueLabel) {
                         vm.addToQueue(track.uri); showMenu = false
                     },
-                    Triple(Icons.AutoMirrored.Filled.PlaylistAdd, addPlaylistLabel) {
+                    Triple(Icons.AutoMirrored.Rounded.PlaylistAdd, addPlaylistLabel) {
                         showMenu = false; vm.showPlaylistPickerForTrack(track.uri)
                     },
-                    Triple(Icons.Default.Favorite, likeLabel) {
+                    Triple(Icons.Rounded.Favorite, likeLabel) {
                         vm.likeSong(track.uri.removePrefix("spotify:track:")); showMenu = false
                     },
-                    Triple(Icons.Default.Album, visitAlbumLabel) {
+                    Triple(Icons.Rounded.Album, visitAlbumLabel) {
                         showMenu = false; vm.openAlbumForTrack(track.uri)
                     },
-                    Triple(Icons.Default.Share, shareLabel) {
+                    Triple(Icons.Rounded.Share, shareLabel) {
                         showMenu = false
                         val id = track.uri.removePrefix("spotify:track:")
                         val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
@@ -656,7 +658,7 @@ private fun AlbumTrackRow(
         }
         var showMenu by remember { mutableStateOf(false) }
         IconButton(onClick = { showMenu = true }, modifier = Modifier.size(36.dp)) {
-            Icon(Icons.Default.MoreVert, stringResource(R.string.more), tint = SpotifyLightGray, modifier = Modifier.size(20.dp))
+            Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SpotifyLightGray, modifier = Modifier.size(20.dp))
         }
         if (showMenu) {
             val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -694,19 +696,19 @@ private fun AlbumTrackRow(
                 val likeLabel = stringResource(R.string.like)
                 val visitArtistLabel = stringResource(R.string.visit_artist)
                 val items = listOf(
-                    Triple(Icons.AutoMirrored.Filled.QueueMusic, addQueueLabel) {
+                    Triple(Icons.AutoMirrored.Rounded.QueueMusic, addQueueLabel) {
                         vm.addToQueue(track.uri); showMenu = false
                     },
-                    Triple(Icons.AutoMirrored.Filled.PlaylistAdd, addPlaylistLabel) {
+                    Triple(Icons.AutoMirrored.Rounded.PlaylistAdd, addPlaylistLabel) {
                         showMenu = false; vm.showPlaylistPickerForTrack(track.uri)
                     },
-                    Triple(Icons.Default.Favorite, likeLabel) {
+                    Triple(Icons.Rounded.Favorite, likeLabel) {
                         vm.likeSong(track.uri.removePrefix("spotify:track:")); showMenu = false
                     },
-                    Triple(Icons.Default.Person, visitArtistLabel) {
+                    Triple(Icons.Rounded.Person, visitArtistLabel) {
                         showMenu = false; vm.openArtistForTrack(track.uri)
                     },
-                    Triple(Icons.Default.Share, shareLabel) {
+                    Triple(Icons.Rounded.Share, shareLabel) {
                         showMenu = false
                         val id = track.uri.removePrefix("spotify:track:")
                         val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
@@ -787,7 +789,7 @@ private fun DetailHeaderMenu(
         val items = buildList<Triple<androidx.compose.ui.graphics.vector.ImageVector, String, () -> Unit>> {
             if (!isCollection) {
                 val id = detail.uri.substringAfterLast(":")
-                add(Triple(Icons.Default.Share, shareLabel) {
+                add(Triple(Icons.Rounded.Share, shareLabel) {
                     onDismiss()
                     val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                         this.type = "text/plain"
@@ -797,17 +799,17 @@ private fun DetailHeaderMenu(
                 })
             }
             if (hasTracks && !isArtist) {
-                add(Triple(Icons.AutoMirrored.Filled.QueueMusic, addToQueueLabel) {
+                add(Triple(Icons.AutoMirrored.Rounded.QueueMusic, addToQueueLabel) {
                     onDismiss()
                     vm.addAllToQueue(trackUris)
                 })
-                add(Triple(Icons.AutoMirrored.Filled.PlaylistAdd, addToPlaylistLabel) {
+                add(Triple(Icons.AutoMirrored.Rounded.PlaylistAdd, addToPlaylistLabel) {
                     onDismiss()
                     vm.showPlaylistPickerForTracks(trackUris)
                 })
             }
             if (isAlbum && detail.artistUri != null) {
-                add(Triple(Icons.Default.Person, visitArtistLabel) {
+                add(Triple(Icons.Rounded.Person, visitArtistLabel) {
                     onDismiss()
                     val artistId = detail.artistUri.substringAfterLast(":")
                     vm.openArtist(artistId)

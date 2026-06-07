@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package ch.snepilatch.app.ui.components
 
 import ch.snepilatch.app.ui.theme.SpotifyWhite
@@ -16,11 +18,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
@@ -95,20 +97,19 @@ fun MiniPlayer(vm: SpotifyViewModel) {
             }
             IconButton(onClick = { if (!streamLoading) vm.togglePlayPause() }, modifier = Modifier.size(40.dp)) {
                 if (streamLoading) {
-                    CircularProgressIndicator(
+                    LoadingIndicator(
                         color = SpotifyWhite,
-                        strokeWidth = 2.dp,
                         modifier = Modifier.size(20.dp)
                     )
                 } else {
                     Icon(
-                        if (playback.isPaused || !playback.isPlaying) Icons.Default.PlayArrow else Icons.Default.Pause,
+                        if (playback.isPaused || !playback.isPlaying) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
                         stringResource(R.string.play_pause), tint = SpotifyWhite, modifier = Modifier.size(28.dp)
                     )
                 }
             }
             IconButton(onClick = { vm.skipNext() }, modifier = Modifier.size(40.dp)) {
-                Icon(Icons.Default.SkipNext, stringResource(R.string.next), tint = SpotifyWhite, modifier = Modifier.size(24.dp))
+                Icon(Icons.Rounded.SkipNext, stringResource(R.string.next), tint = SpotifyWhite, modifier = Modifier.size(24.dp))
             }
         }
         if (playback.durationMs > 0) {

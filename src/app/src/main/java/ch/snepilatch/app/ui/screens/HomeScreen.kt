@@ -27,8 +27,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
@@ -239,7 +239,7 @@ fun HomeSectionCard(item: kotify.api.home.HomeSectionItem, vm: SpotifyViewModel,
             url = item.imageUrl,
             modifier = Modifier.size(140.dp),
             shape = if (isArtist) CircleShape else RoundedCornerShape(8.dp),
-            icon = if (isArtist) Icons.Default.Person else Icons.Default.MusicNote
+            icon = if (isArtist) Icons.Rounded.Person else Icons.Rounded.MusicNote
         )
         Spacer(Modifier.height(8.dp))
         Text(

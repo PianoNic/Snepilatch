@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package ch.snepilatch.app.ui.screens
 
 import android.content.Context
@@ -29,11 +31,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.North
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.North
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -125,11 +127,11 @@ fun SearchScreen(vm: SpotifyViewModel, searchVm: SearchViewModel = viewModel()) 
                 .clip(RoundedCornerShape(8.dp))
                 .focusRequester(focusRequester),
             placeholder = { Text(stringResource(R.string.search_field_placeholder), color = SpotifyLightGray.copy(alpha = 0.7f)) },
-            leadingIcon = { Icon(Icons.Default.Search, null, tint = SpotifyBlack) },
+            leadingIcon = { Icon(Icons.Rounded.Search, null, tint = SpotifyBlack) },
             trailingIcon = {
                 if (query.isNotEmpty()) {
                     IconButton(onClick = { searchVm.updateQuery("") }) {
-                        Icon(Icons.Default.Close, stringResource(R.string.search_clear), tint = SpotifyBlack)
+                        Icon(Icons.Rounded.Close, stringResource(R.string.search_clear), tint = SpotifyBlack)
                     }
                 }
             },
@@ -169,10 +171,9 @@ fun SearchScreen(vm: SpotifyViewModel, searchVm: SearchViewModel = viewModel()) 
             else -> {
                 AnimatedVisibility(visible = isSearching, enter = fadeIn(), exit = fadeOut()) {
                     Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(
+                        LoadingIndicator(
                             color = SpotifyWhite,
-                            modifier = Modifier.size(24.dp),
-                            strokeWidth = 2.dp
+                            modifier = Modifier.size(24.dp)
                         )
                     }
                 }
@@ -245,7 +246,7 @@ private fun SuggestionsList(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    Icons.Default.Search,
+                    Icons.Rounded.Search,
                     null,
                     tint = SpotifyLightGray,
                     modifier = Modifier.size(20.dp)
@@ -253,7 +254,7 @@ private fun SuggestionsList(
                 Spacer(Modifier.width(16.dp))
                 Text(sug.text, color = SpotifyWhite, fontSize = 15.sp, modifier = Modifier.weight(1f))
                 Icon(
-                    Icons.Default.North,
+                    Icons.Rounded.North,
                     null,
                     tint = SpotifyLightGray.copy(alpha = 0.6f),
                     modifier = Modifier.size(16.dp)

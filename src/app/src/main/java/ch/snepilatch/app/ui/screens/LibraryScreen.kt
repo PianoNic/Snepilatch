@@ -27,17 +27,16 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Album
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.automirrored.rounded.List
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.SwapVert
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
@@ -68,6 +67,7 @@ import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
 import ch.snepilatch.app.data.LibraryItem
 import ch.snepilatch.app.ui.components.SpotifyImage
+import ch.snepilatch.app.ui.components.TightAlertDialog
 import ch.snepilatch.app.ui.theme.SpotifyBlack
 import ch.snepilatch.app.ui.theme.SpotifyElevated
 import ch.snepilatch.app.ui.theme.SpotifyGray
@@ -123,10 +123,10 @@ fun LibraryScreen(vm: SpotifyViewModel) {
             Text(stringResource(R.string.library_title), color = SpotifyWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f))
             IconButton(onClick = { searchActive = !searchActive; if (!searchActive) searchQuery = "" }) {
-                Icon(Icons.Default.Search, stringResource(R.string.search), tint = SpotifyWhite, modifier = Modifier.size(24.dp))
+                Icon(Icons.Rounded.Search, stringResource(R.string.search), tint = SpotifyWhite, modifier = Modifier.size(24.dp))
             }
             IconButton(onClick = { showCreateDialog = true }) {
-                Icon(Icons.Default.Add, stringResource(R.string.library_create), tint = SpotifyWhite, modifier = Modifier.size(26.dp))
+                Icon(Icons.Rounded.Add, stringResource(R.string.library_create), tint = SpotifyWhite, modifier = Modifier.size(26.dp))
             }
         }
 
@@ -145,11 +145,11 @@ fun LibraryScreen(vm: SpotifyViewModel) {
                         color = SpotifyLightGray.copy(alpha = 0.7f)
                     )
                 },
-                leadingIcon = { Icon(Icons.Default.Search, null, tint = SpotifyLightGray) },
+                leadingIcon = { Icon(Icons.Rounded.Search, null, tint = SpotifyLightGray) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Close, stringResource(R.string.clear), tint = SpotifyLightGray)
+                            Icon(Icons.Rounded.Close, stringResource(R.string.clear), tint = SpotifyLightGray)
                         }
                     }
                 },
@@ -208,7 +208,7 @@ fun LibraryScreen(vm: SpotifyViewModel) {
                     Modifier.clickable { showSortMenu = true }.padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.SwapVert, stringResource(R.string.library_sort), tint = SpotifyLightGray, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Rounded.SwapVert, stringResource(R.string.library_sort), tint = SpotifyLightGray, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
                     val sortLabel = when (sortMode) {
                         "alpha" -> stringResource(R.string.library_sort_alpha)
@@ -239,7 +239,7 @@ fun LibraryScreen(vm: SpotifyViewModel) {
                 modifier = Modifier.size(32.dp)
             ) {
                 Icon(
-                    if (gridView) Icons.AutoMirrored.Filled.List else Icons.Default.GridView,
+                    if (gridView) Icons.AutoMirrored.Rounded.List else Icons.Rounded.GridView,
                     stringResource(R.string.library_toggle_view),
                     tint = SpotifyLightGray,
                     modifier = Modifier.size(20.dp)
@@ -333,9 +333,9 @@ fun LibraryGridCard(item: LibraryItem, vm: SpotifyViewModel) {
                 modifier = Modifier.fillMaxWidth().aspectRatio(1f),
                 shape = if (isArtist) CircleShape else RoundedCornerShape(8.dp),
                 icon = when (item.type) {
-                    "artist" -> Icons.Default.Person
-                    "album" -> Icons.Default.Album
-                    else -> Icons.AutoMirrored.Filled.QueueMusic
+                    "artist" -> Icons.Rounded.Person
+                    "album" -> Icons.Rounded.Album
+                    else -> Icons.AutoMirrored.Rounded.QueueMusic
                 }
             )
         }
@@ -374,7 +374,7 @@ fun LibraryListItem(item: LibraryItem, vm: SpotifyViewModel) {
                     .background(Brush.linearGradient(listOf(Color(0xFF450AF5), Color(0xFFC4EAFD)))),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.FavoriteBorder, null, tint = SpotifyWhite, modifier = Modifier.size(28.dp))
+                Icon(Icons.Filled.FavoriteBorder, null, tint = SpotifyWhite, modifier = Modifier.size(28.dp))
             }
         } else {
             SpotifyImage(
@@ -382,9 +382,9 @@ fun LibraryListItem(item: LibraryItem, vm: SpotifyViewModel) {
                 modifier = Modifier.size(56.dp),
                 shape = if (isArtist) CircleShape else RoundedCornerShape(4.dp),
                 icon = when (item.type) {
-                    "artist" -> Icons.Default.Person
-                    "album" -> Icons.Default.Album
-                    else -> Icons.AutoMirrored.Filled.QueueMusic
+                    "artist" -> Icons.Rounded.Person
+                    "album" -> Icons.Rounded.Album
+                    else -> Icons.AutoMirrored.Rounded.QueueMusic
                 }
             )
         }
@@ -403,7 +403,7 @@ fun LibraryListItem(item: LibraryItem, vm: SpotifyViewModel) {
 @Composable
 fun CreatePlaylistDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
     var name by remember { mutableStateOf("") }
-    AlertDialog(
+    TightAlertDialog(
         onDismissRequest = onDismiss,
         containerColor = SpotifyElevated,
         title = { Text(stringResource(R.string.library_create_playlist), color = SpotifyWhite, fontWeight = FontWeight.Bold) },
@@ -438,7 +438,7 @@ fun CreatePlaylistDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
 
 @Composable
 private fun LibraryRemoveDialog(item: LibraryItem, vm: SpotifyViewModel, onDismiss: () -> Unit) {
-    AlertDialog(
+    TightAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.library_remove_title), color = SpotifyWhite) },
         text = { Text(stringResource(R.string.library_remove_message, item.name), color = SpotifyLightGray) },

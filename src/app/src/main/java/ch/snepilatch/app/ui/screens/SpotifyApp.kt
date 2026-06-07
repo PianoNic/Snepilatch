@@ -25,7 +25,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -48,6 +48,7 @@ import ch.snepilatch.app.ui.components.BottomNav
 import ch.snepilatch.app.ui.components.DevicesDialog
 import ch.snepilatch.app.ui.components.MiniPlayer
 import ch.snepilatch.app.ui.components.SpotifyImage
+import ch.snepilatch.app.ui.components.TightAlertDialog
 import ch.snepilatch.app.ui.theme.SpotifyGray
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
@@ -176,7 +177,7 @@ fun SpotifyApp(vm: SpotifyViewModel) {
         if (showPicker) {
             val library by vm.library.collectAsState()
             val playlists = library.filter { it.type == "playlist" }
-            AlertDialog(
+            TightAlertDialog(
                 onDismissRequest = { vm.showPlaylistPicker.value = false },
                 title = { Text(stringResource(R.string.add_to_playlist), color = SpotifyWhite) },
                 text = {
@@ -246,7 +247,7 @@ fun LoadingScreen(
                     val progress = ((safeTotal - cooldownSecondsRemaining).toFloat() / safeTotal)
                         .coerceIn(0f, 1f)
 
-                    Icon(Icons.Default.CloudOff, null, tint = SpotifyLightGray, modifier = Modifier.size(48.dp))
+                    Icon(Icons.Rounded.CloudOff, null, tint = SpotifyLightGray, modifier = Modifier.size(48.dp))
                     Spacer(Modifier.height(16.dp))
                     Text(stringResource(R.string.rate_limited), color = SpotifyWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(8.dp))
@@ -267,7 +268,7 @@ fun LoadingScreen(
                     }
                 }
                 error != null -> {
-                    Icon(Icons.Default.CloudOff, null, tint = SpotifyLightGray, modifier = Modifier.size(48.dp))
+                    Icon(Icons.Rounded.CloudOff, null, tint = SpotifyLightGray, modifier = Modifier.size(48.dp))
                     Spacer(Modifier.height(16.dp))
                     Text(stringResource(R.string.connection_failed), color = SpotifyWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(8.dp))
@@ -286,7 +287,7 @@ fun LoadingScreen(
                     }
                 }
                 else -> {
-                    CircularProgressIndicator(color = SpotifyWhite, strokeWidth = 3.dp)
+                    CircularWavyProgressIndicator(color = SpotifyWhite)
                     Spacer(Modifier.height(20.dp))
                     Text(stringResource(R.string.connecting_to_spotify), color = SpotifyLightGray, fontSize = 15.sp)
                 }

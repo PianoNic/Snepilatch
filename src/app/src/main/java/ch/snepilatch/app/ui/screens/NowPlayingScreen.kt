@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package ch.snepilatch.app.ui.screens
 
 import androidx.compose.animation.animateColorAsState
@@ -14,9 +16,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
-import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -42,6 +45,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import ch.snepilatch.app.ui.components.SpotifyImage
+import ch.snepilatch.app.ui.components.TightAlertDialog
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.util.formatTime
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
@@ -257,7 +261,7 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                                     .clickable { vm.goBack() },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.KeyboardArrowDown, stringResource(R.string.close), tint = SpotifyWhite, modifier = Modifier.size(24.dp))
+                                Icon(Icons.Rounded.KeyboardArrowDown, stringResource(R.string.close), tint = SpotifyWhite, modifier = Modifier.size(24.dp))
                             }
                             val ctx by vm.playingContext.collectAsState()
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -337,7 +341,7 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                    if (isLiked) Icons.Rounded.Favorite else Icons.Filled.FavoriteBorder,
                                     stringResource(R.string.like),
                                     tint = if (isLiked) animatedPrimary else SpotifyWhite.copy(alpha = 0.7f),
                                     modifier = Modifier.size(24.dp)
@@ -390,7 +394,7 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                                 Modifier.size(44.dp).background(buttonBg, CircleShape).clip(CircleShape).clickable { vm.toggleShuffle() },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.Shuffle, stringResource(R.string.shuffle),
+                                Icon(Icons.Rounded.Shuffle, stringResource(R.string.shuffle),
                                     tint = if (playback.isShuffling) animatedPrimary else SpotifyWhite,
                                     modifier = Modifier.size(20.dp))
                             }
@@ -398,7 +402,7 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                                 Modifier.size(48.dp).background(buttonBg, CircleShape).clip(CircleShape).clickable { vm.skipPrevious() },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.SkipPrevious, stringResource(R.string.previous), tint = SpotifyWhite, modifier = Modifier.size(28.dp))
+                                Icon(Icons.Rounded.SkipPrevious, stringResource(R.string.previous), tint = SpotifyWhite, modifier = Modifier.size(28.dp))
                             }
                             Box(
                                 Modifier
@@ -409,10 +413,10 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (streamLoading) {
-                                    CircularProgressIndicator(color = SpotifyWhite, strokeWidth = 3.dp, modifier = Modifier.size(26.dp))
+                                    LoadingIndicator(color = SpotifyWhite, modifier = Modifier.size(26.dp))
                                 } else {
                                     Icon(
-                                        if (playback.isPaused || !playback.isPlaying) Icons.Default.PlayArrow else Icons.Default.Pause,
+                                        if (playback.isPaused || !playback.isPlaying) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
                                         stringResource(R.string.play_pause), tint = SpotifyWhite, modifier = Modifier.size(32.dp)
                                     )
                                 }
@@ -425,9 +429,9 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (nextLoading) {
-                                    CircularProgressIndicator(color = SpotifyWhite, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+                                    LoadingIndicator(color = SpotifyWhite, modifier = Modifier.size(20.dp))
                                 } else {
-                                    Icon(Icons.Default.SkipNext, stringResource(R.string.next), tint = SpotifyWhite, modifier = Modifier.size(28.dp))
+                                    Icon(Icons.Rounded.SkipNext, stringResource(R.string.next), tint = SpotifyWhite, modifier = Modifier.size(28.dp))
                                 }
                             }
                             Box(
@@ -435,7 +439,7 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    when (playback.repeatMode) { "track" -> Icons.Default.RepeatOne; else -> Icons.Default.Repeat },
+                                    when (playback.repeatMode) { "track" -> Icons.Rounded.RepeatOne; else -> Icons.Rounded.Repeat },
                                     stringResource(R.string.repeat),
                                     tint = if (playback.repeatMode != "off") animatedPrimary else SpotifyWhite,
                                     modifier = Modifier.size(20.dp)
@@ -463,10 +467,10 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                             onDispose { am.unregisterAudioDeviceCallback(cb) }
                         }
                         val audioIcon = when (audioType) {
-                            "bluetooth" -> Icons.Default.Bluetooth
-                            "wired" -> Icons.Default.Headphones
-                            "usb" -> Icons.Default.Usb
-                            else -> Icons.Default.Speaker
+                            "bluetooth" -> Icons.Rounded.Bluetooth
+                            "wired" -> Icons.Rounded.Headphones
+                            "usb" -> Icons.Rounded.Usb
+                            else -> Icons.Rounded.Speaker
                         }
                         Row(
                             Modifier.fillMaxWidth(),
@@ -512,7 +516,7 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                                         },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(Icons.Default.Share, stringResource(R.string.share), tint = SpotifyWhite, modifier = Modifier.size(20.dp))
+                                    Icon(Icons.Rounded.Share, stringResource(R.string.share), tint = SpotifyWhite, modifier = Modifier.size(20.dp))
                                 }
                                 Box(
                                     Modifier
@@ -523,7 +527,7 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
-                                        Icons.AutoMirrored.Filled.QueueMusic,
+                                        Icons.AutoMirrored.Rounded.QueueMusic,
                                         stringResource(R.string.queue),
                                         tint = SpotifyWhite,
                                         modifier = Modifier.size(20.dp)
@@ -571,7 +575,7 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                                     .clickable { vm.goBack() },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.KeyboardArrowDown, stringResource(R.string.close), tint = SpotifyWhite, modifier = Modifier.size(28.dp))
+                                Icon(Icons.Rounded.KeyboardArrowDown, stringResource(R.string.close), tint = SpotifyWhite, modifier = Modifier.size(28.dp))
                             }
                             val ctx by vm.playingContext.collectAsState()
                             Column(
@@ -612,7 +616,7 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.Tune, stringResource(R.string.equalizer), tint = SpotifyWhite, modifier = Modifier.size(22.dp))
+                                Icon(Icons.Rounded.Tune, stringResource(R.string.equalizer), tint = SpotifyWhite, modifier = Modifier.size(22.dp))
                             }
                     }
 
@@ -681,7 +685,7 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                    if (isLiked) Icons.Rounded.Favorite else Icons.Filled.FavoriteBorder,
                                     stringResource(R.string.like),
                                     tint = if (isLiked) animatedPrimary else SpotifyWhite.copy(alpha = 0.7f),
                                     modifier = Modifier.size(28.dp)
@@ -749,7 +753,7 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                                 .clickable { vm.toggleShuffle() },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.Shuffle, stringResource(R.string.shuffle),
+                            Icon(Icons.Rounded.Shuffle, stringResource(R.string.shuffle),
                                 tint = if (playback.isShuffling) animatedPrimary else SpotifyWhite,
                                 modifier = Modifier.size(22.dp))
                         }
@@ -762,7 +766,7 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                                 .clickable { vm.skipPrevious() },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.SkipPrevious, stringResource(R.string.previous), tint = SpotifyWhite, modifier = Modifier.size(32.dp))
+                            Icon(Icons.Rounded.SkipPrevious, stringResource(R.string.previous), tint = SpotifyWhite, modifier = Modifier.size(32.dp))
                         }
                         // Play/Pause — large prominent button
                         Box(
@@ -777,14 +781,13 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                             contentAlignment = Alignment.Center
                         ) {
                             if (streamLoading) {
-                                CircularProgressIndicator(
+                                LoadingIndicator(
                                     color = SpotifyWhite,
-                                    strokeWidth = 3.dp,
                                     modifier = Modifier.size(30.dp)
                                 )
                             } else {
                                 Icon(
-                                    if (playback.isPaused || !playback.isPlaying) Icons.Default.PlayArrow else Icons.Default.Pause,
+                                    if (playback.isPaused || !playback.isPlaying) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
                                     stringResource(R.string.play_pause), tint = SpotifyWhite, modifier = Modifier.size(38.dp)
                                 )
                             }
@@ -802,9 +805,9 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                             contentAlignment = Alignment.Center
                         ) {
                             if (nextLoading) {
-                                CircularProgressIndicator(color = SpotifyWhite, strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
+                                LoadingIndicator(color = SpotifyWhite, modifier = Modifier.size(22.dp))
                             } else {
-                                Icon(Icons.Default.SkipNext, stringResource(R.string.next), tint = SpotifyWhite, modifier = Modifier.size(32.dp))
+                                Icon(Icons.Rounded.SkipNext, stringResource(R.string.next), tint = SpotifyWhite, modifier = Modifier.size(32.dp))
                             }
                         }
                         // Repeat
@@ -817,7 +820,7 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                when (playback.repeatMode) { "track" -> Icons.Default.RepeatOne; else -> Icons.Default.Repeat },
+                                when (playback.repeatMode) { "track" -> Icons.Rounded.RepeatOne; else -> Icons.Rounded.Repeat },
                                 stringResource(R.string.repeat),
                                 tint = if (playback.repeatMode != "off") animatedPrimary else SpotifyWhite,
                                 modifier = Modifier.size(22.dp)
@@ -844,10 +847,10 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                         onDispose { am.unregisterAudioDeviceCallback(cb) }
                     }
                     val audioIcon = when (audioType) {
-                        "bluetooth" -> Icons.Default.Bluetooth
-                        "wired" -> Icons.Default.Headphones
-                        "usb" -> Icons.Default.Usb
-                        else -> Icons.Default.Speaker
+                        "bluetooth" -> Icons.Rounded.Bluetooth
+                        "wired" -> Icons.Rounded.Headphones
+                        "usb" -> Icons.Rounded.Usb
+                        else -> Icons.Rounded.Speaker
                     }
                     Row(
                         Modifier.fillMaxWidth(),
@@ -893,7 +896,7 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.Share, stringResource(R.string.share), tint = SpotifyWhite, modifier = Modifier.size(22.dp))
+                                Icon(Icons.Rounded.Share, stringResource(R.string.share), tint = SpotifyWhite, modifier = Modifier.size(22.dp))
                             }
                             Box(
                                 Modifier
@@ -903,7 +906,12 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                                     .clickable { vm.openQueue() },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.AutoMirrored.Filled.QueueMusic, stringResource(R.string.queue), tint = SpotifyWhite, modifier = Modifier.size(22.dp))
+                                Icon(
+                                    Icons.AutoMirrored.Rounded.QueueMusic,
+                                    stringResource(R.string.queue),
+                                    tint = SpotifyWhite,
+                                    modifier = Modifier.size(22.dp)
+                                )
                             }
                         }
                     }
@@ -918,7 +926,7 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
     if (showPlaylistPicker) {
         val libraryItems by vm.library.collectAsState()
         val playlists = libraryItems.filter { it.type == "playlist" }
-        AlertDialog(
+        TightAlertDialog(
             onDismissRequest = { showPlaylistPicker = false },
             title = { Text(stringResource(R.string.add_to_playlist), color = SpotifyWhite) },
             containerColor = SpotifyGray,
@@ -995,7 +1003,7 @@ private fun SourcePill(provider: String) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
-        Icon(Icons.Default.MusicNote, null, tint = SpotifyWhite, modifier = Modifier.size(9.dp))
+        Icon(Icons.Rounded.MusicNote, null, tint = SpotifyWhite, modifier = Modifier.size(9.dp))
         Text(label, color = SpotifyWhite, fontSize = 9.sp, maxLines = 1)
     }
 }
@@ -1019,7 +1027,7 @@ private fun NowPlayingMenu(
             .clickable { onShowMore(true) },
         contentAlignment = Alignment.Center
     ) {
-        Icon(Icons.Default.MoreVert, stringResource(R.string.more), tint = SpotifyWhite, modifier = Modifier.size(22.dp))
+        Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SpotifyWhite, modifier = Modifier.size(22.dp))
     }
 
     if (showMore) {
@@ -1068,25 +1076,25 @@ private fun NowPlayingMenu(
             val devicesLabel = stringResource(R.string.devices)
             val shareLabel = stringResource(R.string.share)
             val items = listOf(
-                Triple(Icons.Default.MusicNote, lyricsLabel) {
+                Triple(Icons.Rounded.MusicNote, lyricsLabel) {
                     onShowMore(false); vm.openLyrics()
                 },
-                Triple(Icons.AutoMirrored.Filled.QueueMusic, addQueueLabel) {
+                Triple(Icons.AutoMirrored.Rounded.QueueMusic, addQueueLabel) {
                     track?.uri?.let { vm.addToQueue(it) }; onShowMore(false)
                 },
-                Triple(Icons.AutoMirrored.Filled.PlaylistAdd, addPlaylistLabel) {
+                Triple(Icons.AutoMirrored.Rounded.PlaylistAdd, addPlaylistLabel) {
                     onShowMore(false); onShowPlaylistPicker()
                 },
-                Triple(Icons.AutoMirrored.Filled.QueueMusic, viewQueueLabel) {
+                Triple(Icons.AutoMirrored.Rounded.QueueMusic, viewQueueLabel) {
                     vm.openQueue(); onShowMore(false)
                 },
-                Triple(Icons.Default.Album, visitAlbumLabel) {
+                Triple(Icons.Rounded.Album, visitAlbumLabel) {
                     onShowMore(false); vm.openAlbumFromCurrentTrack()
                 },
-                Triple(Icons.Default.Devices, devicesLabel) {
+                Triple(Icons.Rounded.Devices, devicesLabel) {
                     onShowMore(false); vm.loadDevices(); vm.showDevices.value = true
                 },
-                Triple(Icons.Default.Share, shareLabel) {
+                Triple(Icons.Rounded.Share, shareLabel) {
                     onShowMore(false)
                     track?.uri?.removePrefix("spotify:track:")?.let { id ->
                         val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {

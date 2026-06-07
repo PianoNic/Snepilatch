@@ -241,4 +241,10 @@
 
     <!-- Login -->
     <string name="login_title">Bei Spotify anmelden</string>
+
+    <!-- Account section headers -->
+    <string name="account_section_profile">Profil &amp; Konto</string>
+    <string name="account_section_playback">Wiedergabe</string>
+    <string name="account_section_appearance">Erscheinungsbild</string>
+    <string name="account_section_notifications">Benachrichtigungen</string>
 </resources>

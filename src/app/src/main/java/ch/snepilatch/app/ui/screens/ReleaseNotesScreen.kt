@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package ch.snepilatch.app.ui.screens
 
 import androidx.compose.foundation.layout.*
@@ -5,9 +7,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
+import ch.snepilatch.app.ui.components.TightAlertDialog
 import ch.snepilatch.app.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -66,7 +69,7 @@ fun ReleaseNotesScreen(onBack: () -> Unit) {
                 title = { Text(stringResource(R.string.release_notes), color = SpotifyWhite) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = SpotifyWhite)
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, null, tint = SpotifyWhite)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SpotifyBlack)
@@ -76,20 +79,20 @@ fun ReleaseNotesScreen(onBack: () -> Unit) {
         when {
             isLoading -> {
                 Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = SpotifyLightGray)
+                    LoadingIndicator(color = SpotifyLightGray)
                 }
             }
             error != null -> {
                 Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.ErrorOutline, null, tint = SpotifyLightGray, modifier = Modifier.size(64.dp))
+                        Icon(Icons.Rounded.ErrorOutline, null, tint = SpotifyLightGray, modifier = Modifier.size(64.dp))
                         Spacer(Modifier.height(16.dp))
                         Text(stringResource(R.string.release_load_failed), color = SpotifyWhite, fontSize = 18.sp)
                         Spacer(Modifier.height(8.dp))
                         Text(error!!, color = SpotifyLightGray, fontSize = 13.sp)
                         Spacer(Modifier.height(24.dp))
                         Button(onClick = { load() }) {
-                            Icon(Icons.Default.Refresh, null)
+                            Icon(Icons.Rounded.Refresh, null)
                             Spacer(Modifier.width(8.dp))
                             Text(stringResource(R.string.retry))
                         }
@@ -240,7 +243,7 @@ fun ReleaseNotesDialog(onDismiss: () -> Unit) {
         isLoading = false
     }
 
-    AlertDialog(
+    TightAlertDialog(
         onDismissRequest = onDismiss,
         containerColor = SpotifyDarkGray,
         title = { Text(stringResource(R.string.release_notes), color = SpotifyWhite) },
@@ -248,7 +251,7 @@ fun ReleaseNotesDialog(onDismiss: () -> Unit) {
             Box(Modifier.heightIn(max = 500.dp)) {
                 when {
                     isLoading -> Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = SpotifyLightGray)
+                        LoadingIndicator(color = SpotifyLightGray)
                     }
                     error != null -> Text(stringResource(R.string.release_load_failed_short, error ?: ""), color = SpotifyLightGray)
                     else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {

@@ -3,8 +3,8 @@ package ch.snepilatch.app.ui.components
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.SystemUpdate
-import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.rounded.SystemUpdate
+import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,16 +28,19 @@ fun UpdateDialog(
     var progress by remember { mutableFloatStateOf(0f) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    AlertDialog(
+    TightAlertDialog(
         onDismissRequest = { if (!isDownloading) onDismiss() },
-        icon = {
-            Icon(
-                Icons.Default.SystemUpdate,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
-            )
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Rounded.SystemUpdate,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.update_available))
+            }
         },
-        title = { Text(stringResource(R.string.update_available)) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -101,7 +104,7 @@ fun UpdateDialog(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Icon(
-                                Icons.Default.ErrorOutline,
+                                Icons.Rounded.ErrorOutline,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onErrorContainer
                             )

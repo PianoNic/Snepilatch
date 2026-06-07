@@ -18,7 +18,7 @@ kotlin {
 
 android {
     namespace = "ch.snepilatch.app"
-    compileSdk = 36
+    compileSdk = 37
 
     // Load keystore properties
     val keystorePropertiesFile = rootProject.file("key.properties")
@@ -37,9 +37,9 @@ android {
     defaultConfig {
         applicationId = "ch.snepilatch.app"
         minSdk = 26
-        targetSdk = 36
-        versionCode = 15
-        versionName = "2.3"
+        targetSdk = 37
+        versionCode = 22
+        versionName = "2.4.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -113,7 +113,7 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
-    implementation(libs.androidx.compose.material3)
+    implementation("androidx.compose.material3:material3:1.5.0-alpha21")
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)

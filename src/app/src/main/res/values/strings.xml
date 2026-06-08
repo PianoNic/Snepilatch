@@ -57,6 +57,7 @@
     <!-- Settings -->
     <string name="lossless_audio">Lossless Audio</string>
     <string name="lossless_on">FLAC via %s</string>
+    <string name="lossless_on_flac">FLAC</string>
     <string name="lossless_off">Standard quality</string>
     <string name="lossless_provider">Lossless Provider</string>
     <string name="tidal_desc">Tidal — FLAC up to 1411kbps</string>

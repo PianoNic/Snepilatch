@@ -1827,7 +1827,7 @@ class SpotifyViewModel : ViewModel() {
                 is StreamResult.Success -> {
                     // Don't resume Spotify yet — onReady callback will sync after ExoPlayer buffers
                     playUrlAt = System.currentTimeMillis()
-                    MusicPlaybackService.instance?.playUrl(result.info.url, title, artist, art)
+                    MusicPlaybackService.instance?.playUrl(result.info.url, title, artist, art, headers = result.info.headers)
                     currentStreamUri = trackUri
                     isStreaming.value = true
                     streamProvider.value = result.info.provider

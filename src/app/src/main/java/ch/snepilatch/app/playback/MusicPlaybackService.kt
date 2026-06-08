@@ -22,8 +22,12 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -288,8 +292,15 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
     var onReady: (() -> Unit)? = null
 
-    fun playUrl(url: String, title: String, artist: String, albumArtUrl: String?, startPlaying: Boolean = true) {
-        LokiLogger.i(TAG, "Loading: $title by $artist -> ${url.take(80)} (play=$startPlaying)")
+    fun playUrl(
+        url: String,
+        title: String,
+        artist: String,
+        albumArtUrl: String?,
+        startPlaying: Boolean = true,
+        headers: Map<String, String> = emptyMap()
+    ) {
+        LokiLogger.i(TAG, "Loading: $title by $artist -> ${url.take(80)} (play=$startPlaying, headers=${headers.keys})")
         val meta = TrackMetadata(title, artist, albumArtUrl)
         metadataQueue.clear()
         metadataQueue.add(meta)
@@ -299,7 +310,15 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         // Start audio IMMEDIATELY — don't wait for art
         mainHandler.post {
             player.playWhenReady = false
-            player.setMediaItem(buildMediaItem(url))
+            // Default sources (squid direct URL, Spotify CDN) play from a plain
+            // MediaItem. Sources that gate their stream behind a request header
+            // (the anandserver Qobuz mirror) need those headers on the HTTP data
+            // source, so they go through a dedicated header-injecting MediaSource.
+            if (headers.isEmpty()) {
+                player.setMediaItem(buildMediaItem(url))
+            } else {
+                player.setMediaSource(buildHeaderedSource(url, headers))
+            }
 
             if (startPlaying) {
                 // Register listener BEFORE prepare() so we catch STATE_READY
@@ -448,6 +467,21 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             .setMediaId(url)
             .setUri(url)
             .build()
+    }
+
+    /**
+     * Progressive media source whose HTTP data source sends [headers] on every
+     * request. Used only for stream URLs that are gated behind a request header
+     * (the anandserver Qobuz mirror's X-API-Key) — the default [buildMediaItem]
+     * path is left untouched for header-less sources.
+     */
+    @OptIn(UnstableApi::class)
+    private fun buildHeaderedSource(url: String, headers: Map<String, String>): MediaSource {
+        val httpFactory = DefaultHttpDataSource.Factory()
+            .setDefaultRequestProperties(headers)
+            .setAllowCrossProtocolRedirects(true)
+        return ProgressiveMediaSource.Factory(httpFactory)
+            .createMediaSource(buildMediaItem(url))
     }
 
     fun buildDrmMediaItem(url: String, licenseUrl: String, licenseHeaders: Map<String, String>): MediaItem {

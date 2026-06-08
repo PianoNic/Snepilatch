@@ -22,8 +22,12 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -44,6 +48,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     private var mediaSession: MediaSessionCompat? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    /** Loopback proxy that decrypts Blowfish-encrypted Deezer streams on the fly. */
+    private val deezerProxy = DeezerDecryptProxy()
     lateinit var player: ExoPlayer
         private set
 
@@ -97,6 +104,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         super.onCreate()
 
         createNotificationChannel()
+        deezerProxy.start()
 
         val audioAttributes = AudioAttributes.Builder()
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
@@ -288,8 +296,15 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
     var onReady: (() -> Unit)? = null
 
-    fun playUrl(url: String, title: String, artist: String, albumArtUrl: String?, startPlaying: Boolean = true) {
-        LokiLogger.i(TAG, "Loading: $title by $artist -> ${url.take(80)} (play=$startPlaying)")
+    fun playUrl(
+        url: String,
+        title: String,
+        artist: String,
+        albumArtUrl: String?,
+        startPlaying: Boolean = true,
+        headers: Map<String, String> = emptyMap()
+    ) {
+        LokiLogger.i(TAG, "Loading: $title by $artist -> ${url.take(80)} (play=$startPlaying, headers=${headers.keys})")
         val meta = TrackMetadata(title, artist, albumArtUrl)
         metadataQueue.clear()
         metadataQueue.add(meta)
@@ -299,7 +314,15 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         // Start audio IMMEDIATELY — don't wait for art
         mainHandler.post {
             player.playWhenReady = false
-            player.setMediaItem(buildMediaItem(url))
+            // Default sources (squid direct URL, Spotify CDN) play from a plain
+            // MediaItem. Sources that gate their stream behind a request header
+            // (the anandserver Qobuz mirror) need those headers on the HTTP data
+            // source, so they go through a dedicated header-injecting MediaSource.
+            if (headers.isEmpty()) {
+                player.setMediaItem(buildMediaItem(url))
+            } else {
+                player.setMediaSource(buildHeaderedSource(url, headers))
+            }
 
             if (startPlaying) {
                 // Register listener BEFORE prepare() so we catch STATE_READY
@@ -448,6 +471,39 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             .setMediaId(url)
             .setUri(url)
             .build()
+    }
+
+    /**
+     * Play an encrypted Deezer stream. The bytes are Blowfish-encrypted, so we
+     * register them with the loopback [deezerProxy] and hand ExoPlayer the
+     * resulting cleartext localhost URL — no custom DataSource, no DRM config.
+     */
+    fun playDeezer(
+        streamUrl: String,
+        decryptionKey: String,
+        headers: Map<String, String>,
+        title: String,
+        artist: String,
+        albumArtUrl: String?,
+        startPlaying: Boolean = true
+    ) {
+        val localUrl = deezerProxy.register(streamUrl, decryptionKey, headers)
+        playUrl(localUrl, title, artist, albumArtUrl, startPlaying)
+    }
+
+    /**
+     * Progressive media source whose HTTP data source sends [headers] on every
+     * request. Used only for stream URLs that are gated behind a request header
+     * (the anandserver Qobuz mirror's X-API-Key) — the default [buildMediaItem]
+     * path is left untouched for header-less sources.
+     */
+    @OptIn(UnstableApi::class)
+    private fun buildHeaderedSource(url: String, headers: Map<String, String>): MediaSource {
+        val httpFactory = DefaultHttpDataSource.Factory()
+            .setDefaultRequestProperties(headers)
+            .setAllowCrossProtocolRedirects(true)
+        return ProgressiveMediaSource.Factory(httpFactory)
+            .createMediaSource(buildMediaItem(url))
     }
 
     fun buildDrmMediaItem(url: String, licenseUrl: String, licenseHeaders: Map<String, String>): MediaItem {
@@ -729,6 +785,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             release()
         }
         player.release()
+        deezerProxy.stop()
         // Do NOT clear SessionHolder here — the VM and MainActivity already
         // handle explicit user-close teardown. If the service is dying for
         // other reasons (e.g. low memory) we want the session to stay live

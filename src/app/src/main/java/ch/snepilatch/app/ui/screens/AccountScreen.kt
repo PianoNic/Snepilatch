@@ -256,28 +256,24 @@ fun AccountScreen(vm: SpotifyViewModel) {
 
         // Audio settings
         val audioSource by vm.preferredAudioSource.collectAsState()
-        val isLossless = audioSource == "tidal" || audioSource == "qobuz"
+        val isLossless = audioSource != null
+        val losslessSubtitle = if (isLossless) {
+            stringResource(R.string.lossless_on_flac)
+        } else {
+            stringResource(R.string.lossless_off_spotify)
+        }
 
-        // Lossless toggle
-        val tidalLabel = stringResource(R.string.tidal)
-        val qobuzLabel = stringResource(R.string.qobuz)
-        val losslessOnText = stringResource(R.string.lossless_on, if (audioSource == "tidal") tidalLabel else qobuzLabel)
-        val losslessOffText = stringResource(R.string.lossless_off_spotify)
+        // Lossless toggle — when on, the resolver picks the best source
+        // (Qobuz, then Deezer, then YouTube) autonomously; no provider choice.
         ListItem(
             headlineContent = { Text(stringResource(R.string.lossless_audio), color = SpotifyWhite) },
-            supportingContent = { Text(
-                if (isLossless) losslessOnText else losslessOffText,
-                color = SpotifyLightGray
-            ) },
+            supportingContent = { Text(losslessSubtitle, color = SpotifyLightGray) },
             leadingContent = { Icon(Icons.Rounded.MusicNote, null, tint = SpotifyLightGray) },
             trailingContent = {
                 Switch(
                     checked = isLossless,
                     onCheckedChange = { enabled ->
-                        vm.setPreferredAudioSource(
-                            if (enabled) "tidal" else null,
-                            audioContext
-                        )
+                        vm.setPreferredAudioSource(if (enabled) "lossless" else null, audioContext)
                     },
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = animatedPrimary,
@@ -289,73 +285,6 @@ fun AccountScreen(vm: SpotifyViewModel) {
             },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
         )
-
-        // Lossless provider picker (only when lossless enabled)
-        if (isLossless) {
-            var showProviderPicker by remember { mutableStateOf(false) }
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.lossless_provider), color = SpotifyWhite) },
-                supportingContent = { Text(
-                    if (audioSource == "tidal") stringResource(R.string.tidal_desc)
-                    else stringResource(R.string.qobuz_desc),
-                    color = SpotifyLightGray
-                ) },
-                leadingContent = { Spacer(Modifier.width(24.dp)) },
-                trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpotifyLightGray) },
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                modifier = Modifier.clickable { showProviderPicker = true }
-            )
-            if (showProviderPicker) {
-                TightAlertDialog(
-                    onDismissRequest = { showProviderPicker = false },
-                    title = { Text(stringResource(R.string.lossless_provider), color = SpotifyWhite) },
-                    text = {
-                        Column {
-                            listOf(
-                                "tidal" to stringResource(R.string.tidal) to stringResource(R.string.tidal_short_desc),
-                                "qobuz" to stringResource(R.string.qobuz) to stringResource(R.string.qobuz_short_desc)
-                            ).forEach { (pair, desc) ->
-                                val (value, label) = pair
-                                Row(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            vm.setPreferredAudioSource(value, audioContext)
-                                            showProviderPicker = false
-                                        }
-                                        .padding(vertical = 12.dp, horizontal = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    RadioButton(
-                                        selected = audioSource == value,
-                                        onClick = {
-                                            vm.setPreferredAudioSource(value, audioContext)
-                                            showProviderPicker = false
-                                        },
-                                        colors = RadioButtonDefaults.colors(
-                                            selectedColor = animatedPrimary,
-                                            unselectedColor = SpotifyLightGray
-                                        )
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                    Column {
-                                        Text(label, color = SpotifyWhite, fontSize = 15.sp)
-                                        Text(desc, color = SpotifyLightGray, fontSize = 12.sp)
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    containerColor = SpotifyGray,
-                    confirmButton = {},
-                    dismissButton = {
-                        TextButton(onClick = { showProviderPicker = false }) {
-                            Text(stringResource(R.string.cancel), color = SpotifyLightGray)
-                        }
-                    }
-                )
-            }
-        }
 
         // Canvas background
         val canvasOn by vm.canvasEnabled.collectAsState()

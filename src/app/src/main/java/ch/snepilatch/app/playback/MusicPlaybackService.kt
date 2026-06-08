@@ -48,6 +48,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     private var mediaSession: MediaSessionCompat? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    /** Loopback proxy that decrypts Blowfish-encrypted Deezer streams on the fly. */
+    private val deezerProxy = DeezerDecryptProxy()
     lateinit var player: ExoPlayer
         private set
 
@@ -101,6 +104,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         super.onCreate()
 
         createNotificationChannel()
+        deezerProxy.start()
 
         val audioAttributes = AudioAttributes.Builder()
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
@@ -470,6 +474,24 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     }
 
     /**
+     * Play an encrypted Deezer stream. The bytes are Blowfish-encrypted, so we
+     * register them with the loopback [deezerProxy] and hand ExoPlayer the
+     * resulting cleartext localhost URL — no custom DataSource, no DRM config.
+     */
+    fun playDeezer(
+        streamUrl: String,
+        decryptionKey: String,
+        headers: Map<String, String>,
+        title: String,
+        artist: String,
+        albumArtUrl: String?,
+        startPlaying: Boolean = true
+    ) {
+        val localUrl = deezerProxy.register(streamUrl, decryptionKey, headers)
+        playUrl(localUrl, title, artist, albumArtUrl, startPlaying)
+    }
+
+    /**
      * Progressive media source whose HTTP data source sends [headers] on every
      * request. Used only for stream URLs that are gated behind a request header
      * (the anandserver Qobuz mirror's X-API-Key) — the default [buildMediaItem]
@@ -763,6 +785,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             release()
         }
         player.release()
+        deezerProxy.stop()
         // Do NOT clear SessionHolder here — the VM and MainActivity already
         // handle explicit user-close teardown. If the service is dying for
         // other reasons (e.g. low memory) we want the session to stay live

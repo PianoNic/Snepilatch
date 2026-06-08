@@ -1827,7 +1827,14 @@ class SpotifyViewModel : ViewModel() {
                 is StreamResult.Success -> {
                     // Don't resume Spotify yet — onReady callback will sync after ExoPlayer buffers
                     playUrlAt = System.currentTimeMillis()
-                    MusicPlaybackService.instance?.playUrl(result.info.url, title, artist, art, headers = result.info.headers)
+                    val info = result.info
+                    val key = info.decryptionKey
+                    if (key != null) {
+                        // Deezer: encrypted stream -> decrypt via the loopback proxy.
+                        MusicPlaybackService.instance?.playDeezer(info.url, key, info.headers, title, artist, art)
+                    } else {
+                        MusicPlaybackService.instance?.playUrl(info.url, title, artist, art, headers = info.headers)
+                    }
                     currentStreamUri = trackUri
                     isStreaming.value = true
                     streamProvider.value = result.info.provider

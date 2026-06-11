@@ -20,8 +20,8 @@ src/key.properties
 *.jks
 *.keystore
 
-# KotifyClient JAR (external dependency, not committed)
-src/app/libs/KotifyClient.jar
+# KotifyClient JAR and any other jar — baked in by the release pipeline, never committed
+src/app/libs/*.jar
 
 # OS files
 .DS_Store
@@ -29,5 +29,4 @@ Thumbs.db
 
 # AI Plans
 docs/superpowers/
-src/app/libs/KotifyClient.jar
 cur.png

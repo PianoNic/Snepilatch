@@ -1,0 +1,24 @@
+name: Guard
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  no-committed-jars:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # KotifyClient.jar (and any jar under src/app/libs) must NEVER be committed.
+      # It is downloaded from KotifyClient's release and baked into the app by
+      # the release pipeline. A committed copy bloats history and goes stale.
+      - name: Reject committed jars under src/app/libs
+        run: |
+          jars="$(git ls-files 'src/app/libs/*.jar')"
+          if [ -n "$jars" ]; then
+            echo "::error::A jar is committed under src/app/libs — these are baked in by the release pipeline and must never be committed:"
+            echo "$jars"
+            exit 1
+          fi
+          echo "OK: no committed jars under src/app/libs"

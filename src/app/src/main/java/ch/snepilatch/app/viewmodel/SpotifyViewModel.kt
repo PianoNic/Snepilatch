@@ -83,6 +83,10 @@ class SpotifyViewModel : ViewModel() {
     private var nextStreamUrl: String? = null
     private var nextTrackInfo: TrackInfo? = null
     private var nextStreamProvider: String? = null
+
+    // Request headers the pre-resolved next stream needs (anandserver X-API-Key);
+    // empty for direct URLs and Deezer (which is pre-registered with the proxy).
+    private var nextStreamHeaders: Map<String, String> = emptyMap()
     private var nextCdnUrl: String? = null      // Pre-resolved Spotify CDN URL (DRM)
     private var nextCdnFileId: String? = null   // File ID for the pre-resolved CDN track
     private var lastCommandTs: Long = 0L  // timing: when last user command was sent
@@ -182,7 +186,7 @@ class SpotifyViewModel : ViewModel() {
     val audioOutputName = MutableStateFlow<String?>(null)
     val audioOutputType = MutableStateFlow("speaker") // "speaker", "bluetooth", "wired", "usb"
 
-    // Audio source preference: null = auto (default chain), or "tidal", "qobuz", "youtube"
+    // Audio source preference: null = Spotify (default), "lossless" = third-party FLAC chain.
     val preferredAudioSource = MutableStateFlow<String?>(null)
     // Lyrics animation direction for line-synced (non word-synced): "vertical" or "horizontal"
     val lyricsAnimDirection = MutableStateFlow("vertical")
@@ -973,7 +977,7 @@ class SpotifyViewModel : ViewModel() {
                     .joinToString(" ")
                 val result = cdn.resolveStreamUrl(
                     trackId, region = contentRegion.value,
-                    youtubeSearchQuery = query, preferredSource = preferredAudioSource.value
+                    searchQuery = query, preferredSource = preferredAudioSource.value
                 )
                 if (result is StreamResult.Success) {
                     val info = result.info
@@ -1767,7 +1771,7 @@ class SpotifyViewModel : ViewModel() {
             LokiLogger.i(TAG, "Using pre-resolved stream for $trackUri")
             // Don't resume Spotify yet — onReady callback will sync after ExoPlayer buffers
             playUrlAt = System.currentTimeMillis()
-            MusicPlaybackService.instance?.playUrl(preResolvedUrl, title, artist, art)
+            MusicPlaybackService.instance?.playUrl(preResolvedUrl, title, artist, art, headers = nextStreamHeaders)
             currentStreamUri = trackUri
             isStreaming.value = true
             isStreamLoading.value = false
@@ -1775,6 +1779,7 @@ class SpotifyViewModel : ViewModel() {
             nextStreamUrl = null
             nextTrackInfo = null
             nextStreamProvider = null
+            nextStreamHeaders = emptyMap()
             preResolveNextTrack()
             return
         }
@@ -1880,12 +1885,6 @@ class SpotifyViewModel : ViewModel() {
                     streamProvider.value = result.info.provider
                     LokiLogger.i(TAG, "Streaming: ${result.info.provider} -> ${result.info.url.take(80)}")
                 }
-                is StreamResult.YouTubeFallback -> {
-                    LokiLogger.w(TAG, "YouTube fallback: ${result.url}")
-                    MusicPlaybackService.instance?.stop()
-                    isStreaming.value = false
-                    streamProvider.value = null
-                }
                 is StreamResult.Failure -> {
                     LokiLogger.e(TAG, "Stream resolve failed: ${result.message}")
                     MusicPlaybackService.instance?.stop()
@@ -1927,7 +1926,10 @@ class SpotifyViewModel : ViewModel() {
             try {
                 val art = normalizeSpotifyImageUrl(track.imageLargeUrl ?: track.imageUrl)
 
-                val result = cdn.resolveStreamUrl(trackId, region = contentRegion.value, youtubeSearchQuery = searchQuery, preferredSource = preferredAudioSource.value)
+                val result = cdn.resolveStreamUrl(
+                    trackId, region = contentRegion.value,
+                    searchQuery = searchQuery, preferredSource = preferredAudioSource.value
+                )
                 when (result) {
                     is StreamResult.Success -> {
                         playUrlAt = System.currentTimeMillis()
@@ -1942,11 +1944,6 @@ class SpotifyViewModel : ViewModel() {
                         isStreaming.value = true
                         streamProvider.value = result.info.provider
                         LokiLogger.i(TAG, "Initial stream: ${result.info.provider} (playing=$shouldPlay)")
-                    }
-                    is StreamResult.YouTubeFallback -> {
-                        LokiLogger.w(TAG, "resolveCurrentTrack: YouTube fallback, not streaming")
-                        isStreaming.value = false
-                        streamProvider.value = null
                     }
                     is StreamResult.Failure -> {
                         LokiLogger.e(TAG, "resolveCurrentTrack: stream resolution failed: ${result.message}")
@@ -1988,14 +1985,31 @@ class SpotifyViewModel : ViewModel() {
                 .joinToString(" ").takeIf { it.isNotBlank() }
 
             LokiLogger.i(TAG, "Pre-resolving next: $title by $artist")
-            val result = cdn.resolveStreamUrl(nextId, region = contentRegion.value, youtubeSearchQuery = searchQuery, preferredSource = preferredAudioSource.value)
+            val result = cdn.resolveStreamUrl(nextId, region = contentRegion.value, searchQuery = searchQuery, preferredSource = preferredAudioSource.value)
             if (result is StreamResult.Success) {
-                nextStreamUrl = result.info.url
-                nextTrackInfo = TrackInfo(uri = nextUri, name = title, artist = artist, albumArt = art)
-                nextStreamProvider = result.info.provider
-                MusicPlaybackService.instance?.setNextUrl(result.info.url, title, artist, art)
-                isNextReady.value = true
-                LokiLogger.i(TAG, "Next track pre-resolved: ${result.info.provider}")
+                val info = result.info
+                val key = info.decryptionKey
+                // Deezer is encrypted — pre-register it with the proxy so the
+                // enqueued URL is a plaintext localhost URL (no headers). Other
+                // sources keep their request headers (anandserver X-API-Key).
+                val playable: String?
+                val headers: Map<String, String>
+                if (key != null) {
+                    playable = MusicPlaybackService.instance?.proxyUrlForDeezer(info.url, key, info.headers)
+                    headers = emptyMap()
+                } else {
+                    playable = info.url
+                    headers = info.headers
+                }
+                if (playable != null) {
+                    nextStreamUrl = playable
+                    nextStreamHeaders = headers
+                    nextTrackInfo = TrackInfo(uri = nextUri, name = title, artist = artist, albumArt = art)
+                    nextStreamProvider = info.provider
+                    MusicPlaybackService.instance?.setNextUrl(playable, title, artist, art, headers)
+                    isNextReady.value = true
+                    LokiLogger.i(TAG, "Next track pre-resolved: ${info.provider}")
+                }
             }
         } catch (e: Exception) {
             LokiLogger.e(TAG, "preResolveNextTrack failed", e)

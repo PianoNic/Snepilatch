@@ -72,6 +72,22 @@ android {
             )
         }
     }
+
+    // Two environments so a Dev build can sit side-by-side with the shipped app.
+    // "prod" is the default and what the release pipeline builds; "dev" gets its
+    // own applicationId/name/version suffix and overrides app_name via the
+    // src/dev/ source set. No behavioural difference between the two.
+    flavorDimensions += "environment"
+    productFlavors {
+        create("prod") {
+            dimension = "environment"
+        }
+        create("dev") {
+            dimension = "environment"
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+        }
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11

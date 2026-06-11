@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Overrides the main app_name for the dev flavor so the Dev build is
+         visually distinct on-device and can be installed alongside prod. -->
+    <string name="app_name">Snepilatch Dev</string>
+</resources>

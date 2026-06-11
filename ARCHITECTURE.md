@@ -77,7 +77,7 @@ Rules:
 
 ## Tests
 
-Unit tests live in `app/src/test/`. Run with `./gradlew :app:testDebugUnitTest`.
+Unit tests live in `app/src/test/`. Run with `./gradlew :app:testProdDebugUnitTest` (or `:app:test` for every variant). The test source set is shared across flavors, so prod and dev run the same tests.
 
 - **Pure helpers** (`util/`) get straightforward JUnit tests. See `SpotifyImageUrlTest`, `FormatUtilsTest`.
 - **ViewModel handlers** use `PlaybackTestRig` which mocks `MusicPlaybackService.instance` via `mockk` and swaps the Main dispatcher. See `RemotePlayPauseHandlerTest`.
@@ -87,8 +87,9 @@ When you fix a playback bug, **add a test that would have caught it.** The "brow
 
 ## Build
 
-- `./gradlew :app:assembleDebug` — debug APK
-- `./gradlew :app:testDebugUnitTest` — unit tests
+- Two product flavors on the `environment` dimension: **prod** (`ch.snepilatch.app`, "Snepilatch") and **dev** (`ch.snepilatch.app.dev`, "Snepilatch Dev", `-dev` versionName). They differ only in identity — same code — so a dev build installs alongside the shipped app. Variants are `{prod,dev}{Debug,Release}`.
+- `./gradlew :app:assembleDebug` — both debug APKs (`assembleProdDebug` / `assembleDevDebug` for one)
+- `./gradlew :app:testProdDebugUnitTest` — unit tests (`:app:test` for every variant)
 - KotifyClient is consumed as a local jar: `app/libs/KotifyClient.jar`. Rebuild with `cd ../KotifyClient && ./gradlew obfuscate` and copy `build/libs/KotifyClient-obfuscated.jar` over.
 - Two `.so` files per ABI in `app/src/main/jniLibs/<abi>/` are required at runtime: `libtls_client_go.so` (the Go TLS engine) and `libjnidispatch.so` (JNA's native dispatcher — JNA can't extract its own `.so` at runtime on Android due to W^X). CI re-fetches both on every release build; for local dev, the committed copies are fine unless KotifyClient bumps its kotlin-tls-client or JNA version. See `CLAUDE.md` for the bump procedure.
 - Local logs go to Loki when `loki.endpoint` is set in `local.properties` (gitignored). Otherwise logs are local.

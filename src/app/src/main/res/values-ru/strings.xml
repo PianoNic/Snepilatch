@@ -53,7 +53,7 @@
     <string name="log_out">Выйти</string>
 
     <!-- Settings -->
-    <string name="lossless_audio">Без потерь</string>
+    <string name="lossless_audio">Без потерь (Beta)</string>
     <string name="lossless_on">FLAC через %s</string>
     <string name="lossless_off">Стандартное качество</string>
     <string name="lossless_provider">Источник без потерь</string>

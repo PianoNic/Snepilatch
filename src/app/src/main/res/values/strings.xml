@@ -55,7 +55,7 @@
     <string name="log_out">Log out</string>
 
     <!-- Settings -->
-    <string name="lossless_audio">Lossless Audio</string>
+    <string name="lossless_audio">Lossless Audio (Beta)</string>
     <string name="lossless_on">FLAC via %s</string>
     <string name="lossless_on_flac">FLAC</string>
     <string name="lossless_off">Standard quality</string>
@@ -133,6 +133,7 @@
     <string name="notif_like_short_desc">Toggle liked state</string>
 
     <!-- Regions -->
+    <string name="region_nearest">Nearest (auto)</string>
     <string name="region_us">United States</string>
     <string name="region_gb">United Kingdom</string>
     <string name="region_de">Germany</string>

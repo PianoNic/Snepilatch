@@ -313,9 +313,14 @@ fun AccountScreen(vm: SpotifyViewModel) {
         // Content region picker
         val currentRegion by vm.contentRegion.collectAsState()
         var showRegionPicker by remember { mutableStateOf(false) }
+        val regionLabel = if (currentRegion == "nearest") {
+            stringResource(R.string.region_nearest)
+        } else {
+            currentRegion
+        }
         ListItem(
             headlineContent = { Text(stringResource(R.string.content_region), color = SpotifyWhite) },
-            supportingContent = { Text(currentRegion, color = SpotifyLightGray) },
+            supportingContent = { Text(regionLabel, color = SpotifyLightGray) },
             leadingContent = { Icon(Icons.Rounded.Language, null, tint = SpotifyLightGray) },
             trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpotifyLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -328,6 +333,7 @@ fun AccountScreen(vm: SpotifyViewModel) {
                 text = {
                     Column {
                         listOf(
+                            "nearest" to stringResource(R.string.region_nearest),
                             "US" to stringResource(R.string.region_us),
                             "GB" to stringResource(R.string.region_gb),
                             "DE" to stringResource(R.string.region_de),

@@ -968,7 +968,7 @@ class SpotifyViewModel : ViewModel() {
             val resolver = cdnResolver ?: throw IllegalStateException("CdnResolver not initialized")
 
             // Lossless mode: resolve via the third-party chain (Qobuz → Deezer →
-            // YouTube) and play locally instead of Spotify's Widevine CDN, so
+            // Deezer) and play locally instead of Spotify's Widevine CDN, so
             // resume-from-idle stays consistent with the rest of the lossless flow.
             if (preferredAudioSource.value != null) {
                 val trackId = trackUri.removePrefix("spotify:track:")

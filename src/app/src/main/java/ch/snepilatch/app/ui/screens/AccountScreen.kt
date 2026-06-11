@@ -264,7 +264,7 @@ fun AccountScreen(vm: SpotifyViewModel) {
         }
 
         // Lossless toggle — when on, the resolver picks the best source
-        // (Qobuz, then Deezer, then YouTube) autonomously; no provider choice.
+        // (Qobuz, then Deezer) autonomously; no provider choice.
         ListItem(
             headlineContent = { Text(stringResource(R.string.lossless_audio), color = SpotifyWhite) },
             supportingContent = { Text(losslessSubtitle, color = SpotifyLightGray) },

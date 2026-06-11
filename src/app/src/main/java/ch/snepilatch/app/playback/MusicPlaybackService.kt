@@ -302,9 +302,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         artist: String,
         albumArtUrl: String?,
         startPlaying: Boolean = true,
-        headers: Map<String, String> = emptyMap()
+        headers: Map<String, String> = emptyMap(),
+        startPositionMs: Long = 0L
     ) {
-        LokiLogger.i(TAG, "Loading: $title by $artist -> ${url.take(80)} (play=$startPlaying, headers=${headers.keys})")
+        LokiLogger.i(TAG, "Loading: $title by $artist -> ${url.take(80)} (play=$startPlaying, headers=${headers.keys}, pos=${startPositionMs}ms)")
         val meta = TrackMetadata(title, artist, albumArtUrl)
         metadataQueue.clear()
         metadataQueue.add(meta)
@@ -318,10 +319,11 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             // MediaItem. Sources that gate their stream behind a request header
             // (the anandserver Qobuz mirror) need those headers on the HTTP data
             // source, so they go through a dedicated header-injecting MediaSource.
+            // Both accept a start position so resume-from-idle seeks on load.
             if (headers.isEmpty()) {
-                player.setMediaItem(buildMediaItem(url))
+                player.setMediaItem(buildMediaItem(url), startPositionMs)
             } else {
-                player.setMediaSource(buildHeaderedSource(url, headers))
+                player.setMediaSource(buildHeaderedSource(url, headers), startPositionMs)
             }
 
             if (startPlaying) {
@@ -443,8 +445,15 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         }
     }
 
-    fun setNextUrl(url: String, title: String, artist: String, albumArtUrl: String?) {
-        LokiLogger.i(TAG, "Next: $title by $artist")
+    @OptIn(UnstableApi::class)
+    fun setNextUrl(
+        url: String,
+        title: String,
+        artist: String,
+        albumArtUrl: String?,
+        headers: Map<String, String> = emptyMap()
+    ) {
+        LokiLogger.i(TAG, "Next: $title by $artist (headers=${headers.keys})")
         val meta = TrackMetadata(title, artist, albumArtUrl)
 
         // Keep only the current track's metadata, replace any queued next
@@ -462,7 +471,13 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             if (player.mediaItemCount > 1) {
                 player.removeMediaItems(1, player.mediaItemCount)
             }
-            player.addMediaItem(buildMediaItem(url))
+            // Header-gated sources (anandserver Qobuz) must be enqueued as a
+            // header-injecting MediaSource, or the gapless advance hits a 401.
+            if (headers.isEmpty()) {
+                player.addMediaItem(buildMediaItem(url))
+            } else {
+                player.addMediaSource(buildHeaderedSource(url, headers))
+            }
         }
     }
 
@@ -485,23 +500,30 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         title: String,
         artist: String,
         albumArtUrl: String?,
-        startPlaying: Boolean = true
+        startPositionMs: Long = 0L
     ) {
         val localUrl = deezerProxy.register(streamUrl, decryptionKey, headers)
-        playUrl(localUrl, title, artist, albumArtUrl, startPlaying)
+        playUrl(localUrl, title, artist, albumArtUrl, startPlaying = true, startPositionMs = startPositionMs)
     }
+
+    /** Register an encrypted Deezer stream with the proxy; returns a playable local URL. */
+    fun proxyUrlForDeezer(streamUrl: String, decryptionKey: String, headers: Map<String, String>): String =
+        deezerProxy.register(streamUrl, decryptionKey, headers)
 
     /**
      * Progressive media source whose HTTP data source sends [headers] on every
      * request. Used only for stream URLs that are gated behind a request header
      * (the anandserver Qobuz mirror's X-API-Key) — the default [buildMediaItem]
-     * path is left untouched for header-less sources.
+     * path is left untouched for header-less sources. Timeouts are generous
+     * because the relay can be slow to first byte.
      */
     @OptIn(UnstableApi::class)
     private fun buildHeaderedSource(url: String, headers: Map<String, String>): MediaSource {
         val httpFactory = DefaultHttpDataSource.Factory()
             .setDefaultRequestProperties(headers)
             .setAllowCrossProtocolRedirects(true)
+            .setConnectTimeoutMs(30_000)
+            .setReadTimeoutMs(30_000)
         return ProgressiveMediaSource.Factory(httpFactory)
             .createMediaSource(buildMediaItem(url))
     }

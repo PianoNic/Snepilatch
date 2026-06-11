@@ -1003,9 +1003,8 @@ private fun InfoPill(icon: androidx.compose.ui.graphics.vector.ImageVector, text
 @Composable
 private fun SourcePill(provider: String) {
     val label = when (provider) {
-        "tidal" -> "Tidal"
         "qobuz" -> "Qobuz"
-        "youtube" -> "YouTube Music"
+        "deezer" -> "Deezer"
         else -> provider.replaceFirstChar { it.uppercase() }
     }
     Row(

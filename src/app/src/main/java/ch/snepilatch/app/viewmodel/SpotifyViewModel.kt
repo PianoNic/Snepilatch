@@ -962,6 +962,46 @@ class SpotifyViewModel : ViewModel() {
 
         try {
             val resolver = cdnResolver ?: throw IllegalStateException("CdnResolver not initialized")
+
+            // Lossless mode: resolve via the third-party chain (Qobuz → Deezer →
+            // YouTube) and play locally instead of Spotify's Widevine CDN, so
+            // resume-from-idle stays consistent with the rest of the lossless flow.
+            if (preferredAudioSource.value != null) {
+                val trackId = trackUri.removePrefix("spotify:track:")
+                val query = listOf(artist, title)
+                    .filter { it.isNotBlank() && it != "Unknown" }
+                    .joinToString(" ")
+                val result = cdn.resolveStreamUrl(
+                    trackId, region = contentRegion.value,
+                    youtubeSearchQuery = query, preferredSource = preferredAudioSource.value
+                )
+                if (result is StreamResult.Success) {
+                    val info = result.info
+                    playUrlAt = System.currentTimeMillis()
+                    withContext(Dispatchers.Main) {
+                        val svc = MusicPlaybackService.instance
+                        val key = info.decryptionKey
+                        if (key != null) {
+                            svc?.playDeezer(
+                                info.url, key, info.headers, title, artist, art,
+                                startPositionMs = savedPositionAtEntry
+                            )
+                        } else {
+                            svc?.playUrl(
+                                info.url, title, artist, art,
+                                startPlaying = true, headers = info.headers, startPositionMs = savedPositionAtEntry
+                            )
+                        }
+                    }
+                    currentStreamUri = trackUri
+                    isStreaming.value = true
+                    streamProvider.value = info.provider
+                    LokiLogger.i(TAG, "[ColdStart] lossless (${info.provider}) loading at ${savedPositionAtEntry}ms")
+                    return
+                }
+                LokiLogger.w(TAG, "[ColdStart] lossless resolve failed, falling back to Spotify CDN")
+            }
+
             val stream = resolver.resolveForFileId(fileId)
             LokiLogger.i(TAG, "[ColdStart] resolved ${stream.mirrorCount} CDN mirrors")
 

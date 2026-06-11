@@ -302,9 +302,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         artist: String,
         albumArtUrl: String?,
         startPlaying: Boolean = true,
-        headers: Map<String, String> = emptyMap()
+        headers: Map<String, String> = emptyMap(),
+        startPositionMs: Long = 0L
     ) {
-        LokiLogger.i(TAG, "Loading: $title by $artist -> ${url.take(80)} (play=$startPlaying, headers=${headers.keys})")
+        LokiLogger.i(TAG, "Loading: $title by $artist -> ${url.take(80)} (play=$startPlaying, headers=${headers.keys}, pos=${startPositionMs}ms)")
         val meta = TrackMetadata(title, artist, albumArtUrl)
         metadataQueue.clear()
         metadataQueue.add(meta)
@@ -318,10 +319,11 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             // MediaItem. Sources that gate their stream behind a request header
             // (the anandserver Qobuz mirror) need those headers on the HTTP data
             // source, so they go through a dedicated header-injecting MediaSource.
+            // Both accept a start position so resume-from-idle seeks on load.
             if (headers.isEmpty()) {
-                player.setMediaItem(buildMediaItem(url))
+                player.setMediaItem(buildMediaItem(url), startPositionMs)
             } else {
-                player.setMediaSource(buildHeaderedSource(url, headers))
+                player.setMediaSource(buildHeaderedSource(url, headers), startPositionMs)
             }
 
             if (startPlaying) {
@@ -485,10 +487,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         title: String,
         artist: String,
         albumArtUrl: String?,
-        startPlaying: Boolean = true
+        startPositionMs: Long = 0L
     ) {
         val localUrl = deezerProxy.register(streamUrl, decryptionKey, headers)
-        playUrl(localUrl, title, artist, albumArtUrl, startPlaying)
+        playUrl(localUrl, title, artist, albumArtUrl, startPlaying = true, startPositionMs = startPositionMs)
     }
 
     /**

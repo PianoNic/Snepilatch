@@ -53,7 +53,7 @@
     <string name="log_out">Abmelde</string>
 
     <!-- Settings -->
-    <string name="lossless_audio">Verlustfreii Audio</string>
+    <string name="lossless_audio">Verlustfreii Audio (Beta)</string>
     <string name="lossless_on">FLAC über %s</string>
     <string name="lossless_off">Standardqualität</string>
     <string name="lossless_provider">Verlustfreii Quelle</string>

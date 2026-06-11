@@ -17,11 +17,17 @@ CI (`.github/workflows/build-and-release.yml`) re-fetches the latest natives rel
 ```sh
 cd src
 ./gradlew :app:assembleDebug
-./gradlew :app:testDebugUnitTest
+./gradlew :app:testProdDebugUnitTest
 ./gradlew detekt
 ```
 
 All three must be green. The test rig + detekt baseline catch most regressions before they reach a phone.
+
+## Build flavors
+
+There are two product flavors on the `environment` dimension: **prod** (`ch.snepilatch.app`, "Snepilatch" — what ships) and **dev** (`ch.snepilatch.app.dev`, "Snepilatch Dev", `-dev` versionName suffix). They differ only in identity, not behaviour, so a dev build installs side-by-side with the production app.
+
+Variant task names are flavor-qualified: `assembleProdDebug` / `assembleDevDebug`, `testProdDebugUnitTest` / `testDevDebugUnitTest`. The umbrella `assembleDebug` still builds both; there is no `testDebugUnitTest` anymore — use `:app:testProdDebugUnitTest` or `:app:test`. The dev `app_name` override lives in `app/src/dev/res/values/strings.xml`. The release pipeline builds `assembleProdRelease`.
 
 ## Test rig
 

@@ -87,6 +87,12 @@ class SpotifyViewModel : ViewModel() {
     // Request headers the pre-resolved next stream needs (anandserver X-API-Key);
     // empty for direct URLs and Deezer (which is pre-registered with the proxy).
     private var nextStreamHeaders: Map<String, String> = emptyMap()
+
+    // Set when the user explicitly taps a track to play (playTrack). Lets the
+    // next onTrackChange resolve+play locally even from an idle/not-streaming
+    // start — otherwise the guard meant for passive init pushes swallows it and
+    // the first song after launch plays on Spotify's side with no local audio.
+    private var pendingUserPlay = false
     private var nextCdnUrl: String? = null      // Pre-resolved Spotify CDN URL (DRM)
     private var nextCdnFileId: String? = null   // File ID for the pre-resolved CDN track
     private var lastCommandTs: Long = 0L  // timing: when last user command was sent
@@ -426,11 +432,15 @@ class SpotifyViewModel : ViewModel() {
             // Set latestFileId from cluster state so resolveAndPlay doesn't wait for onPlaybackId
             if (event.currentFileId != null) latestFileId = event.currentFileId
             // Only auto-resolve when we're already streaming (legit track changes
-            // during active playback). Otherwise the very first WS push on init
-            // runs a futile CDN resolve, eats 18s of SongLink retries on the
-            // third-party fallback path, AND resets _playback.value.positionMs
-            // to 0 — clobbering the saved snapshot position.
-            if (!isStreaming.value) {
+            // during active playback), OR when the user just tapped a track to
+            // play (pendingUserPlay). Otherwise the very first WS push on init
+            // runs a futile CDN resolve, eats retries on the fallback path, AND
+            // resets _playback.value.positionMs to 0 — clobbering the saved
+            // snapshot position. The one-shot pendingUserPlay flag distinguishes
+            // a user-initiated play from a passive idle push.
+            val userPlay = pendingUserPlay
+            pendingUserPlay = false
+            if (!isStreaming.value && !userPlay) {
                 LokiLogger.d(TAG, "Skipping resolveAndPlay: not streaming (idle WS push)")
                 return@onTrackChange
             }
@@ -1122,6 +1132,9 @@ class SpotifyViewModel : ViewModel() {
     }
 
     fun playTrack(trackUri: String, contextUri: String? = null) {
+        // The user explicitly asked to play this track — honor the resulting
+        // onTrackChange even if we're starting from idle (no local audio yet).
+        pendingUserPlay = true
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val pc = player ?: return@launch

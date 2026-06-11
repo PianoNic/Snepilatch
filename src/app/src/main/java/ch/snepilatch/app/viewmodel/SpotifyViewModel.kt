@@ -1432,14 +1432,26 @@ class SpotifyViewModel : ViewModel() {
 
     /**
      * The 2-letter region passed to the CDN resolver. "nearest" resolves to the
-     * device's region at call time (from the system config, so the in-app
-     * language setting doesn't skew it); any other value is used as-is.
+     * device's real country at call time, preferring the mobile-network country
+     * (where you physically are, roaming-aware), then the SIM's home country,
+     * then the system locale region. The telephony signals are tried first
+     * because the locale region only reflects the language/region *setting* — a
+     * user in Switzerland with an English phone would otherwise resolve to the
+     * wrong region. Any value other than "nearest" is used as-is.
      */
     private fun effectiveRegion(): String {
         if (contentRegion.value != "nearest") return contentRegion.value
-        val deviceCountry = android.content.res.Resources.getSystem().configuration.locales[0].country
-        val region = deviceCountry.takeIf { it.isNotBlank() } ?: "US"
-        LokiLogger.i(TAG, "Content region 'nearest' -> device country '$deviceCountry' -> using $region")
+        val tm = appContext?.getSystemService(Context.TELEPHONY_SERVICE) as? android.telephony.TelephonyManager
+        val net = tm?.networkCountryIso
+        val sim = tm?.simCountryIso
+        val locale = android.content.res.Resources.getSystem().configuration.locales[0].country
+        // Keep only letters so a dual-SIM phone's "ch," collapses to "ch", then
+        // take the first signal that yields a 2-letter code.
+        val region = listOf(net, sim, locale)
+            .firstNotNullOfOrNull { it?.filter(Char::isLetter)?.take(2)?.takeIf { c -> c.length == 2 } }
+            ?.uppercase(java.util.Locale.ROOT)
+            ?: "US"
+        LokiLogger.i(TAG, "Content region 'nearest' -> net='$net' sim='$sim' locale='$locale' -> $region")
         return region
     }
 

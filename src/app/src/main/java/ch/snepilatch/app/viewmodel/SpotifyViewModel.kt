@@ -202,7 +202,7 @@ class SpotifyViewModel : ViewModel() {
     val notificationLeftButton = MutableStateFlow("repeat")
     val notificationRightButton = MutableStateFlow("like")
     // Content region for CDN resolution
-    val contentRegion = MutableStateFlow("US")
+    val contentRegion = MutableStateFlow("nearest")
     // Canvas background
     val canvasEnabled = MutableStateFlow(false)
     val canvasUrl = MutableStateFlow<String?>(null)
@@ -986,7 +986,7 @@ class SpotifyViewModel : ViewModel() {
                     .filter { it.isNotBlank() && it != "Unknown" }
                     .joinToString(" ")
                 val result = cdn.resolveStreamUrl(
-                    trackId, region = contentRegion.value,
+                    trackId, region = effectiveRegion(),
                     searchQuery = query, preferredSource = preferredAudioSource.value
                 )
                 if (result is StreamResult.Success) {
@@ -1430,6 +1430,19 @@ class SpotifyViewModel : ViewModel() {
             .edit().putString("content_region", region).apply()
     }
 
+    /**
+     * The 2-letter region passed to the CDN resolver. "nearest" resolves to the
+     * device's region at call time (from the system config, so the in-app
+     * language setting doesn't skew it); any other value is used as-is.
+     */
+    private fun effectiveRegion(): String {
+        if (contentRegion.value != "nearest") return contentRegion.value
+        val deviceCountry = android.content.res.Resources.getSystem().configuration.locales[0].country
+        val region = deviceCountry.takeIf { it.isNotBlank() } ?: "US"
+        LokiLogger.i(TAG, "Content region 'nearest' -> device country '$deviceCountry' -> using $region")
+        return region
+    }
+
     fun setLyricsAnimDirection(direction: String, context: Context) {
         lyricsAnimDirection.value = direction
         context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
@@ -1474,7 +1487,7 @@ class SpotifyViewModel : ViewModel() {
             context.resources.updateConfiguration(config, context.resources.displayMetrics)
         }
         canvasEnabled.value = prefs.getBoolean("canvas_enabled", false)
-        contentRegion.value = prefs.getString("content_region", "US") ?: "US"
+        contentRegion.value = prefs.getString("content_region", "nearest") ?: "nearest"
         notificationLeftButton.value = prefs.getString("notification_left_button", "repeat") ?: "repeat"
         notificationRightButton.value = prefs.getString("notification_right_button", "like") ?: "like"
     }
@@ -1880,7 +1893,7 @@ class SpotifyViewModel : ViewModel() {
         }
 
         try {
-            val result = cdn.resolveFromTrack(event, region = contentRegion.value, preferredSource = preferredAudioSource.value)
+            val result = cdn.resolveFromTrack(event, region = effectiveRegion(), preferredSource = preferredAudioSource.value)
             when (result) {
                 is StreamResult.Success -> {
                     // Don't resume Spotify yet — onReady callback will sync after ExoPlayer buffers
@@ -1940,7 +1953,7 @@ class SpotifyViewModel : ViewModel() {
                 val art = normalizeSpotifyImageUrl(track.imageLargeUrl ?: track.imageUrl)
 
                 val result = cdn.resolveStreamUrl(
-                    trackId, region = contentRegion.value,
+                    trackId, region = effectiveRegion(),
                     searchQuery = searchQuery, preferredSource = preferredAudioSource.value
                 )
                 when (result) {
@@ -1998,7 +2011,7 @@ class SpotifyViewModel : ViewModel() {
                 .joinToString(" ").takeIf { it.isNotBlank() }
 
             LokiLogger.i(TAG, "Pre-resolving next: $title by $artist")
-            val result = cdn.resolveStreamUrl(nextId, region = contentRegion.value, searchQuery = searchQuery, preferredSource = preferredAudioSource.value)
+            val result = cdn.resolveStreamUrl(nextId, region = effectiveRegion(), searchQuery = searchQuery, preferredSource = preferredAudioSource.value)
             if (result is StreamResult.Success) {
                 val info = result.info
                 val key = info.decryptionKey

@@ -545,7 +545,10 @@ private fun ArtistTrackRow(
             Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SpotifyLightGray, modifier = Modifier.size(20.dp))
         }
         if (showMenu) {
-            val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            val sheetState = rememberBottomSheetState(
+                initialValue = SheetValue.Hidden,
+                enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+            )
             ModalBottomSheet(
                 onDismissRequest = { showMenu = false },
                 sheetState = sheetState,
@@ -667,7 +670,10 @@ private fun AlbumTrackRow(
             Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SpotifyLightGray, modifier = Modifier.size(20.dp))
         }
         if (showMenu) {
-            val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            val sheetState = rememberBottomSheetState(
+                initialValue = SheetValue.Hidden,
+                enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+            )
             ModalBottomSheet(
                 onDismissRequest = { showMenu = false },
                 sheetState = sheetState,
@@ -760,13 +766,13 @@ private fun DetailHeaderMenu(
     context: android.content.Context,
     onDismiss: () -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val trackUris = detail.tracks.map { it.uri }
-    val type = detail.type
+    val sheetState = rememberBottomSheetState(
+        initialValue = SheetValue.Hidden,
+        enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+    )
+    val trackUris = detail.tracks.map { it.uri }; val hasTracks = trackUris.isNotEmpty(); val type = detail.type
     val isAlbum = type == "album"; val isCollection = type == "collection"; val isArtist = type == "artist"
-    val hasTracks = trackUris.isNotEmpty()
-    val shareLabel = stringResource(R.string.share)
-    val addToQueueLabel = stringResource(R.string.add_to_queue)
+    val shareLabel = stringResource(R.string.share); val addToQueueLabel = stringResource(R.string.add_to_queue)
     val addToPlaylistLabel = stringResource(R.string.add_to_playlist)
     val visitArtistLabel = stringResource(R.string.visit_artist)
     ModalBottomSheet(

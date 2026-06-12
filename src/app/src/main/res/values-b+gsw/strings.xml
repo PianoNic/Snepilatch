@@ -49,7 +49,7 @@
     <string name="user_id">Benutzer-ID</string>
     <string name="plan">Abo</string>
     <string name="plan_free">Gratis</string>
-    <string name="followers_playlists">%d Follower · %d Playlists</string>
+    <string name="followers_playlists">%1$d Follower · %2$d Playlists</string>
     <string name="log_out">Abmelde</string>
 
     <!-- Settings -->

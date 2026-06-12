@@ -1,10 +1,12 @@
 package ch.snepilatch.app.ui.screens
 
 import ch.snepilatch.app.R
+import ch.snepilatch.app.ui.theme.SpotifyBlack
 import ch.snepilatch.app.ui.theme.SpotifyWhite
 import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
@@ -32,7 +35,12 @@ import ch.snepilatch.app.viewmodel.SpotifyViewModel
 
 @Composable
 fun SpotifyLoginScreen(vm: SpotifyViewModel) {
-    Column(Modifier.fillMaxSize()) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(SpotifyBlack)
+            .statusBarsPadding()
+    ) {
         Row(
             Modifier
                 .fillMaxWidth()
@@ -51,6 +59,10 @@ fun SpotifyLoginScreen(vm: SpotifyViewModel) {
                 WebView(context).apply {
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
+                    // Google's OAuth refuses embedded WebViews ("disallowed_useragent",
+                    // error 403) — it detects the "; wv" token Android appends to the
+                    // WebView UA. Strip it so "Continue with Google" is allowed through.
+                    settings.userAgentString = settings.userAgentString.replace("; wv", "")
                     CookieManager.getInstance().apply {
                         setAcceptCookie(true)
                         removeAllCookies(null)

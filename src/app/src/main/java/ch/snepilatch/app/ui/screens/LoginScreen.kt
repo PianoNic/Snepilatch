@@ -51,6 +51,10 @@ fun SpotifyLoginScreen(vm: SpotifyViewModel) {
                 WebView(context).apply {
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
+                    // Google's OAuth refuses embedded WebViews ("disallowed_useragent",
+                    // error 403) — it detects the "; wv" token Android appends to the
+                    // WebView UA. Strip it so "Continue with Google" is allowed through.
+                    settings.userAgentString = settings.userAgentString.replace("; wv", "")
                     CookieManager.getInstance().apply {
                         setAcceptCookie(true)
                         removeAllCookies(null)

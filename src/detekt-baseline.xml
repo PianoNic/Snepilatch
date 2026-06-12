@@ -5,13 +5,13 @@
     <ID>AnnotationOnSeparateLine:MediaButtonReceiver.kt$MediaButtonReceiver$@Suppress("DEPRECATION") intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT)</ID>
     <ID>BlockCommentInitialStarAlignment:Theme.kt$/* Other default colors to override background = Color(0xFFFFFBFE), surface = Color(0xFFFFFBFE), onPrimary = Color.White, onSecondary = Color.White, onTertiary = Color.White, onBackground = Color(0xFF1C1B1F), onSurface = Color(0xFF1C1B1F), */</ID>
     <ID>BlockCommentInitialStarAlignment:Type.kt$/* Other default text styles to override titleLarge = TextStyle( fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal, fontSize = 22.sp, lineHeight = 28.sp, letterSpacing = 0.sp ), labelSmall = TextStyle( fontFamily = FontFamily.Default, fontWeight = FontWeight.Medium, fontSize = 11.sp, lineHeight = 16.sp, letterSpacing = 0.5.sp ) */</ID>
-    <ID>ComplexCondition:NowPlayingScreen.kt$&lt;no name provided&gt;$viewW == 0f || viewH == 0f || videoW == 0f || videoH == 0f</ID>
     <ID>ComplexCondition:SpotifyViewModel.kt$SpotifyViewModel$isStreaming.value &amp;&amp; !isSeekGuarded &amp;&amp; !isStreamLoading.value &amp;&amp; !isTrackMismatch &amp;&amp; !isStaleSnapshot</ID>
     <ID>CyclomaticComplexMethod:AccountScreen.kt$@Composable fun AccountScreen(vm: SpotifyViewModel)</ID>
     <ID>CyclomaticComplexMethod:DetailScreen.kt$@Composable fun DetailScreen(vm: SpotifyViewModel)</ID>
     <ID>CyclomaticComplexMethod:LibraryScreen.kt$@Composable fun LibraryScreen(vm: SpotifyViewModel)</ID>
     <ID>CyclomaticComplexMethod:LyricsScreen.kt$@Composable fun LyricsScreen(vm: SpotifyViewModel)</ID>
-    <ID>CyclomaticComplexMethod:NowPlayingScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun NowPlayingScreen(vm: SpotifyViewModel)</ID>
+    <ID>CyclomaticComplexMethod:NowPlayingScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun NowPlayingScreen( vm: SpotifyViewModel, /** When false, the screen paints no background of its own — the morphing card * in SpotifyApp supplies a card-anchored background that grows with it. */ drawBackground: Boolean = true, /** Per-frame vertical drag (px, down = positive) for finger-tracked collapse; * when set, replaces the standalone swipe-down-to-dismiss. */ onMorphDrag: ((Float) -&gt; Unit)? = null, /** Drag release with vertical velocity (px/s) so the morph can settle. */ onMorphDragEnd: ((Float) -&gt; Unit)? = null )</ID>
+    <ID>CyclomaticComplexMethod:SpotifyApp.kt$@Composable fun SpotifyApp(vm: SpotifyViewModel)</ID>
     <ID>CyclomaticComplexMethod:SpotifyViewModel.kt$SpotifyViewModel$private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent)</ID>
     <ID>CyclomaticComplexMethod:SpotifyViewModel.kt$SpotifyViewModel$private suspend fun updatePlaybackFromState(state: PlayerStateData)</ID>
     <ID>Filename:AudioOutputDetector.kt$ch.snepilatch.app.util.AudioOutputDetector.kt</ID>
@@ -25,7 +25,6 @@
     <ID>Indentation:MediaButtonReceiver.kt$MediaButtonReceiver$ </ID>
     <ID>Indentation:MusicPlaybackService.kt$MusicPlaybackService$ </ID>
     <ID>Indentation:NowPlayingScreen.kt$ </ID>
-    <ID>Indentation:NowPlayingScreen.kt$&lt;no name provided&gt;$ </ID>
     <ID>Indentation:SpotifyApp.kt$ </ID>
     <ID>LongMethod:AccountScreen.kt$@Composable fun AccountScreen(vm: SpotifyViewModel)</ID>
     <ID>LongMethod:DetailScreen.kt$@Composable fun DetailScreen(vm: SpotifyViewModel)</ID>
@@ -35,7 +34,8 @@
     <ID>LongMethod:LibraryScreen.kt$@Composable fun LibraryScreen(vm: SpotifyViewModel)</ID>
     <ID>LongMethod:LyricsScreen.kt$@Composable fun LyricsScreen(vm: SpotifyViewModel)</ID>
     <ID>LongMethod:MainActivity.kt$MainActivity$override fun onCreate(savedInstanceState: Bundle?)</ID>
-    <ID>LongMethod:NowPlayingScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun NowPlayingScreen(vm: SpotifyViewModel)</ID>
+    <ID>LongMethod:NowPlayingScreen.kt$@Composable fun PlayerBackground(vm: SpotifyViewModel, modifier: Modifier = Modifier)</ID>
+    <ID>LongMethod:NowPlayingScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun NowPlayingScreen( vm: SpotifyViewModel, /** When false, the screen paints no background of its own — the morphing card * in SpotifyApp supplies a card-anchored background that grows with it. */ drawBackground: Boolean = true, /** Per-frame vertical drag (px, down = positive) for finger-tracked collapse; * when set, replaces the standalone swipe-down-to-dismiss. */ onMorphDrag: ((Float) -&gt; Unit)? = null, /** Drag release with vertical velocity (px/s) so the morph can settle. */ onMorphDragEnd: ((Float) -&gt; Unit)? = null )</ID>
     <ID>LongMethod:NowPlayingScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun NowPlayingMenu( showMore: Boolean, onShowMore: (Boolean) -&gt; Unit, onShowPlaylistPicker: () -&gt; Unit, vm: SpotifyViewModel, track: ch.snepilatch.app.data.TrackInfo?, shareContext: android.content.Context, buttonBg: Color )</ID>
     <ID>LongMethod:SearchScreen.kt$@Composable fun SearchScreen(vm: SpotifyViewModel, searchVm: SearchViewModel = viewModel())</ID>
     <ID>LongMethod:SharedComponents.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun TrackRow(track: TrackInfo, vm: SpotifyViewModel, contextUri: String? = null)</ID>
@@ -56,15 +56,11 @@
     <ID>MaxLineLength:SpotifyViewModel.kt$SpotifyViewModel$?:</ID>
     <ID>MaxLineLength:SpotifyViewModel.kt$SpotifyViewModel$LokiLogger.i(TAG, "[Timing] WS onTrackChange arrived (${delta}ms after CMD '$lastCommandName') -&gt; ${event.current?.uri} fileId=${event.currentFileId}")</ID>
     <ID>MaxLineLength:SpotifyViewModel.kt$SpotifyViewModel$LokiLogger.i(TAG, "[Timing] resolveAndPlay DRM loaded in ${System.currentTimeMillis() - resolveStart}ms (${System.currentTimeMillis() - lastCommandTs}ms total from CMD)")</ID>
-    <ID>MaxLineLength:SpotifyViewModel.kt$SpotifyViewModel$val result = cdn.resolveStreamUrl(nextId, region = contentRegion.value, youtubeSearchQuery = searchQuery, preferredSource = preferredAudioSource.value)</ID>
-    <ID>MaxLineLength:SpotifyViewModel.kt$SpotifyViewModel$val result = cdn.resolveStreamUrl(trackId, region = contentRegion.value, youtubeSearchQuery = searchQuery, preferredSource = preferredAudioSource.value)</ID>
     <ID>MaximumLineLength:DetailScreen.kt$ </ID>
     <ID>MaximumLineLength:MusicPlaybackService.kt$MusicPlaybackService.&lt;no name provided&gt;$ </ID>
     <ID>MaximumLineLength:NowPlayingScreen.kt$ </ID>
     <ID>MaximumLineLength:QueueScreen.kt$ </ID>
     <ID>MaximumLineLength:SpotifyViewModel.kt$SpotifyViewModel$ </ID>
-    <ID>MultiLineIfElse:AccountScreen.kt$stringResource(R.string.qobuz_desc)</ID>
-    <ID>MultiLineIfElse:AccountScreen.kt$stringResource(R.string.tidal_desc)</ID>
     <ID>MultiLineIfElse:BottomNav.kt$Modifier</ID>
     <ID>MultiLineIfElse:BottomNav.kt$Modifier.border(2.dp, SpotifyWhite, CircleShape)</ID>
     <ID>MultiLineIfElse:DetailScreen.kt$String.format("%,d", detail.followers)</ID>
@@ -76,8 +72,6 @@
     <ID>MultiLineIfElse:LyricsScreen.kt$PaddingValues(top = 40.dp, bottom = 80.dp)</ID>
     <ID>MultiLineIfElse:LyricsScreen.kt$PaddingValues(top = 80.dp, bottom = 300.dp)</ID>
     <ID>MultiLineIfElse:LyricsScreen.kt$remember(posMs / 100) { lines.indexOfLast { posMs &gt;= it.startTimeMs }.coerceAtLeast(0) }</ID>
-    <ID>MultiLineIfElse:MusicPlaybackService.kt$MusicPlaybackService$android.R.drawable.ic_media_pause</ID>
-    <ID>MultiLineIfElse:MusicPlaybackService.kt$MusicPlaybackService$android.R.drawable.ic_media_play</ID>
     <ID>MultiLineIfElse:MusicPlaybackService.kt$MusicPlaybackService$url</ID>
     <ID>MultiLineIfElse:NowPlayingScreen.kt$seekDragValue</ID>
     <ID>MultiLineIfElse:ReleaseNotesScreen.kt$MaterialTheme.colorScheme.primary</ID>
@@ -95,7 +89,6 @@
     <ID>NoMultipleSpaces:MusicPlaybackService.kt$MusicPlaybackService$ </ID>
     <ID>NoMultipleSpaces:ReleaseNotesScreen.kt$ </ID>
     <ID>NoMultipleSpaces:SpotifyViewModel.kt$SpotifyViewModel$ </ID>
-    <ID>PropertyWrapping:AccountScreen.kt$val losslessOnText = stringResource(R.string.lossless_on, if (audioSource == "tidal") tidalLabel else qobuzLabel)</ID>
     <ID>SpacingAroundKeyword:SpotifyViewModel.kt$SpotifyViewModel$catch</ID>
     <ID>SpacingAroundKeyword:SpotifyViewModel.kt$SpotifyViewModel$finally</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:SessionHolder.kt$SessionHolder$@Volatile var cdnResolver: SpotifyCdnResolver? = null</ID>
@@ -109,7 +102,6 @@
     <ID>SpacingBetweenDeclarationsWithComments:SpotifyViewModel.kt$SpotifyViewModel$// Lyrics animation direction for line-synced (non word-synced): "vertical" or "horizontal"</ID>
     <ID>SpacingBetweenDeclarationsWithComments:SpotifyViewModel.kt$SpotifyViewModel$// Next track info (always available from WebSocket state for mini player swipe)</ID>
     <ID>SpacingBetweenDeclarationsWithComments:SpotifyViewModel.kt$SpotifyViewModel$// Notification button preferences: "like", "shuffle", "repeat"</ID>
-    <ID>StringTemplate:DetailScreen.kt$${totalMin}</ID>
     <ID>ThrowsCount:SpotifyViewModel.kt$SpotifyViewModel$fun togglePlayPause()</ID>
     <ID>TooGenericExceptionThrown:ReleaseNotesScreen.kt$throw Exception("HTTP ${response.code}")</ID>
     <ID>UseCheckOrError:SpotifyCdnResolver.kt$SpotifyCdnResolver$throw IllegalStateException("No CDN mirrors for fileId=$fileId")</ID>
@@ -119,9 +111,7 @@
     <ID>VariableNaming:SpotifyViewModel.kt$SpotifyViewModel$private val TAG = "SpotifyVM"</ID>
     <ID>Wrapping:AccountScreen.kt$(</ID>
     <ID>Wrapping:AccountScreen.kt$;</ID>
-    <ID>Wrapping:AccountScreen.kt$Text( if (audioSource == "tidal") stringResource(R.string.tidal_desc) else stringResource(R.string.qobuz_desc), color = SpotifyLightGray )</ID>
     <ID>Wrapping:AccountScreen.kt$Text( if (canvasOn) stringResource(R.string.canvas_on) else stringResource(R.string.canvas_off), color = SpotifyLightGray )</ID>
-    <ID>Wrapping:AccountScreen.kt$Text( if (isLossless) losslessOnText else losslessOffText, color = SpotifyLightGray )</ID>
     <ID>Wrapping:AccountScreen.kt$Text( when { isChecking -&gt; stringResource(R.string.checking) upToDate -&gt; stringResource(R.string.up_to_date) else -&gt; stringResource(R.string.tap_to_check) }, color = if (upToDate) animatedPrimary else SpotifyLightGray )</ID>
     <ID>Wrapping:AccountScreen.kt$Text(stringResource(R.string.cancel), color = SpotifyLightGray)</ID>
     <ID>Wrapping:AccountScreen.kt$TextButton(onClick = { showLanguagePicker = false }) { Text(stringResource(R.string.cancel), color = SpotifyLightGray) }</ID>
@@ -132,7 +122,6 @@
     <ID>Wrapping:AccountScreen.kt$showRightPicker = false</ID>
     <ID>Wrapping:DetailScreen.kt$(</ID>
     <ID>Wrapping:DetailScreen.kt$;</ID>
-    <ID>Wrapping:DetailScreen.kt$showMenu = false; vm.showPlaylistPickerForTrack(track.uri)</ID>
     <ID>Wrapping:DetailScreen.kt$stripHtml(it)</ID>
     <ID>Wrapping:LibraryScreen.kt$(</ID>
     <ID>Wrapping:LibraryScreen.kt$;</ID>
@@ -144,16 +133,12 @@
     <ID>Wrapping:MainActivity.kt$MainActivity$(</ID>
     <ID>Wrapping:MiniPlayer.kt$(</ID>
     <ID>Wrapping:MusicPlaybackService.kt$MusicPlaybackService$(</ID>
-    <ID>Wrapping:NowPlayingScreen.kt$(</ID>
     <ID>Wrapping:NowPlayingScreen.kt$;</ID>
     <ID>Wrapping:NowPlayingScreen.kt$&lt;no name provided&gt;${ vm.updateAudioOutput(audioCtx) }</ID>
     <ID>Wrapping:NowPlayingScreen.kt$&lt;no name provided&gt;${ vm.updateAudioOutput(audioCtx2) }</ID>
-    <ID>Wrapping:NowPlayingScreen.kt$track?.uri?.let { vm.addToQueue(it) }; onShowMore(false)</ID>
-    <ID>Wrapping:NowPlayingScreen.kt$vm.addToQueue(it)</ID>
     <ID>Wrapping:ReleaseNotesScreen.kt$(</ID>
     <ID>Wrapping:SharedComponents.kt$(</ID>
     <ID>Wrapping:SharedComponents.kt$;</ID>
-    <ID>Wrapping:SharedComponents.kt$showMenu = false; vm.showPlaylistPickerForTrack(track.uri)</ID>
     <ID>Wrapping:SpotifyApp.kt$;</ID>
     <ID>Wrapping:SpotifyViewModel.kt$SpotifyViewModel$(</ID>
     <ID>Wrapping:SpotifyViewModel.kt$SpotifyViewModel$;</ID>

@@ -6,8 +6,6 @@ import ch.snepilatch.app.ui.theme.SpotifyWhite
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -33,33 +31,44 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
-import ch.snepilatch.app.data.Screen
 import ch.snepilatch.app.ui.theme.SpotifyElevated
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
 
+/**
+ * Base fill colour of the mini-player card. Shared with the expanding-player morph
+ * (PlayerMorph in SpotifyApp) so the hand-off from bar to growing card has no
+ * colour seam — both must derive the fill from the same tint of the album colour.
+ */
+fun miniCardBaseColor(primary: Color): Color = lerp(SpotifyElevated, primary, 0.18f)
+
+/**
+ * The compact now-playing bar — a rounded card around [MiniPlayerContent].
+ * Gesture-free: the parent supplies tap/drag via [modifier] so the same bar acts
+ * as the collapsed anchor of the expanding player morph (see SpotifyApp).
+ */
 @Composable
-fun MiniPlayer(vm: SpotifyViewModel) {
-    val playback by vm.playback.collectAsState()
-    val track = playback.track ?: return
+fun MiniPlayer(
+    vm: SpotifyViewModel,
+    modifier: Modifier = Modifier
+) {
     val theme by vm.themeColors.collectAsState()
-    val animatedPrimary by animateColorAsState(theme.primary, tween(800), label = "miniPrimary")
     val animatedCardBg by animateColorAsState(
-        lerp(SpotifyElevated, theme.primary, 0.18f),
+        miniCardBaseColor(theme.primary),
         tween(800), label = "miniCardBg"
     )
-    val streamLoading by vm.isStreamLoading.collectAsState()
 
-    Column(
-        modifier = Modifier
+    MiniPlayerContent(
+        vm,
+        modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 6.dp)
             .shadow(
@@ -70,13 +79,26 @@ fun MiniPlayer(vm: SpotifyViewModel) {
             )
             .clip(RoundedCornerShape(12.dp))
             .background(animatedCardBg)
-            .pointerInput(Unit) {
-                detectVerticalDragGestures { _, dragAmount ->
-                    if (dragAmount < -30) vm.navigateTo(Screen.NOW_PLAYING)
-                }
-            }
-            .clickable { vm.navigateTo(Screen.NOW_PLAYING) }
-    ) {
+    )
+}
+
+/**
+ * The mini-player's inner content (artwork + title + transport + progress),
+ * without the card chrome — so the expanding-player morph can render it inside
+ * the growing card while it stretches to fullscreen.
+ */
+@Composable
+fun MiniPlayerContent(
+    vm: SpotifyViewModel,
+    modifier: Modifier = Modifier
+) {
+    val playback by vm.playback.collectAsState()
+    val track = playback.track ?: return
+    val theme by vm.themeColors.collectAsState()
+    val animatedPrimary by animateColorAsState(theme.primary, tween(800), label = "miniPrimary")
+    val streamLoading by vm.isStreamLoading.collectAsState()
+
+    Column(modifier.fillMaxWidth()) {
         Row(
             Modifier
                 .fillMaxWidth()

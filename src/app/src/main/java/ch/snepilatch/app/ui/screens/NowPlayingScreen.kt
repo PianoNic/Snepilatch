@@ -24,9 +24,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -48,38 +50,33 @@ import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.util.formatTime
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * The now-playing background: Canvas video when enabled, otherwise the album's
+ * accent colour with the blurred album art over it, topped by a dark scrim.
+ * Extracted so the expanding-player morph (SpotifyApp) can render the same *live*
+ * background — video included — inside the growing card, anchored to it, instead
+ * of a still. The video transform is recomputed on view resize so it stays
+ * fit-cropped while the card grows.
+ */
 @Composable
-fun NowPlayingScreen(vm: SpotifyViewModel) {
+fun PlayerBackground(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
     val playback by vm.playback.collectAsState()
     val track = playback.track
-    val streamLoading by vm.isStreamLoading.collectAsState()
     val theme by vm.themeColors.collectAsState()
-
-    val animatedPrimary by animateColorAsState(theme.primary, tween(800), label = "primary")
-    val buttonBg = Color.White.copy(alpha = 0.12f)
-
-    var showMore by remember { mutableStateOf(false) }
-    var showPlaylistPicker by remember { mutableStateOf(false) }
-    val shareContext = LocalContext.current
-    val shareTrackLabel = stringResource(R.string.share_track_chooser)
+    val animatedPrimary by animateColorAsState(theme.primary, tween(800), label = "bgPrimary")
     val canvasVideoUrl by vm.canvasUrl.collectAsState()
     val canvasOn by vm.canvasEnabled.collectAsState()
     val hasCanvas = canvasOn && canvasVideoUrl != null
-    // Brighter text in canvas mode for readability over video
-    val secondaryText = if (hasCanvas) SpotifyWhite.copy(alpha = 0.85f) else SpotifyLightGray
-    val tertiaryText = if (hasCanvas) SpotifyWhite.copy(alpha = 0.65f) else SpotifyLightGray.copy(alpha = 0.7f)
 
-    Box(Modifier.fillMaxSize()) {
-        // Background layer (hazeSource for blur panels)
-        Box(Modifier.fillMaxSize()) {
+    Box(modifier) {
         // Canvas video background (looping, muted)
         if (canvasOn && canvasVideoUrl != null) {
             val context = LocalContext.current
+            val density = LocalDensity.current
             var canvasPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
-
             var textureRef by remember { mutableStateOf<TextureView?>(null) }
             var surfaceReady by remember { mutableStateOf(false) }
+            var videoSizePx by remember { mutableStateOf(0 to 0) }
 
             val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
             DisposableEffect(canvasVideoUrl, lifecycleOwner) {
@@ -90,19 +87,7 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                     playWhenReady = true
                     addListener(object : Player.Listener {
                         override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
-                            val tv = textureRef ?: return
-                            val viewW = tv.width.toFloat()
-                            val viewH = tv.height.toFloat()
-                            val videoW = videoSize.width.toFloat()
-                            val videoH = videoSize.height.toFloat()
-                            if (viewW == 0f || viewH == 0f || videoW == 0f || videoH == 0f) return
-                            val scale = maxOf(viewW / videoW, viewH / videoH)
-                            val scaledW = videoW * scale
-                            val scaledH = videoH * scale
-                            val matrix = android.graphics.Matrix()
-                            matrix.setScale(scaledW / viewW, scaledH / viewH)
-                            matrix.postTranslate((viewW - scaledW) / 2f, (viewH - scaledH) / 2f)
-                            tv.setTransform(matrix)
+                            videoSizePx = videoSize.width to videoSize.height
                         }
                     })
                     prepare()
@@ -141,39 +126,62 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                 }
             }
 
-            AndroidView(
-                factory = { ctx ->
-                    TextureView(ctx).apply {
-                        surfaceTextureListener = object : TextureView.SurfaceTextureListener {
-                            override fun onSurfaceTextureAvailable(
-                                surface: SurfaceTexture, width: Int, height: Int
-                            ) {
-                                surfaceReady = true
-                                textureRef = this@apply
-                                canvasPlayer?.setVideoTextureView(this@apply)
+            // Size the TextureView to COVER the (growing) card at the video's aspect
+            // ratio, then centre + clip it. The view's own bounds already match the
+            // video aspect, so the raw TextureView fills them without distortion — no
+            // per-frame matrix that loses the race with layout while the card resizes.
+            BoxWithConstraints(Modifier.fillMaxSize().clipToBounds()) {
+                val (vw, vh) = videoSizePx
+                val boxW = constraints.maxWidth.toFloat()
+                val boxH = constraints.maxHeight.toFloat()
+                val coverMod = if (vw > 0 && vh > 0 && minOf(boxW, boxH) > 0f) {
+                    val scale = maxOf(boxW / vw, boxH / vh)
+                    // requiredSize, not size: the cover width can exceed the box
+                    // (1080px) and must NOT be clamped to it, or the video gets
+                    // squished horizontally. The overflow is clipped by clipToBounds.
+                    Modifier.requiredSize(
+                        with(density) { (vw * scale).toDp() },
+                        with(density) { (vh * scale).toDp() }
+                    )
+                } else {
+                    Modifier.fillMaxSize()
+                }
+                AndroidView(
+                    factory = { ctx ->
+                        TextureView(ctx).apply {
+                            surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+                                override fun onSurfaceTextureAvailable(
+                                    surface: SurfaceTexture, width: Int, height: Int
+                                ) {
+                                    surfaceReady = true
+                                    textureRef = this@apply
+                                    canvasPlayer?.setVideoTextureView(this@apply)
+                                }
+                                override fun onSurfaceTextureSizeChanged(
+                                    surface: SurfaceTexture, width: Int, height: Int
+                                ) {}
+                                override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
+                                    surfaceReady = false
+                                    canvasPlayer?.clearVideoTextureView(this@apply)
+                                    return true
+                                }
+                                override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {}
                             }
-                            override fun onSurfaceTextureSizeChanged(
-                                surface: SurfaceTexture, width: Int, height: Int
-                            ) {}
-                            override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
-                                surfaceReady = false
-                                canvasPlayer?.clearVideoTextureView(this@apply)
-                                return true
-                            }
-                            override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {}
+                            textureRef = this
                         }
-                        textureRef = this
-                    }
-                },
-                update = { texture ->
-                    if (surfaceReady) {
-                        canvasPlayer?.setVideoTextureView(texture)
-                    }
-                },
-                modifier = Modifier.fillMaxSize()
-            )
+                    },
+                    update = { texture ->
+                        if (surfaceReady) {
+                            canvasPlayer?.setVideoTextureView(texture)
+                        }
+                    },
+                    modifier = coverMod.align(Alignment.Center)
+                )
+            }
         } else {
-            // Blurred album art background — animated crossfade
+            // Solid one-colour base (the album's accent) under the blurred art.
+            Box(Modifier.fillMaxSize().background(animatedPrimary))
+            // Blurred album art.
             var displayedArt by remember { mutableStateOf(track?.albumArt) }
             if (track?.albumArt != null) displayedArt = track.albumArt
             androidx.compose.animation.Crossfade(
@@ -188,8 +196,6 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize().blur(80.dp)
                     )
-                } else {
-                    Box(Modifier.fillMaxSize().background(Color.Black))
                 }
             }
         }
@@ -199,7 +205,48 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = if (hasCanvas) 0.35f else 0.45f))
         )
-        } // end hazeSource Box
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NowPlayingScreen(
+    vm: SpotifyViewModel,
+    /** When false, the screen paints no background of its own — the morphing card
+     *  in SpotifyApp supplies a card-anchored background that grows with it. */
+    drawBackground: Boolean = true,
+    /** Per-frame vertical drag (px, down = positive) for finger-tracked collapse;
+     *  when set, replaces the standalone swipe-down-to-dismiss. */
+    onMorphDrag: ((Float) -> Unit)? = null,
+    /** Drag release with vertical velocity (px/s) so the morph can settle. */
+    onMorphDragEnd: ((Float) -> Unit)? = null
+) {
+    val playback by vm.playback.collectAsState()
+    val track = playback.track
+    val streamLoading by vm.isStreamLoading.collectAsState()
+    val theme by vm.themeColors.collectAsState()
+
+    val animatedPrimary by animateColorAsState(theme.primary, tween(800), label = "primary")
+    val buttonBg = Color.White.copy(alpha = 0.12f)
+
+    var showMore by remember { mutableStateOf(false) }
+    var showPlaylistPicker by remember { mutableStateOf(false) }
+    val shareContext = LocalContext.current
+    val shareTrackLabel = stringResource(R.string.share_track_chooser)
+    val canvasVideoUrl by vm.canvasUrl.collectAsState()
+    val canvasOn by vm.canvasEnabled.collectAsState()
+    val hasCanvas = canvasOn && canvasVideoUrl != null
+    // Brighter text in canvas mode for readability over video
+    val secondaryText = if (hasCanvas) SpotifyWhite.copy(alpha = 0.85f) else SpotifyLightGray
+    val tertiaryText = if (hasCanvas) SpotifyWhite.copy(alpha = 0.65f) else SpotifyLightGray.copy(alpha = 0.7f)
+
+    Box(Modifier.fillMaxSize()) {
+        // Background (Canvas video, or album colour + blurred art + scrim). Skipped
+        // during the morph, where the growing card renders the same PlayerBackground
+        // card-anchored so the live background grows with the card.
+        if (drawBackground) {
+            PlayerBackground(vm, Modifier.fillMaxSize())
+        }
 
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val isLandscape = maxWidth > maxHeight
@@ -559,15 +606,28 @@ fun NowPlayingScreen(vm: SpotifyViewModel) {
                 Column(
                     Modifier
                         .fillMaxSize()
-                        .pointerInput(Unit) {
-                            var totalDrag = 0f
-                            var handled = false
-                            detectVerticalDragGestures(
-                                onDragStart = { totalDrag = 0f; handled = false },
-                                onDragEnd = { if (totalDrag > 80 && !handled) { handled = true; vm.goBack() } },
-                                onDragCancel = { totalDrag = 0f; handled = false }
-                            ) { _, dragAmount ->
-                                totalDrag += dragAmount
+                        .pointerInput(onMorphDrag) {
+                            if (onMorphDrag != null) {
+                                // Finger-tracked collapse driven by the parent morph.
+                                val tracker = androidx.compose.ui.input.pointer.util.VelocityTracker()
+                                detectVerticalDragGestures(
+                                    onDragStart = { tracker.resetTracking() },
+                                    onDragEnd = { onMorphDragEnd?.invoke(tracker.calculateVelocity().y) },
+                                    onDragCancel = { onMorphDragEnd?.invoke(0f) }
+                                ) { change, dragAmount ->
+                                    tracker.addPosition(change.uptimeMillis, change.position)
+                                    onMorphDrag(dragAmount)
+                                }
+                            } else {
+                                var totalDrag = 0f
+                                var handled = false
+                                detectVerticalDragGestures(
+                                    onDragStart = { totalDrag = 0f; handled = false },
+                                    onDragEnd = { if (totalDrag > 80 && !handled) { handled = true; vm.goBack() } },
+                                    onDragCancel = { totalDrag = 0f; handled = false }
+                                ) { _, dragAmount ->
+                                    totalDrag += dragAmount
+                                }
                             }
                         }
                         .navigationBarsPadding()

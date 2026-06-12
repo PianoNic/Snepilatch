@@ -105,7 +105,11 @@ jobs:
       - name: Prepare artifacts
         run: |
           mkdir -p artifacts
-          cp src/app/build/outputs/apk/prod/release/app-prod-release.apk artifacts/snepilatch-${{ github.ref_name }}.apk
+          # Sanitize the ref name so a slash in a branch (e.g. feature/x on a
+          # workflow_dispatch dry run) doesn't make cp treat it as a directory.
+          # Tags used for real releases have no slash and are unaffected.
+          safe_ref="${GITHUB_REF_NAME//\//-}"
+          cp src/app/build/outputs/apk/prod/release/app-prod-release.apk "artifacts/snepilatch-${safe_ref}.apk"
 
       - name: Upload Android artifacts
         uses: actions/upload-artifact@v7

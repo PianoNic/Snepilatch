@@ -1043,7 +1043,10 @@ private fun NowPlayingMenu(
     }
 
     if (showMore) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val sheetState = rememberBottomSheetState(
+            initialValue = SheetValue.Hidden,
+            enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+        )
         ModalBottomSheet(
             onDismissRequest = { onShowMore(false) },
             sheetState = sheetState,

@@ -49,7 +49,7 @@
     <string name="user_id">ID пользователя</string>
     <string name="plan">Подписка</string>
     <string name="plan_free">Бесплатно</string>
-    <string name="followers_playlists">%d подписчиков · %d плейлистов</string>
+    <string name="followers_playlists">%1$d подписчиков · %2$d плейлистов</string>
     <string name="log_out">Выйти</string>
 
     <!-- Settings -->

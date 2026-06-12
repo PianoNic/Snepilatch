@@ -51,7 +51,7 @@
     <string name="user_id">User ID</string>
     <string name="plan">Plan</string>
     <string name="plan_free">Free</string>
-    <string name="followers_playlists">%d Followers · %d Playlists</string>
+    <string name="followers_playlists">%1$d Followers · %2$d Playlists</string>
     <string name="log_out">Log out</string>
 
     <!-- Settings -->

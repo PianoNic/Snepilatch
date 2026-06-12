@@ -1,10 +1,12 @@
 package ch.snepilatch.app.ui.screens
 
 import ch.snepilatch.app.R
+import ch.snepilatch.app.ui.theme.SpotifyBlack
 import ch.snepilatch.app.ui.theme.SpotifyWhite
 import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -33,7 +35,12 @@ import ch.snepilatch.app.viewmodel.SpotifyViewModel
 
 @Composable
 fun SpotifyLoginScreen(vm: SpotifyViewModel) {
-    Column(Modifier.fillMaxSize().statusBarsPadding()) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(SpotifyBlack)
+            .statusBarsPadding()
+    ) {
         Row(
             Modifier
                 .fillMaxWidth()

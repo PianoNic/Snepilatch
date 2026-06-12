@@ -8,7 +8,7 @@ jobs:
   no-committed-jars:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # KotifyClient.jar (and any jar under src/app/libs) must NEVER be committed.
       # It is downloaded from KotifyClient's release and baked into the app by

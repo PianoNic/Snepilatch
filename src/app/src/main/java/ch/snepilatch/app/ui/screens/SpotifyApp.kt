@@ -51,8 +51,8 @@ import ch.snepilatch.app.ui.components.BottomNav
 import ch.snepilatch.app.ui.components.DevicesDialog
 import ch.snepilatch.app.ui.components.MiniPlayer
 import ch.snepilatch.app.ui.components.MiniPlayerContent
+import ch.snepilatch.app.ui.components.miniCardBaseColor
 import ch.snepilatch.app.ui.components.SpotifyImage
-import ch.snepilatch.app.ui.theme.SpotifyElevated
 import ch.snepilatch.app.ui.components.TightAlertDialog
 import ch.snepilatch.app.ui.theme.SpotifyGray
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
@@ -82,6 +82,15 @@ import kotlin.math.roundToInt
 
 /** Dp height of the bottom overlay (MiniPlayer + BottomNav). Screens use this for bottom padding. */
 val LocalBottomOverlayHeight = compositionLocalOf { mutableStateOf(0.dp) }
+
+/**
+ * The mini-player card's padding — must mirror MiniPlayer's
+ * `padding(horizontal = 12.dp, vertical = 6.dp)`. The morph insets the bar bounds
+ * by this to find the visible card rect, and the drag maps finger travel to the
+ * card's top (`miniBounds.top + [MorphCardPadV]`), so all three uses must agree.
+ */
+private val MorphCardPadH = 12.dp
+private val MorphCardPadV = 6.dp
 
 // --- App Shell ---
 
@@ -158,7 +167,7 @@ fun SpotifyApp(vm: SpotifyViewModel) {
                         .pointerInput(Unit) {
                             detectTapGestures { vm.navigateTo(Screen.NOW_PLAYING) }
                         }
-                        .pointerInput(fullHeightPx) {
+                        .pointerInput(Unit) {
                             var opened = false
                             // Rolling ~60ms window of (time, y) samples → an honest release
                             // velocity that's robust to 120Hz batching (a single-sample
@@ -196,7 +205,7 @@ fun SpotifyApp(vm: SpotifyViewModel) {
                                 }
                                 // Always track the finger; the open decision is on release.
                                 val span = (miniBounds?.top ?: fullHeightPx.toFloat()) +
-                                    with(density) { 6.dp.toPx() }
+                                    with(density) { MorphCardPadV.toPx() }
                                 val next = (expand.value - dragAmount / span).coerceIn(0f, 1f)
                                 scope.launch { expand.snapTo(next) }
                             }
@@ -235,7 +244,7 @@ fun SpotifyApp(vm: SpotifyViewModel) {
                 onCollapseDrag = { delta ->
                     // Same 1:1 mapping as the open drag: the card's top travels from
                     // the bar to the screen top, so divide by that span, not the screen.
-                    val span = mb.top + with(density) { 6.dp.toPx() }
+                    val span = mb.top + with(density) { MorphCardPadV.toPx() }
                     scope.launch {
                         expand.snapTo((expand.value - delta / span).coerceIn(0f, 1f))
                     }
@@ -359,7 +368,7 @@ private fun PlayerMorph(
     val density = LocalDensity.current
     val theme by vm.themeColors.collectAsState()
     val cardBg by animateColorAsState(
-        androidx.compose.ui.graphics.lerp(SpotifyElevated, theme.primary, 0.18f),
+        miniCardBaseColor(theme.primary),
         tween(800), label = "morphCardBg"
     )
     // The card's fill crossfades from the solid mini-card colour into the live
@@ -369,9 +378,11 @@ private fun PlayerMorph(
     val bgFade = (f / 0.7f).coerceIn(0f, 1f)
 
     // Start from the *visible* mini card (miniBounds is the padded outer node, so
-    // inset by the 12dp/6dp card padding) and grow that rect to the full screen.
-    val padH = with(density) { 12.dp.toPx() }
-    val padV = with(density) { 6.dp.toPx() }
+    // inset by the card padding) and grow that rect to the full screen.
+    val padH = with(density) { MorphCardPadH.toPx() }
+    val padV = with(density) { MorphCardPadV.toPx() }
+    val fullW = with(density) { fullSize.width.toDp() }
+    val fullH = with(density) { fullSize.height.toDp() }
     val startW = (miniBounds.width - padH * 2).coerceAtLeast(1f)
     val startH = (miniBounds.height - padV * 2).coerceAtLeast(1f)
     val x = lerp(miniBounds.left + padH, 0f, f)
@@ -404,10 +415,7 @@ private fun PlayerMorph(
         if (bgFade > 0.001f) {
             Box(
                 Modifier
-                    .requiredSize(
-                        with(density) { fullSize.width.toDp() },
-                        with(density) { fullSize.height.toDp() }
-                    )
+                    .requiredSize(fullW, fullH)
                     .graphicsLayer { alpha = bgFade }
             ) {
                 PlayerBackground(vm, Modifier.fillMaxSize())
@@ -418,10 +426,7 @@ private fun PlayerMorph(
         // card-anchored PlayerBackground above is the only background.
         Box(
             Modifier
-                .requiredSize(
-                    with(density) { fullSize.width.toDp() },
-                    with(density) { fullSize.height.toDp() }
-                )
+                .requiredSize(fullW, fullH)
                 .offset { IntOffset(-x.roundToInt(), -y.roundToInt()) }
                 .graphicsLayer { alpha = fullAlpha }
         ) {

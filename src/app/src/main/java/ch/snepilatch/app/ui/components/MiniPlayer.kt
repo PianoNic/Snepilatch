@@ -31,9 +31,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.layout.boundsInRoot
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,21 +44,25 @@ import ch.snepilatch.app.ui.theme.SpotifyLightGray
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
 
 /**
+ * Base fill colour of the mini-player card. Shared with the expanding-player morph
+ * (PlayerMorph in SpotifyApp) so the hand-off from bar to growing card has no
+ * colour seam — both must derive the fill from the same tint of the album colour.
+ */
+fun miniCardBaseColor(primary: Color): Color = lerp(SpotifyElevated, primary, 0.18f)
+
+/**
  * The compact now-playing bar — a rounded card around [MiniPlayerContent].
  * Gesture-free: the parent supplies tap/drag via [modifier] so the same bar acts
  * as the collapsed anchor of the expanding player morph (see SpotifyApp).
- * [cardCornerRadius] lets the morph un-round the card as it grows to fullscreen.
  */
 @Composable
 fun MiniPlayer(
     vm: SpotifyViewModel,
-    modifier: Modifier = Modifier,
-    cardCornerRadius: androidx.compose.ui.unit.Dp = 12.dp,
-    onArtworkBounds: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null
+    modifier: Modifier = Modifier
 ) {
     val theme by vm.themeColors.collectAsState()
     val animatedCardBg by animateColorAsState(
-        lerp(SpotifyElevated, theme.primary, 0.18f),
+        miniCardBaseColor(theme.primary),
         tween(800), label = "miniCardBg"
     )
 
@@ -70,13 +73,12 @@ fun MiniPlayer(
             .padding(horizontal = 12.dp, vertical = 6.dp)
             .shadow(
                 elevation = 12.dp,
-                shape = RoundedCornerShape(cardCornerRadius),
+                shape = RoundedCornerShape(12.dp),
                 ambientColor = animatedCardBg,
                 spotColor = animatedCardBg
             )
-            .clip(RoundedCornerShape(cardCornerRadius))
-            .background(animatedCardBg),
-        onArtworkBounds = onArtworkBounds
+            .clip(RoundedCornerShape(12.dp))
+            .background(animatedCardBg)
     )
 }
 
@@ -88,8 +90,7 @@ fun MiniPlayer(
 @Composable
 fun MiniPlayerContent(
     vm: SpotifyViewModel,
-    modifier: Modifier = Modifier,
-    onArtworkBounds: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null
+    modifier: Modifier = Modifier
 ) {
     val playback by vm.playback.collectAsState()
     val track = playback.track ?: return
@@ -106,9 +107,7 @@ fun MiniPlayerContent(
         ) {
             SpotifyImage(
                 url = track.albumArt,
-                modifier = Modifier
-                    .size(44.dp)
-                    .onGloballyPositioned { onArtworkBounds?.invoke(it.boundsInRoot()) },
+                modifier = Modifier.size(44.dp),
                 shape = RoundedCornerShape(8.dp)
             )
             Spacer(Modifier.width(10.dp))

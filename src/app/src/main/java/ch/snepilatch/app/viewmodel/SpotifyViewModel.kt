@@ -111,6 +111,11 @@ class SpotifyViewModel : ViewModel() {
     val isStreaming = MutableStateFlow(false)
     val streamProvider = MutableStateFlow<String?>(null)
     val isNextReady = MutableStateFlow(false)
+
+    // Ad break: KotifyClient owns ad lifecycle/audio suppression; the app just
+    // reflects the window in UI and locks transport. Set via onAdBreakStart/End.
+    private val _isAdBreak = MutableStateFlow(false)
+    val isAdBreak: StateFlow<Boolean> = _isAdBreak
     private var suppressRemotePause = false
     private var resolveJob: Job? = null  // Cancel in-flight resolveAndPlay when a new track arrives
 
@@ -128,7 +133,7 @@ class SpotifyViewModel : ViewModel() {
         playback = _playback,
         isStreaming = isStreaming,
         getExoPositionMs = { MusicPlaybackService.instance?.getCurrentPosition() },
-        reportPosition = { pos -> player?.reportPosition(pos, false) ?: Unit }
+        reportPosition = { pos -> player?.reportPosition(pos, _playback.value.isPaused) ?: Unit }
     )
     private var commandJob: Job? = null
     private var seekGuardUntil: Long = 0  // suppress remote position updates briefly after local seek
@@ -418,6 +423,16 @@ class SpotifyViewModel : ViewModel() {
                     LokiLogger.d(TAG, "Pre-resolve next CDN failed: ${e.message}")
                 }
             }
+        }
+
+        pc.onAdBreakStart { durationMs ->
+            _isAdBreak.value = true
+            LokiLogger.i(TAG, "[Ad] break start (~${durationMs}ms) — locking transport, no ad audio")
+        }
+
+        pc.onAdBreakEnd {
+            _isAdBreak.value = false
+            LokiLogger.i(TAG, "[Ad] break end — resuming normal playback")
         }
 
         pc.onState { state ->
@@ -835,13 +850,13 @@ class SpotifyViewModel : ViewModel() {
                         startPositionTicker()
                         withContext(Dispatchers.Main) { MusicPlaybackService.instance?.syncPlay(_playback.value.positionMs) }
                         try {
-                            p.resume()
+                            p.localResume(_playback.value.positionMs)
                         } catch (e: CancellationException) { throw e }
                         catch (e: Exception) {
                             LokiLogger.w(TAG, "resume failed, transferring playback and retrying: ${e.message}")
                             p.transferPlaybackHere()
                             delay(500)
-                            p.resume()
+                            p.localResume(_playback.value.positionMs)
                         }
                     } else {
                         // Cold start: nothing loaded in ExoPlayer yet. Mirror the Spotify
@@ -858,13 +873,13 @@ class SpotifyViewModel : ViewModel() {
                         withContext(Dispatchers.Main) { MusicPlaybackService.instance?.syncPause() }
                     }
                     try {
-                        p.pause()
+                        p.localPause(_playback.value.positionMs)
                     } catch (e: CancellationException) { throw e }
                     catch (e: Exception) {
                         LokiLogger.w(TAG, "pause failed, transferring playback and retrying: ${e.message}")
                         p.transferPlaybackHere()
                         delay(500)
-                        p.pause()
+                        p.localPause(_playback.value.positionMs)
                     }
                 }
                 LokiLogger.i(TAG, "[Timing] CMD $action API done in ${System.currentTimeMillis() - t0}ms")
@@ -1055,7 +1070,8 @@ class SpotifyViewModel : ViewModel() {
         commandJob = viewModelScope.launch(Dispatchers.IO) {
             try {
                 val t0 = System.currentTimeMillis()
-                player?.skipNext()
+                // Local advance (state report, never skip-capped) — the new track loads via onPlaybackId.
+                player?.localNext()
                 LokiLogger.i(TAG, "[Timing] CMD skipNext API done in ${System.currentTimeMillis() - t0}ms")
             }
             catch (e: CancellationException) { throw e }
@@ -1065,10 +1081,12 @@ class SpotifyViewModel : ViewModel() {
 
     fun skipPrevious() {
         // If we're more than 3s into the track, restart it instead of going to previous.
+        // (Same threshold KotifyClient's localPrevious uses; restarting also seeks ExoPlayer.)
         if (_playback.value.positionMs > PREV_RESTART_THRESHOLD_MS) {
             seekTo(0)
             return
         }
+        val pos = _playback.value.positionMs
         commandJob?.cancel()
         lastCommandTs = System.currentTimeMillis()
         lastCommandName = "skipPrevious"
@@ -1076,7 +1094,8 @@ class SpotifyViewModel : ViewModel() {
         commandJob = viewModelScope.launch(Dispatchers.IO) {
             try {
                 val t0 = System.currentTimeMillis()
-                player?.skipPrevious()
+                // Local go-to-previous (state report, never skip-capped) — prev track loads via onPlaybackId.
+                player?.localPrevious(pos)
                 LokiLogger.i(TAG, "[Timing] CMD skipPrevious API done in ${System.currentTimeMillis() - t0}ms")
             }
             catch (e: CancellationException) { throw e }
@@ -1092,8 +1111,8 @@ class SpotifyViewModel : ViewModel() {
         viewModelScope.launch(Dispatchers.Main) {
             MusicPlaybackService.instance?.syncSeek(positionMs)
         }
-        // Seek Spotify in background
-        launchWithPlayer("seek") { it.seek(positionMs.toInt()) }
+        // Report the seek to Spotify locally (state report, not a seek command)
+        launchWithPlayer("seek") { it.localSeek(positionMs) }
     }
 
     fun toggleShuffle() {
@@ -1201,8 +1220,8 @@ class SpotifyViewModel : ViewModel() {
                     LokiLogger.i(TAG, "QUEUE SKIP: index=$index, name=${track.name}, uri=${track.uri}, uid=$uid")
                     p.skipToTrack(track.uri, uid, ctxUri)
                 } else {
-                    LokiLogger.w(TAG, "No UID for queue track, falling back to skip_next")
-                    repeat(index + 1) { p.skipNext(); delay(300) }
+                    LokiLogger.w(TAG, "No UID for queue track, falling back to local advance")
+                    repeat(index + 1) { p.localNext(); delay(300) }
                 }
             } catch (e: Exception) { LokiLogger.e(TAG, "skipToQueueIndex", e) }
         }
@@ -1577,13 +1596,13 @@ class SpotifyViewModel : ViewModel() {
         wirePlaybackLifecycleCallbacks(svc)
     }
 
-    /** Play / pause / skip / seek — simple commands forwarded to Spotify Connect. */
+    /** Play / pause / skip / seek — forwarded through KotifyClient's local-device transport (uncapped). */
     private fun wireTransportCallbacks(svc: MusicPlaybackService) {
         svc.onPlay = { togglePlayPause() }
         svc.onPause = { togglePlayPause() }
         svc.onSkipNext = {
             viewModelScope.launch(Dispatchers.IO) {
-                try { player?.skipNext() }
+                try { player?.localNext() }
                 catch (e: CancellationException) { throw e }
                 catch (e: Exception) { LokiLogger.e(TAG, "svc next", e) }
             }
@@ -1591,7 +1610,7 @@ class SpotifyViewModel : ViewModel() {
         svc.onSkipPrevious = { skipPrevious() }
         svc.onSeek = { posMs ->
             viewModelScope.launch(Dispatchers.IO) {
-                try { player?.seek(posMs.toInt()) }
+                try { player?.localSeek(posMs) }
                 catch (e: CancellationException) { throw e }
                 catch (e: Exception) { LokiLogger.e(TAG, "svc seek", e) }
             }
@@ -1678,9 +1697,17 @@ class SpotifyViewModel : ViewModel() {
                     }
                     if (newTrackLoaded || exoPlaying) {
                         LokiLogger.d(TAG, "Auto-advance fired naturally (newTrackLoaded=$newTrackLoaded, exoPlaying=$exoPlaying)")
+                    } else if (_isAdBreak.value) {
+                        // During an ad break the silent slot is expected — the
+                        // app plays nothing and KotifyClient drives the timeline.
+                        // Forcing skipNext here would fight the ad lifecycle.
+                        LokiLogger.i(TAG, "Auto-advance watchdog suppressed during ad break (still on $endedUri)")
                     } else {
-                        LokiLogger.w(TAG, "Auto-advance didn't fire (still on $endedUri), forcing skipNext")
-                        player?.skipNext()
+                        // Advance LOCALLY (no skip command) — a slightly-late auto-advance (e.g. the
+                        // post-ad track) gets resolved without spending a Free skip. skipNext here
+                        // would burn a skip and hit Spotify's Free skip cap.
+                        LokiLogger.w(TAG, "Auto-advance didn't fire (still on $endedUri), forcing local advance")
+                        player?.forceAdvance()
                     }
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) {
@@ -1754,14 +1781,9 @@ class SpotifyViewModel : ViewModel() {
         val trackUri = current.uri
         LokiLogger.i(TAG, "[Timing] resolveAndPlay start for $trackUri (${resolveStart - lastCommandTs}ms after CMD)")
         if (trackUri.startsWith("spotify:ad:")) {
-            LokiLogger.i(TAG, "[AdSkip] Ad detected: $trackUri — skipping to next track")
-            // Don't stop ExoPlayer — let current song keep playing while ad is skipped
-            viewModelScope.launch(Dispatchers.IO) {
-                try {
-                    delay(1000) // Brief delay so Spotify processes the ad
-                    player?.skipNext()
-                } catch (_: Exception) {}
-            }
+            // KotifyClient owns ad handling (lifecycle reporting + audio
+            // suppression). The app must not skip or play ads — just ignore.
+            LokiLogger.i(TAG, "[Ad] ignoring ad track in resolveAndPlay: $trackUri")
             return
         }
         if (trackUri == currentStreamUri) {
@@ -2011,7 +2033,8 @@ class SpotifyViewModel : ViewModel() {
             val nextTrack = state.next_tracks.firstOrNull() ?: return
             val nextUri = nextTrack.uri
             if (nextUri.startsWith("spotify:ad:")) {
-                LokiLogger.i(TAG, "[AdSkip] Skipping ad URI in preResolveNextTrack: $nextUri")
+                // Don't pre-resolve ads — KotifyClient handles them.
+                LokiLogger.i(TAG, "[Ad] not pre-resolving ad URI in preResolveNextTrack: $nextUri")
                 return
             }
             val nextId = nextUri.removePrefix("spotify:track:")

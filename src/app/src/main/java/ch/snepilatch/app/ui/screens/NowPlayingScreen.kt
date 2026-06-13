@@ -452,7 +452,10 @@ fun NowPlayingScreen(
                             }
                             FilledTonalIconButton(
                                 onClick = { vm.skipPrevious() },
-                                colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = buttonBg, contentColor = SpotifyWhite),
+                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = buttonBg,
+                                    contentColor = SpotifyWhite
+                                ),
                                 modifier = Modifier.size(48.dp),
                             ) {
                                 Icon(Icons.Rounded.SkipPrevious, stringResource(R.string.previous), modifier = Modifier.size(28.dp))
@@ -479,7 +482,10 @@ fun NowPlayingScreen(
                             val nextLoading = !nextReady && isCurrentlyStreaming
                             FilledTonalIconButton(
                                 onClick = { vm.skipNext() },
-                                colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = buttonBg, contentColor = SpotifyWhite),
+                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = buttonBg,
+                                    contentColor = SpotifyWhite
+                                ),
                                 modifier = Modifier.size(48.dp),
                             ) {
                                 if (nextLoading) {
@@ -838,7 +844,10 @@ fun NowPlayingScreen(
                         // Previous
                         FilledTonalIconButton(
                             onClick = { vm.skipPrevious() },
-                            colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = buttonBg, contentColor = SpotifyWhite),
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = buttonBg,
+                                contentColor = SpotifyWhite
+                            ),
                             modifier = Modifier.size(56.dp),
                         ) {
                             Icon(Icons.Rounded.SkipPrevious, stringResource(R.string.previous), modifier = Modifier.size(32.dp))
@@ -870,7 +879,10 @@ fun NowPlayingScreen(
                         val nextLoading = !nextReady && isCurrentlyStreaming
                         FilledTonalIconButton(
                             onClick = { vm.skipNext() },
-                            colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = buttonBg, contentColor = SpotifyWhite),
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = buttonBg,
+                                contentColor = SpotifyWhite
+                            ),
                             modifier = Modifier.size(56.dp),
                         ) {
                             if (nextLoading) {

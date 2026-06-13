@@ -131,7 +131,12 @@ fun MiniPlayerContent(
                 }
             }
             IconButton(onClick = { vm.skipNext() }, modifier = Modifier.size(40.dp)) {
-                Icon(Icons.Rounded.SkipNext, stringResource(R.string.next), tint = SpotifyWhite, modifier = Modifier.size(24.dp))
+                Icon(
+                    Icons.Rounded.SkipNext,
+                    stringResource(R.string.next),
+                    tint = SpotifyWhite,
+                    modifier = Modifier.size(24.dp)
+                )
             }
         }
         if (playback.durationMs > 0) {

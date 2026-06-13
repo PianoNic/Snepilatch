@@ -1502,7 +1502,7 @@ class SpotifyViewModel : ViewModel() {
             @Suppress("DEPRECATION")
             context.resources.updateConfiguration(config, context.resources.displayMetrics)
         }
-        canvasEnabled.value = prefs.getBoolean("canvas_enabled", false)
+        canvasEnabled.value = prefs.getBoolean("canvas_enabled", true)
         contentRegion.value = prefs.getString("content_region", "nearest") ?: "nearest"
         notificationLeftButton.value = prefs.getString("notification_left_button", "repeat") ?: "repeat"
         notificationRightButton.value = prefs.getString("notification_right_button", "like") ?: "like"

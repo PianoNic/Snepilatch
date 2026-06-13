@@ -38,10 +38,14 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.window.DialogWindowProvider
+import android.os.Build
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -63,6 +67,24 @@ import ch.snepilatch.app.ui.theme.SpotifyLightGray
 import ch.snepilatch.app.util.formatTime
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
 import coil.compose.SubcomposeAsyncImage
+
+/**
+ * Match the app's transparent, edge-to-edge nav bar inside a ModalBottomSheet. The sheet
+ * has its own window that re-enables the nav-bar contrast scrim the Activity turned off,
+ * which shows as a static white backdrop behind the system buttons. Call at the top of the
+ * sheet's content.
+ */
+@Composable
+fun SheetNavBarFix() {
+    val view = LocalView.current
+    SideEffect {
+        val window = (view.parent as? DialogWindowProvider)?.window ?: return@SideEffect
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+        }
+    }
+}
 
 // --- Shimmer effect ---
 
@@ -191,6 +213,7 @@ fun TrackRow(track: TrackInfo, vm: SpotifyViewModel, contextUri: String? = null)
                 )
             }
         ) {
+            SheetNavBarFix()
             // Track header
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),

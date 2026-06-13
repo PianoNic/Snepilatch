@@ -44,6 +44,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import ch.snepilatch.app.ui.components.SheetNavBarFix
 import ch.snepilatch.app.ui.components.SpotifyImage
 import ch.snepilatch.app.ui.components.TightAlertDialog
 import ch.snepilatch.app.ui.theme.*
@@ -1133,6 +1134,7 @@ private fun NowPlayingMenu(
                 )
             }
         ) {
+            SheetNavBarFix()
             // Track header
             track?.let { t ->
                 Row(

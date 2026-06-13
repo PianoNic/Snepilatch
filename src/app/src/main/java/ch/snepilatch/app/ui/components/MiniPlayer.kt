@@ -97,7 +97,6 @@ fun MiniPlayerContent(
     val theme by vm.themeColors.collectAsState()
     val animatedPrimary by animateColorAsState(theme.primary, tween(800), label = "miniPrimary")
     val streamLoading by vm.isStreamLoading.collectAsState()
-    val isAdBreak by vm.isAdBreak.collectAsState()
 
     Column(modifier.fillMaxWidth()) {
         Row(
@@ -131,11 +130,11 @@ fun MiniPlayerContent(
                     )
                 }
             }
-            IconButton(onClick = { vm.skipNext() }, enabled = !isAdBreak, modifier = Modifier.size(40.dp)) {
+            IconButton(onClick = { vm.skipNext() }, modifier = Modifier.size(40.dp)) {
                 Icon(
                     Icons.Rounded.SkipNext,
                     stringResource(R.string.next),
-                    tint = SpotifyWhite.copy(alpha = if (isAdBreak) 0.3f else 1f),
+                    tint = SpotifyWhite,
                     modifier = Modifier.size(24.dp)
                 )
             }

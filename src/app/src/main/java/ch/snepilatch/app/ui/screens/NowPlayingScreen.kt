@@ -224,7 +224,6 @@ fun NowPlayingScreen(
     val playback by vm.playback.collectAsState()
     val track = playback.track
     val streamLoading by vm.isStreamLoading.collectAsState()
-    val isAdBreak by vm.isAdBreak.collectAsState()
     val theme by vm.themeColors.collectAsState()
 
     val animatedPrimary by animateColorAsState(theme.primary, tween(800), label = "primary")
@@ -406,7 +405,6 @@ fun NowPlayingScreen(
                         else if (playback.durationMs > 0) (playback.positionMs.toFloat() / playback.durationMs) else 0f
                         Slider(
                             value = sliderValue,
-                            enabled = !isAdBreak,
                             onValueChange = { seekDragging = true; seekDragValue = it },
                             onValueChangeFinished = {
                                 vm.seekTo((seekDragValue * playback.durationMs).toLong())
@@ -416,7 +414,7 @@ fun NowPlayingScreen(
                                 Box(
                                     Modifier
                                         .size(width = 6.dp, height = 30.dp)
-                                        .background(animatedPrimary.copy(alpha = if (isAdBreak) 0.3f else 1f), RoundedCornerShape(3.dp))
+                                        .background(animatedPrimary, RoundedCornerShape(3.dp))
                                 )
                             },
                             colors = SliderDefaults.colors(
@@ -454,10 +452,9 @@ fun NowPlayingScreen(
                             }
                             FilledTonalIconButton(
                                 onClick = { vm.skipPrevious() },
-                                enabled = !isAdBreak,
-                                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
                                     containerColor = buttonBg,
-                                    contentColor = SpotifyWhite.copy(alpha = if (isAdBreak) 0.3f else 1f)
+                                    contentColor = SpotifyWhite
                                 ),
                                 modifier = Modifier.size(48.dp),
                             ) {
@@ -485,10 +482,9 @@ fun NowPlayingScreen(
                             val nextLoading = !nextReady && isCurrentlyStreaming
                             FilledTonalIconButton(
                                 onClick = { vm.skipNext() },
-                                enabled = !isAdBreak,
-                                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
                                     containerColor = buttonBg,
-                                    contentColor = SpotifyWhite.copy(alpha = if (isAdBreak) 0.3f else 1f)
+                                    contentColor = SpotifyWhite
                                 ),
                                 modifier = Modifier.size(48.dp),
                             ) {
@@ -799,7 +795,6 @@ fun NowPlayingScreen(
                         else if (playback.durationMs > 0) (playback.positionMs.toFloat() / playback.durationMs) else 0f
                     Slider(
                         value = sliderValue,
-                        enabled = !isAdBreak,
                         onValueChange = { seekDragging = true; seekDragValue = it },
                         onValueChangeFinished = {
                             vm.seekTo((seekDragValue * playback.durationMs).toLong())
@@ -809,7 +804,7 @@ fun NowPlayingScreen(
                             Box(
                                 Modifier
                                     .size(width = 6.dp, height = 30.dp)
-                                    .background(animatedPrimary.copy(alpha = if (isAdBreak) 0.3f else 1f), RoundedCornerShape(3.dp))
+                                    .background(animatedPrimary, RoundedCornerShape(3.dp))
                             )
                         },
                         colors = SliderDefaults.colors(
@@ -849,10 +844,9 @@ fun NowPlayingScreen(
                         // Previous
                         FilledTonalIconButton(
                             onClick = { vm.skipPrevious() },
-                            enabled = !isAdBreak,
                             colors = IconButtonDefaults.filledTonalIconButtonColors(
                                 containerColor = buttonBg,
-                                contentColor = SpotifyWhite.copy(alpha = if (isAdBreak) 0.3f else 1f)
+                                contentColor = SpotifyWhite
                             ),
                             modifier = Modifier.size(56.dp),
                         ) {
@@ -885,10 +879,9 @@ fun NowPlayingScreen(
                         val nextLoading = !nextReady && isCurrentlyStreaming
                         FilledTonalIconButton(
                             onClick = { vm.skipNext() },
-                            enabled = !isAdBreak,
                             colors = IconButtonDefaults.filledTonalIconButtonColors(
                                 containerColor = buttonBg,
-                                contentColor = SpotifyWhite.copy(alpha = if (isAdBreak) 0.3f else 1f)
+                                contentColor = SpotifyWhite
                             ),
                             modifier = Modifier.size(56.dp),
                         ) {

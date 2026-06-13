@@ -563,6 +563,7 @@ private fun ArtistTrackRow(
                     )
                 }
             ) {
+                ch.snepilatch.app.ui.components.SheetNavBarFix()
                 // Track header
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
@@ -688,6 +689,7 @@ private fun AlbumTrackRow(
                     )
                 }
             ) {
+                ch.snepilatch.app.ui.components.SheetNavBarFix()
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -773,13 +775,13 @@ private fun DetailHeaderMenu(
     val trackUris = detail.tracks.map { it.uri }; val hasTracks = trackUris.isNotEmpty(); val type = detail.type
     val isAlbum = type == "album"; val isCollection = type == "collection"; val isArtist = type == "artist"
     val shareLabel = stringResource(R.string.share); val addToQueueLabel = stringResource(R.string.add_to_queue)
-    val addToPlaylistLabel = stringResource(R.string.add_to_playlist)
-    val visitArtistLabel = stringResource(R.string.visit_artist)
+    val addToPlaylistLabel = stringResource(R.string.add_to_playlist); val visitArtistLabel = stringResource(R.string.visit_artist)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = SpotifyElevated,
     ) {
+        ch.snepilatch.app.ui.components.SheetNavBarFix()
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically

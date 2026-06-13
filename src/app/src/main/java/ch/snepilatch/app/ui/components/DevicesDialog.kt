@@ -83,6 +83,7 @@ fun DevicesDialog(vm: SpotifyViewModel) {
             )
         }
     ) {
+        SheetNavBarFix()
         Column(
             Modifier
                 .fillMaxWidth()

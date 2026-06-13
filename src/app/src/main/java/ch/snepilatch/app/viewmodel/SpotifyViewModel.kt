@@ -849,15 +849,8 @@ class SpotifyViewModel : ViewModel() {
                         _playback.value = _playback.value.copy(isPlaying = true, isPaused = false)
                         startPositionTicker()
                         withContext(Dispatchers.Main) { MusicPlaybackService.instance?.syncPlay(_playback.value.positionMs) }
-                        try {
-                            p.localResume(_playback.value.positionMs)
-                        } catch (e: CancellationException) { throw e }
-                        catch (e: Exception) {
-                            LokiLogger.w(TAG, "resume failed, transferring playback and retrying: ${e.message}")
-                            p.transferPlaybackHere()
-                            delay(500)
-                            p.localResume(_playback.value.positionMs)
-                        }
+                        // Local state report — never fails the way a command can, so no transfer/retry needed.
+                        p.localResume(_playback.value.positionMs)
                     } else {
                         // Cold start: nothing loaded in ExoPlayer yet. Mirror the Spotify
                         // web player's protocol — fetch track metadata directly (no WS,
@@ -872,15 +865,8 @@ class SpotifyViewModel : ViewModel() {
                     if (isStreaming.value) {
                         withContext(Dispatchers.Main) { MusicPlaybackService.instance?.syncPause() }
                     }
-                    try {
-                        p.localPause(_playback.value.positionMs)
-                    } catch (e: CancellationException) { throw e }
-                    catch (e: Exception) {
-                        LokiLogger.w(TAG, "pause failed, transferring playback and retrying: ${e.message}")
-                        p.transferPlaybackHere()
-                        delay(500)
-                        p.localPause(_playback.value.positionMs)
-                    }
+                    // Local state report — never fails the way a command can, so no transfer/retry needed.
+                    p.localPause(_playback.value.positionMs)
                 }
                 LokiLogger.i(TAG, "[Timing] CMD $action API done in ${System.currentTimeMillis() - t0}ms")
             } catch (e: CancellationException) { throw e }

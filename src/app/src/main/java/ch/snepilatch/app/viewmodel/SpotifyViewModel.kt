@@ -561,8 +561,22 @@ class SpotifyViewModel : ViewModel() {
         needsLogin.value = true
     }
 
+    /** The player and lyrics are overlays, not pages — they never sit on the back stack. */
+    private fun isOverlay(s: Screen) = s == Screen.NOW_PLAYING || s == Screen.LYRICS
+
     fun navigateTo(screen: Screen) {
-        screenStack.add(currentScreen.value)
+        val current = currentScreen.value
+        if (screen == current) return
+        // Don't record an overlay we're leaving for a real page, else back re-opens the
+        // player instead of returning to the page beneath it.
+        if (!isOverlay(current) || isOverlay(screen)) screenStack.add(current)
+        currentScreen.value = screen
+    }
+
+    /** Tabs are roots: switching resets the stack so back returns to Home, not a stale page. */
+    fun navigateToTab(screen: Screen) {
+        screenStack.clear()
+        if (screen != Screen.HOME) screenStack.add(Screen.HOME)
         currentScreen.value = screen
     }
 

@@ -73,7 +73,7 @@ fun BottomNav(screen: Screen, vm: SpotifyViewModel, hazeState: HazeState) {
                 val selected = screen == nav.s
                 NavigationBarItem(
                     selected = selected,
-                    onClick = { vm.currentScreen.value = nav.s },
+                    onClick = { vm.navigateToTab(nav.s) },
                     icon = {
                         if (nav.s == Screen.ACCOUNT && account.profileImageUrl != null) {
                             Box(

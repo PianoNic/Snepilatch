@@ -240,6 +240,8 @@
     <string name="search_filter_playlists">Playlists</string>
     <string name="search_filter_podcasts">Podcasts</string>
     <string name="search_filter_profiles">Profiles</string>
+    <string name="search_top_result">Top result</string>
+    <string name="search_show_all">Show all</string>
 
     <!-- Login -->
     <string name="login_title">Login to Spotify</string>

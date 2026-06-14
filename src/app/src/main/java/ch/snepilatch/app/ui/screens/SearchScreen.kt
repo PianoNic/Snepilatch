@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
@@ -72,6 +73,7 @@ import kotify.api.song.SearchArtist
 import kotify.api.song.SearchPlaylist
 import kotify.api.song.SearchPodcast
 import kotify.api.song.SearchSuggestion
+import kotify.api.song.SearchTopResult
 import kotify.api.song.SearchTrack
 import kotify.api.song.SearchUser
 
@@ -346,6 +348,10 @@ private fun CategorizedResults(
     if (results == null) return
     val ctx = LocalContext.current
 
+    // Jump back to the top whenever the filter changes (e.g. tapping "Show all").
+    val listState = rememberLazyListState()
+    LaunchedEffect(selectedFilter) { listState.scrollToItem(0) }
+
     Column(Modifier.fillMaxSize()) {
         FilterChipRow(
             selected = selectedFilter,
@@ -353,41 +359,133 @@ private fun CategorizedResults(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
 
-        // Build the unified list based on the selected filter.
-        val rows: List<UnifiedResult> = when (selectedFilter) {
-            SearchViewModel.SearchFilter.ALL -> buildList {
-                // Top result is the first artist (Spotify usually features an
-                // artist as the top result for entity queries). Falls back to
-                // the first available item if there's no artist.
-                results.artists.items.forEach { add(it.toUnified(vm, ctx)) }
-                results.tracks.items.forEach { add(it.toUnified(vm, ctx)) }
-                results.albums.items.forEach { add(it.toUnified(vm)) }
-                results.playlists.items.forEach { add(it.toUnified(vm, ctx)) }
-                results.podcasts.items.forEach { add(it.toUnified(ctx)) }
-                results.users.items.forEach { add(it.toUnified(ctx)) }
-            }
-            SearchViewModel.SearchFilter.ARTISTS -> results.artists.items.map { it.toUnified(vm, ctx) }
-            SearchViewModel.SearchFilter.ALBUMS -> results.albums.items.map { it.toUnified(vm) }
-            SearchViewModel.SearchFilter.SONGS -> results.tracks.items.map { it.toUnified(vm, ctx) }
-            SearchViewModel.SearchFilter.PLAYLISTS -> results.playlists.items.map { it.toUnified(vm, ctx) }
-            SearchViewModel.SearchFilter.PODCASTS -> results.podcasts.items.map { it.toUnified(ctx) }
-            SearchViewModel.SearchFilter.PROFILES -> results.users.items.map { it.toUnified(ctx) }
-        }
-
         LazyColumn(
-            Modifier.fillMaxSize(),
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = LocalBottomOverlayHeight.current.value + 16.dp)
         ) {
-            items(rows, key = { it.uri }) { row ->
-                ResultRow(
-                    title = row.title,
-                    subtitle = row.subtitle,
-                    imageUrl = row.imageUrl,
-                    circular = row.circular,
-                    onClick = row.onClick
-                )
+            if (selectedFilter == SearchViewModel.SearchFilter.ALL) {
+                // Relevance layout (web-player style): the Top Result hero, then each
+                // section in Spotify's per-query chipOrder, capped with a "Show all".
+                results.topResult?.let { top ->
+                    val unified = top.toUnified(vm, ctx)
+                    item(key = "top") { TopResultCard(unified) }
+                }
+                results.chipOrder.ifEmpty { DEFAULT_CHIP_ORDER }.forEach { type ->
+                    val (filter, rows) = sectionFor(type, results, vm, ctx) ?: return@forEach
+                    if (rows.isEmpty()) return@forEach
+                    item(key = "h_$type") {
+                        SectionHeader(stringResource(labelFor(filter))) { onFilterChange(filter) }
+                    }
+                    items(rows.take(SECTION_PREVIEW), key = { "${type}_${it.uri}" }) { row ->
+                        ResultRow(row.title, row.subtitle, row.imageUrl, row.circular, row.onClick)
+                    }
+                }
+            } else {
+                val rows = singleFilterRows(results, vm, ctx, selectedFilter)
+                items(rows, key = { it.uri }) { row ->
+                    ResultRow(row.title, row.subtitle, row.imageUrl, row.circular, row.onClick)
+                }
             }
         }
+    }
+}
+
+private const val SECTION_PREVIEW = 4
+private val DEFAULT_CHIP_ORDER = listOf("TRACKS", "ARTISTS", "ALBUMS", "PLAYLISTS", "PODCASTS", "USERS")
+
+/** Maps a chipOrder type name to its filter chip + the section's rows, or null if unsupported. */
+private fun sectionFor(
+    type: String,
+    results: kotify.api.song.SearchResult,
+    vm: SpotifyViewModel,
+    ctx: Context
+): Pair<SearchViewModel.SearchFilter, List<UnifiedResult>>? = when (type) {
+    "TRACKS" -> SearchViewModel.SearchFilter.SONGS to results.tracks.items.map { it.toUnified(vm, ctx) }
+    "ARTISTS" -> SearchViewModel.SearchFilter.ARTISTS to results.artists.items.map { it.toUnified(vm, ctx) }
+    "ALBUMS" -> SearchViewModel.SearchFilter.ALBUMS to results.albums.items.map { it.toUnified(vm) }
+    "PLAYLISTS" -> SearchViewModel.SearchFilter.PLAYLISTS to results.playlists.items.map { it.toUnified(vm, ctx) }
+    "PODCASTS" -> SearchViewModel.SearchFilter.PODCASTS to results.podcasts.items.map { it.toUnified(ctx) }
+    "USERS" -> SearchViewModel.SearchFilter.PROFILES to results.users.items.map { it.toUnified(ctx) }
+    else -> null
+}
+
+private fun singleFilterRows(
+    results: kotify.api.song.SearchResult,
+    vm: SpotifyViewModel,
+    ctx: Context,
+    filter: SearchViewModel.SearchFilter
+): List<UnifiedResult> = when (filter) {
+    SearchViewModel.SearchFilter.ARTISTS -> results.artists.items.map { it.toUnified(vm, ctx) }
+    SearchViewModel.SearchFilter.ALBUMS -> results.albums.items.map { it.toUnified(vm) }
+    SearchViewModel.SearchFilter.SONGS -> results.tracks.items.map { it.toUnified(vm, ctx) }
+    SearchViewModel.SearchFilter.PLAYLISTS -> results.playlists.items.map { it.toUnified(vm, ctx) }
+    SearchViewModel.SearchFilter.PODCASTS -> results.podcasts.items.map { it.toUnified(ctx) }
+    SearchViewModel.SearchFilter.PROFILES -> results.users.items.map { it.toUnified(ctx) }
+    SearchViewModel.SearchFilter.ALL -> emptyList()
+}
+
+private fun SearchTopResult.toUnified(vm: SpotifyViewModel, ctx: Context): UnifiedResult = when (this) {
+    is SearchTopResult.Track -> track.toUnified(vm, ctx)
+    is SearchTopResult.Artist -> artist.toUnified(vm, ctx)
+    is SearchTopResult.Album -> album.toUnified(vm)
+    is SearchTopResult.Playlist -> playlist.toUnified(vm, ctx)
+    is SearchTopResult.Podcast -> podcast.toUnified(ctx)
+    is SearchTopResult.User -> user.toUnified(ctx)
+}
+
+@Composable
+private fun TopResultCard(r: UnifiedResult) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text(
+            stringResource(R.string.search_top_result),
+            color = SpotifyWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(SpotifyLightGray.copy(alpha = 0.10f))
+                .clickable { r.onClick() }
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            SpotifyImage(
+                url = r.imageUrl,
+                modifier = Modifier.size(80.dp),
+                shape = if (r.circular) CircleShape else RoundedCornerShape(6.dp)
+            )
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    r.title, color = SpotifyWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis
+                )
+                if (r.subtitle.isNotBlank()) {
+                    Text(
+                        r.subtitle, color = SpotifyLightGray, fontSize = 13.sp,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionHeader(title: String, onShowAll: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(title, color = SpotifyWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        Text(
+            stringResource(R.string.search_show_all),
+            color = SpotifyLightGray, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.clickable { onShowAll() }
+        )
     }
 }
 

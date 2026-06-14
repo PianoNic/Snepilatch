@@ -238,6 +238,8 @@
     <string name="search_filter_playlists">Playlists</string>
     <string name="search_filter_podcasts">Podcasts</string>
     <string name="search_filter_profiles">Profil</string>
+    <string name="search_top_result">Top-Ergäbnis</string>
+    <string name="search_show_all">Alli azeige</string>
 
     <!-- Login -->
     <string name="login_title">Bi Spotify aamelde</string>

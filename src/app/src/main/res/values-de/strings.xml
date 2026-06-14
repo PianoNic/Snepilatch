@@ -238,6 +238,8 @@
     <string name="search_filter_playlists">Playlists</string>
     <string name="search_filter_podcasts">Podcasts</string>
     <string name="search_filter_profiles">Profile</string>
+    <string name="search_top_result">Top-Ergebnis</string>
+    <string name="search_show_all">Alle anzeigen</string>
 
     <!-- Login -->
     <string name="login_title">Bei Spotify anmelden</string>

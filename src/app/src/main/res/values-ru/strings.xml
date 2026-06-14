@@ -238,6 +238,8 @@
     <string name="search_filter_playlists">Плейлисты</string>
     <string name="search_filter_podcasts">Подкасты</string>
     <string name="search_filter_profiles">Профили</string>
+    <string name="search_top_result">Лучший результат</string>
+    <string name="search_show_all">Показать все</string>
 
     <!-- Login -->
     <string name="login_title">Войти в Spotify</string>

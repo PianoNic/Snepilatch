@@ -421,6 +421,18 @@ class SpotifyViewModel : ViewModel() {
             }
         }
 
+        pc.onAd { durationMs ->
+            // KotifyClient signals an ad (no ad audio is ever fetched) and clocks it out in ~1s,
+            // advancing to the next real track on its own. Play a local silent clip so the
+            // MediaSession stays alive (no idle gap) and flip the UI to a "Skipping ad…" placeholder.
+            // isAd is cleared when the next real track's state rebuilds PlaybackUiState.
+            LokiLogger.i(TAG, "Ad — skipping with local silent clip (~${durationMs}ms)")
+            _playback.value = _playback.value.copy(isAd = true, isPlaying = true, isPaused = false)
+            viewModelScope.launch(Dispatchers.Main) {
+                MusicPlaybackService.instance?.playSilentAd()
+            }
+        }
+
         pc.onState { state ->
             val delta = if (lastCommandTs > 0) System.currentTimeMillis() - lastCommandTs else -1
             LokiLogger.i(TAG, "[Timing] WS onState arrived (${delta}ms after CMD '$lastCommandName')")
@@ -714,7 +726,9 @@ class SpotifyViewModel : ViewModel() {
             durationMs = displayDuration,
             isShuffling = state.is_shuffling,
             repeatMode = state.repeat_mode,
-            volume = _playback.value.volume
+            volume = _playback.value.volume,
+            // A real track state clears any in-progress ad-skip placeholder.
+            isAd = false
         )
 
         // While we're idle (not streaming locally), push the cluster's
@@ -1657,7 +1671,14 @@ class SpotifyViewModel : ViewModel() {
             currentStreamUri = null
             viewModelScope.launch(Dispatchers.IO) { fallbackResume() }
         }
-        svc.onPlaybackEnded = {
+        svc.onPlaybackEnded = onEnded@{
+            // The silent ad clip ending is not a real track end: KotifyClient's engine clocks the
+            // ad out and drives the post-ad advance itself. Forcing an advance here would skip a
+            // real track. Ignore — the next real track's setMediaItem replaces the clip.
+            if (_playback.value.isAd) {
+                LokiLogger.d(TAG, "Silent ad clip ended — engine drives the post-ad advance, skipping fallback")
+                return@onEnded
+            }
             // Snapshot the URI that JUST ended. If a new track gets loaded
             // (currentStreamUri changes) before our timer fires, Spotify
             // already auto-advanced naturally — do NOT force-skip, that would

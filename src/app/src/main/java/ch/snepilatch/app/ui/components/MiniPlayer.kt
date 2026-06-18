@@ -94,6 +94,10 @@ fun MiniPlayerContent(
 ) {
     val playback by vm.playback.collectAsState()
     val track = playback.track ?: return
+    // While skipping an ad, show a "Skipping ad…" placeholder instead of the lingering track.
+    val displayTitle = if (playback.isAd) stringResource(R.string.now_playing_skipping_ad) else track.name
+    val displayArtist = if (playback.isAd) "" else track.artist
+    val displayArtUrl: String? = if (playback.isAd) null else track.albumArt
     val theme by vm.themeColors.collectAsState()
     val animatedPrimary by animateColorAsState(theme.primary, tween(800), label = "miniPrimary")
     val streamLoading by vm.isStreamLoading.collectAsState()
@@ -106,15 +110,15 @@ fun MiniPlayerContent(
             verticalAlignment = Alignment.CenterVertically
         ) {
             SpotifyImage(
-                url = track.albumArt,
+                url = displayArtUrl,
                 modifier = Modifier.size(44.dp),
                 shape = RoundedCornerShape(8.dp)
             )
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                Text(track.name, color = SpotifyWhite, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                Text(displayTitle, color = SpotifyWhite, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(track.artist, color = SpotifyLightGray, fontSize = 12.sp,
+                Text(displayArtist, color = SpotifyLightGray, fontSize = 12.sp,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             IconButton(onClick = { if (!streamLoading) vm.togglePlayPause() }, modifier = Modifier.size(40.dp)) {

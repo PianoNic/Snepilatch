@@ -220,6 +220,7 @@
     <!-- Now Playing -->
     <string name="now_playing_playing_from">Spielt von %s</string>
     <string name="now_playing_not_playing">Nichts spielt</string>
+    <string name="now_playing_skipping_ad">Werbung wird übersprungen…</string>
 
     <!-- Search (added) -->
     <string name="search_title">Suche</string>

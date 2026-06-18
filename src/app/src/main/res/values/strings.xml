@@ -222,6 +222,7 @@
     <!-- Now Playing -->
     <string name="now_playing_playing_from">Playing from %s</string>
     <string name="now_playing_not_playing">Not Playing</string>
+    <string name="now_playing_skipping_ad">Skipping ad…</string>
 
     <!-- Search (added) -->
     <string name="search_title">Search</string>

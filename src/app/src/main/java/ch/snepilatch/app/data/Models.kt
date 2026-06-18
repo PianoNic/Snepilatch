@@ -22,7 +22,10 @@ data class PlaybackUiState(
     val durationMs: Long = 0,
     val isShuffling: Boolean = false,
     val repeatMode: String = "off",
-    val volume: Double = 0.5
+    val volume: Double = 0.5,
+    // True while an ad is being skipped: a local silent clip plays for ~1s and the UI shows a
+    // "Skipping ad…" placeholder instead of track metadata. Cleared when the next real track loads.
+    val isAd: Boolean = false
 )
 
 data class LibraryItem(

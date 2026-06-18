@@ -1839,7 +1839,7 @@ class SpotifyViewModel : ViewModel() {
                     LokiLogger.i(TAG, "SpotifyCDN: Using pre-resolved CDN URL (fileId=$currentFileId)")
                     nextCdnUrl = null
                     nextCdnFileId = null
-                    resolver.buildStreamForCachedUrl(cachedCdnUrl)
+                    resolver.buildStreamForCachedUrl(cachedCdnUrl, currentFileId)
                 } else {
                     // Use file ID from cluster state or from onPlaybackId (state machine)
                     var fileId = event.currentFileId ?: latestFileId
@@ -1891,6 +1891,7 @@ class SpotifyViewModel : ViewModel() {
                     MusicPlaybackService.instance?.playDrmUrl(
                         stream.cdnUrl, stream.licenseUrl, stream.licenseHeaders, title, artist, art,
                         startPlaying = !coldStart,
+                        pssh = stream.pssh,
                     )
                 }
                 currentStreamUri = trackUri

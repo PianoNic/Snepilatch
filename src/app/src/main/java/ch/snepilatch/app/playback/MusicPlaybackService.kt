@@ -24,7 +24,9 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.RawResourceDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.MediaSource
@@ -356,6 +358,34 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 updateMediaSessionMetadata()
                 updateNotification()
             }
+        }
+    }
+
+    /**
+     * Play the bundled silent clip while an ad is being skipped. This is the native equivalent of
+     * uBlock's 1s-silent-mp4 substitution: KotifyClient signals ads via `onAd` (no ad audio is ever
+     * fetched) and clocks them out in ~1s, advancing to the next real track on its own. Loading the
+     * silent clip here keeps the MediaSession/notification "playing" (no idle gap) and lets the UI
+     * show a "Skipping ad…" placeholder. The next real track's `setMediaItem` replaces this clip.
+     */
+    @OptIn(UnstableApi::class)
+    fun playSilentAd() {
+        LokiLogger.i(TAG, "Ad — playing local silent clip (skipping)")
+        val meta = TrackMetadata("Skipping ad…", "", null)
+        metadataQueue.clear()
+        metadataQueue.add(meta)
+        currentTitle = "Skipping ad…"
+        currentArtist = ""
+        currentArt = null
+        val uri = RawResourceDataSource.buildRawResourceUri(ch.snepilatch.app.R.raw.silent_ad)
+        mainHandler.post {
+            val source = ProgressiveMediaSource.Factory(DefaultDataSource.Factory(this))
+                .createMediaSource(MediaItem.fromUri(uri))
+            player.setMediaSource(source)
+            player.playWhenReady = true
+            player.prepare()
+            updateMediaSessionMetadata()
+            updateNotification()
         }
     }
 

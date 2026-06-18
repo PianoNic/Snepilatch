@@ -224,6 +224,14 @@ fun NowPlayingScreen(
 ) {
     val playback by vm.playback.collectAsState()
     val track = playback.track
+    // While an ad is being skipped, KotifyClient plays a local silent clip; show a "Skipping ad…"
+    // placeholder (no art, no metadata) instead of the lingering previous track's info.
+    val displayTitle = when {
+        playback.isAd -> stringResource(R.string.now_playing_skipping_ad)
+        else -> track?.name ?: stringResource(R.string.now_playing_not_playing)
+    }
+    val displayArtist = if (playback.isAd) "" else track?.artist ?: ""
+    val displayArtUrl: String? = if (playback.isAd) null else track?.albumArt
     val streamLoading by vm.isStreamLoading.collectAsState()
     val theme by vm.themeColors.collectAsState()
 
@@ -276,7 +284,7 @@ fun NowPlayingScreen(
                         verticalArrangement = Arrangement.Center
                     ) {
                         SpotifyImage(
-                            url = track?.albumArt,
+                            url = displayArtUrl,
                             modifier = Modifier
                                 .fillMaxHeight(0.85f)
                                 .aspectRatio(1f),
@@ -348,7 +356,7 @@ fun NowPlayingScreen(
                         ) {
                             Column(Modifier.weight(1f).padding(end = 8.dp)) {
                                 Text(
-                                    track?.name ?: stringResource(R.string.now_playing_not_playing),
+                                    displayTitle,
                                     color = SpotifyWhite,
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold,
@@ -357,7 +365,7 @@ fun NowPlayingScreen(
                                 )
                                 Spacer(Modifier.height(2.dp))
                                 Text(
-                                    track?.artist ?: "",
+                                    displayArtist,
                                     color = SpotifyLightGray,
                                     fontSize = 13.sp,
                                     maxLines = 1,
@@ -710,7 +718,7 @@ fun NowPlayingScreen(
                     } else {
                         // Album art — large with rounded corners
                         SpotifyImage(
-                            url = track?.albumArt,
+                            url = displayArtUrl,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .aspectRatio(1f),
@@ -728,19 +736,19 @@ fun NowPlayingScreen(
                     ) {
                         Column(Modifier.weight(1f).padding(end = 12.dp)) {
                             MarqueeText(
-                                text = track?.name ?: stringResource(R.string.now_playing_not_playing),
+                                text = displayTitle,
                                 color = SpotifyWhite,
                                 fontSize = 22.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(Modifier.height(2.dp))
                             MarqueeText(
-                                text = track?.artist ?: "",
+                                text = displayArtist,
                                 color = secondaryText,
                                 fontSize = 15.sp,
                                 modifier = Modifier.clickable { vm.openArtistFromCurrentTrack() }
                             )
-                            track?.albumName?.let {
+                            track?.albumName?.takeIf { !playback.isAd }?.let {
                                 Spacer(Modifier.height(2.dp))
                                 MarqueeText(
                                     text = it,

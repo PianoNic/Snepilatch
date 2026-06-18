@@ -220,6 +220,7 @@
     <!-- Now Playing -->
     <string name="now_playing_playing_from">Lauft vo %s</string>
     <string name="now_playing_not_playing">Nüt lauft</string>
+    <string name="now_playing_skipping_ad">Werbig wird übersprunge…</string>
 
     <!-- Search (added) -->
     <string name="search_title">Suechi</string>

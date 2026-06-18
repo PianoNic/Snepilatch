@@ -1014,6 +1014,7 @@ class SpotifyViewModel : ViewModel() {
                     stream.cdnUrl, stream.licenseUrl, stream.licenseHeaders, title, artist, art,
                     startPlaying = true,
                     startPositionMs = savedPositionAtEntry,
+                    pssh = stream.pssh,
                 )
             }
             currentStreamUri = trackUri

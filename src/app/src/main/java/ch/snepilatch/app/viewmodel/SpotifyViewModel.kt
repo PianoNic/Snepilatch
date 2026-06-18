@@ -296,31 +296,9 @@ class SpotifyViewModel : ViewModel() {
                 LokiLogger.i(TAG, "Player ready, device: ${pc.ourDeviceId()}")
                 loadDevices()
 
-                // Refresh the access token a couple of minutes before it
-                // actually expires. KotifyClient now exposes the absolute
-                // expiration timestamp via baseClient.accessTokenExpirationTimestampMs;
-                // we wake up REFRESH_LEAD_MS before it, refresh, repeat.
-                // Falls back to a 50-minute interval if the timestamp isn't
-                // available (e.g. older Kotify or unexpected response shape).
-                viewModelScope.launch(Dispatchers.IO) {
-                    while (true) {
-                        val expiresAt = sess.baseClient.accessTokenExpirationTimestampMs
-                        val sleepMs = if (expiresAt != null) {
-                            (expiresAt - System.currentTimeMillis() - REFRESH_LEAD_MS)
-                                .coerceAtLeast(MIN_REFRESH_DELAY_MS)
-                        } else {
-                            FALLBACK_REFRESH_INTERVAL_MS
-                        }
-                        delay(sleepMs)
-                        try {
-                            sess.baseClient.refreshAccessToken()
-                            LokiLogger.i(TAG, "Access token refreshed (next in ~${sleepMs / 60_000}m)")
-                        } catch (e: Exception) {
-                            LokiLogger.w(TAG, "Token refresh failed: ${e.message}")
-                            delay(REFRESH_RETRY_DELAY_MS)
-                        }
-                    }
-                }
+                // No background token-refresh loop: KotifyClient provisions tokens proactively before
+                // every request (access token refreshed before expiry, client token on its
+                // refresh_after_seconds) and on dealer reconnect, so manual refresh here is redundant.
 
                 wirePlayerConnectCallbacks(pc)
                 wireServiceControls()
@@ -2333,13 +2311,6 @@ class SpotifyViewModel : ViewModel() {
     }
 
     companion object {
-        // Token refresh: wake up this many ms BEFORE the actual expiry so the
-        // refresh completes before any in-flight request hits an expired token.
-        private const val REFRESH_LEAD_MS = 2 * 60 * 1000L
-        private const val MIN_REFRESH_DELAY_MS = 5 * 1000L
-        private const val FALLBACK_REFRESH_INTERVAL_MS = 50 * 60 * 1000L
-        private const val REFRESH_RETRY_DELAY_MS = 60 * 1000L
-
         /** How long to wait after ExoPlayer's STATE_ENDED before falling back to
          *  a forced player.skipNext(). Spotify's natural onTrackChange reliably
          *  lands within ~1.5s; 5s gives generous headroom so we don't double-skip

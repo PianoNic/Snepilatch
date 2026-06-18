@@ -44,6 +44,12 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         private const val TAG = "MusicService"
         private const val CHANNEL_ID = "music_playback"
         private const val NOTIFICATION_ID = 1
+
+        // Audio-focus loop guard tuning: >= THRESHOLD permanent focus losses within WINDOW_MS triggers
+        // a COOLDOWN_MS suppression of remote auto-resume. Normal playback never bursts focus losses.
+        private const val FOCUS_LOOP_THRESHOLD = 4
+        private const val FOCUS_LOOP_WINDOW_MS = 2_000L
+        private const val FOCUS_LOOP_COOLDOWN_MS = 8_000L
         var instance: MusicPlaybackService? = null
             private set
     }
@@ -102,6 +108,11 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     /** True while playback is paused because another app holds transient audio focus.
      *  Used to auto-resume Spotify when focus returns. */
     private var wasSuppressedByFocus = false
+
+    // Audio-focus loop guard: timestamps of recent permanent focus losses, and the time until which
+    // remote auto-resume is suppressed once a rapid loss burst (a resume↔pause storm) is detected.
+    private val focusLossTimestamps = ArrayDeque<Long>()
+    private var resumeSuppressedUntil = 0L
 
     override fun onCreate() {
         super.onCreate()
@@ -165,6 +176,21 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 // Full (permanent) audio focus loss — e.g. phone call answered.
                 // ExoPlayer flips playWhenReady to false. Mirror to Spotify side.
                 if (!playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS) {
+                    // Loop guard: if the device keeps denying audio focus (e.g. a second app instance
+                    // or another player owns it), every resume immediately loses focus → we mirror a
+                    // pause → Spotify Connect re-resumes → focus loss again, a tight resume↔pause storm
+                    // that also spams Connect commands. When losses come in rapid bursts, suppress the
+                    // remote auto-resume (syncPlay) for a cooldown so the player stops fighting for focus.
+                    val now = System.currentTimeMillis()
+                    focusLossTimestamps.addLast(now)
+                    while (focusLossTimestamps.isNotEmpty() && now - focusLossTimestamps.first() > FOCUS_LOOP_WINDOW_MS) {
+                        focusLossTimestamps.removeFirst()
+                    }
+                    if (focusLossTimestamps.size >= FOCUS_LOOP_THRESHOLD) {
+                        resumeSuppressedUntil = now + FOCUS_LOOP_COOLDOWN_MS
+                        focusLossTimestamps.clear()
+                        LokiLogger.w(TAG, "Audio-focus loop detected — suppressing auto-resume for ${FOCUS_LOOP_COOLDOWN_MS}ms")
+                    }
                     LokiLogger.i(TAG, "Pausing Spotify side due to audio focus loss")
                     onPause?.invoke()
                 }
@@ -390,6 +416,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     }
 
     fun syncPlay(positionMs: Long) {
+        if (System.currentTimeMillis() < resumeSuppressedUntil) {
+            LokiLogger.w(TAG, "Ignoring remote resume — audio-focus loop cooldown active")
+            return
+        }
         mainHandler.post {
             if (player.mediaItemCount > 0) {
                 player.seekTo(positionMs)

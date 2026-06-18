@@ -11,7 +11,11 @@ data class SpotifyStream(
     val cdnUrl: String,
     val licenseUrl: String,
     val licenseHeaders: Map<String, String>,
-    val mirrorCount: Int
+    val mirrorCount: Int,
+    // Base64 Widevine PSSH from the seektable. Many Spotify files don't embed a Widevine pssh box, so
+    // we inject this one into ExoPlayer's DRM session (see PsshInjectingDrmSessionManager). Null if the
+    // seektable lookup failed — playback then falls back to the file's own (possibly missing) pssh.
+    val pssh: String? = null
 )
 
 /**
@@ -35,7 +39,8 @@ class SpotifyCdnResolver(
             cdnUrl = cdnUrl,
             licenseUrl = session.spclientUrl("widevine-license/v1/audio/license"),
             licenseHeaders = buildLicenseHeaders(),
-            mirrorCount = cdnUrls.size
+            mirrorCount = cdnUrls.size,
+            pssh = runCatching { spotifyPlayback.getPssh(fileId) }.getOrNull()
         )
     }
 
@@ -45,11 +50,12 @@ class SpotifyCdnResolver(
      * re-hitting getCdnUrls. Use when the caller already has a valid URL and
      * only needs fresh license headers.
      */
-    fun buildStreamForCachedUrl(cdnUrl: String): SpotifyStream = SpotifyStream(
+    suspend fun buildStreamForCachedUrl(cdnUrl: String, fileId: String?): SpotifyStream = SpotifyStream(
         cdnUrl = cdnUrl,
         licenseUrl = session.spclientUrl("widevine-license/v1/audio/license"),
         licenseHeaders = buildLicenseHeaders(),
-        mirrorCount = 1
+        mirrorCount = 1,
+        pssh = fileId?.let { id -> runCatching { spotifyPlayback.getPssh(id) }.getOrNull() }
     )
 
     /**

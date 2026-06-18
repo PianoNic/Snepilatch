@@ -103,6 +103,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
      *  Used to auto-resume Spotify when focus returns. */
     private var wasSuppressedByFocus = false
 
+    @OptIn(UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
 
@@ -221,6 +222,48 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                     broadcastAudioEffectAction(AudioEffect.ACTION_OPEN_AUDIO_EFFECT_CONTROL_SESSION)
                     openAudioEffectSession = true
                 }
+            }
+        })
+
+        // DRM / audio-decode diagnostics: a track can reach STATE_READY yet emit no audio when its
+        // samples are genuinely Widevine-encrypted (cenc) and key load/decryption fails silently. These
+        // callbacks reveal whether the Widevine key actually loaded and what codec ExoPlayer decoded.
+        player.addAnalyticsListener(object : androidx.media3.exoplayer.analytics.AnalyticsListener {
+            override fun onDrmKeysLoaded(eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime) {
+                LokiLogger.i(TAG, "[DRM] keys loaded")
+            }
+            override fun onDrmSessionManagerError(
+                eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                error: Exception
+            ) {
+                LokiLogger.e(TAG, "[DRM] session error: ${error.javaClass.simpleName}: ${error.message}", error)
+            }
+            override fun onAudioInputFormatChanged(
+                eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                format: androidx.media3.common.Format,
+                decoderReuseEvaluation: androidx.media3.exoplayer.DecoderReuseEvaluation?
+            ) {
+                LokiLogger.i(TAG, "[Audio] inputFormat codec=${format.sampleMimeType} drm=${format.drmInitData != null} ch=${format.channelCount} hz=${format.sampleRate} br=${format.bitrate}")
+            }
+            override fun onAudioDecoderInitialized(
+                eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                decoderName: String,
+                initializedTimestampMs: Long,
+                initializationDurationMs: Long
+            ) {
+                LokiLogger.i(TAG, "[Audio] decoder=$decoderName")
+            }
+            override fun onAudioSinkError(
+                eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                audioSinkError: Exception
+            ) {
+                LokiLogger.e(TAG, "[Audio] sink error: ${audioSinkError.message}", audioSinkError)
+            }
+            override fun onAudioPositionAdvancing(
+                eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                playoutStartSystemTimeMs: Long
+            ) {
+                LokiLogger.i(TAG, "[Audio] position advancing — real audio is being rendered")
             }
         })
 

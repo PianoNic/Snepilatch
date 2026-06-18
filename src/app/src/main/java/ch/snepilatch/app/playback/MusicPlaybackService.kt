@@ -243,7 +243,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 format: androidx.media3.common.Format,
                 decoderReuseEvaluation: androidx.media3.exoplayer.DecoderReuseEvaluation?
             ) {
-                LokiLogger.i(TAG, "[Audio] inputFormat codec=${format.sampleMimeType} drm=${format.drmInitData != null} ch=${format.channelCount} hz=${format.sampleRate} br=${format.bitrate}")
+                LokiLogger.i(TAG, "[Audio] ${format.sampleMimeType} ${format.channelCount}ch ${format.sampleRate}Hz")
             }
             override fun onAudioDecoderInitialized(
                 eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
@@ -615,11 +615,34 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             .build()
     }
 
+    /**
+     * Progressive media source that injects a Widevine PSSH (base64 from Spotify's seektable) into
+     * the DRM session. Needed because many Spotify files are cenc-encrypted but embed no Widevine
+     * pssh box, so ExoPlayer's default in-file DRM throws MissingSchemeDataException and plays silent.
+     */
+    @OptIn(UnstableApi::class)
+    private fun buildPsshDrmSource(url: String, licenseUrl: String, licenseHeaders: Map<String, String>, psshBase64: String): MediaSource {
+        val callback = androidx.media3.exoplayer.drm.HttpMediaDrmCallback(licenseUrl, DefaultHttpDataSource.Factory())
+        licenseHeaders.forEach { (k, v) -> callback.setKeyRequestProperty(k, v) }
+        val base = androidx.media3.exoplayer.drm.DefaultDrmSessionManager.Builder()
+            .setUuidAndExoMediaDrmProvider(C.WIDEVINE_UUID, androidx.media3.exoplayer.drm.FrameworkMediaDrm.DEFAULT_PROVIDER)
+            .setMultiSession(true)
+            .build(callback)
+        val psshBytes = android.util.Base64.decode(psshBase64, android.util.Base64.DEFAULT)
+        val injecting = ch.snepilatch.app.playback.engine.PsshInjectingDrmSessionManager(base, psshBytes)
+        return ProgressiveMediaSource.Factory(DefaultDataSource.Factory(this))
+            .setDrmSessionManagerProvider { injecting }
+            .createMediaSource(MediaItem.fromUri(url))
+    }
+
+    @OptIn(UnstableApi::class)
+    @Suppress("LongParameterList")
     fun playDrmUrl(url: String, licenseUrl: String, licenseHeaders: Map<String, String>,
                    title: String, artist: String, albumArtUrl: String?,
                    startPlaying: Boolean = true,
-                   startPositionMs: Long = 0L) {
-        LokiLogger.i(TAG, "Loading DRM: $title by $artist -> ${url.take(80)} (play=$startPlaying, pos=${startPositionMs}ms)")
+                   startPositionMs: Long = 0L,
+                   pssh: String? = null) {
+        LokiLogger.i(TAG, "Loading DRM: $title by $artist -> ${url.take(80)} (play=$startPlaying, pos=${startPositionMs}ms, pssh=${pssh != null})")
         val meta = TrackMetadata(title, artist, albumArtUrl)
         metadataQueue.clear()
         metadataQueue.add(meta)
@@ -632,7 +655,11 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             // seek, and reach STATE_READY at that exact position. No post-prepare seek
             // dance — eliminates the race where the post-ready seek fails to actually
             // produce audio (the bug in the cold-start sync).
-            player.setMediaItem(buildDrmMediaItem(url, licenseUrl, licenseHeaders), startPositionMs)
+            if (pssh != null) {
+                player.setMediaSource(buildPsshDrmSource(url, licenseUrl, licenseHeaders, pssh), startPositionMs)
+            } else {
+                player.setMediaItem(buildDrmMediaItem(url, licenseUrl, licenseHeaders), startPositionMs)
+            }
             player.playWhenReady = startPlaying
             // Register listener BEFORE prepare() so we catch STATE_READY
             player.addListener(object : Player.Listener {

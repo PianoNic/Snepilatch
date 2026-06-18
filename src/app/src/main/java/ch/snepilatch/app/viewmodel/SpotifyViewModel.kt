@@ -231,11 +231,10 @@ class SpotifyViewModel : ViewModel() {
                 ))
                 sess.load()
 
-                // Fast-path detection of persistent auth failure: when any API
-                // call's 401-refresh retry path gives up MAX_AUTH_REFRESH_FAILURES
-                // times in a row the consumer-side foreground refresh loop's
-                // 3-strikes guard would eventually catch it minutes later. This
-                // callback drops the UI back to the loading gate immediately.
+                // KotifyClient fires this once its HttpClient has exhausted the
+                // single forced token refresh on a 401 and the session is no
+                // longer recoverable (cookies revoked / expired). Drop the UI back
+                // to the loading gate so the user re-authenticates.
                 sess.onAuthLost = {
                     LokiLogger.e(TAG, "Session auth lost (HttpClient onAuthLost fired)")
                     initError.value = "Lost Spotify session — sign in again to continue"

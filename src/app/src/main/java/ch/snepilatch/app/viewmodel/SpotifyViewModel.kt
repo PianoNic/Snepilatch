@@ -427,7 +427,11 @@ class SpotifyViewModel : ViewModel() {
             // MediaSession stays alive (no idle gap) and flip the UI to a "Skipping ad…" placeholder.
             // isAd is cleared when the next real track's state rebuilds PlaybackUiState.
             LokiLogger.i(TAG, "Ad — skipping with local silent clip (~${durationMs}ms)")
-            _playback.value = _playback.value.copy(isAd = true, isPlaying = true, isPaused = false)
+            // Zero the position/duration so the progress bar shows 0:00 instead of the previous
+            // track's length while the ad is being skipped.
+            _playback.value = _playback.value.copy(
+                isAd = true, isPlaying = true, isPaused = false, positionMs = 0, durationMs = 0
+            )
             viewModelScope.launch(Dispatchers.Main) {
                 MusicPlaybackService.instance?.playSilentAd()
             }

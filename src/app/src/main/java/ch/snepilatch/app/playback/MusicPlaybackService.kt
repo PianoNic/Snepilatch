@@ -10,6 +10,7 @@ import android.graphics.BitmapFactory
 import android.media.audiofx.AudioEffect
 import android.net.ConnectivityManager
 import android.net.Network
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.support.v4.media.MediaBrowserCompat
@@ -35,7 +36,9 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import kotify.api.album.Album
 import kotify.api.playlist.Playlist
+import kotify.api.song.Song
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -52,6 +55,25 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         // Android Auto browse tree
         private const val BROWSE_ROOT = "root"
         private const val LIKED_SONGS_URI = "spotify:collection:tracks"
+
+        // Top-level category nodes — Android Auto renders root-level browsable items as tabs.
+        private const val CAT_PLAYLISTS = "cat:playlists"
+        private const val CAT_ALBUMS = "cat:albums"
+        private const val CAT_LIKED = "cat:liked"
+        private const val CAT_RECENT = "cat:recent"
+
+        // mediaId prefixes so onPlayFromMediaId knows how to act on a tapped item.
+        // PLAY_PREFIX + contextUri plays a whole context; TRACK_PREFIX + "trackUri|contextUri"
+        // plays a single track within its context so the queue continues.
+        private const val PLAY_PREFIX = "play:"
+        private const val TRACK_PREFIX = "track:"
+
+        // Android Auto content-style hints (androidx.media doesn't expose these as constants).
+        private const val CONTENT_STYLE_SUPPORTED = "android.media.browse.CONTENT_STYLE_SUPPORTED"
+        private const val CONTENT_STYLE_BROWSABLE_HINT = "android.media.browse.CONTENT_STYLE_BROWSABLE_HINT"
+        private const val CONTENT_STYLE_PLAYABLE_HINT = "android.media.browse.CONTENT_STYLE_PLAYABLE_HINT"
+        private const val CONTENT_STYLE_LIST = 1
+        private const val CONTENT_STYLE_GRID = 2
         private const val NOTIFICATION_ID = 1
         var instance: MusicPlaybackService? = null
             private set
@@ -265,7 +287,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 }
 
                 override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
-                    if (mediaId != null) playFromContext(mediaId)
+                    if (mediaId != null) playFromMediaId(mediaId)
                 }
 
                 override fun onSeekTo(pos: Long) {
@@ -864,71 +886,179 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     override fun onGetRoot(clientPackageName: String, clientUid: Int, rootHints: Bundle?): BrowserRoot {
         // The content is the signed-in user's own library, so we grant any caller (Android Auto,
         // Assistant, the app itself). Transport still runs through the validated MediaSession.
-        return BrowserRoot(BROWSE_ROOT, null)
+        // Advertise content-style support so Auto honours the per-node grid/list hints below.
+        val extras = Bundle().apply {
+            putBoolean(CONTENT_STYLE_SUPPORTED, true)
+            putInt(CONTENT_STYLE_BROWSABLE_HINT, CONTENT_STYLE_GRID)
+            putInt(CONTENT_STYLE_PLAYABLE_HINT, CONTENT_STYLE_LIST)
+        }
+        return BrowserRoot(BROWSE_ROOT, extras)
     }
 
     override fun onLoadChildren(parentId: String, result: Result<MutableList<MediaBrowserCompat.MediaItem>>) {
-        if (parentId != BROWSE_ROOT) {
-            result.sendResult(mutableListOf())
+        // The root tabs are static and need no network, so answer synchronously.
+        if (parentId == BROWSE_ROOT) {
+            result.sendResult(buildRootTabs())
             return
         }
-        // Library load is a network call — detach and fill asynchronously.
+        // Everything below the root is a network call — detach and fill asynchronously.
         result.detach()
         serviceScope.launch {
             val items = try {
-                withContext(Dispatchers.IO) { buildRootChildren() }
+                withContext(Dispatchers.IO) { loadCategory(parentId) }
             } catch (e: Exception) {
-                LokiLogger.e(TAG, "onLoadChildren failed", e)
+                LokiLogger.e(TAG, "onLoadChildren failed for $parentId", e)
                 mutableListOf()
             }
             result.sendResult(items)
         }
     }
 
-    /** Liked Songs + the user's playlists, each as a playable item whose mediaId is its context URI. */
-    private suspend fun buildRootChildren(): MutableList<MediaBrowserCompat.MediaItem> {
+    /** Top-level tabs shown across the Android Auto browse bar. */
+    private fun buildRootTabs(): MutableList<MediaBrowserCompat.MediaItem> = mutableListOf(
+        browsableItem(CAT_PLAYLISTS, "Playlists", null, null),
+        browsableItem(CAT_ALBUMS, "Albums", null, null),
+        browsableItem(CAT_LIKED, "Liked Songs", null, null),
+        browsableItem(CAT_RECENT, "Recently Played", null, null),
+    )
+
+    /** Resolve the children of any non-root node: a category tab, or a playlist/album to drill into. */
+    private suspend fun loadCategory(parentId: String): MutableList<MediaBrowserCompat.MediaItem> {
         val sess = SessionHolder.session ?: return mutableListOf()
-        val out = mutableListOf<MediaBrowserCompat.MediaItem>()
-        out.add(browseItem(LIKED_SONGS_URI, "Liked Songs", "Playlist"))
-        Playlist(sess).getLibrary(limit = 50, offset = 0).items
-            .filter { it.uri.contains(":playlist:") || it.uri.contains(":album:") }
-            .forEach { out.add(browseItem(it.uri, it.name, it.ownerName ?: it.type)) }
-        return out
+        return when (parentId) {
+            CAT_PLAYLISTS -> Playlist(sess).getLibrary(limit = 50).items
+                .filter { it.uri.contains(":playlist:") }
+                .map { browsableItem(it.uri, it.name, it.ownerName ?: "Playlist", it.imageUrl) }
+                .toMutableList()
+
+            CAT_ALBUMS -> Playlist(sess).getLibrary(limit = 50).items
+                .filter { it.uri.contains(":album:") }
+                .map { browsableItem(it.uri, it.name, it.ownerName ?: "Album", it.imageUrl) }
+                .toMutableList()
+
+            CAT_RECENT -> Playlist(sess).getLibrary(limit = 50).items
+                .filter { it.uri.contains(":playlist:") || it.uri.contains(":album:") }
+                .sortedByDescending { it.playedAt ?: "" }
+                .take(20)
+                .map { browsableItem(it.uri, it.name, it.ownerName ?: it.type, it.imageUrl) }
+                .toMutableList()
+
+            CAT_LIKED, LIKED_SONGS_URI -> {
+                val out = mutableListOf(playAllItem(LIKED_SONGS_URI))
+                Playlist(sess).getLikedSongs(limit = 100).items.forEach { t ->
+                    out.add(trackItem(t.uri, LIKED_SONGS_URI, t.name, t.artists.joinToString(", ") { it.name }, t.album.coverArtUrl))
+                }
+                out
+            }
+
+            else -> when {
+                parentId.contains(":playlist:") -> {
+                    val info = Playlist(sess).getPlaylist(parentId.substringAfterLast(":"), limit = 100)
+                    val out = mutableListOf(playAllItem(parentId))
+                    info.tracks.forEach { t ->
+                        out.add(trackItem(t.uri, parentId, t.name, t.artists.joinToString(", "), t.coverArtUrl))
+                    }
+                    out
+                }
+                parentId.contains(":album:") -> {
+                    val info = Album(sess).getAlbum(parentId.substringAfterLast(":"), limit = 100)
+                    val out = mutableListOf(playAllItem(parentId))
+                    info.tracks.forEach { t ->
+                        out.add(trackItem(t.uri, parentId, t.name, t.artists.joinToString(", "), info.coverArtUrl))
+                    }
+                    out
+                }
+                else -> mutableListOf()
+            }
+        }
     }
 
-    private fun browseItem(mediaId: String, title: String, subtitle: String?): MediaBrowserCompat.MediaItem {
+    override fun onSearch(query: String, extras: Bundle?, result: Result<MutableList<MediaBrowserCompat.MediaItem>>) {
+        result.detach()
+        serviceScope.launch {
+            val items = try {
+                withContext(Dispatchers.IO) {
+                    val sess = SessionHolder.session ?: return@withContext mutableListOf()
+                    Song(sess).search(query, limit = 30).tracks.items.map { t ->
+                        // Search hits have no surrounding context — play the single track.
+                        trackItem(t.uri, t.uri, t.name, t.artists.joinToString(", ") { it.name }, t.album.coverArtUrl)
+                    }.toMutableList()
+                }
+            } catch (e: Exception) {
+                LokiLogger.e(TAG, "onSearch failed for '$query'", e)
+                mutableListOf()
+            }
+            result.sendResult(items)
+        }
+    }
+
+    /** A node Auto can open to reveal its children (a category, playlist or album). */
+    private fun browsableItem(mediaId: String, title: String, subtitle: String?, imageUrl: String?): MediaBrowserCompat.MediaItem {
         val desc = MediaDescriptionCompat.Builder()
             .setMediaId(mediaId)
             .setTitle(title)
             .setSubtitle(subtitle)
+            .apply { imageUrl?.let { setIconUri(Uri.parse(it)) } }
+            .build()
+        return MediaBrowserCompat.MediaItem(desc, MediaBrowserCompat.MediaItem.FLAG_BROWSABLE)
+    }
+
+    /** "Play all" entry at the top of a context, so the whole playlist/album can play in one tap. */
+    private fun playAllItem(contextUri: String): MediaBrowserCompat.MediaItem {
+        val desc = MediaDescriptionCompat.Builder()
+            .setMediaId(PLAY_PREFIX + contextUri)
+            .setTitle("▶ Play all")
+            .build()
+        return MediaBrowserCompat.MediaItem(desc, MediaBrowserCompat.MediaItem.FLAG_PLAYABLE)
+    }
+
+    /** A single playable track; tapping plays it within [contextUri] so the queue continues. */
+    private fun trackItem(trackUri: String, contextUri: String, title: String, subtitle: String?, imageUrl: String?): MediaBrowserCompat.MediaItem {
+        val desc = MediaDescriptionCompat.Builder()
+            .setMediaId("$TRACK_PREFIX$trackUri|$contextUri")
+            .setTitle(title)
+            .setSubtitle(subtitle)
+            .apply { imageUrl?.let { setIconUri(Uri.parse(it)) } }
             .build()
         return MediaBrowserCompat.MediaItem(desc, MediaBrowserCompat.MediaItem.FLAG_PLAYABLE)
     }
 
     /**
-     * Play a context (playlist/album/Liked Songs) chosen from the Android Auto browse tree. Resolves
-     * the context's first track and issues the play command via PlayerConnect; the dealer then drives
-     * the rest of the pipeline (onTrackChange -> resolve -> ExoPlayer) exactly like an in-app tap.
-     * Requires a live session — if the app process is cold this is a no-op (see the Auto cold-start note).
+     * Act on a tapped Android Auto item. "play:<ctx>" plays a whole context from its first track;
+     * "track:<trackUri>|<ctx>" plays a specific track inside its context (so the queue continues);
+     * a bare context URI keeps the old whole-context behaviour. The dealer then drives the rest of
+     * the pipeline (onTrackChange -> resolve -> ExoPlayer) exactly like an in-app tap. Requires a
+     * live session — if the app process is cold this is a no-op (see the Auto cold-start note).
      */
-    private fun playFromContext(contextUri: String) {
+    private fun playFromMediaId(mediaId: String) {
         serviceScope.launch {
             try {
                 val sess = SessionHolder.session ?: return@launch
                 val player = SessionHolder.player ?: return@launch
+                if (mediaId.startsWith(TRACK_PREFIX)) {
+                    val body = mediaId.removePrefix(TRACK_PREFIX)
+                    val trackUri = body.substringBefore("|")
+                    val contextUri = body.substringAfter("|", trackUri)
+                    LokiLogger.i(TAG, "Auto: playing track $trackUri in $contextUri")
+                    withContext(Dispatchers.IO) { player.playTrack(trackUri, contextUri) }
+                    return@launch
+                }
+                val contextUri = mediaId.removePrefix(PLAY_PREFIX)
                 val firstTrack = withContext(Dispatchers.IO) {
                     when {
                         contextUri == LIKED_SONGS_URI ->
                             Playlist(sess).getLikedSongs(limit = 1).items.firstOrNull()?.uri
                         contextUri.contains(":playlist:") ->
                             Playlist(sess).getPlaylist(contextUri.substringAfterLast(":"), limit = 1).tracks.firstOrNull()?.uri
+                        contextUri.contains(":album:") ->
+                            Album(sess).getAlbum(contextUri.substringAfterLast(":"), limit = 1).tracks.firstOrNull()?.uri
                         else -> null
                     }
                 } ?: return@launch
                 LokiLogger.i(TAG, "Auto: playing $contextUri from $firstTrack")
                 withContext(Dispatchers.IO) { player.playTrack(firstTrack, contextUri) }
             } catch (e: Exception) {
-                LokiLogger.e(TAG, "Auto play failed for $contextUri", e)
+                LokiLogger.e(TAG, "Auto play failed for $mediaId", e)
             }
         }
     }

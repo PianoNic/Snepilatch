@@ -364,10 +364,20 @@ class SpotifyViewModel : ViewModel() {
     /**
      * A remote controller seeked the current track (KotifyClient surfaced the inbound `seek_to`
      * command). Seek ExoPlayer to the exact target — the web player's only seek path, replacing the
-     * old position-diffing heuristic. Only act when we're the streaming device.
+     * old position-diffing heuristic. Only act when we're the streaming device. Public for the rig.
+     *
+     * A legitimate seek is always within the current track. A stale cloud snapshot can produce a
+     * wildly out-of-range target (e.g. 23 min into a 3-min song); applying it would seek ExoPlayer
+     * past the end and instantly kill the track. The web player never hits this — the media element
+     * clamps currentTime to [0, duration] — so we ignore any target outside the known duration.
      */
-    private fun handleRemoteSeek(positionMs: Long) {
+    internal fun handleRemoteSeek(positionMs: Long) {
         if (!isStreaming.value) return
+        val duration = _playback.value.durationMs
+        if (positionMs < 0 || (duration > 0 && positionMs > duration + SEEK_BOUNDS_TOLERANCE_MS)) {
+            LokiLogger.w(TAG, "Ignoring out-of-range remote seek -> ${positionMs}ms (duration=${duration}ms)")
+            return
+        }
         LokiLogger.i(TAG, "Remote seek -> ${positionMs}ms")
         MusicPlaybackService.instance?.syncSeek(positionMs)
         _playback.value = _playback.value.copy(positionMs = positionMs)
@@ -2371,6 +2381,10 @@ class SpotifyViewModel : ViewModel() {
          *  lands within ~1.5s; 5s gives generous headroom so we don't double-skip
          *  when the natural advance arrives just past a tighter timeout. */
         private const val AUTO_ADVANCE_GRACE_MS = 5000L
+
+        // Slack allowed when bounds-checking a remote seek target against the track duration, so a
+        // seek to the very end isn't rejected on rounding/boundary jitter.
+        private const val SEEK_BOUNDS_TOLERANCE_MS = 1000L
 
         /** Page size for playlist/album detail pagination. Matches the limit
          *  passed to [kotify.api.playlist.Playlist.getPlaylist] in

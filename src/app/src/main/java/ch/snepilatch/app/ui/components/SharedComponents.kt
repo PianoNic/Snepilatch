@@ -157,7 +157,7 @@ fun SpotifyImage(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TrackRow(track: TrackInfo, vm: SpotifyViewModel, contextUri: String? = null) {
+fun TrackRow(track: TrackInfo, vm: SpotifyViewModel, contextUri: String? = null, trackIndex: Int? = null) {
     var showMenu by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val playback by vm.playback.collectAsState()
@@ -168,7 +168,7 @@ fun TrackRow(track: TrackInfo, vm: SpotifyViewModel, contextUri: String? = null)
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable { vm.playTrack(track, contextUri) }
+            .clickable { vm.playTrack(track, contextUri, trackIndex) }
             .padding(horizontal = 16.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

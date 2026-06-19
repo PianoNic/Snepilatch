@@ -22,8 +22,6 @@ import kotify.api.playerconnect.PlayerConnect
 import kotify.api.playlist.Playlist
 import kotify.api.playerstatus.DeviceInfo
 import kotify.api.playerstatus.PlayerStateData
-import kotify.api.playerstatus.PlayerTrack
-import kotify.api.playerstatus.TrackChangeEvent
 import kotify.api.lyrics.Lyrics
 import kotify.api.lyrics.LyricsData
 import kotify.api.song.Song
@@ -95,10 +93,8 @@ class SpotifyViewModel : ViewModel() {
     // start — otherwise the guard meant for passive init pushes swallows it and
     // the first song after launch plays on Spotify's side with no local audio.
     private var pendingUserPlay = false
-    internal var nextCdnUrl: String? = null      // Pre-resolved Spotify CDN URL (DRM)
-    internal var nextCdnFileId: String? = null   // File ID for the pre-resolved CDN track
-    internal var nextCdnUri: String? = null      // Track URI for the pre-resolved CDN track (local-first skip)
-    internal var nextCdnName: String? = null     // Track name for the pre-resolved CDN track (fallback metadata)
+    private var nextCdnUrl: String? = null      // Pre-resolved Spotify CDN URL (DRM)
+    private var nextCdnFileId: String? = null   // File ID for the pre-resolved CDN track
     private var lastCommandTs: Long = 0L  // timing: when last user command was sent
     private var lastCommandName: String = ""
     private var playUrlAt: Long = 0L      // timing: when playUrl/playDrmUrl was last called
@@ -408,7 +404,7 @@ class SpotifyViewModel : ViewModel() {
             }
         }
 
-        pc.onNextPlaybackId { fileId, uri, name ->
+        pc.onNextPlaybackId { fileId, _, name ->
             if (preferredAudioSource.value != null) return@onNextPlaybackId
             // Deduplicate — don't re-resolve if we already have this file ID cached
             if (fileId == nextCdnFileId && nextCdnUrl != null) return@onNextPlaybackId
@@ -420,12 +416,9 @@ class SpotifyViewModel : ViewModel() {
                     LokiLogger.d(TAG, "Pre-resolving next Spotify CDN: $name ($fileId)")
                     val stream = resolver.resolveForFileId(fileId)
                     // Cache only — DRM items can't be pre-queued because each
-                    // needs its own Widevine license session. The uri/name let
-                    // skipNext play this track locally before the WS echo arrives.
+                    // needs its own Widevine license session.
                     nextCdnUrl = stream.cdnUrl
                     nextCdnFileId = fileId
-                    nextCdnUri = uri
-                    nextCdnName = name
                     isNextReady.value = true
                     LokiLogger.i(TAG, "Next Spotify CDN pre-resolved: $name")
                 } catch (e: Exception) {
@@ -1123,92 +1116,15 @@ class SpotifyViewModel : ViewModel() {
         lastCommandTs = System.currentTimeMillis()
         lastCommandName = "skipNext"
         LokiLogger.i(TAG, "[Timing] CMD skipNext sent")
-        // Local-first: if the upcoming track is already pre-resolved, play it on ExoPlayer
-        // immediately instead of waiting for the WS onTrackChange echo (2–22s). This mirrors
-        // the web player's _streamer.nextTrack(): it plays the buffered next track locally and
-        // notifies Spotify Connect in parallel rather than awaiting the round-trip.
-        val fastEvent = buildPreResolvedNextEvent()
         commandJob = viewModelScope.launch(Dispatchers.IO) {
             try {
                 val t0 = System.currentTimeMillis()
-                if (fastEvent != null) {
-                    LokiLogger.i(TAG, "[Timing] skipNext local-first: playing pre-resolved next ${fastEvent.current?.uri}")
-                    // Report the advance and load audio in parallel — don't serialize them.
-                    val advance = launch { player?.localNext() }
-                    resolveAndPlay(fastEvent)
-                    advance.join()
-                } else {
-                    // No pre-resolved next — report and let the onTrackChange echo load it.
-                    player?.localNext()
-                }
+                // Local advance (state report, never skip-capped) — the new track loads via onPlaybackId.
+                player?.localNext()
                 LokiLogger.i(TAG, "[Timing] CMD skipNext API done in ${System.currentTimeMillis() - t0}ms")
             }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { LokiLogger.e(TAG, "skipNext", e) }
-        }
-    }
-
-    /**
-     * Build a synthetic [TrackChangeEvent] for the pre-resolved upcoming track so [skipNext] can
-     * load it locally before Spotify echoes the change back. Returns null unless we're on the
-     * Spotify-CDN path and have a pre-resolved next URL, file id, and track URI — without all three
-     * the local-first fast path can't run, and skipNext falls back to the report-then-await flow.
-     *
-     * Metadata (artist/art/album) is best-effort from the local queue snapshot; the WS echo enriches
-     * it shortly after via [enrichCurrentTrackMetadata]. The file id is wired into currentFileId so
-     * resolveAndPlay's cached-CDN branch consumes the pre-resolved URL instead of re-resolving.
-     */
-    internal fun buildPreResolvedNextEvent(): TrackChangeEvent? {
-        if (preferredAudioSource.value != null) return null
-        if (nextCdnUrl == null) return null
-        val fileId = nextCdnFileId ?: return null
-        val uri = nextCdnUri ?: return null
-        val q = _queue.value.firstOrNull { it.uri == uri }
-        val current = PlayerTrack(
-            uri = uri,
-            uid = q?.uid,
-            provider = "context",
-            name = q?.name ?: nextCdnName ?: "Unknown",
-            artistName = q?.artist,
-            artistUri = null,
-            albumName = q?.albumName,
-            albumUri = null,
-            durationMs = q?.durationMs ?: 0L,
-            isExplicit = false,
-            imageUrl = q?.albumArt,
-            imageSmallUrl = null,
-            imageLargeUrl = q?.albumArt,
-            contextUri = null,
-        )
-        return TrackChangeEvent(previous = currentStreamUri, current = current, currentFileId = fileId)
-    }
-
-    /**
-     * Fill in track metadata from a WS onTrackChange echo for a track a local-first [skipNext] or
-     * [playTrack] already loaded. The fast path may only know the URI (+ whatever the queue snapshot
-     * had); the echo carries the full name/artist/art/album, so patch any gaps and refresh the palette.
-     */
-    internal fun enrichCurrentTrackMetadata(current: PlayerTrack, trackUri: String) {
-        val existing = _playback.value.track
-        if (existing == null || existing.uri != trackUri) return
-        val art = normalizeSpotifyImageUrl(current.imageLargeUrl ?: current.imageUrl)
-        val needsName = (existing.name.isBlank() || existing.name == "Unknown") && current.name.isNotBlank()
-        val needsArt = existing.albumArt == null && art != null
-        val needsArtist = (existing.artist.isBlank() || existing.artist == "Unknown") && !current.artistName.isNullOrBlank()
-        val needsAlbum = existing.albumName == null && current.albumName != null
-        val hasGap = needsName || needsArt || needsArtist || needsAlbum
-        if (!hasGap) return
-        _playback.value = _playback.value.copy(
-            track = existing.copy(
-                name = if (needsName) current.name else existing.name,
-                artist = current.artistName ?: existing.artist,
-                albumArt = art ?: existing.albumArt,
-                albumName = current.albumName ?: existing.albumName,
-            )
-        )
-        if (art != null && art != lastPaletteUrl) {
-            lastPaletteUrl = art
-            extractColorsFromArt(art)
         }
     }
 
@@ -1288,44 +1204,20 @@ class SpotifyViewModel : ViewModel() {
         playTrack(TrackInfo(uri = trackUri, name = "", artist = "", albumArt = null), contextUri)
 
     /**
-     * Play a tapped track. Local-first like the web player: resolve + load it on ExoPlayer immediately,
-     * in parallel with the Spotify Connect "play" command, instead of waiting for the WS onTrackChange
-     * echo. The track's uid + index (carried by playlist/album rows) are forwarded so a context with the
-     * same track more than once starts on the exact tapped occurrence, matching the JS skip_to.
+     * Play a tapped track via the Connect "play" command, then let the WS onTrackChange echo drive
+     * local playback (known-good path). The track's uid + index (carried by playlist/album rows) are
+     * forwarded so a context with the same track more than once starts on the exact tapped occurrence,
+     * matching the JS skip_to.
      */
     fun playTrack(track: TrackInfo, contextUri: String? = null, trackIndex: Int? = null) {
         userPlayJob?.cancel()
         userPlayJob = viewModelScope.launch(Dispatchers.IO) { startUserPlayback(track, contextUri, trackIndex) }
     }
 
-    internal suspend fun startUserPlayback(track: TrackInfo, contextUri: String?, trackIndex: Int? = null) = coroutineScope {
+    internal suspend fun startUserPlayback(track: TrackInfo, contextUri: String?, trackIndex: Int? = null) {
         // Honor the resulting onTrackChange even if we're starting from idle (no local audio yet).
         pendingUserPlay = true
-        val pc = player ?: return@coroutineScope
-        // Local-first: resolve the tapped track's CDN and play it on ExoPlayer now, parallel to the
-        // command. We resolve the file id up front (never reuse the stale latestFileId of the outgoing
-        // track) and only take the fast path once we have it; otherwise the echo loads it the slow way.
-        val localPlay = launch {
-            try {
-                val fileId = if (preferredAudioSource.value == null) cdnResolver?.fetchFileIdFromMetadata(track.uri) else null
-                if (preferredAudioSource.value == null && fileId == null) {
-                    LokiLogger.d(TAG, "playTrack: no file id up front, letting the echo load ${track.uri}")
-                    return@launch
-                }
-                if (fileId != null) latestFileId = fileId
-                val current = PlayerTrack(
-                    uri = track.uri, uid = track.uid, provider = "context", name = track.name,
-                    artistName = track.artist.ifBlank { null }, artistUri = null,
-                    albumName = track.albumName, albumUri = null,
-                    durationMs = track.durationMs, isExplicit = false,
-                    imageUrl = track.albumArt, imageSmallUrl = null, imageLargeUrl = track.albumArt,
-                    contextUri = contextUri,
-                )
-                LokiLogger.i(TAG, "[Timing] playTrack local-first: loading ${track.uri}")
-                resolveAndPlay(TrackChangeEvent(previous = currentStreamUri, current = current, currentFileId = fileId))
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { LokiLogger.e(TAG, "playTrack local-first", e) }
-        }
+        val pc = player ?: return
         try {
             try {
                 pc.playTrack(track.uri, contextUri, track.uid, trackIndex)
@@ -1340,7 +1232,6 @@ class SpotifyViewModel : ViewModel() {
             delay(500)
             refreshState()
         } catch (e: Exception) { LokiLogger.e(TAG, "playTrack", e) }
-        localPlay.join()
     }
 
     fun addTrackToPlaylist(playlistId: String, trackUri: String) {
@@ -1935,9 +1826,6 @@ class SpotifyViewModel : ViewModel() {
             return
         }
         if (trackUri == currentStreamUri) {
-            // Already loaded (e.g. a local-first skip beat this echo). Don't reload — just fill in
-            // any metadata the fast path couldn't know yet (artist/art/album) from the echo.
-            enrichCurrentTrackMetadata(current, trackUri)
             isStreamLoading.value = false
             return
         }
@@ -2014,8 +1902,6 @@ class SpotifyViewModel : ViewModel() {
                     LokiLogger.i(TAG, "SpotifyCDN: Using pre-resolved CDN URL (fileId=$currentFileId)")
                     nextCdnUrl = null
                     nextCdnFileId = null
-                    nextCdnUri = null
-                    nextCdnName = null
                     resolver.buildStreamForCachedUrl(cachedCdnUrl, currentFileId)
                 } else {
                     // Use file ID from cluster state or from onPlaybackId (state machine)

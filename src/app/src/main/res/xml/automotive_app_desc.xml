@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Declares Snepilatch as an Android Auto media app. Auto reads this via the
+     com.google.android.gms.car.application meta-data and connects to the
+     MediaBrowserService (MusicPlaybackService) for browse + playback. -->
+<automotiveApp>
+    <uses name="media" />
+</automotiveApp>

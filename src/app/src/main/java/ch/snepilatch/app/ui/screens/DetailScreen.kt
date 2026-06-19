@@ -267,7 +267,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
                                 vm.togglePlayPause()
                             } else {
                                 val first = detail.tracks.firstOrNull() ?: return@clickable
-                                vm.playTrack(first.uri, detail.uri)
+                                vm.playTrack(first, detail.uri)
                             }
                         },
                     contentAlignment = Alignment.Center
@@ -503,7 +503,7 @@ private fun ArtistTrackRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable { vm.playTrack(track.uri, contextUri) }
+            .clickable { vm.playTrack(track, contextUri) }
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -643,7 +643,7 @@ private fun AlbumTrackRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable { vm.playTrack(track.uri, contextUri) }
+            .clickable { vm.playTrack(track, contextUri) }
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

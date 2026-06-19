@@ -8,6 +8,8 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.audiofx.AudioEffect
+import android.net.ConnectivityManager
+import android.net.Network
 import android.os.Handler
 import android.os.Looper
 import android.support.v4.media.MediaMetadataCompat
@@ -108,6 +110,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
         createNotificationChannel()
         deezerProxy.start()
+        registerNetworkCallback()
 
         val audioAttributes = AudioAttributes.Builder()
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
@@ -855,7 +858,40 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         result.sendResult(mutableListOf())
     }
 
+    private var connectivityManager: ConnectivityManager? = null
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        private var hadNetwork = false
+        override fun onAvailable(network: Network) {
+            // A new default network arrived. If we already had one, this is a handover (Wi-Fi<->cell)
+            // that silently invalidates the dealer socket — reconnect now instead of waiting for the
+            // keep-alive liveness timeout to notice.
+            if (hadNetwork) {
+                LokiLogger.i(TAG, "Default network changed — reconnecting dealer")
+                SessionHolder.player?.onNetworkChanged()
+            }
+            hadNetwork = true
+        }
+    }
+
+    private fun registerNetworkCallback() {
+        val cm = getSystemService(ConnectivityManager::class.java) ?: return
+        connectivityManager = cm
+        try {
+            cm.registerDefaultNetworkCallback(networkCallback)
+        } catch (e: Exception) {
+            LokiLogger.e(TAG, "registerDefaultNetworkCallback failed", e)
+        }
+    }
+
+    private fun unregisterNetworkCallback() {
+        try {
+            connectivityManager?.unregisterNetworkCallback(networkCallback)
+        } catch (_: Exception) {}
+        connectivityManager = null
+    }
+
     override fun onDestroy() {
+        unregisterNetworkCallback()
         if (openAudioEffectSession) {
             broadcastAudioEffectAction(AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION)
             openAudioEffectSession = false

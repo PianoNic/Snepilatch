@@ -577,6 +577,24 @@ class SpotifyViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Repeat-one (loop): when the just-ended track is set to loop, replay it from 0 instead of
+     * advancing. Spotify signals loop by pointing the state machine's `advance` back to the same track
+     * (next == current), which the engine reports as "exhausted" — so the loop has to be driven here,
+     * on ExoPlayer, where it's instant and gapless (the web player loops the same way: advance → same
+     * state). Returns true if it handled the loop (caller should not advance). Public for the test rig.
+     */
+    internal fun maybeLoopRepeatTrack(): Boolean {
+        if (_playback.value.repeatMode != "track") return false
+        LokiLogger.i(TAG, "Repeat-track on — looping current track")
+        MusicPlaybackService.instance?.syncPlay(0)
+        _playback.value = _playback.value.copy(isPlaying = true, isPaused = false, positionMs = 0)
+        startPositionTicker()
+        // Re-arm KotifyClient's clock and report position 0 so Spotify keeps counting the loop.
+        launchWithPlayer("repeatLoop") { it.localSeek(0) }
+        return true
+    }
+
     fun onLoginComplete(cookies: Map<String, String>) {
         needsLogin.value = false
         initError.value = null
@@ -1700,6 +1718,7 @@ class SpotifyViewModel : ViewModel() {
                 LokiLogger.d(TAG, "Silent ad clip ended — engine drives the post-ad advance, skipping fallback")
                 return@onEnded
             }
+            if (maybeLoopRepeatTrack()) return@onEnded
             // Snapshot the URI that JUST ended. If a new track gets loaded
             // (currentStreamUri changes) before our timer fires, Spotify
             // already auto-advanced naturally — do NOT force-skip, that would

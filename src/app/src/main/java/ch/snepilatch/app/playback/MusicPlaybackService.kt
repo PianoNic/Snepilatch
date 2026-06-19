@@ -37,6 +37,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import kotify.api.album.Album
+import kotify.api.home.Home
 import kotify.api.playlist.Playlist
 import kotify.api.song.Song
 import kotlinx.coroutines.CoroutineScope
@@ -57,10 +58,11 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         private const val LIKED_SONGS_URI = "spotify:collection:tracks"
 
         // Top-level category nodes — Android Auto renders root-level browsable items as tabs.
-        private const val CAT_PLAYLISTS = "cat:playlists"
-        private const val CAT_ALBUMS = "cat:albums"
-        private const val CAT_LIKED = "cat:liked"
+        // Mirrors Spotify's layout: Home (Liked Songs pinned first) / Latest / Library. Search is the
+        // toolbar button (SEARCH_SUPPORTED) rather than a tab — Auto can't host a keyboard in a tab.
+        private const val CAT_HOME = "cat:home"
         private const val CAT_RECENT = "cat:recent"
+        private const val CAT_LIBRARY = "cat:library"
 
         // mediaId prefixes so onPlayFromMediaId knows how to act on a tapped item.
         // PLAY_PREFIX + contextUri plays a whole context; TRACK_PREFIX + "trackUri|contextUri"
@@ -921,10 +923,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
     /** Top-level tabs shown across the Android Auto browse bar, each with its own glyph. */
     private fun buildRootTabs(): MutableList<MediaBrowserCompat.MediaItem> = mutableListOf(
-        browsableItem(CAT_PLAYLISTS, "Playlists", null, resourceUri(R.drawable.ic_auto_playlists)),
-        browsableItem(CAT_ALBUMS, "Albums", null, resourceUri(R.drawable.ic_auto_albums)),
-        browsableItem(CAT_LIKED, "Liked Songs", null, resourceUri(R.drawable.ic_auto_liked)),
-        browsableItem(CAT_RECENT, "Recently Played", null, resourceUri(R.drawable.ic_auto_recent)),
+        browsableItem(CAT_HOME, "Home", null, resourceUri(R.drawable.ic_auto_home)),
+        browsableItem(CAT_RECENT, "Latest", null, resourceUri(R.drawable.ic_auto_recent)),
+        browsableItem(CAT_LIBRARY, "Library", null, resourceUri(R.drawable.ic_auto_library)),
     )
 
     /** A loadable URI for a bundled drawable, for use as an Android Auto item/tab icon. */
@@ -934,16 +935,23 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     private suspend fun loadCategory(parentId: String): MutableList<MediaBrowserCompat.MediaItem> {
         val sess = SessionHolder.session ?: return mutableListOf()
         return when (parentId) {
-            CAT_PLAYLISTS -> Playlist(sess).getLibrary(limit = 50).items
-                .filter { it.uri.contains(":playlist:") }
-                .map { browsableItem(it.uri, it.name, it.ownerName ?: "Playlist", it.imageUrl) }
-                .toMutableList()
+            // Home: Liked Songs pinned first, then the user's Spotify home feed (playlists/albums).
+            CAT_HOME -> {
+                val out = mutableListOf(
+                    browsableItem(LIKED_SONGS_URI, "Liked Songs", "Playlist", resourceUri(R.drawable.ic_auto_liked))
+                )
+                Home(sess).getHomeFeed()?.sections
+                    ?.flatMap { it.items }
+                    ?.filter { it.uri.contains(":playlist:") || it.uri.contains(":album:") }
+                    ?.distinctBy { it.uri }
+                    ?.take(40)
+                    ?.forEach {
+                        out.add(browsableItem(it.uri, it.name, it.artists?.joinToString(", ") ?: it.owner ?: it.type, it.imageUrl))
+                    }
+                out
+            }
 
-            CAT_ALBUMS -> Playlist(sess).getLibrary(limit = 50).items
-                .filter { it.uri.contains(":album:") }
-                .map { browsableItem(it.uri, it.name, it.ownerName ?: "Album", it.imageUrl) }
-                .toMutableList()
-
+            // Latest: recently played items from the library, newest first.
             CAT_RECENT -> Playlist(sess).getLibrary(limit = 50).items
                 .filter { it.uri.contains(":playlist:") || it.uri.contains(":album:") }
                 .sortedByDescending { it.playedAt ?: "" }
@@ -951,7 +959,13 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 .map { browsableItem(it.uri, it.name, it.ownerName ?: it.type, it.imageUrl) }
                 .toMutableList()
 
-            CAT_LIKED, LIKED_SONGS_URI -> {
+            // Library: the user's playlists + saved albums.
+            CAT_LIBRARY -> Playlist(sess).getLibrary(limit = 50).items
+                .filter { it.uri.contains(":playlist:") || it.uri.contains(":album:") }
+                .map { browsableItem(it.uri, it.name, it.ownerName ?: it.type, it.imageUrl) }
+                .toMutableList()
+
+            LIKED_SONGS_URI -> {
                 val out = mutableListOf(playAllItem(LIKED_SONGS_URI))
                 Playlist(sess).getLikedSongs(limit = 100).items.forEach { t ->
                     out.add(trackItem(t.uri, LIKED_SONGS_URI, t.name, t.artists.joinToString(", ") { it.name }, t.album.coverArtUrl))
@@ -1015,7 +1029,8 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     private fun playAllItem(contextUri: String): MediaBrowserCompat.MediaItem {
         val desc = MediaDescriptionCompat.Builder()
             .setMediaId(PLAY_PREFIX + contextUri)
-            .setTitle("▶ Play all")
+            .setTitle("Play all")
+            .setIconUri(Uri.parse(resourceUri(R.drawable.ic_auto_play)))
             .build()
         return MediaBrowserCompat.MediaItem(desc, MediaBrowserCompat.MediaItem.FLAG_PLAYABLE)
     }

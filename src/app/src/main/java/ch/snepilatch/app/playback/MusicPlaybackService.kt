@@ -37,9 +37,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import kotify.api.album.Album
+import ch.snepilatch.app.data.TrackInfo
 import kotify.api.artist.Artist
 import kotify.api.home.Home
-import kotify.api.playerstatus.QueueTrack
 import kotify.api.playlist.Playlist
 import kotify.api.song.Song
 import kotlinx.coroutines.CoroutineScope
@@ -95,7 +95,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     /** The upcoming queue last published to the media session, indexed by queue-item id. */
-    private var currentQueue: List<QueueTrack> = emptyList()
+    private var currentQueue: List<TrackInfo> = emptyList()
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     /** Loopback proxy that decrypts Blowfish-encrypted Deezer streams on the fly. */
@@ -944,9 +944,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     /**
      * Publish the upcoming tracks to the media session so Android Auto (and the system UI) show a
      * queue button on the now-playing screen. Each item's id is its index, used by onSkipToQueueItem.
-     * Called from the ViewModel on every state update.
+     * Fed from the ViewModel's _queue (a fresh getState() fetch) — the pushed cluster state truncates
+     * next_tracks to a couple of entries, so we use the full queue the app already resolves.
      */
-    fun updateQueue(tracks: List<QueueTrack>) {
+    fun updateQueue(tracks: List<TrackInfo>) {
         val capped = tracks.take(50)
         currentQueue = capped
         mainHandler.post {
@@ -957,9 +958,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             val items = capped.mapIndexed { index, t ->
                 val desc = MediaDescriptionCompat.Builder()
                     .setMediaId(t.uri)
-                    .setTitle(t.name ?: "")
-                    .setSubtitle(t.artistName)
-                    .apply { t.imageUrl?.let { setIconUri(Uri.parse(it)) } }
+                    .setTitle(t.name)
+                    .setSubtitle(t.artist)
+                    .apply { t.albumArt?.let { setIconUri(Uri.parse(it)) } }
                     .build()
                 MediaSessionCompat.QueueItem(desc, index.toLong())
             }

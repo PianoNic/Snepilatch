@@ -456,8 +456,6 @@ class SpotifyViewModel : ViewModel() {
         pc.onState { state ->
             val delta = if (lastCommandTs > 0) System.currentTimeMillis() - lastCommandTs else -1
             LokiLogger.i(TAG, "[Timing] WS onState arrived (${delta}ms after CMD '$lastCommandName')")
-            // Feed the upcoming queue to the media session so Android Auto shows the queue button.
-            MusicPlaybackService.instance?.updateQueue(state.next_tracks)
             viewModelScope.launch { updatePlaybackFromState(state) }
         }
 
@@ -482,7 +480,10 @@ class SpotifyViewModel : ViewModel() {
             resolveJob?.cancel()
             resolveJob = viewModelScope.launch(Dispatchers.IO) {
                 resolveAndPlay(event)
-                if (currentScreen.value == Screen.QUEUE) refreshQueue()
+                // Refresh on every track change (not just when the queue screen is open) so the
+                // Android Auto queue stays current — refreshQueue uses a fresh getState() whose
+                // next_tracks isn't truncated like the pushed cluster state.
+                refreshQueue()
             }
         }
 
@@ -1380,6 +1381,7 @@ class SpotifyViewModel : ViewModel() {
 
                 // Show immediately with what we have
                 _queue.value = parsed.map { it.info }
+                MusicPlaybackService.instance?.updateQueue(_queue.value)
 
                 // Fetch missing metadata concurrently
                 val needFetch = parsed.filter { it.needsFetch }
@@ -1406,6 +1408,7 @@ class SpotifyViewModel : ViewModel() {
                             f.copy(uid = pt.info.uid ?: f.uid)
                         } else pt.info
                     }
+                    MusicPlaybackService.instance?.updateQueue(_queue.value)
                 }
             } catch (e: Exception) { LokiLogger.e(TAG, "refreshQueue", e) }
         }

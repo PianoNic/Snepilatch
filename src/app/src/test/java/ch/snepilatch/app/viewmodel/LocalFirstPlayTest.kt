@@ -42,9 +42,9 @@ class LocalFirstPlayTest {
             uri = "spotify:track:abc", name = "Song", artist = "Artist", albumArt = null, uid = "uid-42",
         )
 
-        runBlocking { rig.vm.startUserPlayback(track, "spotify:playlist:p1") }
+        runBlocking { rig.vm.startUserPlayback(track, "spotify:playlist:p1", trackIndex = 7) }
 
-        coVerify(exactly = 1) { pc.playTrack("spotify:track:abc", "spotify:playlist:p1", "uid-42") }
+        coVerify(exactly = 1) { pc.playTrack("spotify:track:abc", "spotify:playlist:p1", "uid-42", 7) }
     }
 
     @Test
@@ -56,6 +56,6 @@ class LocalFirstPlayTest {
             rig.vm.startUserPlayback(TrackInfo(uri = "spotify:track:xyz", name = "", artist = "", albumArt = null), null)
         }
 
-        coVerify(exactly = 1) { pc.playTrack("spotify:track:xyz", null, null) }
+        coVerify(exactly = 1) { pc.playTrack("spotify:track:xyz", null, null, null) }
     }
 }

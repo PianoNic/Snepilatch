@@ -267,7 +267,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
                                 vm.togglePlayPause()
                             } else {
                                 val first = detail.tracks.firstOrNull() ?: return@clickable
-                                vm.playTrack(first, detail.uri)
+                                vm.playTrack(first, detail.uri, 0)
                             }
                         },
                     contentAlignment = Alignment.Center
@@ -302,8 +302,8 @@ fun DetailScreen(vm: SpotifyViewModel) {
             }
             when {
                 isArtist -> ArtistTrackRow(index + 1, track, vm, detail.uri, detail.topTrackPlaycounts.getOrNull(index))
-                detail.type == "album" -> AlbumTrackRow(track, vm, detail.uri)
-                else -> TrackRow(track, vm, contextUri = detail.uri)
+                detail.type == "album" -> AlbumTrackRow(track, vm, detail.uri, index)
+                else -> TrackRow(track, vm, contextUri = detail.uri, trackIndex = index)
             }
         }
 
@@ -503,7 +503,7 @@ private fun ArtistTrackRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable { vm.playTrack(track, contextUri) }
+            .clickable { vm.playTrack(track, contextUri, number - 1) }
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -633,7 +633,8 @@ private fun ArtistTrackRow(
 private fun AlbumTrackRow(
     track: ch.snepilatch.app.data.TrackInfo,
     vm: SpotifyViewModel,
-    contextUri: String
+    contextUri: String,
+    trackIndex: Int? = null
 ) {
     val playback by vm.playback.collectAsState()
     val isPlaying = playback.track?.uri == track.uri && playback.isPlaying
@@ -643,7 +644,7 @@ private fun AlbumTrackRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable { vm.playTrack(track, contextUri) }
+            .clickable { vm.playTrack(track, contextUri, trackIndex) }
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

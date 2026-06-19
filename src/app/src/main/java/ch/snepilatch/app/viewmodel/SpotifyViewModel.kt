@@ -1290,15 +1290,15 @@ class SpotifyViewModel : ViewModel() {
     /**
      * Play a tapped track. Local-first like the web player: resolve + load it on ExoPlayer immediately,
      * in parallel with the Spotify Connect "play" command, instead of waiting for the WS onTrackChange
-     * echo. The track's uid (carried by playlist rows) is forwarded so a context with the same track more
-     * than once starts on the exact tapped occurrence, matching the JS skip_to.
+     * echo. The track's uid + index (carried by playlist/album rows) are forwarded so a context with the
+     * same track more than once starts on the exact tapped occurrence, matching the JS skip_to.
      */
-    fun playTrack(track: TrackInfo, contextUri: String? = null) {
+    fun playTrack(track: TrackInfo, contextUri: String? = null, trackIndex: Int? = null) {
         userPlayJob?.cancel()
-        userPlayJob = viewModelScope.launch(Dispatchers.IO) { startUserPlayback(track, contextUri) }
+        userPlayJob = viewModelScope.launch(Dispatchers.IO) { startUserPlayback(track, contextUri, trackIndex) }
     }
 
-    internal suspend fun startUserPlayback(track: TrackInfo, contextUri: String?) = coroutineScope {
+    internal suspend fun startUserPlayback(track: TrackInfo, contextUri: String?, trackIndex: Int? = null) = coroutineScope {
         // Honor the resulting onTrackChange even if we're starting from idle (no local audio yet).
         pendingUserPlay = true
         val pc = player ?: return@coroutineScope
@@ -1328,13 +1328,13 @@ class SpotifyViewModel : ViewModel() {
         }
         try {
             try {
-                pc.playTrack(track.uri, contextUri, track.uid)
+                pc.playTrack(track.uri, contextUri, track.uid, trackIndex)
             } catch (e: Exception) {
                 if (e.message?.contains("PLAYER_COMMAND_REJECTED") == true) {
                     LokiLogger.i(TAG, "Command rejected, transferring playback here and retrying")
                     pc.transferPlaybackHere()
                     delay(500)
-                    pc.playTrack(track.uri, contextUri, track.uid)
+                    pc.playTrack(track.uri, contextUri, track.uid, trackIndex)
                 } else throw e
             }
             delay(500)

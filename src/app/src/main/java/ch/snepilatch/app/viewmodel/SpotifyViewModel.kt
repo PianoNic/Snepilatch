@@ -113,6 +113,13 @@ class SpotifyViewModel : ViewModel() {
     val isNextReady = MutableStateFlow(false)
 
     private var suppressRemotePause = false
+
+    // Set when an end-of-track advance fails because the transport dropped (e.g. a Wi-Fi/cell
+    // handover times the connect-state request out). Like the web player, we DON'T tear the session
+    // down on a recoverable disconnect — we keep the stream and re-fire the advance once the dealer
+    // reconnects (mirrors the JS _onConnectionId → register → resume path).
+    @Volatile
+    private var advancePendingReconnect = false
     private var resolveJob: Job? = null  // Cancel in-flight resolveAndPlay when a new track arrives
 
 
@@ -463,22 +470,31 @@ class SpotifyViewModel : ViewModel() {
         pc.onPause { state -> handleRemotePause(state.position_as_of_timestamp) }
 
         pc.onReconnected {
-            viewModelScope.launch(Dispatchers.IO) {
-                val wasPlaying = withContext(Dispatchers.Main) {
-                    MusicPlaybackService.instance?.isPlaying() == true
-                }
-                LokiLogger.i(TAG, "WebSocket reconnected, re-syncing state (wasPlaying=$wasPlaying)")
-                if (wasPlaying) suppressRemotePause = true
-                try {
-                    pc.getState()?.let { updatePlaybackFromState(it) }
-                    loadDevices()
-                    if (wasPlaying) fallbackResume()
-                } catch (e: Exception) {
-                    LokiLogger.e(TAG, "Failed to re-sync after reconnect", e)
-                } finally {
-                    suppressRemotePause = false
-                }
-            }
+            viewModelScope.launch(Dispatchers.IO) { resyncAfterReconnect(pc) }
+        }
+    }
+
+    /**
+     * Re-establish state after the dealer WebSocket reconnects: pull the live state, refresh devices,
+     * resume if we were playing, and re-fire any advance the disconnect interrupted so playback
+     * self-heals after a network handover. Mirrors the web player resuming once the transport
+     * re-registers.
+     */
+    private suspend fun resyncAfterReconnect(pc: PlayerConnect) {
+        val wasPlaying = withContext(Dispatchers.Main) {
+            MusicPlaybackService.instance?.isPlaying() == true
+        }
+        LokiLogger.i(TAG, "WebSocket reconnected, re-syncing state (wasPlaying=$wasPlaying)")
+        if (wasPlaying) suppressRemotePause = true
+        try {
+            pc.getState()?.let { updatePlaybackFromState(it) }
+            loadDevices()
+            if (wasPlaying) fallbackResume()
+            retryPendingAdvance()  // self-heal an advance the disconnect interrupted
+        } catch (e: Exception) {
+            LokiLogger.e(TAG, "Failed to re-sync after reconnect", e)
+        } finally {
+            suppressRemotePause = false
         }
     }
 
@@ -515,6 +531,49 @@ class SpotifyViewModel : ViewModel() {
             MusicPlaybackService.instance?.syncPause()
             _playback.value = _playback.value.copy(isPlaying = false, isPaused = true)
             stopPositionTicker()
+        }
+    }
+
+    /**
+     * An end-of-track advance threw. The web player never tears the session down on a recoverable
+     * transport error (a Wi-Fi/cell handover that times the request out) — it keeps the session,
+     * reconnects the dealer, and resumes. We mirror that: keep the stream alive, show paused, and arm
+     * [advancePendingReconnect] so [onReconnected] re-fires the advance once the dealer is back. Only a
+     * genuinely lost session (no PlayerConnect) falls through to a hard stop. Public for the test rig.
+     */
+    internal fun handleAdvanceFailure(e: Throwable) {
+        if (player != null) {
+            LokiLogger.w(TAG, "End-of-track advance failed (likely transport drop: ${e.message}) — arming retry on reconnect")
+            advancePendingReconnect = true
+            _playback.value = _playback.value.copy(isPlaying = false, isPaused = true)
+            stopPositionTicker()
+            return
+        }
+        LokiLogger.e(TAG, "playbackEnded advance failed with no player, stopping", e)
+        isStreaming.value = false
+        streamProvider.value = null
+        currentStreamUri = null
+        _playback.value = _playback.value.copy(isPlaying = false, isPaused = true)
+        stopPositionTicker()
+    }
+
+    /**
+     * After the dealer reconnects, re-fire an advance that the disconnect interrupted (mirrors the web
+     * player resuming its queue once the transport re-registers). No-op unless one is pending. Public
+     * for the test rig.
+     */
+    internal suspend fun retryPendingAdvance() {
+        if (!advancePendingReconnect) return
+        advancePendingReconnect = false
+        LokiLogger.i(TAG, "Reconnected — retrying the interrupted end-of-track advance")
+        try {
+            player?.forceAdvance()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Still no good — re-arm; the next reconnect will try again, exactly like the web player.
+            LokiLogger.w(TAG, "Advance retry after reconnect failed (${e.message}) — re-arming")
+            advancePendingReconnect = true
         }
     }
 
@@ -1670,14 +1729,7 @@ class SpotifyViewModel : ViewModel() {
                         player?.forceAdvance()
                     }
                 } catch (e: CancellationException) { throw e }
-                catch (e: Exception) {
-                    LokiLogger.e(TAG, "playbackEnded advance failed, stopping", e)
-                    isStreaming.value = false
-                    streamProvider.value = null
-                    currentStreamUri = null
-                    _playback.value = _playback.value.copy(isPlaying = false, isPaused = true)
-                    stopPositionTicker()
-                }
+                catch (e: Exception) { handleAdvanceFailure(e) }
             }
         }
         svc.onReady = {
@@ -1745,6 +1797,9 @@ class SpotifyViewModel : ViewModel() {
         isStreamLoading.value = true
         isNextReady.value = false
         stopPositionTicker()
+        // A real track is loading — the queue moved on, so any advance we'd armed for a reconnect
+        // retry is now satisfied. Clear it so a later reconnect can't double-advance past this track.
+        advancePendingReconnect = false
 
         // Don't stop the old song — let it keep playing until the new one is ready.
         // ExoPlayer's setMediaItem() in playUrl/playDrmUrl will seamlessly replace it.

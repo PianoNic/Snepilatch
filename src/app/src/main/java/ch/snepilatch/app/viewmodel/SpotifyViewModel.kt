@@ -143,6 +143,7 @@ class SpotifyViewModel : ViewModel() {
         reportPosition = { pos -> player?.reportPosition(pos, _playback.value.isPaused) ?: Unit }
     )
     private var commandJob: Job? = null
+    private var userPlayJob: Job? = null  // Cancel an in-flight user-initiated play when another track is tapped
 
     // Home
     private val _homeData = MutableStateFlow<HomeData?>(null)
@@ -1183,20 +1184,23 @@ class SpotifyViewModel : ViewModel() {
     }
 
     /**
-     * Fill in track metadata from a WS onTrackChange echo for a track a local-first [skipNext] already
-     * loaded. The fast path only knows the URI + name (+ whatever the queue snapshot had); the echo
-     * carries the full artist/art/album, so patch any gaps and refresh the palette.
+     * Fill in track metadata from a WS onTrackChange echo for a track a local-first [skipNext] or
+     * [playTrack] already loaded. The fast path may only know the URI (+ whatever the queue snapshot
+     * had); the echo carries the full name/artist/art/album, so patch any gaps and refresh the palette.
      */
     internal fun enrichCurrentTrackMetadata(current: PlayerTrack, trackUri: String) {
         val existing = _playback.value.track
         if (existing == null || existing.uri != trackUri) return
         val art = normalizeSpotifyImageUrl(current.imageLargeUrl ?: current.imageUrl)
+        val needsName = (existing.name.isBlank() || existing.name == "Unknown") && current.name.isNotBlank()
         val needsArt = existing.albumArt == null && art != null
         val needsArtist = (existing.artist.isBlank() || existing.artist == "Unknown") && !current.artistName.isNullOrBlank()
         val needsAlbum = existing.albumName == null && current.albumName != null
-        if (!needsArt && !needsArtist && !needsAlbum) return
+        val hasGap = needsName || needsArt || needsArtist || needsAlbum
+        if (!hasGap) return
         _playback.value = _playback.value.copy(
             track = existing.copy(
+                name = if (needsName) current.name else existing.name,
                 artist = current.artistName ?: existing.artist,
                 albumArt = art ?: existing.albumArt,
                 albumName = current.albumName ?: existing.albumName,
@@ -1279,27 +1283,64 @@ class SpotifyViewModel : ViewModel() {
         launchWithPlayer("setSpotifyVolume") { it.setVolume(volumePercent) }
     }
 
-    fun playTrack(trackUri: String, contextUri: String? = null) {
-        // The user explicitly asked to play this track — honor the resulting
-        // onTrackChange even if we're starting from idle (no local audio yet).
+    /** URI-only entry point (search results, home shortcuts) — no uid/metadata, the WS echo enriches it. */
+    fun playTrack(trackUri: String, contextUri: String? = null) =
+        playTrack(TrackInfo(uri = trackUri, name = "", artist = "", albumArt = null), contextUri)
+
+    /**
+     * Play a tapped track. Local-first like the web player: resolve + load it on ExoPlayer immediately,
+     * in parallel with the Spotify Connect "play" command, instead of waiting for the WS onTrackChange
+     * echo. The track's uid (carried by playlist rows) is forwarded so a context with the same track more
+     * than once starts on the exact tapped occurrence, matching the JS skip_to.
+     */
+    fun playTrack(track: TrackInfo, contextUri: String? = null) {
+        userPlayJob?.cancel()
+        userPlayJob = viewModelScope.launch(Dispatchers.IO) { startUserPlayback(track, contextUri) }
+    }
+
+    internal suspend fun startUserPlayback(track: TrackInfo, contextUri: String?) = coroutineScope {
+        // Honor the resulting onTrackChange even if we're starting from idle (no local audio yet).
         pendingUserPlay = true
-        viewModelScope.launch(Dispatchers.IO) {
+        val pc = player ?: return@coroutineScope
+        // Local-first: resolve the tapped track's CDN and play it on ExoPlayer now, parallel to the
+        // command. We resolve the file id up front (never reuse the stale latestFileId of the outgoing
+        // track) and only take the fast path once we have it; otherwise the echo loads it the slow way.
+        val localPlay = launch {
             try {
-                val pc = player ?: return@launch
-                try {
-                    pc.playTrack(trackUri, contextUri)
-                } catch (e: Exception) {
-                    if (e.message?.contains("PLAYER_COMMAND_REJECTED") == true) {
-                        LokiLogger.i(TAG, "Command rejected, transferring playback here and retrying")
-                        pc.transferPlaybackHere()
-                        delay(500)
-                        pc.playTrack(trackUri, contextUri)
-                    } else throw e
+                val fileId = if (preferredAudioSource.value == null) cdnResolver?.fetchFileIdFromMetadata(track.uri) else null
+                if (preferredAudioSource.value == null && fileId == null) {
+                    LokiLogger.d(TAG, "playTrack: no file id up front, letting the echo load ${track.uri}")
+                    return@launch
                 }
-                delay(500)
-                refreshState()
-            } catch (e: Exception) { LokiLogger.e(TAG, "playTrack", e) }
+                if (fileId != null) latestFileId = fileId
+                val current = PlayerTrack(
+                    uri = track.uri, uid = track.uid, provider = "context", name = track.name,
+                    artistName = track.artist.ifBlank { null }, artistUri = null,
+                    albumName = track.albumName, albumUri = null,
+                    durationMs = track.durationMs, isExplicit = false,
+                    imageUrl = track.albumArt, imageSmallUrl = null, imageLargeUrl = track.albumArt,
+                    contextUri = contextUri,
+                )
+                LokiLogger.i(TAG, "[Timing] playTrack local-first: loading ${track.uri}")
+                resolveAndPlay(TrackChangeEvent(previous = currentStreamUri, current = current, currentFileId = fileId))
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { LokiLogger.e(TAG, "playTrack local-first", e) }
         }
+        try {
+            try {
+                pc.playTrack(track.uri, contextUri, track.uid)
+            } catch (e: Exception) {
+                if (e.message?.contains("PLAYER_COMMAND_REJECTED") == true) {
+                    LokiLogger.i(TAG, "Command rejected, transferring playback here and retrying")
+                    pc.transferPlaybackHere()
+                    delay(500)
+                    pc.playTrack(track.uri, contextUri, track.uid)
+                } else throw e
+            }
+            delay(500)
+            refreshState()
+        } catch (e: Exception) { LokiLogger.e(TAG, "playTrack", e) }
+        localPlay.join()
     }
 
     fun addTrackToPlaylist(playlistId: String, trackUri: String) {

@@ -168,7 +168,7 @@ fun TrackRow(track: TrackInfo, vm: SpotifyViewModel, contextUri: String? = null)
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable { vm.playTrack(track.uri, contextUri) }
+            .clickable { vm.playTrack(track, contextUri) }
             .padding(horizontal = 16.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

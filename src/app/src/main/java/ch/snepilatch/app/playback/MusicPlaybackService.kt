@@ -137,6 +137,11 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         player = ExoPlayer.Builder(this)
             .setAudioAttributes(audioAttributes, true)
             .setLoadControl(loadControl)
+            // Hold a partial wake + Wi-Fi lock while playing. Streaming playback needs the network
+            // alive with the screen off; without this Doze freezes the CPU/radio between tracks, the
+            // dealer keep-alive thread stalls and end-of-track advance fails. WAKE_MODE_NETWORK is
+            // released automatically when playback stops. Requires the WAKE_LOCK permission.
+            .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
 
         player.addListener(object : Player.Listener {

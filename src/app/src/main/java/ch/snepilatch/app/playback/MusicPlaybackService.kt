@@ -74,6 +74,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         private const val CONTENT_STYLE_PLAYABLE_HINT = "android.media.browse.CONTENT_STYLE_PLAYABLE_HINT"
         private const val CONTENT_STYLE_LIST = 1
         private const val CONTENT_STYLE_GRID = 2
+
+        // Tells Android Auto the browser supports search, so it shows the search button → onSearch.
+        private const val SEARCH_SUPPORTED = "android.media.browse.SEARCH_SUPPORTED"
         private const val NOTIFICATION_ID = 1
         var instance: MusicPlaybackService? = null
             private set
@@ -891,6 +894,8 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             putBoolean(CONTENT_STYLE_SUPPORTED, true)
             putInt(CONTENT_STYLE_BROWSABLE_HINT, CONTENT_STYLE_GRID)
             putInt(CONTENT_STYLE_PLAYABLE_HINT, CONTENT_STYLE_LIST)
+            // Surface Auto's search affordance (the magnifying-glass button) — routed to onSearch.
+            putBoolean(SEARCH_SUPPORTED, true)
         }
         return BrowserRoot(BROWSE_ROOT, extras)
     }
@@ -914,13 +919,16 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         }
     }
 
-    /** Top-level tabs shown across the Android Auto browse bar. */
+    /** Top-level tabs shown across the Android Auto browse bar, each with its own glyph. */
     private fun buildRootTabs(): MutableList<MediaBrowserCompat.MediaItem> = mutableListOf(
-        browsableItem(CAT_PLAYLISTS, "Playlists", null, null),
-        browsableItem(CAT_ALBUMS, "Albums", null, null),
-        browsableItem(CAT_LIKED, "Liked Songs", null, null),
-        browsableItem(CAT_RECENT, "Recently Played", null, null),
+        browsableItem(CAT_PLAYLISTS, "Playlists", null, resourceUri(R.drawable.ic_auto_playlists)),
+        browsableItem(CAT_ALBUMS, "Albums", null, resourceUri(R.drawable.ic_auto_albums)),
+        browsableItem(CAT_LIKED, "Liked Songs", null, resourceUri(R.drawable.ic_auto_liked)),
+        browsableItem(CAT_RECENT, "Recently Played", null, resourceUri(R.drawable.ic_auto_recent)),
     )
+
+    /** A loadable URI for a bundled drawable, for use as an Android Auto item/tab icon. */
+    private fun resourceUri(resId: Int): String = "android.resource://$packageName/$resId"
 
     /** Resolve the children of any non-root node: a category tab, or a playlist/album to drill into. */
     private suspend fun loadCategory(parentId: String): MutableList<MediaBrowserCompat.MediaItem> {

@@ -37,7 +37,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import kotify.api.album.Album
+import kotify.api.artist.Artist
 import kotify.api.home.Home
+import kotify.api.playerstatus.QueueTrack
 import kotify.api.playlist.Playlist
 import kotify.api.song.Song
 import kotlinx.coroutines.CoroutineScope
@@ -91,6 +93,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
     private var mediaSession: MediaSessionCompat? = null
     private val mainHandler = Handler(Looper.getMainLooper())
+
+    /** The upcoming queue last published to the media session, indexed by queue-item id. */
+    private var currentQueue: List<QueueTrack> = emptyList()
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     /** Loopback proxy that decrypts Blowfish-encrypted Deezer streams on the fly. */
@@ -303,6 +308,19 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
                 override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
                     if (mediaId != null) playFromMediaId(mediaId)
+                }
+
+                override fun onSkipToQueueItem(id: Long) {
+                    val track = currentQueue.getOrNull(id.toInt()) ?: return
+                    serviceScope.launch {
+                        try {
+                            withContext(Dispatchers.IO) {
+                                SessionHolder.player?.skipToTrack(track.uri, track.uid ?: "")
+                            }
+                        } catch (e: Exception) {
+                            LokiLogger.e(TAG, "Auto: skipToQueueItem failed for ${track.uri}", e)
+                        }
+                    }
                 }
 
                 override fun onSeekTo(pos: Long) {
@@ -740,6 +758,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 PlaybackStateCompat.ACTION_PLAY_PAUSE or
                 PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
                 PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
+                PlaybackStateCompat.ACTION_SKIP_TO_QUEUE_ITEM or
                 PlaybackStateCompat.ACTION_SEEK_TO or
                 PlaybackStateCompat.ACTION_STOP
             )
@@ -749,7 +768,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         fun addButtonAction(type: String, actionName: String) {
             when (type) {
                 "like" -> {
-                    val icon = if (isLiked) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline
+                    // White/tintable icons — Android Auto can't tint the green ic_heart_* vectors and
+                    // falls back to the app icon for the custom action.
+                    val icon = if (isLiked) R.drawable.ic_auto_like_on else R.drawable.ic_auto_like_off
                     builder.addCustomAction(actionName, if (isLiked) "Unlike" else "Like", icon)
                 }
                 "shuffle" -> {
@@ -920,6 +941,33 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         }
     }
 
+    /**
+     * Publish the upcoming tracks to the media session so Android Auto (and the system UI) show a
+     * queue button on the now-playing screen. Each item's id is its index, used by onSkipToQueueItem.
+     * Called from the ViewModel on every state update.
+     */
+    fun updateQueue(tracks: List<QueueTrack>) {
+        val capped = tracks.take(50)
+        currentQueue = capped
+        mainHandler.post {
+            if (capped.isEmpty()) {
+                mediaSession?.setQueue(null)
+                return@post
+            }
+            val items = capped.mapIndexed { index, t ->
+                val desc = MediaDescriptionCompat.Builder()
+                    .setMediaId(t.uri)
+                    .setTitle(t.name ?: "")
+                    .setSubtitle(t.artistName)
+                    .apply { t.imageUrl?.let { setIconUri(Uri.parse(it)) } }
+                    .build()
+                MediaSessionCompat.QueueItem(desc, index.toLong())
+            }
+            mediaSession?.setQueue(items)
+            mediaSession?.setQueueTitle("Up next")
+        }
+    }
+
     private suspend fun loadBitmap(url: String): Bitmap? = withContext(Dispatchers.IO) {
         try {
             // Spotify's cluster API returns art as `spotify:image:<id>` URIs.
@@ -1024,10 +1072,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 .map { browsableItem(it.uri, it.name, it.ownerName ?: it.type, it.imageUrl) }
                 .toMutableList()
 
-            // Library: the user's playlists + saved albums.
+            // Library: the user's full library — playlists, albums and artists — matching the
+            // in-app Library tab (default order), not just playlists and albums.
             CAT_LIBRARY -> Playlist(sess).getLibrary(limit = 50).items
-                .filter { it.uri.contains(":playlist:") || it.uri.contains(":album:") }
-                .map { browsableItem(it.uri, it.name, it.ownerName ?: it.type, it.imageUrl) }
+                .map { browsableItem(it.uri, it.name, it.ownerName ?: it.type.replaceFirstChar { c -> c.uppercase() }, it.imageUrl) }
                 .toMutableList()
 
             LIKED_SONGS_URI -> {
@@ -1054,6 +1102,12 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                         out.add(trackItem(t.uri, parentId, t.name, t.artists.joinToString(", "), info.coverArtUrl))
                     }
                     out
+                }
+                parentId.contains(":artist:") -> {
+                    val info = Artist(sess).getArtist(parentId.substringAfterLast(":"))
+                    info.topTracks.map { t ->
+                        trackItem(t.uri, parentId, t.name, info.name, t.coverArtUrl)
+                    }.toMutableList()
                 }
                 else -> mutableListOf()
             }

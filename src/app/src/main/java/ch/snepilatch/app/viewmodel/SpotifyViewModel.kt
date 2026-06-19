@@ -456,6 +456,8 @@ class SpotifyViewModel : ViewModel() {
         pc.onState { state ->
             val delta = if (lastCommandTs > 0) System.currentTimeMillis() - lastCommandTs else -1
             LokiLogger.i(TAG, "[Timing] WS onState arrived (${delta}ms after CMD '$lastCommandName')")
+            // Feed the upcoming queue to the media session so Android Auto shows the queue button.
+            MusicPlaybackService.instance?.updateQueue(state.next_tracks)
             viewModelScope.launch { updatePlaybackFromState(state) }
         }
 

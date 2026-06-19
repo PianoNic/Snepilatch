@@ -356,6 +356,18 @@ class SpotifyViewModel : ViewModel() {
     }
 
     /**
+     * A remote controller seeked the current track (KotifyClient surfaced the inbound `seek_to`
+     * command). Seek ExoPlayer to the exact target — the web player's only seek path, replacing the
+     * old position-diffing heuristic. Only act when we're the streaming device.
+     */
+    private fun handleRemoteSeek(positionMs: Long) {
+        if (!isStreaming.value) return
+        LokiLogger.i(TAG, "Remote seek -> ${positionMs}ms")
+        MusicPlaybackService.instance?.syncSeek(positionMs)
+        _playback.value = _playback.value.copy(positionMs = positionMs)
+    }
+
+    /**
      * Attach the ViewModel's reactions to a freshly created PlayerConnect.
      *
      * These callbacks are what keeps the UI in sync with whatever Spotify is
@@ -413,6 +425,8 @@ class SpotifyViewModel : ViewModel() {
                 MusicPlaybackService.instance?.playSilentAd()
             }
         }
+
+        pc.onSeek { positionMs -> handleRemoteSeek(positionMs) }
 
         pc.onState { state ->
             val delta = if (lastCommandTs > 0) System.currentTimeMillis() - lastCommandTs else -1
@@ -642,36 +656,12 @@ class SpotifyViewModel : ViewModel() {
         val stateTrackUri = track?.uri
         val isTrackMismatch = isStreaming.value && currentStreamUri != null && stateTrackUri != currentStreamUri
 
-        // Detect remote seek: when streaming, if Spotify's position differs significantly
-        // from ExoPlayer's, someone seeked from the web player — sync ExoPlayer.
-        // Skip during track transitions (mismatch) to avoid false seeks.
-        // Skip if the spotify timestamp is stale (>10s old) — the cluster snapshot's
-        // timestamp can be minutes in the past after the user resumes from idle, and
-        // interpolating against it produces a bogus position past the end of the track.
+        // Remote seeks are applied explicitly via pc.onSeek (KotifyClient surfaces the inbound
+        // connect-state seek_to command), exactly like the web player. The active local device owns
+        // its clock, so we deliberately do NOT reconcile position by diffing ExoPlayer against the
+        // (often lagging) cloud snapshot — that heuristic yanked ExoPlayer backward at track-end on an
+        // exhausted queue, replaying the last seconds forever.
         val isSeekGuarded = System.currentTimeMillis() < seekGuardUntil
-        val timestampAge = System.currentTimeMillis() - state.timestamp
-        val isStaleSnapshot = timestampAge > 10_000L
-        if (isStreaming.value && !isSeekGuarded && !isStreamLoading.value && !isTrackMismatch && !isStaleSnapshot) {
-            val exoPos = withContext(Dispatchers.Main) {
-                MusicPlaybackService.instance?.getCurrentPosition()
-            } ?: 0L
-            // Interpolate Spotify's position using timestamp
-            val elapsed = timestampAge.coerceAtLeast(0)
-            val spotifyPos = if (state.is_playing && !state.is_paused) {
-                state.position_as_of_timestamp + elapsed
-            } else {
-                state.position_as_of_timestamp
-            }
-            if (kotlin.math.abs(spotifyPos - exoPos) > 3000) {
-                LokiLogger.i(TAG, "Remote seek detected: Spotify=${spotifyPos}ms (interpolated), ExoPlayer=${exoPos}ms — syncing")
-                seekGuardUntil = System.currentTimeMillis() + 1500
-                withContext(Dispatchers.Main) {
-                    MusicPlaybackService.instance?.syncSeek(spotifyPos)
-                }
-            }
-        } else if (isStaleSnapshot && isStreaming.value) {
-            LokiLogger.d(TAG, "Skipping remote-seek sync: snapshot timestamp is ${timestampAge}ms old")
-        }
 
         val posMs = when {
             isSeekGuarded -> _playback.value.positionMs

@@ -132,7 +132,6 @@ class SpotifyViewModel : ViewModel() {
         reportPosition = { pos -> player?.reportPosition(pos, _playback.value.isPaused) ?: Unit }
     )
     private var commandJob: Job? = null
-    private var seekGuardUntil: Long = 0  // suppress remote position updates briefly after local seek
 
     // Home
     private val _homeData = MutableStateFlow<HomeData?>(null)
@@ -658,13 +657,9 @@ class SpotifyViewModel : ViewModel() {
 
         // Remote seeks are applied explicitly via pc.onSeek (KotifyClient surfaces the inbound
         // connect-state seek_to command), exactly like the web player. The active local device owns
-        // its clock, so we deliberately do NOT reconcile position by diffing ExoPlayer against the
-        // (often lagging) cloud snapshot — that heuristic yanked ExoPlayer backward at track-end on an
-        // exhausted queue, replaying the last seconds forever.
-        val isSeekGuarded = System.currentTimeMillis() < seekGuardUntil
-
+        // its clock, so while streaming the position is read straight from ExoPlayer (its currentTime)
+        // and we never reconcile against the lagging cloud snapshot.
         val posMs = when {
-            isSeekGuarded -> _playback.value.positionMs
             isTrackMismatch -> _playback.value.positionMs  // Keep old position during transition
             isStreamLoading.value -> 0L
             isStreaming.value -> withContext(Dispatchers.Main) {
@@ -896,10 +891,6 @@ class SpotifyViewModel : ViewModel() {
 
         coldStartPending = true
         isStreamLoading.value = true
-        // Suppress remote-seek detection during the entire cold-start handoff so
-        // cluster_update pushes triggered by the transfer don't race-seek
-        // ExoPlayer before we explicitly position it in the onReady callback.
-        seekGuardUntil = System.currentTimeMillis() + 30_000L
         // CompletableDeferred that gets completed when onPlaybackId fires with
         // the current track's file id. Set up BEFORE the transfer call so we
         // don't miss the push.
@@ -1025,7 +1016,6 @@ class SpotifyViewModel : ViewModel() {
         coldStartPending = false
         coldStartFileId = null
         isStreamLoading.value = false
-        seekGuardUntil = 0L
     }
 
     /** Hand control back to Spotify Connect (resume) — a state report that can't meaningfully fail. */
@@ -1075,8 +1065,8 @@ class SpotifyViewModel : ViewModel() {
     }
 
     fun seekTo(positionMs: Long) {
-        // Guard: suppress remote state updates for 1.5s to prevent seek position from being overwritten
-        seekGuardUntil = System.currentTimeMillis() + 1500
+        // Reflect the target immediately; ExoPlayer's getCurrentPosition() catches up once the
+        // posted seek lands, and the position ticker then reads it straight from the player.
         _playback.value = _playback.value.copy(positionMs = positionMs)
         // Seek ExoPlayer on main thread
         viewModelScope.launch(Dispatchers.Main) {
@@ -1702,24 +1692,15 @@ class SpotifyViewModel : ViewModel() {
                 // producing at the right position. We just need to:
                 //   1. Tell Spotify Connect to resume (so other clients show us playing)
                 //   2. Update the UI playing state and start the position ticker
-                //   3. Release the seek guard so normal remote-seek sync can take over
-                //   4. Hide the loading spinner
+                //   3. Hide the loading spinner
                 val pos = MusicPlaybackService.instance?.getCurrentPosition() ?: _playback.value.positionMs
                 LokiLogger.i(TAG, "[ColdStart] ExoPlayer producing at ${pos}ms — resuming Spotify Connect")
                 coldStartPending = false
                 _playback.value = _playback.value.copy(isPlaying = true, isPaused = false, positionMs = pos)
                 startPositionTicker()
-                // Hold the seek guard for 15s after cold-start completion.
-                // The transfer + resume handshake can leave Spotify's cluster
-                // snapshot with a stale position_as_of_timestamp that
-                // interpolates tens of seconds past the real position — our
-                // remote-seek detector would then yank ExoPlayer forward and
-                // break playback. 15s is long enough for stale snapshots to
-                // wash out without blocking legitimate user seeks for long.
                 viewModelScope.launch(Dispatchers.IO) {
                     try {
                         fallbackResume()
-                        seekGuardUntil = System.currentTimeMillis() + 15_000L
                     } finally {
                         isStreamLoading.value = false
                     }
@@ -1727,12 +1708,6 @@ class SpotifyViewModel : ViewModel() {
             } else {
                 _playback.value = _playback.value.copy(isPlaying = true, isPaused = false)
                 startPositionTicker()
-                // Hold the seek guard for 5s after any fresh track load so the
-                // stale position Spotify carries across a track transition
-                // can't trigger a bogus remote-seek that seeks ExoPlayer past
-                // the end of the new track. Five seconds is enough for the
-                // cluster snapshot to catch up to position 0 of the new song.
-                seekGuardUntil = System.currentTimeMillis() + 5_000L
                 viewModelScope.launch(Dispatchers.IO) {
                     try {
                         // For Spotify CDN: resume Spotify so other clients show us as playing
@@ -1868,16 +1843,6 @@ class SpotifyViewModel : ViewModel() {
                 }
                 playUrlAt = System.currentTimeMillis()
                 val coldStart = coldStartPending
-                // Extend the seek guard across the entire DRM load + ready
-                // window. playDrmUrl posts to the main handler and returns
-                // instantly; the actual STATE_READY fires 1-2s later. Between
-                // those two points ExoPlayer reports position 0, and if a
-                // stale cluster snapshot interpolates tens of seconds forward
-                // the remote-seek detector would yank ExoPlayer past the
-                // start of the new track — the song would effectively be
-                // skipped because STATE_READY would fire at the seeked
-                // position, not at 0.
-                seekGuardUntil = System.currentTimeMillis() + 5_000L
                 withContext(Dispatchers.Main) {
                     MusicPlaybackService.instance?.playDrmUrl(
                         stream.cdnUrl, stream.licenseUrl, stream.licenseHeaders, title, artist, art,

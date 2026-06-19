@@ -49,10 +49,15 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         private const val TAG = "MusicService"
         private const val CHANNEL_ID = "music_playback"
 
+        // Separate high-importance channel for error alerts so they pop up (heads-up) instead of
+        // sitting silently like the ongoing playback notification.
+        private const val ALERT_CHANNEL_ID = "snepilatch_alerts"
+
         // Android Auto browse tree
         private const val BROWSE_ROOT = "root"
         private const val LIKED_SONGS_URI = "spotify:collection:tracks"
         private const val NOTIFICATION_ID = 1
+        private const val ALERT_NOTIFICATION_ID = 2
         var instance: MusicPlaybackService? = null
             private set
     }
@@ -816,6 +821,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     }
 
     private fun createNotificationChannel() {
+        val nm = getSystemService(NotificationManager::class.java)
         val channel = NotificationChannel(
             CHANNEL_ID,
             "Music Playback",
@@ -824,8 +830,62 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             description = "Shows current playing track"
             setShowBadge(false)
         }
-        val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(channel)
+
+        // High-importance channel so error alerts surface as a heads-up pop-up.
+        val alertChannel = NotificationChannel(
+            ALERT_CHANNEL_ID,
+            "Alerts",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Connection and sign-in problems that need your attention"
+        }
+        nm.createNotificationChannel(alertChannel)
+    }
+
+    /**
+     * Surface an error the user would otherwise miss (e.g. lost session): a heads-up notification
+     * that pops up over any app and opens Snepilatch when tapped, plus an error state on the media
+     * session so the now-playing bar / lockscreen / Android Auto reflect it too. Called from the
+     * ViewModel when [kotify.session.Session.onAuthLost] fires. Cleared by [clearError] on recovery.
+     */
+    fun showError(title: String, message: String) {
+        mainHandler.post {
+            val openApp = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            val tapIntent = PendingIntent.getActivity(
+                this, 1, openApp,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            val notification = NotificationCompat.Builder(this, ALERT_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(title)
+                .setContentText(message)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_ERROR)
+                .setAutoCancel(true)
+                .setContentIntent(tapIntent)
+                .build()
+            getSystemService(NotificationManager::class.java).notify(ALERT_NOTIFICATION_ID, notification)
+
+            // Reflect the error on the media surfaces (now-playing bar, lockscreen, Android Auto).
+            mediaSession?.setPlaybackState(
+                PlaybackStateCompat.Builder()
+                    .setState(PlaybackStateCompat.STATE_ERROR, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 0f)
+                    .setErrorMessage(PlaybackStateCompat.ERROR_CODE_AUTHENTICATION_EXPIRED, message)
+                    .build()
+            )
+        }
+    }
+
+    /** Dismiss the error alert and restore the normal media state once the session recovers. */
+    fun clearError() {
+        mainHandler.post {
+            getSystemService(NotificationManager::class.java).cancel(ALERT_NOTIFICATION_ID)
+            updatePlaybackState()
+        }
     }
 
     private suspend fun loadBitmap(url: String): Bitmap? = withContext(Dispatchers.IO) {

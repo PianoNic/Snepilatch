@@ -246,6 +246,12 @@ class SpotifyViewModel : ViewModel() {
                     LokiLogger.e(TAG, "Session auth lost (HttpClient onAuthLost fired)")
                     initError.value = "Lost Spotify session — sign in again to continue"
                     isInitialized.value = false
+                    // Push it to where the user will actually see it — a heads-up notification +
+                    // an error state on the now-playing bar — instead of only an in-app screen.
+                    MusicPlaybackService.instance?.showError(
+                        "Snepilatch — connection lost",
+                        "Tap to reconnect to Spotify"
+                    )
                 }
                 session = sess
                 val sp = SpotifyPlayback(sess)
@@ -281,6 +287,8 @@ class SpotifyViewModel : ViewModel() {
 
                 isInitialized.value = true
                 initRetryCount = 0
+                // Session is healthy again — dismiss any lingering "connection lost" alert.
+                MusicPlaybackService.instance?.clearError()
 
                 // Disconnect any existing player before creating a new one
                 // This prevents duplicate device registrations

@@ -12,6 +12,8 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.os.Handler
 import android.os.Looper
+import android.support.v4.media.MediaBrowserCompat
+import android.support.v4.media.MediaDescriptionCompat
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
@@ -33,6 +35,7 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import kotify.api.playlist.Playlist
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -45,6 +48,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     companion object {
         private const val TAG = "MusicService"
         private const val CHANNEL_ID = "music_playback"
+
+        // Android Auto browse tree
+        private const val BROWSE_ROOT = "root"
+        private const val LIKED_SONGS_URI = "spotify:collection:tracks"
         private const val NOTIFICATION_ID = 1
         var instance: MusicPlaybackService? = null
             private set
@@ -255,6 +262,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
                 override fun onSkipToPrevious() {
                     onSkipPrevious?.invoke()
+                }
+
+                override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
+                    if (mediaId != null) playFromContext(mediaId)
                 }
 
                 override fun onSeekTo(pos: Long) {
@@ -850,12 +861,76 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         )
     }
 
-    override fun onGetRoot(clientPackageName: String, clientUid: Int, rootHints: Bundle?): BrowserRoot? {
-        return BrowserRoot("empty_root", null)
+    override fun onGetRoot(clientPackageName: String, clientUid: Int, rootHints: Bundle?): BrowserRoot {
+        // The content is the signed-in user's own library, so we grant any caller (Android Auto,
+        // Assistant, the app itself). Transport still runs through the validated MediaSession.
+        return BrowserRoot(BROWSE_ROOT, null)
     }
 
-    override fun onLoadChildren(parentId: String, result: Result<MutableList<android.support.v4.media.MediaBrowserCompat.MediaItem>>) {
-        result.sendResult(mutableListOf())
+    override fun onLoadChildren(parentId: String, result: Result<MutableList<MediaBrowserCompat.MediaItem>>) {
+        if (parentId != BROWSE_ROOT) {
+            result.sendResult(mutableListOf())
+            return
+        }
+        // Library load is a network call — detach and fill asynchronously.
+        result.detach()
+        serviceScope.launch {
+            val items = try {
+                withContext(Dispatchers.IO) { buildRootChildren() }
+            } catch (e: Exception) {
+                LokiLogger.e(TAG, "onLoadChildren failed", e)
+                mutableListOf()
+            }
+            result.sendResult(items)
+        }
+    }
+
+    /** Liked Songs + the user's playlists, each as a playable item whose mediaId is its context URI. */
+    private suspend fun buildRootChildren(): MutableList<MediaBrowserCompat.MediaItem> {
+        val sess = SessionHolder.session ?: return mutableListOf()
+        val out = mutableListOf<MediaBrowserCompat.MediaItem>()
+        out.add(browseItem(LIKED_SONGS_URI, "Liked Songs", "Playlist"))
+        Playlist(sess).getLibrary(limit = 50, offset = 0).items
+            .filter { it.uri.contains(":playlist:") || it.uri.contains(":album:") }
+            .forEach { out.add(browseItem(it.uri, it.name, it.ownerName ?: it.type)) }
+        return out
+    }
+
+    private fun browseItem(mediaId: String, title: String, subtitle: String?): MediaBrowserCompat.MediaItem {
+        val desc = MediaDescriptionCompat.Builder()
+            .setMediaId(mediaId)
+            .setTitle(title)
+            .setSubtitle(subtitle)
+            .build()
+        return MediaBrowserCompat.MediaItem(desc, MediaBrowserCompat.MediaItem.FLAG_PLAYABLE)
+    }
+
+    /**
+     * Play a context (playlist/album/Liked Songs) chosen from the Android Auto browse tree. Resolves
+     * the context's first track and issues the play command via PlayerConnect; the dealer then drives
+     * the rest of the pipeline (onTrackChange -> resolve -> ExoPlayer) exactly like an in-app tap.
+     * Requires a live session — if the app process is cold this is a no-op (see the Auto cold-start note).
+     */
+    private fun playFromContext(contextUri: String) {
+        serviceScope.launch {
+            try {
+                val sess = SessionHolder.session ?: return@launch
+                val player = SessionHolder.player ?: return@launch
+                val firstTrack = withContext(Dispatchers.IO) {
+                    when {
+                        contextUri == LIKED_SONGS_URI ->
+                            Playlist(sess).getLikedSongs(limit = 1).items.firstOrNull()?.uri
+                        contextUri.contains(":playlist:") ->
+                            Playlist(sess).getPlaylist(contextUri.substringAfterLast(":"), limit = 1).tracks.firstOrNull()?.uri
+                        else -> null
+                    }
+                } ?: return@launch
+                LokiLogger.i(TAG, "Auto: playing $contextUri from $firstTrack")
+                withContext(Dispatchers.IO) { player.playTrack(firstTrack, contextUri) }
+            } catch (e: Exception) {
+                LokiLogger.e(TAG, "Auto play failed for $contextUri", e)
+            }
+        }
     }
 
     private var connectivityManager: ConnectivityManager? = null

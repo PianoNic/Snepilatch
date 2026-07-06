@@ -59,6 +59,15 @@ class SpotifyCdnResolver(
     )
 
     /**
+     * Fetch the audio file id for a track URI via `track-playback/v1/media` — the endpoint the web
+     * player's local ListPlayer uses. This is the reliable self-resolve path: [fetchFileIdFromMetadata]
+     * (`metadata/4/track`) returns only cover-art ids on many accounts. Used to start a tapped track
+     * immediately, without waiting for the connect-state command echo to push the file id.
+     */
+    suspend fun fetchFileIdFromMedia(trackUri: String): String? =
+        spotifyPlayback.resolveFileIdForUri(trackUri)
+
+    /**
      * Fetch the file id for a track via the metadata API, preferring the
      * higher-quality MP4_256 variant and falling back to MP4_128.
      */

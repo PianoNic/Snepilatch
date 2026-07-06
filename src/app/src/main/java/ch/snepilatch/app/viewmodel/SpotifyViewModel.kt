@@ -211,6 +211,12 @@ class SpotifyViewModel : ViewModel() {
     val notificationRightButton = MutableStateFlow("like")
     // Content region for CDN resolution
     val contentRegion = MutableStateFlow("nearest")
+
+    // EXPERIMENTAL (Mode 2, off by default): on a tap, self-resolve the track's audio via
+    // track-playback/v1/media and start ExoPlayer immediately, in parallel with the Connect play
+    // command, instead of waiting for the WS echo. The command still fires (Connect state stays
+    // correct); the echo just reconciles. See the local-client mode notes in KotifyClient's ad-flow.md.
+    val instantTapPlay = MutableStateFlow(false)
     // Canvas background
     val canvasEnabled = MutableStateFlow(false)
     val canvasUrl = MutableStateFlow<String?>(null)
@@ -1226,20 +1232,88 @@ class SpotifyViewModel : ViewModel() {
         // Honor the resulting onTrackChange even if we're starting from idle (no local audio yet).
         pendingUserPlay = true
         val pc = player ?: return
-        try {
-            try {
-                pc.playTrack(track.uri, contextUri, track.uid, trackIndex)
-            } catch (e: Exception) {
-                if (e.message?.contains("PLAYER_COMMAND_REJECTED") == true) {
-                    LokiLogger.i(TAG, "Command rejected, transferring playback here and retrying")
-                    pc.transferPlaybackHere()
-                    delay(500)
-                    pc.playTrack(track.uri, contextUri, track.uid, trackIndex)
-                } else throw e
+        coroutineScope {
+            // EXPERIMENTAL Mode 2 (instantTapPlay): self-resolve the tapped track's audio and start
+            // ExoPlayer NOW, in parallel with the Connect play command, instead of waiting for the WS
+            // echo. Only for the Spotify-CDN source + a track URI, and not during a cold-start handoff.
+            // On success it sets currentStreamUri so the echo's resolveAndPlay short-circuits; on
+            // failure it does nothing and the echo path plays as usual. Runs as a child of this scope
+            // so a rapid re-tap (which cancels userPlayJob) cancels it too.
+            if (shouldInstantTap(track.uri)) {
+                launch(Dispatchers.IO) { optimisticTapPlay(track) }
             }
-            delay(500)
-            refreshState()
-        } catch (e: Exception) { LokiLogger.e(TAG, "playTrack", e) }
+            try {
+                try {
+                    pc.playTrack(track.uri, contextUri, track.uid, trackIndex)
+                } catch (e: Exception) {
+                    if (e.message?.contains("PLAYER_COMMAND_REJECTED") == true) {
+                        LokiLogger.i(TAG, "Command rejected, transferring playback here and retrying")
+                        pc.transferPlaybackHere()
+                        delay(500)
+                        pc.playTrack(track.uri, contextUri, track.uid, trackIndex)
+                    } else throw e
+                }
+                delay(500)
+                refreshState()
+            } catch (e: Exception) { LokiLogger.e(TAG, "playTrack", e) }
+        }
+    }
+
+    /**
+     * Gate for the experimental optimistic tap-to-play: the toggle is on, we're on the Spotify-CDN
+     * source (the only one that resolves by file id), it's a track URI, and no cold-start handoff is
+     * in flight. Extracted so the call site keeps a simple condition.
+     */
+    private fun shouldInstantTap(trackUri: String): Boolean =
+        instantTapPlay.value && preferredAudioSource.value == null &&
+            trackUri.startsWith("spotify:track:") && !coldStartPending
+
+    /**
+     * EXPERIMENTAL (Mode 2): resolve the tapped track's audio via track-playback/v1/media and start
+     * ExoPlayer immediately, without waiting for the WS command echo. Mirrors the Spotify-CDN branch of
+     * [resolveAndPlay]. Best-effort: any failure logs and returns, leaving the echo path to play the
+     * track the normal way. On success it commits currentStreamUri so the echo's resolveAndPlay
+     * short-circuits instead of double-loading.
+     */
+    private suspend fun optimisticTapPlay(track: TrackInfo) {
+        val t0 = System.currentTimeMillis()
+        try {
+            val resolver = cdnResolver ?: return
+            val trackUri = track.uri
+            val fileId = resolver.fetchFileIdFromMedia(trackUri) ?: run {
+                LokiLogger.i(TAG, "[InstantTap] no media file id for $trackUri, deferring to echo")
+                return
+            }
+            val stream = resolver.resolveForFileId(fileId)
+            // The echo may have already loaded this exact track while we were resolving — don't double-load.
+            if (currentStreamUri == trackUri) return
+            val title = track.name.ifBlank { "Unknown" }
+            val artist = track.artist.ifBlank { "Unknown" }
+            val art = normalizeSpotifyImageUrl(track.albumArt)
+            // Reflect the tapped track in the UI immediately (echo's onState corrects any stale metadata).
+            _playback.value = _playback.value.copy(track = track.copy(albumArt = art), positionMs = 0)
+            if (art != null && art != lastPaletteUrl) { lastPaletteUrl = art; extractColorsFromArt(art) }
+            checkLikedState(trackUri)
+            fetchCanvasForTrack(trackUri)
+            // DRM: stop the old player to close its Widevine session, then load the new track.
+            withContext(Dispatchers.Main) { MusicPlaybackService.instance?.stop() }
+            playUrlAt = System.currentTimeMillis()
+            withContext(Dispatchers.Main) {
+                MusicPlaybackService.instance?.playDrmUrl(
+                    stream.cdnUrl, stream.licenseUrl, stream.licenseHeaders, title, artist, art,
+                    startPlaying = true, pssh = stream.pssh,
+                )
+            }
+            latestFileId = fileId
+            currentStreamUri = trackUri
+            isStreaming.value = true
+            streamProvider.value = "Spotify CDN"
+            isStreamLoading.value = false
+            LokiLogger.i(TAG, "[InstantTap] optimistic play started in ${System.currentTimeMillis() - t0}ms for $trackUri")
+            preResolveNextTrack()
+        } catch (e: Exception) {
+            LokiLogger.w(TAG, "[InstantTap] optimistic play failed (${e.message}); echo path will handle it")
+        }
     }
 
     fun addTrackToPlaylist(playlistId: String, trackUri: String) {
@@ -1512,6 +1586,13 @@ class SpotifyViewModel : ViewModel() {
             }.apply()
     }
 
+    /** EXPERIMENTAL: toggle Mode-2 optimistic tap-to-play (self-resolve + play before the WS echo). */
+    fun setInstantTapPlay(enabled: Boolean, context: Context) {
+        instantTapPlay.value = enabled
+        context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
+            .edit().putBoolean("instant_tap_play", enabled).apply()
+    }
+
     fun setContentRegion(region: String, context: Context) {
         contentRegion.value = region
         context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
@@ -1575,6 +1656,7 @@ class SpotifyViewModel : ViewModel() {
         if (savedSource == "spotify") {
             prefs.edit().remove("audio_source").apply()
         }
+        instantTapPlay.value = prefs.getBoolean("instant_tap_play", false)
         lyricsAnimDirection.value = prefs.getString("lyrics_anim_direction", "vertical") ?: "vertical"
         appLanguage.value = prefs.getString("app_language", "system") ?: "system"
         // Apply saved language on startup
@@ -1924,12 +2006,13 @@ class SpotifyViewModel : ViewModel() {
                             LokiLogger.d(TAG, "SpotifyCDN: file ID still null after attempt $i")
                         }
                     }
-                    // If still null, fetch file ID from track metadata API
+                    // If still null, self-resolve the file ID. Prefer track-playback/v1/media (returns
+                    // real audio ids) and fall back to metadata/4/track for parity with older accounts.
                     if (fileId == null) {
-                        LokiLogger.i(TAG, "SpotifyCDN: No file ID from state machine, fetching from metadata API...")
-                        fileId = resolver.fetchFileIdFromMetadata(trackUri)
+                        LokiLogger.i(TAG, "SpotifyCDN: No file ID from state machine, self-resolving via media endpoint...")
+                        fileId = resolver.fetchFileIdFromMedia(trackUri) ?: resolver.fetchFileIdFromMetadata(trackUri)
                         if (fileId != null) {
-                            LokiLogger.i(TAG, "SpotifyCDN: Got file ID from metadata: $fileId")
+                            LokiLogger.i(TAG, "SpotifyCDN: Got file ID from self-resolve: $fileId")
                             latestFileId = fileId
                         }
                     }

@@ -112,12 +112,84 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
      *  Used to auto-resume Spotify when focus returns. */
     private var wasSuppressedByFocus = false
 
+    // Control-plane keep-awake. ExoPlayer's WAKE_MODE_NETWORK only holds a wake/Wi-Fi lock while the
+    // PLAYER needs the network (i.e. buffering); once a track is buffered it lets the radio sleep. But
+    // we are a Spotify Connect device — the dealer WebSocket and the end-of-track advance run OUTSIDE
+    // ExoPlayer and must stay responsive with the screen off, or the server-driven advance stalls
+    // until the phone is unlocked (Wi-Fi power-save was delaying the control messages). So we hold our
+    // OWN partial wake lock + a high-perf Wi-Fi lock for the whole time we're actively playing,
+    // independent of ExoPlayer's buffer state. Acquired on play, released on pause/stop.
+    private var wakeLock: android.os.PowerManager.WakeLock? = null
+    private var wifiLock: android.net.wifi.WifiManager.WifiLock? = null
+
+    // Logs screen on/off so we can confirm on-device that a track advance no longer waits for unlock
+    // (before the control-plane locks, the server-driven advance flushed the instant the screen came on).
+    private val screenReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context?, intent: Intent?) {
+            val state = when (intent?.action) {
+                Intent.ACTION_SCREEN_ON -> "ON"
+                Intent.ACTION_SCREEN_OFF -> "OFF"
+                else -> return
+            }
+            val playing = runCatching { player.isPlaying }.getOrDefault(false)
+            LokiLogger.i(TAG, "[Screen] $state (playing=$playing, wakeHeld=${wakeLock?.isHeld == true})")
+        }
+    }
+
+    /** Keep the CPU and Wi-Fi radio awake so the dealer socket + advance stay responsive with the screen off. */
+    private fun acquireControlPlaneLocks() {
+        try {
+            if (wakeLock == null) {
+                val pm = getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager
+                wakeLock = pm.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "snepilatch:playback")
+                    .apply { setReferenceCounted(false) }
+            }
+            if (wifiLock == null) {
+                val wm = applicationContext.getSystemService(android.content.Context.WIFI_SERVICE) as android.net.wifi.WifiManager
+                @Suppress("DEPRECATION") // HIGH_PERF is the one that keeps the radio up with the screen OFF
+                wifiLock = wm.createWifiLock(android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF, "snepilatch:wifi")
+                    .apply { setReferenceCounted(false) }
+            }
+            if (wakeLock?.isHeld != true) {
+                wakeLock?.acquire()
+                LokiLogger.i(TAG, "[KeepAwake] partial wake lock acquired")
+            }
+            if (wifiLock?.isHeld != true) {
+                wifiLock?.acquire()
+                LokiLogger.i(TAG, "[KeepAwake] wifi lock acquired")
+            }
+        } catch (e: Exception) {
+            LokiLogger.e(TAG, "[KeepAwake] failed to acquire locks", e)
+        }
+    }
+
+    /** Release the control-plane locks (on pause/stop) so we don't drain the battery when idle. */
+    private fun releaseControlPlaneLocks() {
+        try {
+            if (wifiLock?.isHeld == true) {
+                wifiLock?.release()
+                LokiLogger.i(TAG, "[KeepAwake] wifi lock released")
+            }
+            if (wakeLock?.isHeld == true) {
+                wakeLock?.release()
+                LokiLogger.i(TAG, "[KeepAwake] partial wake lock released")
+            }
+        } catch (e: Exception) {
+            LokiLogger.e(TAG, "[KeepAwake] failed to release locks", e)
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
 
         createNotificationChannel()
         deezerProxy.start()
         registerNetworkCallback()
+        val screenFilter = android.content.IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_SCREEN_OFF)
+        }
+        registerReceiver(screenReceiver, screenFilter)
 
         val audioAttributes = AudioAttributes.Builder()
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
@@ -137,10 +209,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         player = ExoPlayer.Builder(this)
             .setAudioAttributes(audioAttributes, true)
             .setLoadControl(loadControl)
-            // Hold a partial wake + Wi-Fi lock while playing. Streaming playback needs the network
-            // alive with the screen off; without this Doze freezes the CPU/radio between tracks, the
-            // dealer keep-alive thread stalls and end-of-track advance fails. WAKE_MODE_NETWORK is
-            // released automatically when playback stops. Requires the WAKE_LOCK permission.
+            // Let ExoPlayer manage a wake/Wi-Fi lock for its OWN network needs (buffering). Note this
+            // is scoped to the player — once a track is buffered ExoPlayer releases it and lets the
+            // radio sleep, which is why the dealer control plane needs its own lock (see
+            // acquire/releaseControlPlaneLocks). Requires the WAKE_LOCK permission.
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
 
@@ -163,6 +235,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             }
 
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                // Keep the control plane (dealer socket + advance) awake for the whole play session,
+                // not just while ExoPlayer is buffering. Released on pause/stop to spare the battery.
+                if (playWhenReady) acquireControlPlaneLocks() else releaseControlPlaneLocks()
+
                 // Follow Auxio convention: open/close audio effect session on play/pause
                 currentAudioSessionId = player.audioSessionId
                 if (playWhenReady) {
@@ -961,6 +1037,8 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
     override fun onDestroy() {
         unregisterNetworkCallback()
+        runCatching { unregisterReceiver(screenReceiver) }
+        releaseControlPlaneLocks()
         if (openAudioEffectSession) {
             broadcastAudioEffectAction(AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION)
             openAudioEffectSession = false

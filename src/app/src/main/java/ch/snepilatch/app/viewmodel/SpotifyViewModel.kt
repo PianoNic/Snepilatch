@@ -229,6 +229,44 @@ class SpotifyViewModel : ViewModel() {
     private var lastLyricsTrackUri: String? = null
 
 
+    // Single-flight guard for onAuthLost recovery so a run of anonymous-token blips can't spawn
+    // overlapping re-inits. Reset when initialization reaches a terminal state (success / give-up /
+    // surfaced sign-in).
+    @Volatile private var authRecovering = false
+
+    /**
+     * Handle a genuinely-lost session: try to silently re-authenticate from the stored cookies, and
+     * only prompt for a fresh sign-in if there are none. Spotify sometimes hands back a transient
+     * anonymous token for a still-valid cookie, so a re-init usually recovers without the user ever
+     * seeing the "connection lost" prompt. [initialize] carries its own bounded rate-limit retry, so
+     * a truly dead cookie still lands on the sign-in gate after those attempts are exhausted.
+     */
+    private fun recoverAuthOrPromptLogin() {
+        if (authRecovering) return
+        authRecovering = true
+        viewModelScope.launch(Dispatchers.IO) {
+            val ctx = MusicPlaybackService.instance as? android.content.Context
+            val savedCookies = ctx?.let { ch.snepilatch.app.util.loadCookies(it) }
+            if (savedCookies == null) {
+                surfaceAuthLost()
+            } else {
+                LokiLogger.i(TAG, "Auth recovery: re-initializing session from saved cookies")
+                initialize(savedCookies)
+            }
+        }
+    }
+
+    /** Terminal "you must sign in again" state — the notification + now-playing error + loading gate. */
+    private fun surfaceAuthLost() {
+        authRecovering = false
+        initError.value = "Lost Spotify session — sign in again to continue"
+        isInitialized.value = false
+        MusicPlaybackService.instance?.showError(
+            "Snepilatch — connection lost",
+            "Tap to reconnect to Spotify"
+        )
+    }
+
     fun initialize(cookies: Map<String, String>) {
         // Clean up any leftover from previous session
         SessionHolder.player?.let {
@@ -244,20 +282,15 @@ class SpotifyViewModel : ViewModel() {
                 ))
                 sess.load()
 
-                // KotifyClient fires this once its HttpClient has exhausted the
-                // single forced token refresh on a 401 and the session is no
-                // longer recoverable (cookies revoked / expired). Drop the UI back
-                // to the loading gate so the user re-authenticates.
+                // KotifyClient now fires this ONLY when the login is genuinely dead (Spotify handed
+                // back an anonymous token — an expired/revoked sp_dc). Transient dealer/network trouble
+                // retries forever inside KotifyClient and never lands here. But Spotify occasionally
+                // returns a transient anonymous token even for a live cookie, so instead of dead-ending
+                // the user we first try to silently re-authenticate from the stored cookies; only when
+                // that's impossible (no saved cookies) do we surface the sign-in prompt.
                 sess.onAuthLost = {
-                    LokiLogger.e(TAG, "Session auth lost (HttpClient onAuthLost fired)")
-                    initError.value = "Lost Spotify session — sign in again to continue"
-                    isInitialized.value = false
-                    // Push it to where the user will actually see it — a heads-up notification +
-                    // an error state on the now-playing bar — instead of only an in-app screen.
-                    MusicPlaybackService.instance?.showError(
-                        "Snepilatch — connection lost",
-                        "Tap to reconnect to Spotify"
-                    )
+                    LokiLogger.e(TAG, "Session auth lost (onAuthLost) — attempting silent recovery")
+                    recoverAuthOrPromptLogin()
                 }
                 session = sess
                 val sp = SpotifyPlayback(sess)
@@ -293,6 +326,7 @@ class SpotifyViewModel : ViewModel() {
 
                 isInitialized.value = true
                 initRetryCount = 0
+                authRecovering = false
                 // Session is healthy again — dismiss any lingering "connection lost" alert.
                 MusicPlaybackService.instance?.clearError()
 
@@ -344,6 +378,7 @@ class SpotifyViewModel : ViewModel() {
                         LokiLogger.e(TAG, "Rate limited — 5 retries exhausted, giving up")
                         initError.value = "Connection failed after 5 attempts. Please try again later."
                         rateLimitCooldown.value = false
+                        authRecovering = false
                         return@launch
                     }
                     val cooldownSecs = 20 * initRetryCount // 20s, 40s, 60s...

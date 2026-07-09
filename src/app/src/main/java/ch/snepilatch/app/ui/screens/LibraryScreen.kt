@@ -301,6 +301,10 @@ fun libraryItemClick(item: LibraryItem, vm: SpotifyViewModel) {
             val id = item.uri.split(":").lastOrNull() ?: return
             vm.openArtist(id)
         }
+        "show" -> {
+            val id = item.uri.split(":").lastOrNull() ?: return
+            vm.openShow(id, item.owner, item.imageUrl)
+        }
     }
 }
 

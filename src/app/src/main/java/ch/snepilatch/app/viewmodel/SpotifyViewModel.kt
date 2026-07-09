@@ -20,6 +20,7 @@ import kotify.api.home.Home
 import kotify.api.home.HomeData
 import kotify.api.playerconnect.PlayerConnect
 import kotify.api.playlist.Playlist
+import kotify.api.podcast.Podcast
 import kotify.api.playerstatus.DeviceInfo
 import kotify.api.playerstatus.PlayerStateData
 import kotify.api.lyrics.Lyrics
@@ -79,6 +80,14 @@ class SpotifyViewModel : ViewModel() {
         get() = SessionHolder.cdnResolver
         set(value) { SessionHolder.cdnResolver = value }
     private var latestFileId: String? = null  // from TrackPlaybackHandler via onPlaybackId
+
+    // Direct https audio URLs for external/RSS podcast episodes (no Spotify file id, no DRM), keyed by
+    // episode uri and pushed via onExternalUrl. Small bounded cache; hosted content never appears here.
+    private val externalUrlByUri = java.util.Collections.synchronizedMap(
+        object : LinkedHashMap<String, String>(16, 0.75f, false) {
+            override fun removeEldestEntry(eldest: Map.Entry<String, String>) = size > 32
+        }
+    )
     private var currentStreamUri: String? = null
     private var nextStreamUrl: String? = null
     private var nextTrackInfo: TrackInfo? = null
@@ -451,6 +460,14 @@ class SpotifyViewModel : ViewModel() {
             if (coldStartPending && deferred != null && !deferred.isCompleted) {
                 deferred.complete(fileId)
             }
+        }
+
+        pc.onExternalUrl { url, uri, name ->
+            // External/RSS episode: no Spotify file id, no Widevine — just a direct https audio url.
+            // Cache it by episode uri so resolveAndPlayEpisode can stream it straight when the echo lands
+            // (onExternalUrl and onTrackChange race, exactly like onPlaybackId does).
+            LokiLogger.i(TAG, "External/RSS episode audio for ${uri ?: name}: ${url.take(80)}")
+            if (uri != null) externalUrlByUri[uri] = url
         }
 
         pc.onNextPlaybackId { fileId, _, name ->
@@ -1598,6 +1615,11 @@ class SpotifyViewModel : ViewModel() {
     private fun checkLikedState(trackUri: String) {
         if (trackUri == lastLikeCheckUri) return
         lastLikeCheckUri = trackUri
+        // isLiked is the track-library check; it doesn't apply to podcast episodes (a different API).
+        if (!trackUri.startsWith("spotify:track:")) {
+            currentTrackLiked.value = false
+            return
+        }
         launchWithSession("checkLikedState") { sess ->
             val trackId = trackUri.removePrefix("spotify:track:")
             currentTrackLiked.value = Song(sess).isLiked(trackId)
@@ -1740,6 +1762,11 @@ class SpotifyViewModel : ViewModel() {
         if (!canvasEnabled.value) return
         if (trackUri == lastCanvasTrackUri) return
         lastCanvasTrackUri = trackUri
+        // Canvas is a track-only visual; podcast episodes have none. Skip the futile lookup + clear.
+        if (!trackUri.startsWith("spotify:track:")) {
+            canvasUrl.value = null
+            return
+        }
         val trackId = trackUri.removePrefix("spotify:track:")
         val requestUri = trackUri // capture for async check
         viewModelScope.launch(Dispatchers.IO) {
@@ -1991,6 +2018,15 @@ class SpotifyViewModel : ViewModel() {
         checkLikedState(trackUri)
         fetchCanvasForTrack(trackUri)
 
+        // Podcast episodes always resolve through Spotify — they are not on the third-party music CDNs
+        // (Qobuz/Deezer/YouTube), so we must never fall back to that chain for them. Hosted episodes
+        // carry a Spotify file id (Widevine, same as a track); external/RSS episodes carry a direct
+        // https url surfaced via onExternalUrl. resolveAndPlayEpisode handles both and returns.
+        if (trackUri.startsWith("spotify:episode:")) {
+            resolveAndPlayEpisode(trackUri, event, title, artist, art, resolveStart)
+            return
+        }
+
         // Check if we already pre-resolved this track
         val preResolvedUrl = nextStreamUrl
         val preResolvedProvider = nextStreamProvider
@@ -2120,10 +2156,99 @@ class SpotifyViewModel : ViewModel() {
         preResolveNextTrack()
     }
 
+    /**
+     * Resolve + play a podcast episode. Two shapes, both fed from the same connect-state/track-playback
+     * state machine (never third-party):
+     *  - **Hosted** (Spotify-hosted): carries a Spotify file id (via onPlaybackId / cluster state) →
+     *    Widevine CDN, identical to a track.
+     *  - **External/RSS**: no file id; a direct https audio url surfaced via onExternalUrl → streamed
+     *    as-is, no DRM.
+     * onPlaybackId / onExternalUrl race onTrackChange, so we wait briefly for either to arrive. On
+     * failure we stop cleanly — we do NOT fall back to the third-party music CDN (wrong for podcasts).
+     */
+    private suspend fun resolveAndPlayEpisode(
+        trackUri: String,
+        event: kotify.api.playerstatus.TrackChangeEvent,
+        title: String,
+        artist: String,
+        art: String?,
+        resolveStart: Long
+    ) {
+        try {
+            var fileId = event.currentFileId ?: latestFileId
+            var externalUrl = externalUrlByUri[trackUri]
+            if (fileId == null && externalUrl == null) {
+                // Either callback can land just after onTrackChange — give them a moment.
+                for (i in 1..8) {
+                    delay(100)
+                    fileId = latestFileId
+                    externalUrl = externalUrlByUri[trackUri]
+                    if (fileId != null || externalUrl != null) break
+                }
+            }
+
+            // External/RSS: direct https url, no DRM. Stream it as-is.
+            if (fileId == null && externalUrl != null) {
+                val coldStart = coldStartPending
+                withContext(Dispatchers.Main) { MusicPlaybackService.instance?.stop() }
+                playUrlAt = System.currentTimeMillis()
+                withContext(Dispatchers.Main) {
+                    MusicPlaybackService.instance?.playUrl(
+                        externalUrl, title, artist, art, startPlaying = !coldStart, headers = emptyMap()
+                    )
+                }
+                currentStreamUri = trackUri
+                isStreaming.value = true
+                streamProvider.value = "Podcast (RSS)"
+                LokiLogger.i(TAG, "[Episode] streaming external/RSS url for $trackUri")
+                return
+            }
+
+            // Hosted: Spotify file id → Widevine, exactly like a track.
+            if (fileId != null) {
+                val resolver = cdnResolver ?: throw IllegalStateException("CdnResolver not initialized")
+                latestFileId = fileId
+                val stream = resolver.resolveForFileId(fileId)
+                val coldStart = coldStartPending
+                withContext(Dispatchers.Main) { MusicPlaybackService.instance?.stop() }
+                playUrlAt = System.currentTimeMillis()
+                withContext(Dispatchers.Main) {
+                    MusicPlaybackService.instance?.playDrmUrl(
+                        stream.cdnUrl, stream.licenseUrl, stream.licenseHeaders, title, artist, art,
+                        startPlaying = !coldStart, pssh = stream.pssh,
+                    )
+                }
+                currentStreamUri = trackUri
+                isStreaming.value = true
+                streamProvider.value = "Spotify CDN"
+                LokiLogger.i(TAG, "[Episode] hosted DRM loaded in ${System.currentTimeMillis() - resolveStart}ms")
+                return
+            }
+
+            // Neither shape resolved — fail cleanly. No third-party fallback for podcasts.
+            LokiLogger.e(TAG, "[Episode] no audio for $trackUri (no file id, no external url)")
+            withContext(Dispatchers.Main) { MusicPlaybackService.instance?.stop() }
+            isStreaming.value = false
+            streamProvider.value = null
+        } catch (e: Exception) {
+            LokiLogger.e(TAG, "[Episode] resolve failed for $trackUri", e)
+            isStreaming.value = false
+        } finally {
+            isStreamLoading.value = false
+        }
+    }
+
     private fun resolveCurrentTrack(state: PlayerStateData) {
         val track = state.track ?: return
         val uri = track.uri
         if (uri == currentStreamUri) return
+        // Podcast episodes never resolve via the third-party music CDN this path uses. If an episode is
+        // already playing on the active device at init, let the state-machine callbacks + resolveAndPlay
+        // drive it (they carry the file id / external url) rather than doing a futile third-party lookup.
+        if (uri.startsWith("spotify:episode:")) {
+            LokiLogger.d(TAG, "resolveCurrentTrack: skipping third-party resolve for episode $uri")
+            return
+        }
         // NOTE: do NOT set currentStreamUri here. Setting it before the resolve
         // succeeds poisons future attempts: if the resolve fails (rate limit, no
         // CDN match, network error) the URI sticks and the next time the user
@@ -2343,6 +2468,18 @@ class SpotifyViewModel : ViewModel() {
                         totalCount = info.totalTracks,
                         loadedOffset = offset + more.size
                     )
+                } else if (uri.startsWith("spotify:show:")) {
+                    val id = uri.removePrefix("spotify:show:")
+                    val info = Podcast(sess, id).getPodcastInfo(limit = DETAIL_PAGE_SIZE, offset = offset)
+                    val more = info?.episodes?.map { it.toTrackInfo(current.name) } ?: emptyList()
+                    val newSize = current.tracks.size + more.size
+                    // A short page means we've hit the end; otherwise keep the server-reported total.
+                    val newTotalCount = if (more.size < DETAIL_PAGE_SIZE) newSize else (info?.totalEpisodes ?: newSize)
+                    _detail.value = current.copy(
+                        tracks = current.tracks + more,
+                        totalCount = newTotalCount,
+                        loadedOffset = newSize
+                    )
                 }
             } catch (e: Exception) { LokiLogger.e(TAG, "loadMoreDetail", e) }
             finally { _isLoadingMore.value = false }
@@ -2384,6 +2521,28 @@ class SpotifyViewModel : ViewModel() {
                 val sess = session ?: return@launch
                 _detail.value = Artist(sess).getArtist(artistId).toDetailData(artistId)
             } catch (e: Exception) { LokiLogger.e(TAG, "openArtist", e) }
+            finally { isLoading.value = false }
+        }
+    }
+
+    /**
+     * Open a podcast show. [publisher]/[imageUrl] come from the search/library item that was tapped
+     * (the `queryPodcastEpisodes` payload doesn't carry them); they fall back to the first episode's
+     * cover art. Episodes render as episode-URI [TrackInfo]s and play through the normal [playTrack].
+     */
+    fun openShow(showId: String, publisher: String? = null, imageUrl: String? = null) {
+        navigateTo(Screen.SHOW_DETAIL)
+        viewModelScope.launch(Dispatchers.IO) {
+            isLoading.value = true
+            try {
+                val sess = session ?: return@launch
+                val info = Podcast(sess, showId).getPodcastInfo(limit = 50, offset = 0)
+                if (info != null) {
+                    _detail.value = info.toDetailData(showId, publisher, imageUrl)
+                } else {
+                    LokiLogger.e(TAG, "openShow: no podcast info for $showId")
+                }
+            } catch (e: Exception) { LokiLogger.e(TAG, "openShow", e) }
             finally { isLoading.value = false }
         }
     }

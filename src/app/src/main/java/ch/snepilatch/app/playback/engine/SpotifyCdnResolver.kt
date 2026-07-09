@@ -72,6 +72,9 @@ class SpotifyCdnResolver(
      * higher-quality MP4_256 variant and falling back to MP4_128.
      */
     suspend fun fetchFileIdFromMetadata(trackUri: String): String? {
+        // metadata/4/track is track-only; a non-track uri (e.g. spotify:episode:) would build a
+        // malformed gid lookup. Episodes resolve their audio from the state machine instead.
+        if (!trackUri.startsWith("spotify:track:")) return null
         val trackId = trackUri.removePrefix("spotify:track:")
         val gid = spotifyPlayback.trackIdToGid(trackId)
         val meta = spotifyPlayback.getTrackMetadata(gid)

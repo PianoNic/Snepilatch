@@ -117,6 +117,12 @@ class SpotifyViewModel : ViewModel() {
     // lock-step. This is the same protocol the open.spotify.com web player uses.
     private var coldStartPending = false
     private var coldStartFileId: kotlinx.coroutines.CompletableDeferred<String>? = null
+
+    // Auto-recovery budget for transient ExoPlayer/DRM errors (e.g. a throttled Widevine license):
+    // instead of going silent until the user taps play, re-resolve + reload the SAME track at its last
+    // position. Reset on any successful onReady; exhausting it hands back to Spotify so a genuinely
+    // unplayable track can't loop forever.
+    private var playbackErrorRetries = 0
     val isStreaming = MutableStateFlow(false)
     val streamProvider = MutableStateFlow<String?>(null)
     val isNextReady = MutableStateFlow(false)
@@ -1177,6 +1183,98 @@ class SpotifyViewModel : ViewModel() {
         try { player?.resume() } catch (_: Exception) {}
     }
 
+    /**
+     * Auto-recover from a transient ExoPlayer/DRM error (most commonly
+     * `ERROR_CODE_DRM_LICENSE_ACQUISITION_FAILED` — a throttled Widevine license). Rather than going
+     * silent until the user taps play, re-resolve the SAME track and reload it at [positionMs], up to
+     * [MAX_PLAYBACK_ERROR_RETRIES] times. A fresh resolve also rebuilds the license headers with a
+     * current access token, which is what clears a transient throttle. Spotify-CDN / podcast path only;
+     * the lossless (third-party) path keeps the old hand-back-to-Spotify behaviour. The retry budget
+     * resets on the next successful [MusicPlaybackService.onReady], so an unplayable track can't loop.
+     */
+    internal suspend fun recoverFromPlaybackError(failedUri: String?, positionMs: Long) {
+        // Nothing to reload locally, or lossless mode: hand back to Spotify (previous behaviour).
+        if (failedUri == null || preferredAudioSource.value != null) {
+            fallbackResume()
+            return
+        }
+        if (playbackErrorRetries >= MAX_PLAYBACK_ERROR_RETRIES) {
+            LokiLogger.w(TAG, "Playback-error retries exhausted for $failedUri — leaving to Spotify")
+            playbackErrorRetries = 0
+            fallbackResume()
+            return
+        }
+        playbackErrorRetries++
+        val attempt = playbackErrorRetries
+        delay(400L * attempt) // brief backoff so a transient license throttle can clear
+        LokiLogger.i(TAG, "Auto-recovering $failedUri @${positionMs}ms (attempt $attempt/$MAX_PLAYBACK_ERROR_RETRIES)")
+        val recovered = try {
+            reloadFailedTrack(failedUri, positionMs)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            LokiLogger.e(TAG, "Auto-recovery attempt $attempt failed: ${e.message}")
+            false
+        }
+        // The re-resolve couldn't produce audio (missing resolver/file id, or it threw) — retry within
+        // budget; when the budget is spent the guard above hands back to Spotify.
+        if (!recovered) recoverFromPlaybackError(failedUri, positionMs)
+    }
+
+    /**
+     * Reload the given track/episode at [positionMs] with a freshly-resolved stream. Returns false
+     * (rather than throwing) when it can't produce audio — no resolver, or no file id for a hosted item
+     * — so the caller can retry within budget. A network/license throw from the resolver propagates.
+     */
+    private suspend fun reloadFailedTrack(failedUri: String, positionMs: Long): Boolean {
+        val track = _playback.value.track
+        val title = track?.name?.ifBlank { "Unknown" } ?: "Unknown"
+        val artist = track?.artist?.ifBlank { "Unknown" } ?: "Unknown"
+        val art = normalizeSpotifyImageUrl(track?.albumArt)
+
+        // External/RSS episode: replay the direct url (no DRM) from where it stopped.
+        externalUrlByUri[failedUri]?.let { externalUrl ->
+            withContext(Dispatchers.Main) { MusicPlaybackService.instance?.stop() }
+            playUrlAt = System.currentTimeMillis()
+            withContext(Dispatchers.Main) {
+                MusicPlaybackService.instance?.playUrl(
+                    externalUrl, title, artist, art,
+                    startPlaying = true, headers = emptyMap(), startPositionMs = positionMs
+                )
+            }
+            commitRecoveredStream(failedUri, "Podcast (RSS)")
+            LokiLogger.i(TAG, "Auto-recovered external episode $failedUri @${positionMs}ms")
+            return true
+        }
+
+        // Hosted track / episode: re-resolve a fresh CDN url + license and reload at position. Prefer
+        // the per-uri media self-resolve (authoritative for the failed uri) so a state-machine advance
+        // can't leave us reloading the wrong file; latestFileId covers hosted episodes.
+        val resolver = cdnResolver ?: return false
+        val fileId = resolver.fetchFileIdFromMedia(failedUri)
+            ?: latestFileId
+            ?: resolver.fetchFileIdFromMetadata(failedUri)
+            ?: return false
+        val stream = resolver.resolveForFileId(fileId)
+        withContext(Dispatchers.Main) { MusicPlaybackService.instance?.stop() }
+        playUrlAt = System.currentTimeMillis()
+        withContext(Dispatchers.Main) {
+            MusicPlaybackService.instance?.playDrmUrl(
+                stream.cdnUrl, stream.licenseUrl, stream.licenseHeaders, title, artist, art,
+                startPlaying = true, startPositionMs = positionMs, pssh = stream.pssh,
+            )
+        }
+        commitRecoveredStream(failedUri, "Spotify CDN")
+        LokiLogger.i(TAG, "Auto-recovered $failedUri — reloaded at ${positionMs}ms (budget resets on ready)")
+        return true
+    }
+
+    private fun commitRecoveredStream(uri: String, provider: String) {
+        currentStreamUri = uri
+        isStreaming.value = true
+        streamProvider.value = provider
+    }
+
     fun skipNext() {
         commandJob?.cancel()
         lastCommandTs = System.currentTimeMillis()
@@ -1879,11 +1977,16 @@ class SpotifyViewModel : ViewModel() {
             }
         }
         svc.onPlaybackError = { errorCode ->
-            LokiLogger.e(TAG, "ExoPlayer error: $errorCode — stopping stream, falling back to Spotify")
+            // Capture what was playing BEFORE clearing state — the recovery re-resolves this exact
+            // track at this position. DRM license failures in particular are usually transient (a
+            // throttled license endpoint), so we retry rather than going silent until the user taps.
+            val failedUri = currentStreamUri
+            val failedPos = _playback.value.positionMs
+            LokiLogger.e(TAG, "ExoPlayer error: $errorCode on ${failedUri ?: "?"} @${failedPos}ms — attempting auto-recovery")
             isStreaming.value = false
             streamProvider.value = null
             currentStreamUri = null
-            viewModelScope.launch(Dispatchers.IO) { fallbackResume() }
+            viewModelScope.launch(Dispatchers.IO) { recoverFromPlaybackError(failedUri, failedPos) }
         }
         svc.onPlaybackEnded = onEnded@{
             // The silent ad clip ending is not a real track end: KotifyClient's engine clocks the
@@ -1931,6 +2034,8 @@ class SpotifyViewModel : ViewModel() {
             val playUrlToReady = if (playUrlAt > 0) now - playUrlAt else -1L
             val cmdToReady = if (lastCommandTs > 0) now - lastCommandTs else -1L
             LokiLogger.i(TAG, "[Timing-CDN] ExoPlayer ready — playUrl→ready=${playUrlToReady}ms, cmd→ready=${cmdToReady}ms")
+            // A track successfully reached STATE_READY — refill the transient-error retry budget.
+            playbackErrorRetries = 0
 
             if (coldStartPending) {
                 // Cold-start sync: ExoPlayer was loaded with startPositionMs and
@@ -2689,6 +2794,11 @@ class SpotifyViewModel : ViewModel() {
          *  [loadMoreDetail]; when a page returns fewer rows than this we've
          *  reached the end regardless of any server-reported total. */
         private const val DETAIL_PAGE_SIZE = 50
+
+        /** How many times to auto-re-resolve + reload a track after a transient ExoPlayer/DRM error
+         *  (e.g. a throttled Widevine license) before handing back to Spotify. See
+         *  [recoverFromPlaybackError]. */
+        private const val MAX_PLAYBACK_ERROR_RETRIES = 2
 
         /** If skipPrevious is invoked after this many ms into the current track,
          *  restart the track instead of going to the previous one. Matches the

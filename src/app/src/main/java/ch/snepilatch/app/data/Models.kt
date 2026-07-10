@@ -2,7 +2,7 @@ package ch.snepilatch.app.data
 
 import androidx.compose.ui.graphics.Color
 
-enum class Screen { LOGIN, HOME, SEARCH, LIBRARY, NOW_PLAYING, QUEUE, PLAYLIST_DETAIL, ALBUM_DETAIL, ARTIST_DETAIL, ACCOUNT, LYRICS }
+enum class Screen { LOGIN, HOME, SEARCH, LIBRARY, NOW_PLAYING, QUEUE, PLAYLIST_DETAIL, ALBUM_DETAIL, ARTIST_DETAIL, SHOW_DETAIL, ACCOUNT, LYRICS }
 
 data class TrackInfo(
     val uri: String,
@@ -60,7 +60,9 @@ data class DetailData(
     val biography: String? = null,
     val popularReleases: List<RelatedAlbum> = emptyList(),
     val relatedArtists: List<RelatedArtist> = emptyList(),
-    val topTrackPlaycounts: List<String> = emptyList()
+    val topTrackPlaycounts: List<String> = emptyList(),
+    // Show-specific (podcast). Episodes are carried in [tracks] as episode-URI TrackInfos.
+    val publisher: String? = null
 )
 
 data class RelatedArtist(

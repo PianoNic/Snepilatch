@@ -320,13 +320,14 @@ private fun SearchPlaylist.toUnified(vm: SpotifyViewModel, ctx: Context) = Unifi
     onClick = { vm.openPlaylist(idFromUri(uri)) }
 )
 
-private fun SearchPodcast.toUnified(ctx: Context) = UnifiedResult(
+private fun SearchPodcast.toUnified(vm: SpotifyViewModel, ctx: Context) = UnifiedResult(
     uri = uri,
     title = name,
     subtitle = listOfNotNull(ctx.getString(R.string.search_subtitle_podcast), publisher).joinToString(" · "),
     imageUrl = coverArtUrl,
     circular = false,
-    onClick = { /* podcast detail not implemented yet */ }
+    // Carry publisher + cover art into the show screen — the queryPodcastEpisodes payload lacks them.
+    onClick = { vm.openShow(idFromUri(uri), publisher, coverArtUrl) }
 )
 
 private fun SearchUser.toUnified(ctx: Context) = UnifiedResult(
@@ -405,7 +406,7 @@ private fun sectionFor(
     "ARTISTS" -> SearchViewModel.SearchFilter.ARTISTS to results.artists.items.map { it.toUnified(vm, ctx) }
     "ALBUMS" -> SearchViewModel.SearchFilter.ALBUMS to results.albums.items.map { it.toUnified(vm) }
     "PLAYLISTS" -> SearchViewModel.SearchFilter.PLAYLISTS to results.playlists.items.map { it.toUnified(vm, ctx) }
-    "PODCASTS" -> SearchViewModel.SearchFilter.PODCASTS to results.podcasts.items.map { it.toUnified(ctx) }
+    "PODCASTS" -> SearchViewModel.SearchFilter.PODCASTS to results.podcasts.items.map { it.toUnified(vm, ctx) }
     "USERS" -> SearchViewModel.SearchFilter.PROFILES to results.users.items.map { it.toUnified(ctx) }
     else -> null
 }
@@ -420,7 +421,7 @@ private fun singleFilterRows(
     SearchViewModel.SearchFilter.ALBUMS -> results.albums.items.map { it.toUnified(vm) }
     SearchViewModel.SearchFilter.SONGS -> results.tracks.items.map { it.toUnified(vm, ctx) }
     SearchViewModel.SearchFilter.PLAYLISTS -> results.playlists.items.map { it.toUnified(vm, ctx) }
-    SearchViewModel.SearchFilter.PODCASTS -> results.podcasts.items.map { it.toUnified(ctx) }
+    SearchViewModel.SearchFilter.PODCASTS -> results.podcasts.items.map { it.toUnified(vm, ctx) }
     SearchViewModel.SearchFilter.PROFILES -> results.users.items.map { it.toUnified(ctx) }
     SearchViewModel.SearchFilter.ALL -> emptyList()
 }
@@ -430,7 +431,7 @@ private fun SearchTopResult.toUnified(vm: SpotifyViewModel, ctx: Context): Unifi
     is SearchTopResult.Artist -> artist.toUnified(vm, ctx)
     is SearchTopResult.Album -> album.toUnified(vm)
     is SearchTopResult.Playlist -> playlist.toUnified(vm, ctx)
-    is SearchTopResult.Podcast -> podcast.toUnified(ctx)
+    is SearchTopResult.Podcast -> podcast.toUnified(vm, ctx)
     is SearchTopResult.User -> user.toUnified(ctx)
 }
 

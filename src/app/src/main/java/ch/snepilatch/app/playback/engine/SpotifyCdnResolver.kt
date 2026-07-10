@@ -30,11 +30,16 @@ class SpotifyCdnResolver(
     /**
      * Resolve a CDN URL for a known file id plus Widevine license metadata.
      * Throws if no mirrors are returned by Spotify.
+     *
+     * [mirrorIndex] selects which of the mirrors `storage-resolve` returns to use (wrapping). The
+     * default 0 is the primary. On a playback error we re-resolve with an incrementing index so a
+     * retry lands on a DIFFERENT CDN edge — hammering the same dead mirror is what left a bad edge
+     * stuck in silence.
      */
-    suspend fun resolveForFileId(fileId: String): SpotifyStream {
+    suspend fun resolveForFileId(fileId: String, mirrorIndex: Int = 0): SpotifyStream {
         val cdnUrls = spotifyPlayback.getCdnUrls(fileId)
-        val cdnUrl = cdnUrls.firstOrNull()
-            ?: throw IllegalStateException("No CDN mirrors for fileId=$fileId")
+        if (cdnUrls.isEmpty()) throw IllegalStateException("No CDN mirrors for fileId=$fileId")
+        val cdnUrl = cdnUrls[mirrorIndex.mod(cdnUrls.size)]
         return SpotifyStream(
             cdnUrl = cdnUrl,
             licenseUrl = session.spclientUrl("widevine-license/v1/audio/license"),
@@ -59,10 +64,22 @@ class SpotifyCdnResolver(
     )
 
     /**
+     * Fetch the audio file id for a track URI via `track-playback/v1/media` — the endpoint the web
+     * player's local ListPlayer uses. This is the reliable self-resolve path: [fetchFileIdFromMetadata]
+     * (`metadata/4/track`) returns only cover-art ids on many accounts. Used to start a tapped track
+     * immediately, without waiting for the connect-state command echo to push the file id.
+     */
+    suspend fun fetchFileIdFromMedia(trackUri: String): String? =
+        spotifyPlayback.resolveFileIdForUri(trackUri)
+
+    /**
      * Fetch the file id for a track via the metadata API, preferring the
      * higher-quality MP4_256 variant and falling back to MP4_128.
      */
     suspend fun fetchFileIdFromMetadata(trackUri: String): String? {
+        // metadata/4/track is track-only; a non-track uri (e.g. spotify:episode:) would build a
+        // malformed gid lookup. Episodes resolve their audio from the state machine instead.
+        if (!trackUri.startsWith("spotify:track:")) return null
         val trackId = trackUri.removePrefix("spotify:track:")
         val gid = spotifyPlayback.trackIdToGid(trackId)
         val meta = spotifyPlayback.getTrackMetadata(gid)

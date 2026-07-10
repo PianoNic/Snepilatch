@@ -9,6 +9,8 @@ import kotify.api.playlist.LikedSong
 import kotify.api.playlist.LikedSongsPage
 import kotify.api.playlist.PlaylistInfo
 import kotify.api.playlist.PlaylistTrack
+import kotify.api.podcast.PodcastEpisode
+import kotify.api.podcast.PodcastInfo
 import kotify.api.song.SearchTrack
 import kotify.api.song.TrackDetail
 import ch.snepilatch.app.data.LibraryItem as UiLibraryItem
@@ -204,6 +206,40 @@ fun AlbumInfo.toDetailData(albumId: String): DetailData {
         },
         totalCount = totalTracks,
         loadedOffset = mappedTracks.size,
+    )
+}
+
+/**
+ * A podcast episode becomes a playable [TrackInfo] with its `spotify:episode:` uri, so the whole
+ * existing row + playback stack works unchanged. The show name stands in for the "artist" line.
+ */
+fun PodcastEpisode.toTrackInfo(showName: String): TrackInfo = TrackInfo(
+    uri = uri,
+    name = name,
+    artist = showName,
+    albumArt = coverArtUrl,
+    durationMs = durationMs,
+    albumName = showName,
+)
+
+/**
+ * Show detail. `PodcastInfo` carries only the show identity + first page of episodes; the cover art and
+ * publisher aren't in that payload, so the caller passes them in from the search/library item it opened
+ * (falling back to the first episode's cover art when unknown).
+ */
+fun PodcastInfo.toDetailData(showId: String, publisher: String?, imageUrl: String?): DetailData {
+    val mappedEpisodes = episodes.map { it.toTrackInfo(name) }
+    val art = imageUrl ?: episodes.firstOrNull()?.coverArtUrl
+    return DetailData(
+        name = name,
+        imageUrl = art,
+        description = "$totalEpisodes Episodes",
+        tracks = mappedEpisodes,
+        uri = "spotify:show:$showId",
+        type = "show",
+        publisher = publisher,
+        totalCount = totalEpisodes,
+        loadedOffset = mappedEpisodes.size,
     )
 }
 

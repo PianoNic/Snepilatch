@@ -157,6 +157,20 @@ fun DetailScreen(vm: SpotifyViewModel) {
             }
         }
 
+        // Show metadata (podcast): publisher + episode count
+        if (detail.type == "show") {
+            item {
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                    if (detail.publisher != null) {
+                        Text(detail.publisher!!, color = SpotifyWhite, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                    if (detail.description != null) {
+                        Text(detail.description!!, color = SpotifyLightGray, fontSize = 13.sp)
+                    }
+                }
+            }
+        }
+
         // Monthly listeners (artist pages) — above action buttons
         if (isArtist && detail.monthlyListeners != null && detail.monthlyListeners!! > 0) {
             item {

@@ -343,7 +343,7 @@ private fun MainContent(screen: Screen, vm: SpotifyViewModel, hazeState: HazeSta
             Screen.LIBRARY -> { LaunchedEffect(Unit) { vm.loadLibrary() }; LibraryScreen(vm) }
             Screen.ACCOUNT -> AccountScreen(vm)
             Screen.QUEUE -> QueueScreen(vm)
-            Screen.PLAYLIST_DETAIL, Screen.ALBUM_DETAIL, Screen.ARTIST_DETAIL -> DetailScreen(vm)
+            Screen.PLAYLIST_DETAIL, Screen.ALBUM_DETAIL, Screen.ARTIST_DETAIL, Screen.SHOW_DETAIL -> DetailScreen(vm)
             Screen.NOW_PLAYING, Screen.LYRICS, Screen.LOGIN -> {}
         }
     }

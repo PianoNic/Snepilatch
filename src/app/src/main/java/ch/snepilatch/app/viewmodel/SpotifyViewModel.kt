@@ -1199,9 +1199,24 @@ class SpotifyViewModel : ViewModel() {
             return
         }
         if (playbackErrorRetries >= MAX_PLAYBACK_ERROR_RETRIES) {
-            LokiLogger.w(TAG, "Playback-error retries exhausted for $failedUri — leaving to Spotify")
+            // Every mirror we tried still failed — the track is genuinely unplayable right now. Don't
+            // sit in silence on it; skip forward to the next track (local advance, uncapped). Falls
+            // back to a plain Spotify resume only if there's no live player to advance.
             playbackErrorRetries = 0
-            fallbackResume()
+            val pc = player
+            if (pc != null) {
+                LokiLogger.w(TAG, "All CDN mirrors failed for $failedUri — skipping to next track")
+                try {
+                    pc.localNext()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    LokiLogger.e(TAG, "skip-on-exhaustion failed: ${e.message}")
+                    fallbackResume()
+                }
+            } else {
+                fallbackResume()
+            }
             return
         }
         playbackErrorRetries++
@@ -1255,7 +1270,9 @@ class SpotifyViewModel : ViewModel() {
             ?: latestFileId
             ?: resolver.fetchFileIdFromMetadata(failedUri)
             ?: return false
-        val stream = resolver.resolveForFileId(fileId)
+        // Rotate to a DIFFERENT CDN mirror each retry (mirror index = attempt count). storage-resolve
+        // returns several edges; retrying the same dead one is what left a bad track stuck in silence.
+        val stream = resolver.resolveForFileId(fileId, mirrorIndex = playbackErrorRetries)
         withContext(Dispatchers.Main) { MusicPlaybackService.instance?.stop() }
         playUrlAt = System.currentTimeMillis()
         withContext(Dispatchers.Main) {
@@ -1265,7 +1282,7 @@ class SpotifyViewModel : ViewModel() {
             )
         }
         commitRecoveredStream(failedUri, "Spotify CDN")
-        LokiLogger.i(TAG, "Auto-recovered $failedUri — reloaded at ${positionMs}ms (budget resets on ready)")
+        LokiLogger.i(TAG, "Auto-recovered $failedUri via mirror #$playbackErrorRetries at ${positionMs}ms")
         return true
     }
 
@@ -2795,10 +2812,9 @@ class SpotifyViewModel : ViewModel() {
          *  reached the end regardless of any server-reported total. */
         private const val DETAIL_PAGE_SIZE = 50
 
-        /** How many times to auto-re-resolve + reload a track after a transient ExoPlayer/DRM error
-         *  (e.g. a throttled Widevine license) before handing back to Spotify. See
-         *  [recoverFromPlaybackError]. */
-        private const val MAX_PLAYBACK_ERROR_RETRIES = 2
+        /** How many times to auto-re-resolve + reload a track (rotating CDN mirrors) after a transient
+         *  ExoPlayer/DRM error before skipping to the next track. See [recoverFromPlaybackError]. */
+        private const val MAX_PLAYBACK_ERROR_RETRIES = 3
 
         /** If skipPrevious is invoked after this many ms into the current track,
          *  restart the track instead of going to the previous one. Matches the

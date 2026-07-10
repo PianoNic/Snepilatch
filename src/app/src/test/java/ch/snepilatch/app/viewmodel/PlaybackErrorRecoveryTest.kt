@@ -39,11 +39,11 @@ class PlaybackErrorRecoveryTest {
     fun transientError_reResolvesAndReloadsSameTrack_notSilent() = runBlocking {
         val resolver = mockk<SpotifyCdnResolver>(relaxed = true)
         coEvery { resolver.fetchFileIdFromMedia("spotify:track:test") } returns "fileXYZ"
-        coEvery { resolver.resolveForFileId("fileXYZ") } returns SpotifyStream(
+        coEvery { resolver.resolveForFileId(eq("fileXYZ"), any()) } returns SpotifyStream(
             cdnUrl = "https://cdn.example/audio",
             licenseUrl = "https://license.example",
             licenseHeaders = emptyMap(),
-            mirrorCount = 1,
+            mirrorCount = 3,
             pssh = null,
         )
         SessionHolder.cdnResolver = resolver
@@ -51,8 +51,8 @@ class PlaybackErrorRecoveryTest {
 
         rig.vm.recoverFromPlaybackError("spotify:track:test", 42_000L)
 
-        // The failed track was re-resolved and reloaded at its position — not paused into silence.
-        coVerify(exactly = 1) { resolver.resolveForFileId("fileXYZ") }
+        // The failed track was re-resolved on a rotated mirror and reloaded — not paused into silence.
+        coVerify(exactly = 1) { resolver.resolveForFileId(eq("fileXYZ"), any()) }
         verify {
             rig.service.playDrmUrl(
                 "https://cdn.example/audio", "https://license.example", emptyMap(),
@@ -62,8 +62,8 @@ class PlaybackErrorRecoveryTest {
     }
 
     @Test
-    fun repeatedFailures_stopRetryingAndHandBackToSpotify() = runBlocking {
-        // Resolve never yields a usable file id, so every attempt fails.
+    fun repeatedFailures_skipToNextTrackInsteadOfSilence() = runBlocking {
+        // Resolve never yields a usable file id, so every mirror/attempt fails.
         val resolver = mockk<SpotifyCdnResolver>(relaxed = true)
         coEvery { resolver.fetchFileIdFromMedia(any()) } returns null
         coEvery { resolver.fetchFileIdFromMetadata(any()) } returns null
@@ -72,10 +72,11 @@ class PlaybackErrorRecoveryTest {
         SessionHolder.player = pc
         rig.seedStreaming(positionMs = 10_000L)
 
-        // Must terminate (not loop forever) and hand back to Spotify once the budget is spent.
+        // Must terminate (not loop forever) and, once the budget is spent, skip forward rather than
+        // sit in silence on the dead track.
         rig.vm.recoverFromPlaybackError("spotify:track:test", 10_000L)
 
         verify(exactly = 0) { rig.service.playDrmUrl(any(), any(), any(), any(), any(), any(), any(), any(), any()) }
-        coVerify(atLeast = 1) { pc.resume() }
+        coVerify(atLeast = 1) { pc.localNext() }
     }
 }

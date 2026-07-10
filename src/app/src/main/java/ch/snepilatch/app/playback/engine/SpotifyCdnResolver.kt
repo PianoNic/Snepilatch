@@ -30,11 +30,16 @@ class SpotifyCdnResolver(
     /**
      * Resolve a CDN URL for a known file id plus Widevine license metadata.
      * Throws if no mirrors are returned by Spotify.
+     *
+     * [mirrorIndex] selects which of the mirrors `storage-resolve` returns to use (wrapping). The
+     * default 0 is the primary. On a playback error we re-resolve with an incrementing index so a
+     * retry lands on a DIFFERENT CDN edge — hammering the same dead mirror is what left a bad edge
+     * stuck in silence.
      */
-    suspend fun resolveForFileId(fileId: String): SpotifyStream {
+    suspend fun resolveForFileId(fileId: String, mirrorIndex: Int = 0): SpotifyStream {
         val cdnUrls = spotifyPlayback.getCdnUrls(fileId)
-        val cdnUrl = cdnUrls.firstOrNull()
-            ?: throw IllegalStateException("No CDN mirrors for fileId=$fileId")
+        if (cdnUrls.isEmpty()) throw IllegalStateException("No CDN mirrors for fileId=$fileId")
+        val cdnUrl = cdnUrls[mirrorIndex.mod(cdnUrls.size)]
         return SpotifyStream(
             cdnUrl = cdnUrl,
             licenseUrl = session.spclientUrl("widevine-license/v1/audio/license"),

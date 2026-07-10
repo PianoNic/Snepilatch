@@ -2321,6 +2321,66 @@ class SpotifyViewModel : ViewModel() {
      * onPlaybackId / onExternalUrl race onTrackChange, so we wait briefly for either to arrive. On
      * failure we stop cleanly — we do NOT fall back to the third-party music CDN (wrong for podcasts).
      */
+    /**
+     * Resolve + play an episode via soundfinder (`soundfinder/v1/unauth/episode`), the web player's
+     * episode path. Passthrough episodes stream their direct DRM-free url (no Widevine); hosted
+     * episodes resolve the Widevine file id with the corrected v2 seektable PSSH. Returns true if
+     * playback started; false (after logging) to fall back to the state-machine path.
+     */
+    internal suspend fun resolveEpisodeViaSoundfinder(
+        trackUri: String, title: String, artist: String, art: String?, resolveStart: Long
+    ): Boolean {
+        val resolver = cdnResolver ?: return false
+        val episodeId = trackUri.removePrefix("spotify:episode:")
+        return try {
+            val ep = resolver.resolveEpisode(episodeId)
+            val coldStart = coldStartPending
+            val passthroughUrl = ep?.passthroughUrl?.takeIf { ep.isPassthrough }
+            val fileId = ep?.fileId
+            when {
+                // Passthrough: the show's original DRM-free url, streamed as-is.
+                passthroughUrl != null -> {
+                    withContext(Dispatchers.Main) { MusicPlaybackService.instance?.stop() }
+                    playUrlAt = System.currentTimeMillis()
+                    withContext(Dispatchers.Main) {
+                        MusicPlaybackService.instance?.playUrl(passthroughUrl, title, artist, art, startPlaying = !coldStart, headers = emptyMap())
+                    }
+                    commitEpisodeStream(trackUri, "Podcast")
+                    LokiLogger.i(TAG, "[Episode] passthrough (direct, no DRM) for $trackUri in ${System.currentTimeMillis() - resolveStart}ms")
+                    true
+                }
+                // Hosted: Widevine file id -> CDN + v2 PSSH + license, played like a track.
+                fileId != null -> {
+                    latestFileId = fileId
+                    val stream = resolver.resolveForFileId(fileId)
+                    withContext(Dispatchers.Main) { MusicPlaybackService.instance?.stop() }
+                    playUrlAt = System.currentTimeMillis()
+                    withContext(Dispatchers.Main) {
+                        MusicPlaybackService.instance?.playDrmUrl(
+                            stream.cdnUrl, stream.licenseUrl, stream.licenseHeaders, title, artist, art,
+                            startPlaying = !coldStart, pssh = stream.pssh,
+                        )
+                    }
+                    commitEpisodeStream(trackUri, "Spotify CDN")
+                    LokiLogger.i(TAG, "[Episode] soundfinder hosted DRM loaded in ${System.currentTimeMillis() - resolveStart}ms")
+                    true
+                }
+                else -> false
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            LokiLogger.e(TAG, "[Episode] soundfinder path failed for $trackUri, falling back", e)
+            false
+        }
+    }
+
+    private fun commitEpisodeStream(trackUri: String, provider: String) {
+        currentStreamUri = trackUri
+        isStreaming.value = true
+        streamProvider.value = provider
+    }
+
     private suspend fun resolveAndPlayEpisode(
         trackUri: String,
         event: kotify.api.playerstatus.TrackChangeEvent,
@@ -2330,6 +2390,12 @@ class SpotifyViewModel : ViewModel() {
         resolveStart: Long
     ) {
         try {
+            // Primary path: resolve the episode directly via soundfinder (what the web player does).
+            // Passthrough episodes hand back a direct DRM-free url (skip Widevine entirely); hosted
+            // episodes carry a Widevine file id we resolve with the corrected v2 seektable PSSH. This
+            // avoids racing the state machine and fixes DRM_LICENSE_ACQUISITION_FAILED on podcasts.
+            if (resolveEpisodeViaSoundfinder(trackUri, title, artist, art, resolveStart)) return
+
             var fileId = event.currentFileId ?: latestFileId
             var externalUrl = externalUrlByUri[trackUri]
             if (fileId == null && externalUrl == null) {

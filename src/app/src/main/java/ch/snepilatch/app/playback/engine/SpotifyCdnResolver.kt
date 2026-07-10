@@ -64,6 +64,14 @@ class SpotifyCdnResolver(
     )
 
     /**
+     * Resolve a podcast episode via the web player's `soundfinder/v1/unauth/episode` endpoint. The
+     * result says whether the episode is passthrough (a direct DRM-free url) or Widevine-hosted (a
+     * file id), so the caller can skip DRM entirely for passthrough episodes. Null if it doesn't resolve.
+     */
+    suspend fun resolveEpisode(episodeId: String): kotify.cdn.EpisodeResolveInfo? =
+        spotifyPlayback.resolveEpisode(episodeId)
+
+    /**
      * Fetch the audio file id for a track URI via `track-playback/v1/media` — the endpoint the web
      * player's local ListPlayer uses. This is the reliable self-resolve path: [fetchFileIdFromMetadata]
      * (`metadata/4/track`) returns only cover-art ids on many accounts. Used to start a tapped track

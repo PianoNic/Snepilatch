@@ -88,6 +88,17 @@ class SpotifyViewModel : ViewModel() {
             override fun removeEldestEntry(eldest: Map.Entry<String, String>) = size > 32
         }
     )
+
+    // Show name + cover art for a playing episode, keyed by episode uri. The connect-state cluster
+    // metadata for episodes carries the episode title but NOT an artist_name/image_url (those are
+    // track-only keys), so the player would otherwise show "Unknown" with no art. We resolve the
+    // parent show once via KotifyClient and cache it so both the optimistic update and later cluster
+    // echoes display the show instead. Bounded; hosted+external episodes both use it.
+    private val episodeDisplayByUri = java.util.Collections.synchronizedMap(
+        object : LinkedHashMap<String, EpisodeDisplay>(16, 0.75f, false) {
+            override fun removeEldestEntry(eldest: Map.Entry<String, EpisodeDisplay>) = size > 64
+        }
+    )
     private var currentStreamUri: String? = null
     private var nextStreamUrl: String? = null
     private var nextTrackInfo: TrackInfo? = null
@@ -780,14 +791,17 @@ class SpotifyViewModel : ViewModel() {
 
     private suspend fun updatePlaybackFromState(state: PlayerStateData) {
         val track = state.track
+        // Episodes carry no artist_name/image_url in the cluster metadata; fall back to the show
+        // (name + cover art) cached when we resolved the episode for playback (see episodeDisplayFor).
+        val epDisplay = track?.uri?.takeIf { it.startsWith("spotify:episode:") }?.let { episodeDisplayByUri[it] }
         val imageUrl = normalizeSpotifyImageUrl(
             track?.imageLargeUrl ?: track?.imageUrl ?: track?.imageSmallUrl
-        )
+        ) ?: epDisplay?.imageUrl
         val trackInfo = if (track != null) {
             TrackInfo(
                 uri = track.uri,
                 name = track.name.ifBlank { "Unknown" },
-                artist = track.artistName ?: "Unknown",
+                artist = track.artistName ?: epDisplay?.showName ?: "Unknown",
                 albumArt = imageUrl,
                 albumName = track.albumName,
                 durationMs = state.duration
@@ -2108,7 +2122,7 @@ class SpotifyViewModel : ViewModel() {
         // the same track short-circuits the equality check above and never loads.
 
         val title = current.name.ifBlank { "Unknown" }
-        val artist = current.artistName ?: "Unknown"
+        var artist = current.artistName ?: "Unknown"
 
         isStreamLoading.value = true
         isNextReady.value = false
@@ -2124,7 +2138,16 @@ class SpotifyViewModel : ViewModel() {
         if (preferredAudioSource.value != null) {
             try { player?.pause() } catch (_: Exception) {}
         }
-        val art = normalizeSpotifyImageUrl(current.imageLargeUrl ?: current.imageUrl)
+        var art = normalizeSpotifyImageUrl(current.imageLargeUrl ?: current.imageUrl)
+
+        // Episodes: the cluster metadata has no artist_name/image_url (track-only keys), so it would
+        // show "Unknown" with no art. Enrich from the parent show (cached after the first lookup).
+        if (trackUri.startsWith("spotify:episode:")) {
+            episodeDisplayFor(trackUri)?.let { display ->
+                if (artist.isBlank() || artist == "Unknown") display.showName?.let { artist = it }
+                if (art == null) art = display.imageUrl
+            }
+        }
 
         // Update UI with new track info immediately — audio will follow in ~100ms
         val newTrack = TrackInfo(
@@ -2288,6 +2311,29 @@ class SpotifyViewModel : ViewModel() {
      * onPlaybackId / onExternalUrl race onTrackChange, so we wait briefly for either to arrive. On
      * failure we stop cleanly — we do NOT fall back to the third-party music CDN (wrong for podcasts).
      */
+    /**
+     * Resolve (once, then cache) the parent show name + cover art for an episode uri. Used so the
+     * player shows the show instead of "Unknown" — the cluster metadata for episodes has no
+     * artist_name/image_url. Returns null (and caches nothing) if the lookup fails.
+     */
+    private suspend fun episodeDisplayFor(episodeUri: String): EpisodeDisplay? {
+        episodeDisplayByUri[episodeUri]?.let { return it }
+        val sess = session ?: return null
+        return try {
+            val ep = kotify.api.podcast.Podcast(sess).getEpisode(episodeUri.substringAfterLast(':'))
+                ?: return null
+            val display = EpisodeDisplay(
+                showName = ep.show.name.ifBlank { null },
+                imageUrl = normalizeSpotifyImageUrl(ep.coverArtUrl)
+            )
+            episodeDisplayByUri[episodeUri] = display
+            display
+        } catch (e: Exception) {
+            LokiLogger.e(TAG, "episodeDisplayFor failed for $episodeUri", e)
+            null
+        }
+    }
+
     private suspend fun resolveAndPlayEpisode(
         trackUri: String,
         event: kotify.api.playerstatus.TrackChangeEvent,
@@ -2822,3 +2868,9 @@ class SpotifyViewModel : ViewModel() {
         private const val PREV_RESTART_THRESHOLD_MS = 3000L
     }
 }
+
+/** Display fallback for an episode (its parent show), resolved once per episode uri. */
+data class EpisodeDisplay(
+    val showName: String?,
+    val imageUrl: String?,
+)

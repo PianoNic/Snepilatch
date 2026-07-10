@@ -151,6 +151,7 @@ fun QuickPickGrid(items: List<kotify.api.home.HomeSectionItem>, vm: SpotifyViewM
                                     "playlist" -> vm.openPlaylist(id)
                                     "album" -> vm.openAlbum(id)
                                     "artist" -> vm.openArtist(id)
+                                    "show" -> vm.openShow(id, item.owner, item.imageUrl)
                                     else -> vm.playTrack(item.uri)
                                 }
                             },
@@ -230,6 +231,7 @@ fun HomeSectionCard(item: kotify.api.home.HomeSectionItem, vm: SpotifyViewModel,
                     "playlist" -> vm.openPlaylist(id)
                     "album" -> vm.openAlbum(id)
                     "artist" -> vm.openArtist(id)
+                    "show" -> vm.openShow(id, item.owner, item.imageUrl)
                     else -> vm.playTrack(item.uri)
                 }
             },

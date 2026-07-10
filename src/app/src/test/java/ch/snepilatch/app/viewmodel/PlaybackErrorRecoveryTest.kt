@@ -38,7 +38,7 @@ class PlaybackErrorRecoveryTest {
     @Test
     fun transientError_reResolvesAndReloadsSameTrack_notSilent() = runBlocking {
         val resolver = mockk<SpotifyCdnResolver>(relaxed = true)
-        coEvery { resolver.fetchFileIdFromMedia("spotify:track:test") } returns "fileXYZ"
+        coEvery { resolver.resolveMediaEntry("spotify:track:test") } returns ("fileXYZ" to "10")
         coEvery { resolver.resolveForFileId(eq("fileXYZ"), any()) } returns SpotifyStream(
             cdnUrl = "https://cdn.example/audio",
             licenseUrl = "https://license.example",
@@ -67,7 +67,7 @@ class PlaybackErrorRecoveryTest {
         // each recovery reload (which used to reset the retry budget), so it stayed pinned to mirror #1
         // forever — never escalating or skipping. It must now walk mirror #1 -> #2 -> #3, then skip.
         val resolver = mockk<SpotifyCdnResolver>(relaxed = true)
-        coEvery { resolver.fetchFileIdFromMedia("spotify:track:test") } returns "fileXYZ"
+        coEvery { resolver.resolveMediaEntry("spotify:track:test") } returns ("fileXYZ" to "10")
         coEvery { resolver.resolveForFileId(eq("fileXYZ"), any()) } returns SpotifyStream(
             cdnUrl = "https://cdn.example/audio",
             licenseUrl = "https://license.example",
@@ -99,7 +99,7 @@ class PlaybackErrorRecoveryTest {
     fun repeatedFailures_skipToNextTrackInsteadOfSilence() = runBlocking {
         // Resolve never yields a usable file id, so every mirror/attempt fails.
         val resolver = mockk<SpotifyCdnResolver>(relaxed = true)
-        coEvery { resolver.fetchFileIdFromMedia(any()) } returns null
+        coEvery { resolver.resolveMediaEntry(any()) } returns null
         coEvery { resolver.fetchFileIdFromMetadata(any()) } returns null
         SessionHolder.cdnResolver = resolver
         val pc = mockk<PlayerConnect>(relaxed = true)

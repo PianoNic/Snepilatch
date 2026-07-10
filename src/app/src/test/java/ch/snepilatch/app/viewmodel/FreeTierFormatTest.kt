@@ -32,29 +32,33 @@ class FreeTierFormatTest {
     }
 
     @Test
-    fun freeAccount_rejectsPremiumFormatMediaFileId() = runBlocking {
+    fun freeAccount_picksMp4128WhenBothOffered() = runBlocking {
+        // The real regression case: the manifest offers BOTH 256 and 128 — a free account must pick
+        // the licensable 128, not the (default first) 256.
         val resolver = mockk<SpotifyCdnResolver>(relaxed = true)
-        coEvery { resolver.resolveMediaEntry("spotify:track:x") } returns ("fileMP4_256" to "11")
+        coEvery { resolver.resolveMediaEntries("spotify:track:x") } returns
+            listOf("fileMP4_256" to "11", "fileMP4_128" to "10", "fileDual256" to "13", "fileDual128" to "12")
         SessionHolder.cdnResolver = resolver
         rig.vm.setPremiumForTest(false)
 
-        assertNull("free account must not use an unlicensable MP4_256 file id", rig.vm.safeMediaFileId("spotify:track:x"))
+        assertEquals("fileMP4_128", rig.vm.safeMediaFileId("spotify:track:x"))
     }
 
     @Test
-    fun freeAccount_acceptsFreeSafeMp4128() = runBlocking {
+    fun freeAccount_returnsNullWhenOnlyPremiumOffered() = runBlocking {
         val resolver = mockk<SpotifyCdnResolver>(relaxed = true)
-        coEvery { resolver.resolveMediaEntry("spotify:track:y") } returns ("fileMP4_128" to "10")
+        coEvery { resolver.resolveMediaEntries("spotify:track:y") } returns listOf("fileMP4_256" to "11")
         SessionHolder.cdnResolver = resolver
         rig.vm.setPremiumForTest(false)
 
-        assertEquals("fileMP4_128", rig.vm.safeMediaFileId("spotify:track:y"))
+        assertNull("free account can't license MP4_256; must defer", rig.vm.safeMediaFileId("spotify:track:y"))
     }
 
     @Test
-    fun premiumAccount_acceptsPremiumFormat() = runBlocking {
+    fun premiumAccount_takesHighestQuality() = runBlocking {
         val resolver = mockk<SpotifyCdnResolver>(relaxed = true)
-        coEvery { resolver.resolveMediaEntry("spotify:track:z") } returns ("fileMP4_256" to "11")
+        coEvery { resolver.resolveMediaEntries("spotify:track:z") } returns
+            listOf("fileMP4_256" to "11", "fileMP4_128" to "10")
         SessionHolder.cdnResolver = resolver
         rig.vm.setPremiumForTest(true)
 

@@ -81,13 +81,13 @@ class SpotifyCdnResolver(
         spotifyPlayback.resolveFileIdForUri(trackUri)
 
     /**
-     * Like [fetchFileIdFromMedia] but also returns the audio's numeric storage format (10=MP4_128,
-     * 11=MP4_256, 12/13=dual). Callers use the format to avoid handing a premium-quality file id to a
-     * free account's Widevine CDM, which returns ERROR_CODE_DRM_LICENSE_ACQUISITION_FAILED. Null if
-     * the URI has no resolvable audio manifest.
+     * All mp4 audio (file id, numeric format) entries the media endpoint offers for a track — usually
+     * both a premium MP4_256 (format 11) and a free-safe MP4_128 (format 10). Callers pick the quality
+     * the account can license: a free account can only get a Widevine license for MP4_128, so handing
+     * its CDM the 256 file id yields ERROR_CODE_DRM_LICENSE_ACQUISITION_FAILED. Empty if unresolvable.
      */
-    suspend fun resolveMediaEntry(trackUri: String): Pair<String, String>? =
-        spotifyPlayback.resolveAudioEntryForUri(trackUri)
+    suspend fun resolveMediaEntries(trackUri: String): List<Pair<String, String>> =
+        spotifyPlayback.resolveAudioEntriesForUri(trackUri)
 
     /**
      * Fetch the file id for a track via the metadata API, preferring the

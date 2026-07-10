@@ -2131,10 +2131,17 @@ class SpotifyViewModel : ViewModel() {
      * the media endpoint.
      */
     internal suspend fun safeMediaFileId(trackUri: String): String? {
-        val (fileId, format) = cdnResolver?.resolveMediaEntry(trackUri) ?: return null
-        if (_account.value.isPremium || format == "10") return fileId
-        LokiLogger.i(TAG, "Skipping media file id for $trackUri (format=$format not licensable on free tier)")
-        return null
+        val entries = cdnResolver?.resolveMediaEntries(trackUri).orEmpty()
+        if (entries.isEmpty()) return null
+        // Premium: take the highest quality the manifest offers (first entry). Free: the CDM can only
+        // license MP4_128, so pick the free-safe format-10 (or 12=128-dual) entry the manifest also
+        // carries; if it offers only premium formats, return null so we rely on the connect-state id.
+        if (_account.value.isPremium) return entries.first().first
+        val free = entries.firstOrNull { it.second == "10" || it.second == "12" }
+        if (free == null) {
+            LokiLogger.i(TAG, "No free-tier (MP4_128) media file id for $trackUri; deferring to connect-state")
+        }
+        return free?.first
     }
 
     /** Test seam: set the account's premium flag so [safeMediaFileId] can be exercised. */

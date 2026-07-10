@@ -1299,7 +1299,7 @@ class SpotifyViewModel : ViewModel() {
         // the per-uri media self-resolve (authoritative for the failed uri) so a state-machine advance
         // can't leave us reloading the wrong file; latestFileId covers hosted episodes.
         val resolver = cdnResolver ?: return false
-        val fileId = resolver.fetchFileIdFromMedia(failedUri)
+        val fileId = safeMediaFileId(failedUri)
             ?: latestFileId
             ?: resolver.fetchFileIdFromMetadata(failedUri)
             ?: return false
@@ -1480,8 +1480,8 @@ class SpotifyViewModel : ViewModel() {
         try {
             val resolver = cdnResolver ?: return
             val trackUri = track.uri
-            val fileId = resolver.fetchFileIdFromMedia(trackUri) ?: run {
-                LokiLogger.i(TAG, "[InstantTap] no media file id for $trackUri, deferring to echo")
+            val fileId = safeMediaFileId(trackUri) ?: run {
+                LokiLogger.i(TAG, "[InstantTap] no licensable media file id for $trackUri, deferring to echo")
                 return
             }
             val stream = resolver.resolveForFileId(fileId)
@@ -2121,6 +2121,27 @@ class SpotifyViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Media-endpoint file id, gated to what the account can actually license. The media endpoint
+     * returns the highest offered quality (often MP4_256, format 11), but a FREE account can only get
+     * a Widevine license for MP4_128 (format 10) — handing its CDM a premium file id yields
+     * ERROR_CODE_DRM_LICENSE_ACQUISITION_FAILED mid-track. Return the media file id only for premium
+     * accounts or a free-safe MP4_128; otherwise null so the caller relies on the connect-state file
+     * id (the account's entitled quality). Fixes the regression from self-resolving the echo path via
+     * the media endpoint.
+     */
+    internal suspend fun safeMediaFileId(trackUri: String): String? {
+        val (fileId, format) = cdnResolver?.resolveMediaEntry(trackUri) ?: return null
+        if (_account.value.isPremium || format == "10") return fileId
+        LokiLogger.i(TAG, "Skipping media file id for $trackUri (format=$format not licensable on free tier)")
+        return null
+    }
+
+    /** Test seam: set the account's premium flag so [safeMediaFileId] can be exercised. */
+    internal fun setPremiumForTest(premium: Boolean) {
+        _account.value = _account.value.copy(isPremium = premium)
+    }
+
     private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent) {
         val resolveStart = System.currentTimeMillis()
         val current = event.current ?: return
@@ -2223,20 +2244,22 @@ class SpotifyViewModel : ViewModel() {
                     // Use file ID from cluster state or from onPlaybackId (state machine)
                     var fileId = event.currentFileId ?: latestFileId
                     if (fileId == null) {
-                        // Brief wait — onPlaybackId may fire slightly after onTrackChange
-                        LokiLogger.d(TAG, "SpotifyCDN: Waiting briefly for file ID...")
-                        for (i in 1..5) {
+                        // Wait for onPlaybackId — the state machine pushes the account's ENTITLED file id
+                        // (MP4_128 on free). Give it real time before self-resolving, because the media
+                        // endpoint below only offers premium MP4_256 on many accounts, which a free CDM
+                        // can't license. Cheap: only runs when the cluster hasn't supplied a file id yet.
+                        LokiLogger.d(TAG, "SpotifyCDN: Waiting for state-machine file ID...")
+                        for (i in 1..15) {
                             delay(100)
                             fileId = latestFileId
                             if (fileId != null) break
-                            LokiLogger.d(TAG, "SpotifyCDN: file ID still null after attempt $i")
                         }
                     }
-                    // If still null, self-resolve the file ID. Prefer track-playback/v1/media (returns
-                    // real audio ids) and fall back to metadata/4/track for parity with older accounts.
+                    // Still null: self-resolve. Use the media endpoint only when the file id is
+                    // licensable for this account (see safeMediaFileId), else metadata/4/track.
                     if (fileId == null) {
-                        LokiLogger.i(TAG, "SpotifyCDN: No file ID from state machine, self-resolving via media endpoint...")
-                        fileId = resolver.fetchFileIdFromMedia(trackUri) ?: resolver.fetchFileIdFromMetadata(trackUri)
+                        LokiLogger.i(TAG, "SpotifyCDN: No file ID from state machine, self-resolving...")
+                        fileId = safeMediaFileId(trackUri) ?: resolver.fetchFileIdFromMetadata(trackUri)
                         if (fileId != null) {
                             LokiLogger.i(TAG, "SpotifyCDN: Got file ID from self-resolve: $fileId")
                             latestFileId = fileId

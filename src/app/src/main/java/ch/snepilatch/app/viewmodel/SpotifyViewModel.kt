@@ -121,9 +121,16 @@ class SpotifyViewModel : ViewModel() {
 
     // Auto-recovery budget for transient ExoPlayer/DRM errors (e.g. a throttled Widevine license):
     // instead of going silent until the user taps play, re-resolve + reload the SAME track at its last
-    // position. Reset on any successful onReady; exhausting it hands back to Spotify so a genuinely
-    // unplayable track can't loop forever.
+    // position. Refilled when a DIFFERENT track reaches onReady; exhausting it skips forward so a
+    // genuinely unplayable track can't loop forever. See [recoveringUri] for why "different" matters.
     private var playbackErrorRetries = 0
+
+    // The uri currently being auto-recovered. A recovery reload of the SAME failing track also reaches
+    // onReady (it buffers fine, then fails again at the same spot), so resetting the retry budget on
+    // every onReady pinned recovery to mirror #1 forever — the track never escalated mirrors or
+    // skipped. We only refill the budget when onReady fires for a uri OTHER than the one we're
+    // recovering, i.e. playback genuinely moved on to a healthy track.
+    private var recoveringUri: String? = null
     val isStreaming = MutableStateFlow(false)
     val streamProvider = MutableStateFlow<String?>(null)
     val isNextReady = MutableStateFlow(false)
@@ -1201,17 +1208,34 @@ class SpotifyViewModel : ViewModel() {
      * the lossless (third-party) path keeps the old hand-back-to-Spotify behaviour. The retry budget
      * resets on the next successful [MusicPlaybackService.onReady], so an unplayable track can't loop.
      */
+    /**
+     * Refill the auto-recovery retry budget when a track reaches STATE_READY — but ONLY when the ready
+     * track differs from the one being recovered. A recovery reload of the same failing track also
+     * reaches READY (it buffers a few seconds, then fails again at the same spot); refilling there
+     * pinned recovery to mirror #1 forever, so the track never escalated mirrors or skipped. Refilling
+     * only on a genuinely different (healthy) track restores the escalate-then-skip progression.
+     */
+    internal fun refillRetryBudgetOnReady(readyUri: String?) {
+        if (readyUri != null && readyUri != recoveringUri) {
+            playbackErrorRetries = 0
+            recoveringUri = null
+        }
+    }
+
     internal suspend fun recoverFromPlaybackError(failedUri: String?, positionMs: Long) {
         // Nothing to reload locally, or lossless mode: hand back to Spotify (previous behaviour).
         if (failedUri == null || preferredAudioSource.value != null) {
             fallbackResume()
             return
         }
+        // Mark the track under recovery so a same-track reload's onReady doesn't refill the budget.
+        recoveringUri = failedUri
         if (playbackErrorRetries >= MAX_PLAYBACK_ERROR_RETRIES) {
             // Every mirror we tried still failed — the track is genuinely unplayable right now. Don't
             // sit in silence on it; skip forward to the next track (local advance, uncapped). Falls
             // back to a plain Spotify resume only if there's no live player to advance.
             playbackErrorRetries = 0
+            recoveringUri = null
             val pc = player
             if (pc != null) {
                 LokiLogger.w(TAG, "All CDN mirrors failed for $failedUri — skipping to next track")
@@ -2060,8 +2084,8 @@ class SpotifyViewModel : ViewModel() {
             val playUrlToReady = if (playUrlAt > 0) now - playUrlAt else -1L
             val cmdToReady = if (lastCommandTs > 0) now - lastCommandTs else -1L
             LokiLogger.i(TAG, "[Timing-CDN] ExoPlayer ready — playUrl→ready=${playUrlToReady}ms, cmd→ready=${cmdToReady}ms")
-            // A track successfully reached STATE_READY — refill the transient-error retry budget.
-            playbackErrorRetries = 0
+            // A track reached STATE_READY — maybe refill the transient-error retry budget.
+            refillRetryBudgetOnReady(currentStreamUri)
 
             if (coldStartPending) {
                 // Cold-start sync: ExoPlayer was loaded with startPositionMs and

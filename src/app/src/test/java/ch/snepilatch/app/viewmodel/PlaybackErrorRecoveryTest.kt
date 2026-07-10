@@ -62,6 +62,40 @@ class PlaybackErrorRecoveryTest {
     }
 
     @Test
+    fun sameTrackReadyBetweenFailures_stillEscalatesMirrorsThenSkips() = runBlocking {
+        // Regression for the livelock: a track that fails at the same spot every time reaches READY on
+        // each recovery reload (which used to reset the retry budget), so it stayed pinned to mirror #1
+        // forever — never escalating or skipping. It must now walk mirror #1 -> #2 -> #3, then skip.
+        val resolver = mockk<SpotifyCdnResolver>(relaxed = true)
+        coEvery { resolver.fetchFileIdFromMedia("spotify:track:test") } returns "fileXYZ"
+        coEvery { resolver.resolveForFileId(eq("fileXYZ"), any()) } returns SpotifyStream(
+            cdnUrl = "https://cdn.example/audio",
+            licenseUrl = "https://license.example",
+            licenseHeaders = emptyMap(),
+            mirrorCount = 6,
+            pssh = null,
+        )
+        SessionHolder.cdnResolver = resolver
+        val pc = mockk<PlayerConnect>(relaxed = true)
+        SessionHolder.player = pc
+        rig.seedStreaming(positionMs = 9808L)
+
+        // Each reload "succeeds" (reaches READY) for the SAME uri, then the track fails again.
+        repeat(3) {
+            rig.vm.recoverFromPlaybackError("spotify:track:test", 9808L)
+            rig.vm.refillRetryBudgetOnReady("spotify:track:test") // same uri -> must NOT refill the budget
+        }
+        // The 4th failure has exhausted the budget -> skip forward instead of looping.
+        rig.vm.recoverFromPlaybackError("spotify:track:test", 9808L)
+
+        // Mirrors escalated across attempts rather than hammering #1 forever.
+        coVerify { resolver.resolveForFileId("fileXYZ", 1) }
+        coVerify { resolver.resolveForFileId("fileXYZ", 2) }
+        coVerify { resolver.resolveForFileId("fileXYZ", 3) }
+        coVerify(atLeast = 1) { pc.localNext() }
+    }
+
+    @Test
     fun repeatedFailures_skipToNextTrackInsteadOfSilence() = runBlocking {
         // Resolve never yields a usable file id, so every mirror/attempt fails.
         val resolver = mockk<SpotifyCdnResolver>(relaxed = true)

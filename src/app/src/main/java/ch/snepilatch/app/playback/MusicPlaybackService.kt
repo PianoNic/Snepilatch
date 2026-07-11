@@ -146,8 +146,13 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             }
             if (wifiLock == null) {
                 val wm = applicationContext.getSystemService(android.content.Context.WIFI_SERVICE) as android.net.wifi.WifiManager
-                @Suppress("DEPRECATION") // HIGH_PERF is the one that keeps the radio up with the screen OFF
-                wifiLock = wm.createWifiLock(android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF, "snepilatch:wifi")
+                // WIFI_MODE_FULL (not HIGH_PERF): keep Wi-Fi associated so the dealer socket survives
+                // screen-off, but allow the radio to power-save between packets. HIGH_PERF disables
+                // power-save entirely, pinning the radio at full power for the whole playback session —
+                // wasteful heat/battery for a stream that buffers ahead and only gets a tiny dealer
+                // message every ~30s. The PARTIAL_WAKE_LOCK is what actually keeps the socket processing.
+                @Suppress("DEPRECATION")
+                wifiLock = wm.createWifiLock(android.net.wifi.WifiManager.WIFI_MODE_FULL, "snepilatch:wifi")
                     .apply { setReferenceCounted(false) }
             }
             if (wakeLock?.isHeld != true) {

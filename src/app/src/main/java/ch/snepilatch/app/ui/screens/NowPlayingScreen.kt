@@ -45,6 +45,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import ch.snepilatch.app.ui.components.SheetNavBarFix
 import ch.snepilatch.app.ui.components.SpotifyImage
 import ch.snepilatch.app.ui.components.TightAlertDialog
+import ch.snepilatch.app.ui.components.rememberSmoothPositionMs
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.util.formatTime
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
@@ -416,8 +417,10 @@ fun NowPlayingScreen(
                         // Progress bar
                         var seekDragging by remember { mutableStateOf(false) }
                         var seekDragValue by remember { mutableFloatStateOf(0f) }
+                        val smoothPos =
+                            rememberSmoothPositionMs(playback.positionMs, playback.durationMs, playback.isPlaying)
                         val sliderValue = if (seekDragging) seekDragValue
-                        else if (playback.durationMs > 0) (playback.positionMs.toFloat() / playback.durationMs) else 0f
+                        else if (playback.durationMs > 0) (smoothPos.toFloat() / playback.durationMs) else 0f
                         Slider(
                             value = sliderValue,
                             onValueChange = { seekDragging = true; seekDragValue = it },
@@ -440,7 +443,7 @@ fun NowPlayingScreen(
                             modifier = Modifier.fillMaxWidth()
                         )
                         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(formatTime(playback.positionMs), color = SpotifyLightGray, fontSize = 11.sp)
+                            Text(formatTime(smoothPos), color = SpotifyLightGray, fontSize = 11.sp)
                             Text(formatTime(playback.durationMs), color = SpotifyLightGray, fontSize = 11.sp)
                         }
 
@@ -813,8 +816,10 @@ fun NowPlayingScreen(
                     // Progress bar — thick rounded bar
                     var seekDragging by remember { mutableStateOf(false) }
                     var seekDragValue by remember { mutableFloatStateOf(0f) }
+                    val smoothPos =
+                        rememberSmoothPositionMs(playback.positionMs, playback.durationMs, playback.isPlaying)
                     val sliderValue = if (seekDragging) seekDragValue
-                        else if (playback.durationMs > 0) (playback.positionMs.toFloat() / playback.durationMs) else 0f
+                        else if (playback.durationMs > 0) (smoothPos.toFloat() / playback.durationMs) else 0f
                     Slider(
                         value = sliderValue,
                         onValueChange = { seekDragging = true; seekDragValue = it },
@@ -837,7 +842,7 @@ fun NowPlayingScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
                     Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(formatTime(playback.positionMs), color = secondaryText, fontSize = 12.sp)
+                        Text(formatTime(smoothPos), color = secondaryText, fontSize = 12.sp)
                         Text(formatTime(playback.durationMs), color = secondaryText, fontSize = 12.sp)
                     }
 

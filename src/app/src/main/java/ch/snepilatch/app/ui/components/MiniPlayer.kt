@@ -144,8 +144,9 @@ fun MiniPlayerContent(
             }
         }
         if (playback.durationMs > 0) {
+            val smoothPos = rememberSmoothPositionMs(playback.positionMs, playback.durationMs, playback.isPlaying)
             LinearProgressIndicator(
-                progress = { (playback.positionMs.toFloat() / playback.durationMs).coerceIn(0f, 1f) },
+                progress = { (smoothPos.toFloat() / playback.durationMs).coerceIn(0f, 1f) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(2.dp)

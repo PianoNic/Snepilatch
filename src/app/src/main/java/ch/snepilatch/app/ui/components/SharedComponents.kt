@@ -38,11 +38,14 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.DialogWindowProvider
 import android.os.Build
@@ -143,6 +146,38 @@ fun SpotifyImage(
             )
         }
     }
+}
+
+// --- Smooth playback position ---
+
+/**
+ * A playback position (ms) that advances at the display's native refresh rate instead of stepping
+ * when the upstream [positionMs] StateFlow ticks.
+ *
+ * Each authoritative [positionMs] (and every play/pause flip) becomes an anchor; while playing,
+ * withFrameNanos advances the returned value once per frame from that anchor, so the progress bar
+ * glides with no visible steps. It stays honest because every upstream tick re-anchors it to the
+ * true position (for local streaming that is ExoPlayer's own clock), correcting any drift twice a
+ * second. Costs nothing when paused or off-screen — no frames are requested.
+ */
+@Composable
+fun rememberSmoothPositionMs(positionMs: Long, durationMs: Long, isPlaying: Boolean): Long {
+    var displayed by remember { mutableLongStateOf(positionMs) }
+    LaunchedEffect(positionMs, isPlaying, durationMs) {
+        if (!isPlaying) {
+            displayed = positionMs
+            return@LaunchedEffect
+        }
+        val cap = if (durationMs > 0) durationMs else Long.MAX_VALUE
+        var anchorFrame = -1L
+        while (true) {
+            withFrameNanos { frame ->
+                if (anchorFrame < 0) anchorFrame = frame
+                displayed = (positionMs + (frame - anchorFrame) / 1_000_000L).coerceIn(0L, cap)
+            }
+        }
+    }
+    return displayed
 }
 
 // --- Track Row ---

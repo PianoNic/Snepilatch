@@ -58,13 +58,13 @@ class PositionInterpolator(
     }
 
     companion object {
-        // 100ms ticks give a visibly smoother progress bar. Only the now-playing progress UI
-        // recomposes on a tick (list rows read distinctUntilChanged projections, not raw position),
-        // so 10Hz is cheap and screen-on-only.
-        private const val TICK_MS = 100L
+        // 500ms is the authoritative "anchor" cadence — it re-reads ExoPlayer's true position twice a
+        // second. Visual smoothness no longer comes from this tick: the now-playing progress bar
+        // interpolates per display frame via withFrameNanos (see rememberSmoothPositionMs), so the bar
+        // glides at the panel's native refresh rate while this only keeps it honest.
+        private const val TICK_MS = 500L
 
-        // Report to Spotify Connect every 30s (300 * 100ms). Kept at 30s independent of TICK_MS so a
-        // faster bar does NOT multiply network position PUTs (that would wake the radio and add heat).
-        private const val REPORT_EVERY_N_TICKS = 300
+        // Report to Spotify Connect every 30s (60 * 500ms).
+        private const val REPORT_EVERY_N_TICKS = 60
     }
 }

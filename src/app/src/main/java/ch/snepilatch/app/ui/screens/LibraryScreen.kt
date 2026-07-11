@@ -256,7 +256,7 @@ fun LibraryScreen(vm: SpotifyViewModel) {
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                itemsIndexed(sortedLibrary) { index, item ->
+                itemsIndexed(sortedLibrary, key = { _, item -> item.uri }) { index, item ->
                     LibraryGridCard(item, vm)
                     if (libraryHasMore && index >= library.size - 10) {
                         LaunchedEffect(library.size) { vm.loadMoreLibrary() }
@@ -268,7 +268,7 @@ fun LibraryScreen(vm: SpotifyViewModel) {
                 contentPadding = PaddingValues(top = 4.dp, bottom = LocalBottomOverlayHeight.current.value + 16.dp),
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
-                itemsIndexed(sortedLibrary) { index, item ->
+                itemsIndexed(sortedLibrary, key = { _, item -> item.uri }) { index, item ->
                     LibraryListItem(item, vm)
                     if (libraryHasMore && index >= library.size - 10) {
                         LaunchedEffect(library.size) { vm.loadMoreLibrary() }

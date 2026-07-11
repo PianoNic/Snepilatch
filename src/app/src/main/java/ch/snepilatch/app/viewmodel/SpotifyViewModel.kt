@@ -41,7 +41,11 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.cancellation.CancellationException
@@ -154,6 +158,21 @@ class SpotifyViewModel : ViewModel() {
     // network-dependent initialize/resolve paths)
     internal val _playback = MutableStateFlow(PlaybackUiState())
     val playback: StateFlow<PlaybackUiState> = _playback
+
+    // Minimal projections of playback for list rows. Subscribing a row to the whole
+    // PlaybackUiState recomposes it on every position tick (the interpolator updates
+    // positionMs several times a second), so a list of N visible rows recomposes N times
+    // per tick — the scroll jank. A row only needs to know whether *it* is the current
+    // track and whether playback is active; distinctUntilChanged collapses the ticks so
+    // these emit only on an actual track change or play/pause.
+    val currentTrackUri: StateFlow<String?> = _playback
+        .map { it.track?.uri }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    val isPlayingFlow: StateFlow<Boolean> = _playback
+        .map { it.isPlaying }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
     private val positionInterpolator = PositionInterpolator(
         scope = viewModelScope,
         playback = _playback,

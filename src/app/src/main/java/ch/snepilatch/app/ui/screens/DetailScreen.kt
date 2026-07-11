@@ -310,7 +310,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
         }
 
         // Tracks
-        itemsIndexed(detail.tracks) { index, track ->
+        itemsIndexed(detail.tracks, key = { index, track -> "$index-${track.uri}" }) { index, track ->
             if (hasMore && index >= detail.tracks.size - 5) {
                 LaunchedEffect(detail.tracks.size) { vm.loadMoreDetail() }
             }

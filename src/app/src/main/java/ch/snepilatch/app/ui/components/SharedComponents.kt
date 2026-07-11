@@ -66,7 +66,7 @@ import ch.snepilatch.app.ui.theme.SpotifyGray
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
 import ch.snepilatch.app.util.formatTime
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
-import coil.compose.SubcomposeAsyncImage
+import coil.compose.AsyncImage
 
 /**
  * Match the app's transparent, edge-to-edge nav bar inside a ModalBottomSheet. The sheet
@@ -119,38 +119,30 @@ fun SpotifyImage(
     shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(8.dp),
     icon: ImageVector = Icons.Rounded.MusicNote
 ) {
-    SubcomposeAsyncImage(
-        model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
-            .data(url)
-            .crossfade(600)
-            .build(),
-        contentDescription = contentDescription,
-        modifier = modifier.clip(shape),
-        contentScale = ContentScale.Crop,
-        loading = {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(SpotifyGray),
-                contentAlignment = Alignment.Center
-            ) {
-                LoadingIndicator(
-                    color = SpotifyLightGray.copy(alpha = 0.5f),
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        },
-        error = {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(SpotifyGray),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, null, tint = SpotifyLightGray.copy(alpha = 0.5f), modifier = Modifier.size(32.dp))
-            }
+    // AsyncImage instead of SubcomposeAsyncImage: subcomposition per row is expensive in a
+    // scrolling list, and the old `loading` slot ran an infinite LoadingIndicator animation
+    // in *every* not-yet-loaded row. A static placeholder box with a faint icon sits behind
+    // the image; the opaque cropped artwork covers it once loaded (crossfade), and it stays
+    // visible while loading or on error — same look, none of the per-row cost.
+    Box(
+        modifier
+            .clip(shape)
+            .background(SpotifyGray),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, null, tint = SpotifyLightGray.copy(alpha = 0.5f), modifier = Modifier.size(32.dp))
+        if (!url.isNullOrEmpty()) {
+            AsyncImage(
+                model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                    .data(url)
+                    .crossfade(300)
+                    .build(),
+                contentDescription = contentDescription,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
         }
-    )
+    }
 }
 
 // --- Track Row ---
@@ -160,8 +152,12 @@ fun SpotifyImage(
 fun TrackRow(track: TrackInfo, vm: SpotifyViewModel, contextUri: String? = null, trackIndex: Int? = null) {
     var showMenu by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
-    val playback by vm.playback.collectAsState()
-    val isPlaying = playback.track?.uri == track.uri && playback.isPlaying
+    // Subscribe only to the two projections that affect a row (which track is current +
+    // whether it's playing), not the whole PlaybackUiState — otherwise every position tick
+    // recomposes every visible row and scrolling janks.
+    val currentUri by vm.currentTrackUri.collectAsState()
+    val playing by vm.isPlayingFlow.collectAsState()
+    val isPlaying = currentUri == track.uri && playing
     val theme by vm.themeColors.collectAsState()
     val accent = theme.primary
 

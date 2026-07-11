@@ -75,7 +75,7 @@ fun QueueScreen(vm: SpotifyViewModel) {
         }
 
         LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = LocalBottomOverlayHeight.current.value + 16.dp)) {
-            itemsIndexed(queue) { index, track ->
+            itemsIndexed(queue, key = { index, track -> "$index-${track.uri}" }) { index, track ->
                 Row(
                     Modifier
                         .fillMaxWidth()

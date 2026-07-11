@@ -1085,6 +1085,13 @@ class SpotifyViewModel : ViewModel() {
         val savedPositionAtEntry = _playback.value.positionMs
 
         coldStartPending = true
+        // transferPlaybackHere(restore_paused=true) makes Spotify push a *paused* cluster state.
+        // That echo would hit handleRemotePause and syncPause() ExoPlayer mid-start — the stream we
+        // are about to play — leaving audio silent even though onReady flips the UI to "playing", so
+        // the user has to tap play a second time. The paused state is our own protocol artifact, not a
+        // real remote pause, so suppress it for the cold-start window (same guard reconnect uses).
+        // Cleared on success in onReady and on every failure path via resetColdStart().
+        suppressRemotePause = true
         isStreamLoading.value = true
         // CompletableDeferred that gets completed when onPlaybackId fires with
         // the current track's file id. Set up BEFORE the transfer call so we
@@ -1210,6 +1217,7 @@ class SpotifyViewModel : ViewModel() {
     private fun resetColdStart() {
         coldStartPending = false
         coldStartFileId = null
+        suppressRemotePause = false
         isStreamLoading.value = false
     }
 
@@ -2116,6 +2124,9 @@ class SpotifyViewModel : ViewModel() {
                 val pos = MusicPlaybackService.instance?.getCurrentPosition() ?: _playback.value.positionMs
                 LokiLogger.i(TAG, "[ColdStart] ExoPlayer producing at ${pos}ms — resuming Spotify Connect")
                 coldStartPending = false
+                // Cold start done: audio is producing and we're about to resume Connect, so real
+                // remote pauses (e.g. from another device) must apply again.
+                suppressRemotePause = false
                 _playback.value = _playback.value.copy(isPlaying = true, isPaused = false, positionMs = pos)
                 startPositionTicker()
                 viewModelScope.launch(Dispatchers.IO) {
@@ -2166,6 +2177,14 @@ class SpotifyViewModel : ViewModel() {
     /** Test seam: set the account's premium flag so [safeMediaFileId] can be exercised. */
     internal fun setPremiumForTest(premium: Boolean) {
         _account.value = _account.value.copy(isPremium = premium)
+    }
+
+    /**
+     * Test seam: simulate being inside the cold-start window (or reconnect) where [suppressRemotePause]
+     * is held, so [handleRemotePause] must ignore the self-inflicted restore_paused echo.
+     */
+    internal fun setSuppressRemotePauseForTest(suppress: Boolean) {
+        suppressRemotePause = suppress
     }
 
     private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent) {

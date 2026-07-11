@@ -316,11 +316,19 @@ fun NowPlayingScreen(
                                 Icon(Icons.Rounded.KeyboardArrowDown, stringResource(R.string.close), modifier = Modifier.size(24.dp))
                             }
                             val ctx by vm.playingContext.collectAsState()
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            // weight(1f) so the header text takes only the space between the two
+                            // buttons; without it a long album name grows to its full width and
+                            // pushes the right-hand menu button off-screen instead of ellipsizing.
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                            ) {
                                 Text(
                                     ctx?.let { stringResource(R.string.now_playing_playing_from, it.type) } ?: stringResource(R.string.now_playing),
                                     color = SpotifyLightGray,
-                                    fontSize = 10.sp
+                                    fontSize = 10.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 ctx?.let {
                                     Text(
@@ -666,14 +674,21 @@ fun NowPlayingScreen(
                                 Icon(Icons.Rounded.KeyboardArrowDown, stringResource(R.string.close), modifier = Modifier.size(28.dp))
                             }
                             val ctx by vm.playingContext.collectAsState()
+                            // weight(1f) so a long album name ellipsizes instead of pushing the
+                            // right-hand EQ button off-screen (see the portrait header above).
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.clickable(enabled = ctx?.uri != null) { vm.navigateToContext() }
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(horizontal = 8.dp)
+                                    .clickable(enabled = ctx?.uri != null) { vm.navigateToContext() }
                             ) {
                                 Text(
                                     ctx?.let { stringResource(R.string.now_playing_playing_from, it.type) } ?: stringResource(R.string.now_playing),
                                     color = secondaryText,
-                                    fontSize = 11.sp
+                                    fontSize = 11.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 ctx?.let {
                                     Text(

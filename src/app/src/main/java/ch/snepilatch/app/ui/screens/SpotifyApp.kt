@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloudOff
@@ -287,9 +286,12 @@ fun SpotifyApp(vm: SpotifyViewModel) {
                 onDismissRequest = { vm.showPlaylistPicker.value = false },
                 title = { Text(stringResource(R.string.add_to_playlist), color = SpotifyWhite) },
                 text = {
-                    LazyColumn {
-                        items(playlists.size) { i ->
-                            val playlist = playlists[i]
+                    // TightAlertDialog already wraps `text` in a height-bounded verticalScroll
+                    // Box, which hands its child infinite max height — a LazyColumn there throws
+                    // "measured with an infinity maximum height". Use a plain Column; the dialog
+                    // supplies the scrolling.
+                    Column {
+                        playlists.forEach { playlist ->
                             Row(
                                 Modifier
                                     .fillMaxWidth()

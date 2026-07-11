@@ -11,8 +11,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
@@ -1025,8 +1023,11 @@ fun NowPlayingScreen(
             title = { Text(stringResource(R.string.add_to_playlist), color = SpotifyWhite) },
             containerColor = SpotifyGray,
             text = {
-                LazyColumn(Modifier.fillMaxWidth()) {
-                    items(playlists) { playlist ->
+                // TightAlertDialog wraps `text` in a height-bounded verticalScroll Box, which
+                // gives its child infinite max height — a LazyColumn there throws "infinity
+                // maximum height". Use a plain Column; the dialog provides the scrolling.
+                Column(Modifier.fillMaxWidth()) {
+                    playlists.forEach { playlist ->
                         Row(
                             Modifier
                                 .fillMaxWidth()

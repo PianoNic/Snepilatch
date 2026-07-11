@@ -58,8 +58,13 @@ class PositionInterpolator(
     }
 
     companion object {
-        private const val TICK_MS = 500L
-        // Report every 30s (60 * 500ms)
-        private const val REPORT_EVERY_N_TICKS = 60
+        // 100ms ticks give a visibly smoother progress bar. Only the now-playing progress UI
+        // recomposes on a tick (list rows read distinctUntilChanged projections, not raw position),
+        // so 10Hz is cheap and screen-on-only.
+        private const val TICK_MS = 100L
+
+        // Report to Spotify Connect every 30s (300 * 100ms). Kept at 30s independent of TICK_MS so a
+        // faster bar does NOT multiply network position PUTs (that would wake the radio and add heat).
+        private const val REPORT_EVERY_N_TICKS = 300
     }
 }

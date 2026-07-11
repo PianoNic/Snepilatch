@@ -111,6 +111,11 @@ class SpotifyViewModel : ViewModel() {
     private var nextCdnFileId: String? = null   // File ID for the pre-resolved CDN track
     private var lastCommandTs: Long = 0L  // timing: when last user command was sent
     private var lastCommandName: String = ""
+
+    // Diagnostic: wall-clock when the current ad-skip began (onAd). Milestones log deltas against it
+    // so we can see exactly where a single-ad skip spends its ~3s (silent clip / advance / post-ad
+    // resolve). Reset to 0 once the post-ad real track's audio is producing.
+    private var adSkipStartTs: Long = 0L
     private var playUrlAt: Long = 0L      // timing: when playUrl/playDrmUrl was last called
 
     // Cold-start sync: when the user taps play with nothing loaded in ExoPlayer,
@@ -531,6 +536,8 @@ class SpotifyViewModel : ViewModel() {
             // advancing to the next real track on its own. Play a local silent clip so the
             // MediaSession stays alive (no idle gap) and flip the UI to a "Skipping ad…" placeholder.
             // isAd is cleared when the next real track's state rebuilds PlaybackUiState.
+            adSkipStartTs = System.currentTimeMillis()
+            LokiLogger.i(TAG, "[AdTiming] onAd received (clip=${durationMs}ms) — T0")
             LokiLogger.i(TAG, "Ad — skipping with local silent clip (~${durationMs}ms)")
             // Reset position and show the ad's real (~1s) duration so the progress bar reflects the
             // short skip instead of the previous track's length.
@@ -553,6 +560,9 @@ class SpotifyViewModel : ViewModel() {
         pc.onTrackChange { event ->
             val delta = if (lastCommandTs > 0) System.currentTimeMillis() - lastCommandTs else -1
             LokiLogger.i(TAG, "[Timing] WS onTrackChange arrived (${delta}ms after CMD '$lastCommandName') -> ${event.current?.uri} fileId=${event.currentFileId}")
+            if (adSkipStartTs > 0 && event.current?.uri?.startsWith("spotify:ad:") == false) {
+                LokiLogger.i(TAG, "[AdTiming] post-ad onTrackChange -> real track (+${System.currentTimeMillis() - adSkipStartTs}ms from T0)")
+            }
             // Set latestFileId from cluster state so resolveAndPlay doesn't wait for onPlaybackId
             if (event.currentFileId != null) latestFileId = event.currentFileId
             // Only auto-resolve when we're already streaming (legit track changes
@@ -2070,6 +2080,7 @@ class SpotifyViewModel : ViewModel() {
             // ad out and drives the post-ad advance itself. Forcing an advance here would skip a
             // real track. Ignore — the next real track's setMediaItem replaces the clip.
             if (_playback.value.isAd) {
+                if (adSkipStartTs > 0) LokiLogger.i(TAG, "[AdTiming] silent clip ended (+${System.currentTimeMillis() - adSkipStartTs}ms from T0)")
                 LokiLogger.d(TAG, "Silent ad clip ended — engine drives the post-ad advance, skipping fallback")
                 return@onEnded
             }
@@ -2111,6 +2122,7 @@ class SpotifyViewModel : ViewModel() {
             val playUrlToReady = if (playUrlAt > 0) now - playUrlAt else -1L
             val cmdToReady = if (lastCommandTs > 0) now - lastCommandTs else -1L
             LokiLogger.i(TAG, "[Timing-CDN] ExoPlayer ready — playUrl→ready=${playUrlToReady}ms, cmd→ready=${cmdToReady}ms")
+            if (currentStreamUri?.startsWith("spotify:ad:") == false) logAdSkipDone()
             // A track reached STATE_READY — maybe refill the transient-error retry budget.
             refillRetryBudgetOnReady(currentStreamUri)
 
@@ -2172,6 +2184,13 @@ class SpotifyViewModel : ViewModel() {
             LokiLogger.i(TAG, "No free-tier (MP4_128) media file id for $trackUri; deferring to connect-state")
         }
         return free?.first
+    }
+
+    /** Diagnostic: log the final ad-skip delta once the post-ad real track's audio is producing. */
+    private fun logAdSkipDone() {
+        if (adSkipStartTs <= 0) return
+        LokiLogger.i(TAG, "[AdTiming] post-ad audio PRODUCING (+${System.currentTimeMillis() - adSkipStartTs}ms from T0) — skip done")
+        adSkipStartTs = 0L
     }
 
     /** Test seam: set the account's premium flag so [safeMediaFileId] can be exercised. */

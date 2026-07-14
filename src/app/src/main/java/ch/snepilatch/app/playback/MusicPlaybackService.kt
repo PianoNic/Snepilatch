@@ -229,6 +229,13 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
 
+        // Preload the NEXT playlist item ahead of the boundary — buffers its first segments AND
+        // pre-acquires its Widevine session while the current item still plays, so a playlist swap
+        // (seekToNextMediaItem) starts with no first-byte/license round trip. This is the mechanism the
+        // Spotify web player uses (PLAYER_CAN_PRELOAD → warm the next track ~10s early); it makes the
+        // pre-buffered post-ad item (enqueuePostAdDrm) and prewarmed next song start effectively instant.
+        player.preloadConfiguration = ExoPlayer.PreloadConfiguration(5_000_000L)
+
         player.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 updateNotification()

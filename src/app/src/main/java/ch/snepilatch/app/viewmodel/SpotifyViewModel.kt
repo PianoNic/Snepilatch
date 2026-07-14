@@ -116,6 +116,12 @@ class SpotifyViewModel : ViewModel() {
     // so we can see exactly where a single-ad skip spends its ~3s (silent clip / advance / post-ad
     // resolve). Reset to 0 once the post-ad real track's audio is producing.
     private var adSkipStartTs: Long = 0L
+
+    // Post-ad track URI that has been pre-buffered into ExoPlayer as the gapless next item during the
+    // silent clip (see the ad path in onNextPlaybackId + MusicPlaybackService.enqueuePostAdDrm). While
+    // set, onTrackChange must NOT run resolveAndPlay for it — the gapless transition owns playback, and
+    // a stop()+reload would throw away the buffered session. Cleared on swap, on error, or when stale.
+    private var adPrebufferedUri: String? = null
     private var playUrlAt: Long = 0L      // timing: when playUrl/playDrmUrl was last called
 
     // Cold-start sync: when the user taps play with nothing loaded in ExoPlayer,
@@ -508,27 +514,11 @@ class SpotifyViewModel : ViewModel() {
             if (uri != null) externalUrlByUri[uri] = url
         }
 
-        pc.onNextPlaybackId { fileId, _, name ->
+        pc.onNextPlaybackId { fileId, uri, name ->
             if (preferredAudioSource.value != null) return@onNextPlaybackId
             // Deduplicate — don't re-resolve if we already have this file ID cached
             if (fileId == nextCdnFileId && nextCdnUrl != null) return@onNextPlaybackId
-            viewModelScope.launch(Dispatchers.IO) {
-                try {
-                    val resolver = cdnResolver ?: return@launch
-                    // Double-check after coroutine dispatch
-                    if (fileId == nextCdnFileId && nextCdnUrl != null) return@launch
-                    LokiLogger.d(TAG, "Pre-resolving next Spotify CDN: $name ($fileId)")
-                    val stream = resolver.resolveForFileId(fileId)
-                    // Cache only — DRM items can't be pre-queued because each
-                    // needs its own Widevine license session.
-                    nextCdnUrl = stream.cdnUrl
-                    nextCdnFileId = fileId
-                    isNextReady.value = true
-                    LokiLogger.i(TAG, "Next Spotify CDN pre-resolved: $name")
-                } catch (e: Exception) {
-                    LokiLogger.d(TAG, "Pre-resolve next CDN failed: ${e.message}")
-                }
-            }
+            viewModelScope.launch(Dispatchers.IO) { preResolveNextAndMaybePrebuffer(fileId, uri, name) }
         }
 
         pc.onAd { durationMs ->
@@ -577,6 +567,19 @@ class SpotifyViewModel : ViewModel() {
             if (!isStreaming.value && !userPlay) {
                 LokiLogger.d(TAG, "Skipping resolveAndPlay: not streaming (idle WS push)")
                 return@onTrackChange
+            }
+            // Post-ad track we pre-buffered for the gapless swap: the ExoPlayer playlist owns it, so
+            // don't resolveAndPlay (that would stop() + reload and discard the buffered session). The
+            // gapless transition + onPostAdSwapped commit currentStreamUri. Guarded to the skip window
+            // so a stale flag can't wedge a later track — past it we clear and fall through to reload.
+            val pre = adPrebufferedUri
+            if (pre != null && event.current?.uri == pre) {
+                if (System.currentTimeMillis() - adSkipStartTs < 3500) {
+                    LokiLogger.i(TAG, "post-ad $pre owned by gapless pre-buffer — skipping resolveAndPlay")
+                    return@onTrackChange
+                }
+                LokiLogger.d(TAG, "post-ad pre-buffer stale — falling through to normal resolve")
+                adPrebufferedUri = null
             }
             resolveJob?.cancel()
             resolveJob = viewModelScope.launch(Dispatchers.IO) {
@@ -2053,6 +2056,65 @@ class SpotifyViewModel : ViewModel() {
      * ExoPlayer lifecycle events — track transitions, errors, end-of-track,
      * and the crucial onReady that completes the cold-start handoff.
      */
+    /**
+     * Pre-resolve the next track's Spotify CDN URL (skip-next stays instant) and, at an ad boundary,
+     * pre-buffer the post-ad track into ExoPlayer so it swaps gaplessly at silent-clip end.
+     */
+    private suspend fun preResolveNextAndMaybePrebuffer(fileId: String, uri: String?, name: String?) {
+        try {
+            val resolver = cdnResolver ?: return
+            if (fileId == nextCdnFileId && nextCdnUrl != null) return
+            LokiLogger.d(TAG, "Pre-resolving next Spotify CDN: $name ($fileId)")
+            val stream = resolver.resolveForFileId(fileId)
+            nextCdnUrl = stream.cdnUrl
+            nextCdnFileId = fileId
+            isNextReady.value = true
+            LokiLogger.i(TAG, "Next Spotify CDN pre-resolved: $name")
+            maybePrebufferPostAd(uri, name, stream)
+        } catch (e: Exception) {
+            LokiLogger.d(TAG, "Pre-resolve next CDN failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Ad boundary only: KotifyClient emits the post-ad track the moment the ad becomes current (its
+     * embedded manifest gives the file id with zero network). Enqueue it as the gapless next ExoPlayer
+     * item so its Widevine session + first segments load DURING the ~1s silent clip and the swap at
+     * clip-end is instant — the web player's behaviour — instead of a stop()+reload after the clip.
+     */
+    private suspend fun maybePrebufferPostAd(uri: String?, name: String?, stream: SpotifyStream) {
+        if (!_playback.value.isAd) return
+        if (uri == null || uri.startsWith("spotify:ad:")) return
+        val pssh = stream.pssh ?: return
+        withContext(Dispatchers.Main) {
+            MusicPlaybackService.instance?.enqueuePostAdDrm(
+                stream.cdnUrl, stream.licenseUrl, stream.licenseHeaders, pssh, name ?: "", ""
+            )
+        }
+        adPrebufferedUri = uri
+        LokiLogger.i(TAG, "[AdTiming] pre-buffered post-ad for gapless swap: $uri (+${System.currentTimeMillis() - adSkipStartTs}ms from T0)")
+    }
+
+    /**
+     * The pre-buffered post-ad track just took over gaplessly from the silent clip — audio is already
+     * producing. Commit the play state so the server echo's resolveAndPlay short-circuits instead of
+     * reloading. No onReady fires here (the item was prepared during the clip), so drive it ourselves.
+     */
+    private fun commitGaplessPostAdSwap() {
+        val uri = adPrebufferedUri ?: return
+        adPrebufferedUri = null
+        currentStreamUri = uri
+        isStreaming.value = true
+        isStreamLoading.value = false
+        streamProvider.value = "Spotify CDN"
+        logAdSkipDone()
+        _playback.value = _playback.value.copy(isAd = false, isPlaying = true, isPaused = false, positionMs = 0)
+        startPositionTicker()
+        viewModelScope.launch(Dispatchers.IO) {
+            try { player?.resume() } catch (_: Exception) {}
+        }
+    }
+
     private fun wirePlaybackLifecycleCallbacks(svc: MusicPlaybackService) {
         svc.onTrackTransition = {
             // ExoPlayer auto-advanced to the pre-buffered next track. The
@@ -2063,6 +2125,7 @@ class SpotifyViewModel : ViewModel() {
                 catch (e: Exception) { LokiLogger.e(TAG, "svc trackTransition", e) }
             }
         }
+        svc.onPostAdSwapped = { commitGaplessPostAdSwap() }
         svc.onPlaybackError = { errorCode ->
             // Capture what was playing BEFORE clearing state — the recovery re-resolves this exact
             // track at this position. DRM license failures in particular are usually transient (a
@@ -2070,6 +2133,9 @@ class SpotifyViewModel : ViewModel() {
             val failedUri = currentStreamUri
             val failedPos = _playback.value.positionMs
             LokiLogger.e(TAG, "ExoPlayer error: $errorCode on ${failedUri ?: "?"} @${failedPos}ms — attempting auto-recovery")
+            // A pre-buffered post-ad item that failed (e.g. transient license error) must not keep
+            // blocking resolveAndPlay — clear the guard so recovery can reload it the normal way.
+            adPrebufferedUri = null
             isStreaming.value = false
             streamProvider.value = null
             currentStreamUri = null

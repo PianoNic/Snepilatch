@@ -94,8 +94,16 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     var onSkipPrevious: (() -> Unit)? = null
     var onSeek: ((Long) -> Unit)? = null
     var onTrackTransition: (() -> Unit)? = null
+
+    // Fired when the pre-buffered post-ad track (see enqueuePostAdDrm) becomes current via the
+    // gapless auto-transition at silent-clip end — the ViewModel commits currentStreamUri + clears
+    // the "Skipping ad…" state here so the server echo's resolveAndPlay short-circuits.
+    var onPostAdSwapped: (() -> Unit)? = null
     var onPlaybackError: ((String) -> Unit)? = null
     var onPlaybackEnded: (() -> Unit)? = null
+
+    // True between enqueuePostAdDrm and the gapless transition that consumes it.
+    private var postAdSwapPending = false
     var onLikeToggle: (() -> Unit)? = null
     var onShuffleToggle: (() -> Unit)? = null
     var onRepeatToggle: (() -> Unit)? = null
@@ -301,6 +309,11 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                         updateNotification()
                         LokiLogger.i(TAG, "Auto-transition to: ${next.title} by ${next.artist}")
                     }
+                    if (postAdSwapPending) {
+                        postAdSwapPending = false
+                        LokiLogger.i(TAG, "Gapless swap: silent clip -> pre-buffered post-ad track")
+                        onPostAdSwapped?.invoke()
+                    }
                     onTrackTransition?.invoke()
                 }
             }
@@ -413,6 +426,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
         // Start audio IMMEDIATELY — don't wait for art
         mainHandler.post {
+            postAdSwapPending = false
             player.playWhenReady = false
             // Default sources (squid direct URL, Spotify CDN) play from a plain
             // MediaItem. Sources that gate their stream behind a request header
@@ -475,6 +489,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         currentArt = null
         val uri = RawResourceDataSource.buildRawResourceUri(ch.snepilatch.app.R.raw.silent_ad)
         mainHandler.post {
+            postAdSwapPending = false
             val source = ProgressiveMediaSource.Factory(DefaultDataSource.Factory(this))
                 .createMediaSource(MediaItem.fromUri(uri))
             player.setMediaSource(source)
@@ -482,6 +497,35 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             player.prepare()
             updateMediaSessionMetadata()
             updateNotification()
+        }
+    }
+
+    /**
+     * Pre-buffer the post-ad track as the NEXT playlist item while the silent clip (item 0) is still
+     * playing, so ExoPlayer acquires its Widevine session and buffers its first segments during the
+     * ~1s clip and then transitions to it GAPLESSLY at clip-end — instead of the stop()+reload that
+     * only starts after the clip (the web player's behaviour: the next track is prepared during the
+     * ad). Only used on the ad path, and only when a PSSH is available (the Spotify CDN case). If the
+     * post-ad isn't buffered in time the transition simply stalls briefly then plays — still far
+     * better than reloading from scratch. [onPostAdSwapped] fires when the gapless transition lands.
+     */
+    @OptIn(UnstableApi::class)
+    @Suppress("LongParameterList")
+    fun enqueuePostAdDrm(
+        url: String, licenseUrl: String, licenseHeaders: Map<String, String>, pssh: String,
+        title: String, artist: String
+    ) {
+        mainHandler.post {
+            // Only append if the silent clip is still the sole item — otherwise a real track already
+            // took over (fallback path won) and we must not stack a stale item behind it.
+            if (player.mediaItemCount != 1) {
+                LokiLogger.d(TAG, "Skip post-ad enqueue — playlist no longer the lone silent clip (count=${player.mediaItemCount})")
+                return@post
+            }
+            player.addMediaSource(buildPsshDrmSource(url, licenseUrl, licenseHeaders, pssh))
+            metadataQueue.add(TrackMetadata(title, artist, null))
+            postAdSwapPending = true
+            LokiLogger.i(TAG, "Enqueued post-ad DRM for gapless swap: $title -> ${url.take(60)}")
         }
     }
 
@@ -521,6 +565,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         currentDurationMs = 0L
         idleArtUrl = null
         mainHandler.post {
+            postAdSwapPending = false
             player.stop()
             player.clearMediaItems()
         }
@@ -704,6 +749,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
         // Start audio IMMEDIATELY — don't wait for art
         mainHandler.post {
+            postAdSwapPending = false
             // Seek-on-load: setMediaItem with a startPositionMs makes ExoPlayer prepare,
             // seek, and reach STATE_READY at that exact position. No post-prepare seek
             // dance — eliminates the race where the post-ready seek fails to actually

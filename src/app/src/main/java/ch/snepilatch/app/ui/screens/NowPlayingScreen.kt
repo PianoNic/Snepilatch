@@ -64,6 +64,8 @@ fun PlayerBackground(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
     val track = playback.track
     val theme by vm.themeColors.collectAsState()
     val animatedPrimary by animateColorAsState(theme.primary, tween(800), label = "bgPrimary")
+    val animatedPrimaryDark by animateColorAsState(theme.primaryDark, tween(800), label = "bgPrimaryDark")
+    val gradientBg by vm.playerGradientBg.collectAsState()
     val canvasVideoUrl by vm.canvasUrl.collectAsState()
     val canvasOn by vm.canvasEnabled.collectAsState()
     val hasCanvas = canvasOn && canvasVideoUrl != null
@@ -179,32 +181,52 @@ fun PlayerBackground(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
                 )
             }
         } else {
-            // Solid one-colour base (the album's accent) under the blurred art.
-            Box(Modifier.fillMaxSize().background(animatedPrimary))
-            // Blurred album art.
-            var displayedArt by remember { mutableStateOf(track?.albumArt) }
-            if (track?.albumArt != null) displayedArt = track.albumArt
-            androidx.compose.animation.Crossfade(
-                targetState = displayedArt,
-                animationSpec = tween(800),
-                label = "bgArt"
-            ) { artUrl ->
-                if (artUrl != null) {
-                    AsyncImage(
-                        model = artUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize().blur(80.dp)
-                    )
-                }
-            }
+            AlbumBackdrop(gradientBg, animatedPrimary, animatedPrimaryDark, track?.albumArt)
         }
-        // Dark overlay
+        // Dark overlay — lighter over the gradient (it already darkens toward the bottom) so the album
+        // colour stays vivid; heavier over the blurred art / canvas for text legibility.
+        val overlayAlpha = when {
+            hasCanvas -> 0.35f
+            gradientBg -> 0.18f
+            else -> 0.45f
+        }
         Box(
             Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = if (hasCanvas) 0.35f else 0.45f))
+                .background(Color.Black.copy(alpha = overlayAlpha))
         )
+    }
+}
+
+/** The non-canvas player backdrop: an album-colour gradient (Spotify/YTM/Metrolist style) when
+ *  [gradient] is on, otherwise the blurred album art over the accent colour. */
+@Composable
+private fun AlbumBackdrop(gradient: Boolean, top: Color, mid: Color, artUrl: String?) {
+    if (gradient) {
+        Box(
+            Modifier.fillMaxSize().background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(listOf(top, mid, Color(0xFF121212)))
+            )
+        )
+    } else {
+        // Solid one-colour base (the album's accent) under the blurred art.
+        Box(Modifier.fillMaxSize().background(top))
+        var displayedArt by remember { mutableStateOf(artUrl) }
+        if (artUrl != null) displayedArt = artUrl
+        androidx.compose.animation.Crossfade(
+            targetState = displayedArt,
+            animationSpec = tween(800),
+            label = "bgArt"
+        ) { url ->
+            if (url != null) {
+                AsyncImage(
+                    model = url,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().blur(80.dp)
+                )
+            }
+        }
     }
 }
 

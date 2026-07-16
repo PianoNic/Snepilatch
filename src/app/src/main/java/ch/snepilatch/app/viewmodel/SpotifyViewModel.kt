@@ -259,6 +259,9 @@ class SpotifyViewModel : ViewModel() {
     // Content region for CDN resolution
     val contentRegion = MutableStateFlow("nearest")
 
+    // Player background style: true = album-colour gradient (Spotify/YTM style), false = blurred art.
+    val playerGradientBg = MutableStateFlow(true)
+
     // Canvas background
     val canvasEnabled = MutableStateFlow(false)
     val canvasUrl = MutableStateFlow<String?>(null)
@@ -1898,6 +1901,7 @@ class SpotifyViewModel : ViewModel() {
             context.resources.updateConfiguration(config, context.resources.displayMetrics)
         }
         canvasEnabled.value = prefs.getBoolean("canvas_enabled", true)
+        playerGradientBg.value = prefs.getBoolean("player_gradient_bg", true)
         contentRegion.value = prefs.getString("content_region", "nearest") ?: "nearest"
         notificationLeftButton.value = prefs.getString("notification_left_button", "repeat") ?: "repeat"
         notificationRightButton.value = prefs.getString("notification_right_button", "like") ?: "like"
@@ -1928,6 +1932,12 @@ class SpotifyViewModel : ViewModel() {
         context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
             .edit().putBoolean("canvas_enabled", enabled).apply()
         if (!enabled) canvasUrl.value = null
+    }
+
+    fun setPlayerGradientBg(enabled: Boolean, context: Context) {
+        playerGradientBg.value = enabled
+        context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
+            .edit().putBoolean("player_gradient_bg", enabled).apply()
     }
 
     private fun fetchCanvasForTrack(trackUri: String) {

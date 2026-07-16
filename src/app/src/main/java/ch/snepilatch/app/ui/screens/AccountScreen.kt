@@ -310,6 +310,32 @@ fun AccountScreen(vm: SpotifyViewModel) {
             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
         )
 
+        // Player background style: album-colour gradient vs. blurred album art.
+        val gradientBg by vm.playerGradientBg.collectAsState()
+        ListItem(
+            headlineContent = { Text("Gradient background", color = SpotifyWhite) },
+            supportingContent = {
+                Text(
+                    if (gradientBg) "On — album colour gradient" else "Off — blurred album art",
+                    color = SpotifyLightGray
+                )
+            },
+            leadingContent = { Icon(Icons.Rounded.Gradient, null, tint = SpotifyLightGray) },
+            trailingContent = {
+                Switch(
+                    checked = gradientBg,
+                    onCheckedChange = { vm.setPlayerGradientBg(it, audioContext) },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = animatedPrimary,
+                        checkedTrackColor = animatedPrimary.copy(alpha = 0.5f),
+                        uncheckedThumbColor = SpotifyLightGray,
+                        uncheckedTrackColor = SpotifyLightGray.copy(alpha = 0.3f)
+                    )
+                )
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+        )
+
         // Content region picker
         val currentRegion by vm.contentRegion.collectAsState()
         var showRegionPicker by remember { mutableStateOf(false) }

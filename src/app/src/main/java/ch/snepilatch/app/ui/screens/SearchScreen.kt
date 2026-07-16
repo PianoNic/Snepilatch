@@ -37,7 +37,9 @@ import androidx.compose.material.icons.rounded.North
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.PersonAdd
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Share
@@ -335,7 +337,12 @@ private fun SearchArtist.toUnified(vm: SpotifyViewModel, ctx: Context) = Unified
     imageUrl = avatarUrl,
     circular = true,
     onClick = { vm.openArtist(idFromUri(uri)) },
-    menu = listOf(shareAction(ctx, uri))
+    menu = listOf(
+        OverflowAction(Icons.Rounded.PersonAdd, "Follow") {
+            vm.followArtist(idFromUri(uri))
+        },
+        shareAction(ctx, uri)
+    )
 )
 
 private fun SearchAlbum.toUnified(vm: SpotifyViewModel, ctx: Context): UnifiedResult {
@@ -359,7 +366,12 @@ private fun SearchPlaylist.toUnified(vm: SpotifyViewModel, ctx: Context) = Unifi
     imageUrl = coverArtUrl,
     circular = false,
     onClick = { vm.openPlaylist(idFromUri(uri)) },
-    menu = listOf(shareAction(ctx, uri))
+    menu = listOf(
+        OverflowAction(Icons.Rounded.Add, "Save to Library") {
+            vm.savePlaylist(idFromUri(uri))
+        },
+        shareAction(ctx, uri)
+    )
 )
 
 private fun SearchPodcast.toUnified(vm: SpotifyViewModel, ctx: Context) = UnifiedResult(
@@ -515,6 +527,7 @@ private fun TopResultCard(r: UnifiedResult) {
                     )
                 }
             }
+            OverflowMenu(r.title, r.subtitle, r.imageUrl, r.circular, r.menu)
         }
     }
 }

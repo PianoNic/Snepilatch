@@ -38,8 +38,8 @@ android {
         applicationId = "ch.snepilatch.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 68
-        versionName = "2.9.32"
+        versionCode = 69
+        versionName = "2.9.33"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

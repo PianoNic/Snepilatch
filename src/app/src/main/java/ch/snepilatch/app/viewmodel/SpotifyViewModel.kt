@@ -2966,6 +2966,10 @@ class SpotifyViewModel : ViewModel() {
         launchWithSession("followArtist") { sess -> Artist(sess).follow(artistId) }
     }
 
+    fun savePlaylist(playlistId: String) {
+        launchWithSession("savePlaylist") { sess -> kotify.api.playlist.Playlist(sess).saveToLibrary(playlistId) }
+    }
+
     fun unfollowArtist(artistId: String) {
         launchWithSession("unfollowArtist") { sess -> Artist(sess).unfollow(artistId) }
     }

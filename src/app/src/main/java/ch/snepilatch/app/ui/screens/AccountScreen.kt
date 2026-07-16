@@ -316,7 +316,7 @@ fun AccountScreen(vm: SpotifyViewModel) {
             headlineContent = { Text("Gradient background", color = SpotifyWhite) },
             supportingContent = {
                 Text(
-                    if (gradientBg) "On — album colour gradient" else "Off — blurred album art",
+                    if (gradientBg) "Album colour gradient" else "Blurred album art",
                     color = SpotifyLightGray
                 )
             },

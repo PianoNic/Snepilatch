@@ -310,33 +310,6 @@ fun AccountScreen(vm: SpotifyViewModel) {
             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
         )
 
-        // EXPERIMENTAL: instant tap-to-play (Mode 2). Self-resolves the tapped track and starts audio
-        // before the Connect echo. Literal strings — experimental, not localized yet.
-        val instantTap by vm.instantTapPlay.collectAsState()
-        ListItem(
-            headlineContent = { Text("Instant play (experimental)", color = SpotifyWhite) },
-            supportingContent = {
-                Text(
-                    if (instantTap) "On — tapped songs start instantly" else "Off — waits for Spotify",
-                    color = SpotifyLightGray
-                )
-            },
-            leadingContent = { Icon(Icons.Rounded.Bolt, null, tint = SpotifyLightGray) },
-            trailingContent = {
-                Switch(
-                    checked = instantTap,
-                    onCheckedChange = { vm.setInstantTapPlay(it, audioContext) },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = animatedPrimary,
-                        checkedTrackColor = animatedPrimary.copy(alpha = 0.5f),
-                        uncheckedThumbColor = SpotifyLightGray,
-                        uncheckedTrackColor = SpotifyLightGray.copy(alpha = 0.3f)
-                    )
-                )
-            },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-        )
-
         // Content region picker
         val currentRegion by vm.contentRegion.collectAsState()
         var showRegionPicker by remember { mutableStateOf(false) }

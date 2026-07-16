@@ -259,11 +259,6 @@ class SpotifyViewModel : ViewModel() {
     // Content region for CDN resolution
     val contentRegion = MutableStateFlow("nearest")
 
-    // EXPERIMENTAL (Mode 2, off by default): on a tap, self-resolve the track's audio via
-    // track-playback/v1/media and start ExoPlayer immediately, in parallel with the Connect play
-    // command, instead of waiting for the WS echo. The command still fires (Connect state stays
-    // correct); the echo just reconciles. See the local-client mode notes in KotifyClient's ad-flow.md.
-    val instantTapPlay = MutableStateFlow(false)
     // Canvas background
     val canvasEnabled = MutableStateFlow(false)
     val canvasUrl = MutableStateFlow<String?>(null)
@@ -1470,7 +1465,7 @@ class SpotifyViewModel : ViewModel() {
         pendingUserPlay = true
         val pc = player ?: return
         coroutineScope {
-            // EXPERIMENTAL Mode 2 (instantTapPlay): self-resolve the tapped track's audio and start
+            // Instant tap-to-play (always on): self-resolve the tapped track's audio and start
             // ExoPlayer NOW, in parallel with the Connect play command, instead of waiting for the WS
             // echo. Only for the Spotify-CDN source + a track URI, and not during a cold-start handoff.
             // On success it sets currentStreamUri so the echo's resolveAndPlay short-circuits; on
@@ -1497,12 +1492,12 @@ class SpotifyViewModel : ViewModel() {
     }
 
     /**
-     * Gate for the experimental optimistic tap-to-play: the toggle is on, we're on the Spotify-CDN
-     * source (the only one that resolves by file id), it's a track URI, and no cold-start handoff is
-     * in flight. Extracted so the call site keeps a simple condition.
+     * Gate for optimistic tap-to-play (always on): we're on the Spotify-CDN source (the only one that
+     * resolves by file id), it's a track URI, and no cold-start handoff is in flight. Extracted so the
+     * call site keeps a simple condition.
      */
     private fun shouldInstantTap(trackUri: String): Boolean =
-        instantTapPlay.value && preferredAudioSource.value == null &&
+        preferredAudioSource.value == null &&
             trackUri.startsWith("spotify:track:") && !coldStartPending
 
     /**
@@ -1828,13 +1823,6 @@ class SpotifyViewModel : ViewModel() {
             }.apply()
     }
 
-    /** EXPERIMENTAL: toggle Mode-2 optimistic tap-to-play (self-resolve + play before the WS echo). */
-    fun setInstantTapPlay(enabled: Boolean, context: Context) {
-        instantTapPlay.value = enabled
-        context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
-            .edit().putBoolean("instant_tap_play", enabled).apply()
-    }
-
     fun setContentRegion(region: String, context: Context) {
         contentRegion.value = region
         context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
@@ -1898,7 +1886,6 @@ class SpotifyViewModel : ViewModel() {
         if (savedSource == "spotify") {
             prefs.edit().remove("audio_source").apply()
         }
-        instantTapPlay.value = prefs.getBoolean("instant_tap_play", false)
         lyricsAnimDirection.value = prefs.getString("lyrics_anim_direction", "vertical") ?: "vertical"
         appLanguage.value = prefs.getString("app_language", "system") ?: "system"
         // Apply saved language on startup

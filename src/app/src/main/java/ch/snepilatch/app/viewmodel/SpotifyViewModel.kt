@@ -2963,11 +2963,19 @@ class SpotifyViewModel : ViewModel() {
     }
 
     fun followArtist(artistId: String) {
-        launchWithSession("followArtist") { sess -> Artist(sess).follow(artistId) }
+        launchWithSession("followArtist") { sess ->
+            Artist(sess).follow(artistId)
+            _snackbarMessage.tryEmit("Following artist")
+        }
     }
 
     fun savePlaylist(playlistId: String) {
-        launchWithSession("savePlaylist") { sess -> kotify.api.playlist.Playlist(sess).saveToLibrary(playlistId) }
+        launchWithSession("savePlaylist") { sess ->
+            // Playlists live in the rootlist, not the generic library (which rejects PLAYLIST uris),
+            // so saveToLibrary needs the current username.
+            kotify.api.playlist.Playlist(sess).saveToLibrary(playlistId, username)
+            _snackbarMessage.tryEmit("Saved to Library")
+        }
     }
 
     fun unfollowArtist(artistId: String) {

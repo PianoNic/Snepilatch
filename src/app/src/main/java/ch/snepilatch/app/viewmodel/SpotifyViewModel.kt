@@ -2053,6 +2053,27 @@ class SpotifyViewModel : ViewModel() {
      * ExoPlayer lifecycle events — track transitions, errors, end-of-track,
      * and the crucial onReady that completes the cold-start handoff.
      */
+    /**
+     * When the 1s silent ad clip ends, KotifyClient's engine normally advances off the ad on its own.
+     * But if it stalls (COMMAND_FAILED, a slow post-ad reveal, a dealer drop) nothing advances and we're
+     * stuck ON the ad until the user manually skips. Mirror the normal-track fallback: if we're STILL on
+     * the ad after the grace window (isAd set AND no real track has taken over), force the advance —
+     * the same local advance a manual skip does.
+     */
+    private fun armAdAdvanceWatchdog() {
+        val adStuckUri = currentStreamUri
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                delay(AD_ADVANCE_WATCHDOG_MS)
+                if (_playback.value.isAd && currentStreamUri == adStuckUri) {
+                    LokiLogger.w(TAG, "Ad advance didn't fire (still on the ad) — forcing local advance")
+                    player?.forceAdvance()
+                }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { handleAdvanceFailure(e) }
+        }
+    }
+
     private fun wirePlaybackLifecycleCallbacks(svc: MusicPlaybackService) {
         svc.onTrackTransition = {
             // ExoPlayer auto-advanced to the pre-buffered next track. The
@@ -2081,7 +2102,8 @@ class SpotifyViewModel : ViewModel() {
             // real track. Ignore — the next real track's setMediaItem replaces the clip.
             if (_playback.value.isAd) {
                 if (adSkipStartTs > 0) LokiLogger.i(TAG, "[AdTiming] silent clip ended (+${System.currentTimeMillis() - adSkipStartTs}ms from T0)")
-                LokiLogger.d(TAG, "Silent ad clip ended — engine drives the post-ad advance, skipping fallback")
+                LokiLogger.d(TAG, "Silent ad clip ended — engine drives the post-ad advance")
+                armAdAdvanceWatchdog()
                 return@onEnded
             }
             if (maybeLoopRepeatTrack()) return@onEnded
@@ -2987,6 +3009,12 @@ class SpotifyViewModel : ViewModel() {
          *  lands within ~1.5s; 5s gives generous headroom so we don't double-skip
          *  when the natural advance arrives just past a tighter timeout. */
         private const val AUTO_ADVANCE_GRACE_MS = 5000L
+
+        /** How long to wait after the 1s silent ad clip ends for the engine to advance off the ad on
+         *  its own before we force it. The post-ad track normally lands ~2-3s after the ad started
+         *  (~1-2s after the clip ends), so this gives headroom without racing the natural advance —
+         *  but still unsticks a stalled ad automatically instead of leaving the user to skip manually. */
+        private const val AD_ADVANCE_WATCHDOG_MS = 3000L
 
         // Slack allowed when bounds-checking a remote seek target against the track duration, so a
         // seek to the very end isn't rejected on rounding/boundary jitter.

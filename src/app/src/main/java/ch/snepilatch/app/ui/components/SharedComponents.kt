@@ -436,7 +436,9 @@ fun SlidingCoverImage(
             previousUrl = null
         }
     }
-    Box(modifier) {
+    // Clip to the cover frame (like spicy's `overflow: hidden` MediaImageContainer) so the incoming
+    // cover slides in from the frame's own right edge, not from off-screen.
+    Box(modifier.clip(shape)) {
         previousUrl?.let { prev ->
             SpotifyImage(url = prev, modifier = Modifier.matchParentSize(), shape = shape)
         }

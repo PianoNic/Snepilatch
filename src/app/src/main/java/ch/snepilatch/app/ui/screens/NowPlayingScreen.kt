@@ -21,11 +21,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -33,7 +31,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
-import coil.compose.AsyncImage
 import android.graphics.SurfaceTexture
 import android.net.Uri
 import android.view.TextureView
@@ -181,7 +178,10 @@ fun PlayerBackground(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
                 )
             }
         } else {
-            AlbumBackdrop(gradientBg, animatedPrimary, animatedPrimaryDark, track?.albumArt)
+            AlbumBackdrop(
+                gradientBg, animatedPrimary, animatedPrimaryDark, track?.albumArt,
+                isPlaying = playback.isPlaying && !playback.isPaused
+            )
         }
         // Dark overlay — lighter over the gradient (it already darkens toward the bottom) so the album
         // colour stays vivid; heavier over the blurred art / canvas for text legibility.
@@ -199,9 +199,10 @@ fun PlayerBackground(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
 }
 
 /** The non-canvas player backdrop: an album-colour gradient (Spotify/YTM/Metrolist style) when
- *  [gradient] is on, otherwise the blurred album art over the accent colour. */
+ *  [gradient] is on, otherwise a fluid, flowing warp of the album art (spicy-lyrics style) over the
+ *  accent colour — falling back to a static blur on pre-Android-13 devices. */
 @Composable
-private fun AlbumBackdrop(gradient: Boolean, top: Color, mid: Color, artUrl: String?) {
+private fun AlbumBackdrop(gradient: Boolean, top: Color, mid: Color, artUrl: String?, isPlaying: Boolean) {
     if (gradient) {
         Box(
             Modifier.fillMaxSize().background(
@@ -209,24 +210,12 @@ private fun AlbumBackdrop(gradient: Boolean, top: Color, mid: Color, artUrl: Str
             )
         )
     } else {
-        // Solid one-colour base (the album's accent) under the blurred art.
-        Box(Modifier.fillMaxSize().background(top))
-        var displayedArt by remember { mutableStateOf(artUrl) }
-        if (artUrl != null) displayedArt = artUrl
-        androidx.compose.animation.Crossfade(
-            targetState = displayedArt,
-            animationSpec = tween(800),
-            label = "bgArt"
-        ) { url ->
-            if (url != null) {
-                AsyncImage(
-                    model = url,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().blur(80.dp)
-                )
-            }
-        }
+        ch.snepilatch.app.ui.components.FluidAlbumBackground(
+            artUrl = artUrl,
+            isPlaying = isPlaying,
+            baseColor = top,
+            modifier = Modifier.fillMaxSize()
+        )
     }
 }
 

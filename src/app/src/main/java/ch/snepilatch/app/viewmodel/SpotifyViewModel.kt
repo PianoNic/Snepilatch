@@ -905,14 +905,22 @@ class SpotifyViewModel : ViewModel() {
         // what would play if they tap the play button — both in the app
         // mini-player AND in the lockscreen / notification shade. The
         // service ignores this call if a media item is already loaded.
-        if (!isStreaming.value && displayTrack != null) {
+        if (displayTrack != null) {
             withContext(Dispatchers.Main) {
-                MusicPlaybackService.instance?.setIdleMetadata(
-                    title = displayTrack.name,
-                    artist = displayTrack.artist,
-                    albumArtUrl = displayTrack.albumArt,
-                    durationMs = displayDuration
-                )
+                val svc = MusicPlaybackService.instance
+                if (!isStreaming.value) {
+                    svc?.setIdleMetadata(
+                        title = displayTrack.name,
+                        artist = displayTrack.artist,
+                        albumArtUrl = displayTrack.albumArt,
+                        durationMs = displayDuration
+                    )
+                } else {
+                    // Streaming locally: setIdleMetadata is a no-op once a media item is loaded, so a
+                    // real name that arrives after playUrl (cold start plays with "Unknown") never reaches
+                    // the notification. Push it explicitly — refreshStreamingMetadata only upgrades.
+                    svc?.refreshStreamingMetadata(displayTrack.name, displayTrack.artist)
+                }
             }
         }
 
@@ -1783,6 +1791,7 @@ class SpotifyViewModel : ViewModel() {
         launchWithSession("likeSong") { sess ->
             Song(sess).likeSong(trackId)
             currentTrackLiked.value = true
+            pushLikeToNotification(true)
             _snackbarMessage.tryEmit("Added to Liked Songs")
         }
     }
@@ -1791,7 +1800,19 @@ class SpotifyViewModel : ViewModel() {
         launchWithSession("unlikeSong") { sess ->
             Song(sess).unlikeSong(trackId)
             currentTrackLiked.value = false
+            pushLikeToNotification(false)
             _snackbarMessage.tryEmit("Removed from Liked Songs")
+        }
+    }
+
+    /** Mirror an in-app like/unlike onto the media-session notification's heart, which otherwise only
+     *  refreshes when toggled from the notification itself. */
+    private fun pushLikeToNotification(liked: Boolean) {
+        viewModelScope.launch(Dispatchers.Main) {
+            MusicPlaybackService.instance?.let {
+                it.isLiked = liked
+                it.updateNotification()
+            }
         }
     }
 

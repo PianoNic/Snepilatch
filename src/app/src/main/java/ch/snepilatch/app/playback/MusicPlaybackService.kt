@@ -537,6 +537,24 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
      * Skipped if a track is already loaded (we don't want to overwrite live
      * playback metadata).
      */
+    /**
+     * Refresh the media-session text for the CURRENTLY streaming item when its real name/artist
+     * arrive after [playUrl] (cold-start plays with placeholder "Unknown" names before the state
+     * machine resolves the track). Only ever upgrades to a real name — a blank or "Unknown" title is
+     * ignored so a later partial state can't downgrade a good title the notification already shows.
+     */
+    fun refreshStreamingMetadata(title: String, artist: String) {
+        if (player.mediaItemCount == 0) return
+        if (title.isBlank() || title == "Unknown") return
+        if (title == currentTitle && artist == currentArtist) return
+        currentTitle = title
+        currentArtist = artist
+        mainHandler.post {
+            updateMediaSessionMetadata()
+            updateNotification()
+        }
+    }
+
     fun setIdleMetadata(title: String, artist: String, albumArtUrl: String?, durationMs: Long) {
         if (player.mediaItemCount > 0) return
         currentTitle = title

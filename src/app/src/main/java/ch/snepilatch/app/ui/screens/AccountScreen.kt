@@ -310,13 +310,13 @@ fun AccountScreen(vm: SpotifyViewModel) {
             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
         )
 
-        // Player background style: album-colour gradient vs. blurred album art.
+        // Player background style: album-colour gradient vs. the fluid Kawarp album-art warp.
         val gradientBg by vm.playerGradientBg.collectAsState()
         ListItem(
             headlineContent = { Text("Gradient background", color = SpotifyWhite) },
             supportingContent = {
                 Text(
-                    if (gradientBg) "Album colour gradient" else "Blurred album art",
+                    if (gradientBg) "Album colour gradient" else "Flowing album art",
                     color = SpotifyLightGray
                 )
             },

@@ -91,47 +91,89 @@ private fun KawarpBackground(
         }
     }
 
-    val context = androidx.compose.ui.platform.LocalContext.current
-    // Feed the shader a tiny cover (Kawarp works at 128px): the upscale strips fine detail at the
-    // source so the warp+blur reads as flowing colour blobs, not a recognisable album cover.
-    val lowResModel = remember(artUrl) {
-        coil.request.ImageRequest.Builder(context).data(artUrl).size(128).allowHardware(false).build()
+    // Song-change transition: the new cover's warped background slides in from the right while the old
+    // one slides out to the left (spicy-lyrics' SDB_StaticBG slide), with the accent colour behind
+    // already cross-animating in PlayerBackground. `progress` runs 0→1 over the slide.
+    var currentUrl by remember { mutableStateOf(artUrl) }
+    var previousUrl by remember { mutableStateOf<String?>(null) }
+    val progress = remember { androidx.compose.animation.core.Animatable(1f) }
+    LaunchedEffect(artUrl) {
+        if (artUrl != currentUrl) {
+            previousUrl = currentUrl
+            currentUrl = artUrl
+            progress.snapTo(0f)
+            progress.animateTo(1f, tween(700, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+            previousUrl = null
+        }
     }
 
     Box(modifier.onSizeChanged { size = it }) {
-        // Accent colour behind, in case a clamped warp ever samples a transparent texel.
+        // Accent colour behind, in case a clamped warp ever samples a transparent texel / during slide.
         Box(Modifier.fillMaxSize().background(baseColor))
-        AsyncImage(
-            model = lowResModel,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    val w = size.width.toFloat()
-                    val h = size.height.toFloat()
-                    if (w > 0f && h > 0f) {
-                        val t = time.floatValue
-                        warpShader.setFloatUniform("size", w, h)
-                        warpShader.setFloatUniform("u_time", t)
-                        warpShader.setFloatUniform("u_intensity", WARP_INTENSITY)
-                        gradeShader.setFloatUniform("size", w, h)
-                        gradeShader.setFloatUniform("u_time", t)
-                        gradeShader.setFloatUniform("u_saturation", SATURATION)
-                        gradeShader.setFloatUniform("u_dithering", DITHERING)
-                        gradeShader.setFloatUniform("u_scale", SCALE)
-
-                        // warp(source) -> blur -> grade, as a native RenderEffect chain.
-                        val warp = RenderEffect.createRuntimeShaderEffect(warpShader, "u_texture")
-                        val blurred = RenderEffect.createBlurEffect(
-                            BLUR_RADIUS, BLUR_RADIUS, warp, Shader.TileMode.CLAMP
-                        )
-                        val grade = RenderEffect.createRuntimeShaderEffect(gradeShader, "u_texture")
-                        renderEffect = RenderEffect.createChainEffect(grade, blurred).asComposeRenderEffect()
-                    }
-                }
+        val p = progress.value
+        // Outgoing cover: 0 → -width (slides off to the left).
+        previousUrl?.let { prev ->
+            WarpedLayer(
+                prev, warpShader, gradeShader, size, time,
+                Modifier.graphicsLayer { translationX = -size.width * p }
+            )
+        }
+        // Incoming cover: +width → 0 (slides in from the right).
+        WarpedLayer(
+            currentUrl, warpShader, gradeShader, size, time,
+            Modifier.graphicsLayer { translationX = size.width * (1f - p) }
         )
     }
+}
+
+/** One warped-cover layer: a low-res album image run through the Kawarp warp→blur→grade RenderEffect
+ *  chain. The warp/grade RuntimeShaders are shared across layers (identical uniforms every frame). */
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+@Composable
+private fun WarpedLayer(
+    artUrl: String,
+    warpShader: RuntimeShader,
+    gradeShader: RuntimeShader,
+    size: IntSize,
+    time: androidx.compose.runtime.FloatState,
+    modifier: Modifier
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    // Kawarp works at 128px; the upscale strips fine detail so warp+blur reads as flowing colour blobs.
+    val lowResModel = remember(artUrl) {
+        coil.request.ImageRequest.Builder(context).data(artUrl).size(128).allowHardware(false)
+            .crossfade(false).build()
+    }
+    AsyncImage(
+        model = lowResModel,
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = modifier
+            .fillMaxSize()
+            .graphicsLayer {
+                val w = size.width.toFloat()
+                val h = size.height.toFloat()
+                if (w > 0f && h > 0f) {
+                    val t = time.floatValue
+                    warpShader.setFloatUniform("size", w, h)
+                    warpShader.setFloatUniform("u_time", t)
+                    warpShader.setFloatUniform("u_intensity", WARP_INTENSITY)
+                    gradeShader.setFloatUniform("size", w, h)
+                    gradeShader.setFloatUniform("u_time", t)
+                    gradeShader.setFloatUniform("u_saturation", SATURATION)
+                    gradeShader.setFloatUniform("u_dithering", DITHERING)
+                    gradeShader.setFloatUniform("u_scale", SCALE)
+
+                    // warp(source) -> blur -> grade, as a native RenderEffect chain.
+                    val warp = RenderEffect.createRuntimeShaderEffect(warpShader, "u_texture")
+                    val blurred = RenderEffect.createBlurEffect(
+                        BLUR_RADIUS, BLUR_RADIUS, warp, Shader.TileMode.CLAMP
+                    )
+                    val grade = RenderEffect.createRuntimeShaderEffect(gradeShader, "u_texture")
+                    renderEffect = RenderEffect.createChainEffect(grade, blurred).asComposeRenderEffect()
+                }
+            }
+    )
 }
 
 // Kawarp static-mode options (spicy-lyrics KawarpOptionsStatic): warpIntensity 1, saturation 1.5,
@@ -140,7 +182,7 @@ private const val WARP_INTENSITY = 1.0f
 private const val SATURATION = 1.5f
 private const val DITHERING = 0.008f
 private const val SCALE = 1.0f
-private const val BLUR_RADIUS = 32f
+private const val BLUR_RADIUS = 120f
 
 // Pass 1 — WARP: Kawarp's warp shader (two-octave 2D simplex-noise domain warp), translated GLSL→AGSL
 // (vec→float2/3/4, texture2D→eval, overloaded mod289 split, resolution-normalised from fragCoord).

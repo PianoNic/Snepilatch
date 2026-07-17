@@ -91,11 +91,18 @@ private fun KawarpBackground(
         }
     }
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+    // Feed the shader a tiny cover (Kawarp works at 128px): the upscale strips fine detail at the
+    // source so the warp+blur reads as flowing colour blobs, not a recognisable album cover.
+    val lowResModel = remember(artUrl) {
+        coil.request.ImageRequest.Builder(context).data(artUrl).size(128).allowHardware(false).build()
+    }
+
     Box(modifier.onSizeChanged { size = it }) {
         // Accent colour behind, in case a clamped warp ever samples a transparent texel.
         Box(Modifier.fillMaxSize().background(baseColor))
         AsyncImage(
-            model = artUrl,
+            model = lowResModel,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
@@ -133,7 +140,7 @@ private const val WARP_INTENSITY = 1.0f
 private const val SATURATION = 1.5f
 private const val DITHERING = 0.008f
 private const val SCALE = 1.0f
-private const val BLUR_RADIUS = 56f
+private const val BLUR_RADIUS = 32f
 
 // Pass 1 — WARP: Kawarp's warp shader (two-octave 2D simplex-noise domain warp), translated GLSL→AGSL
 // (vec→float2/3/4, texture2D→eval, overloaded mod289 split, resolution-normalised from fragCoord).
@@ -210,6 +217,11 @@ half4 main(float2 fragCoord) {
     color.rgb = color.rgb * vignette;
     float gray = dot(color.rgb, float3(0.299, 0.587, 0.114));
     color.rgb = mix(float3(gray), color.rgb, u_saturation);
+    // spicy-lyrics wraps the Kawarp canvas in CSS `filter: saturate(2.5) brightness(0.65)` — apply it
+    // here so the final look matches (moodier + more vivid than raw Kawarp).
+    float gray2 = dot(color.rgb, float3(0.299, 0.587, 0.114));
+    color.rgb = mix(float3(gray2), color.rgb, 2.5);
+    color.rgb = color.rgb * 0.65;
     float2 pixelPos = floor(vtc * size);
     float noise = hash3(float3(pixelPos, floor(u_time * 60.0)));
     color.rgb = color.rgb + (noise - 0.5) * u_dithering;

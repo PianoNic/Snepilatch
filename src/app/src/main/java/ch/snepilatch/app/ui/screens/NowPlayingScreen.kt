@@ -188,7 +188,8 @@ fun PlayerBackground(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
         val overlayAlpha = when {
             hasCanvas -> 0.35f
             gradientBg -> 0.18f
-            else -> 0.45f
+            // The fluid Kawarp background already darkens itself (brightness 0.65), so a lighter scrim.
+            else -> 0.28f
         }
         Box(
             Modifier

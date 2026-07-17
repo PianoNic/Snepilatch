@@ -41,7 +41,11 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.cancellation.CancellationException
@@ -107,6 +111,11 @@ class SpotifyViewModel : ViewModel() {
     private var nextCdnFileId: String? = null   // File ID for the pre-resolved CDN track
     private var lastCommandTs: Long = 0L  // timing: when last user command was sent
     private var lastCommandName: String = ""
+
+    // Diagnostic: wall-clock when the current ad-skip began (onAd). Milestones log deltas against it
+    // so we can see exactly where a single-ad skip spends its ~3s (silent clip / advance / post-ad
+    // resolve). Reset to 0 once the post-ad real track's audio is producing.
+    private var adSkipStartTs: Long = 0L
     private var playUrlAt: Long = 0L      // timing: when playUrl/playDrmUrl was last called
 
     // Cold-start sync: when the user taps play with nothing loaded in ExoPlayer,
@@ -154,6 +163,21 @@ class SpotifyViewModel : ViewModel() {
     // network-dependent initialize/resolve paths)
     internal val _playback = MutableStateFlow(PlaybackUiState())
     val playback: StateFlow<PlaybackUiState> = _playback
+
+    // Minimal projections of playback for list rows. Subscribing a row to the whole
+    // PlaybackUiState recomposes it on every position tick (the interpolator updates
+    // positionMs several times a second), so a list of N visible rows recomposes N times
+    // per tick — the scroll jank. A row only needs to know whether *it* is the current
+    // track and whether playback is active; distinctUntilChanged collapses the ticks so
+    // these emit only on an actual track change or play/pause.
+    val currentTrackUri: StateFlow<String?> = _playback
+        .map { it.track?.uri }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    val isPlayingFlow: StateFlow<Boolean> = _playback
+        .map { it.isPlaying }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
     private val positionInterpolator = PositionInterpolator(
         scope = viewModelScope,
         playback = _playback,
@@ -235,11 +259,9 @@ class SpotifyViewModel : ViewModel() {
     // Content region for CDN resolution
     val contentRegion = MutableStateFlow("nearest")
 
-    // EXPERIMENTAL (Mode 2, off by default): on a tap, self-resolve the track's audio via
-    // track-playback/v1/media and start ExoPlayer immediately, in parallel with the Connect play
-    // command, instead of waiting for the WS echo. The command still fires (Connect state stays
-    // correct); the echo just reconciles. See the local-client mode notes in KotifyClient's ad-flow.md.
-    val instantTapPlay = MutableStateFlow(false)
+    // Player background style: true = album-colour gradient (Spotify/YTM style), false = blurred art.
+    val playerGradientBg = MutableStateFlow(true)
+
     // Canvas background
     val canvasEnabled = MutableStateFlow(false)
     val canvasUrl = MutableStateFlow<String?>(null)
@@ -512,12 +534,14 @@ class SpotifyViewModel : ViewModel() {
             // advancing to the next real track on its own. Play a local silent clip so the
             // MediaSession stays alive (no idle gap) and flip the UI to a "Skipping ad…" placeholder.
             // isAd is cleared when the next real track's state rebuilds PlaybackUiState.
+            adSkipStartTs = System.currentTimeMillis()
+            LokiLogger.i(TAG, "[AdTiming] onAd received (clip=${durationMs}ms) — T0")
             LokiLogger.i(TAG, "Ad — skipping with local silent clip (~${durationMs}ms)")
-            // Reset position and show the ad's real (~1s) duration so the progress bar reflects the
-            // short skip instead of the previous track's length.
-            _playback.value = _playback.value.copy(
-                isAd = true, isPlaying = true, isPaused = false, positionMs = 0, durationMs = durationMs
-            )
+            // Ad is handled invisibly: keep the CURRENT song's cover/title/progress frozen on screen
+            // (track is unchanged during an ad) and let the UI show a loading spinner (driven by isAd)
+            // for the ~2.5s skip, so it reads as "loading the next track", not an ad interruption. The
+            // next real track's state clears isAd and slides its cover in.
+            _playback.value = _playback.value.copy(isAd = true, isPlaying = true, isPaused = false)
             viewModelScope.launch(Dispatchers.Main) {
                 MusicPlaybackService.instance?.playSilentAd()
             }
@@ -534,6 +558,9 @@ class SpotifyViewModel : ViewModel() {
         pc.onTrackChange { event ->
             val delta = if (lastCommandTs > 0) System.currentTimeMillis() - lastCommandTs else -1
             LokiLogger.i(TAG, "[Timing] WS onTrackChange arrived (${delta}ms after CMD '$lastCommandName') -> ${event.current?.uri} fileId=${event.currentFileId}")
+            if (adSkipStartTs > 0 && event.current?.uri?.startsWith("spotify:ad:") == false) {
+                LokiLogger.i(TAG, "[AdTiming] post-ad onTrackChange -> real track (+${System.currentTimeMillis() - adSkipStartTs}ms from T0)")
+            }
             // Set latestFileId from cluster state so resolveAndPlay doesn't wait for onPlaybackId
             if (event.currentFileId != null) latestFileId = event.currentFileId
             // Only auto-resolve when we're already streaming (legit track changes
@@ -878,14 +905,22 @@ class SpotifyViewModel : ViewModel() {
         // what would play if they tap the play button — both in the app
         // mini-player AND in the lockscreen / notification shade. The
         // service ignores this call if a media item is already loaded.
-        if (!isStreaming.value && displayTrack != null) {
+        if (displayTrack != null) {
             withContext(Dispatchers.Main) {
-                MusicPlaybackService.instance?.setIdleMetadata(
-                    title = displayTrack.name,
-                    artist = displayTrack.artist,
-                    albumArtUrl = displayTrack.albumArt,
-                    durationMs = displayDuration
-                )
+                val svc = MusicPlaybackService.instance
+                if (!isStreaming.value) {
+                    svc?.setIdleMetadata(
+                        title = displayTrack.name,
+                        artist = displayTrack.artist,
+                        albumArtUrl = displayTrack.albumArt,
+                        durationMs = displayDuration
+                    )
+                } else {
+                    // Streaming locally: setIdleMetadata is a no-op once a media item is loaded, so a
+                    // real name that arrives after playUrl (cold start plays with "Unknown") never reaches
+                    // the notification. Push it explicitly — refreshStreamingMetadata only upgrades.
+                    svc?.refreshStreamingMetadata(displayTrack.name, displayTrack.artist)
+                }
             }
         }
 
@@ -1066,6 +1101,13 @@ class SpotifyViewModel : ViewModel() {
         val savedPositionAtEntry = _playback.value.positionMs
 
         coldStartPending = true
+        // transferPlaybackHere(restore_paused=true) makes Spotify push a *paused* cluster state.
+        // That echo would hit handleRemotePause and syncPause() ExoPlayer mid-start — the stream we
+        // are about to play — leaving audio silent even though onReady flips the UI to "playing", so
+        // the user has to tap play a second time. The paused state is our own protocol artifact, not a
+        // real remote pause, so suppress it for the cold-start window (same guard reconnect uses).
+        // Cleared on success in onReady and on every failure path via resetColdStart().
+        suppressRemotePause = true
         isStreamLoading.value = true
         // CompletableDeferred that gets completed when onPlaybackId fires with
         // the current track's file id. Set up BEFORE the transfer call so we
@@ -1191,6 +1233,7 @@ class SpotifyViewModel : ViewModel() {
     private fun resetColdStart() {
         coldStartPending = false
         coldStartFileId = null
+        suppressRemotePause = false
         isStreamLoading.value = false
     }
 
@@ -1433,7 +1476,7 @@ class SpotifyViewModel : ViewModel() {
         pendingUserPlay = true
         val pc = player ?: return
         coroutineScope {
-            // EXPERIMENTAL Mode 2 (instantTapPlay): self-resolve the tapped track's audio and start
+            // Instant tap-to-play (always on): self-resolve the tapped track's audio and start
             // ExoPlayer NOW, in parallel with the Connect play command, instead of waiting for the WS
             // echo. Only for the Spotify-CDN source + a track URI, and not during a cold-start handoff.
             // On success it sets currentStreamUri so the echo's resolveAndPlay short-circuits; on
@@ -1460,12 +1503,12 @@ class SpotifyViewModel : ViewModel() {
     }
 
     /**
-     * Gate for the experimental optimistic tap-to-play: the toggle is on, we're on the Spotify-CDN
-     * source (the only one that resolves by file id), it's a track URI, and no cold-start handoff is
-     * in flight. Extracted so the call site keeps a simple condition.
+     * Gate for optimistic tap-to-play (always on): we're on the Spotify-CDN source (the only one that
+     * resolves by file id), it's a track URI, and no cold-start handoff is in flight. Extracted so the
+     * call site keeps a simple condition.
      */
     private fun shouldInstantTap(trackUri: String): Boolean =
-        instantTapPlay.value && preferredAudioSource.value == null &&
+        preferredAudioSource.value == null &&
             trackUri.startsWith("spotify:track:") && !coldStartPending
 
     /**
@@ -1748,6 +1791,7 @@ class SpotifyViewModel : ViewModel() {
         launchWithSession("likeSong") { sess ->
             Song(sess).likeSong(trackId)
             currentTrackLiked.value = true
+            pushLikeToNotification(true)
             _snackbarMessage.tryEmit("Added to Liked Songs")
         }
     }
@@ -1756,7 +1800,19 @@ class SpotifyViewModel : ViewModel() {
         launchWithSession("unlikeSong") { sess ->
             Song(sess).unlikeSong(trackId)
             currentTrackLiked.value = false
+            pushLikeToNotification(false)
             _snackbarMessage.tryEmit("Removed from Liked Songs")
+        }
+    }
+
+    /** Mirror an in-app like/unlike onto the media-session notification's heart, which otherwise only
+     *  refreshes when toggled from the notification itself. */
+    private fun pushLikeToNotification(liked: Boolean) {
+        viewModelScope.launch(Dispatchers.Main) {
+            MusicPlaybackService.instance?.let {
+                it.isLiked = liked
+                it.updateNotification()
+            }
         }
     }
 
@@ -1789,13 +1845,6 @@ class SpotifyViewModel : ViewModel() {
             .edit().apply {
                 if (source == null) remove("audio_source") else putString("audio_source", source)
             }.apply()
-    }
-
-    /** EXPERIMENTAL: toggle Mode-2 optimistic tap-to-play (self-resolve + play before the WS echo). */
-    fun setInstantTapPlay(enabled: Boolean, context: Context) {
-        instantTapPlay.value = enabled
-        context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
-            .edit().putBoolean("instant_tap_play", enabled).apply()
     }
 
     fun setContentRegion(region: String, context: Context) {
@@ -1861,7 +1910,6 @@ class SpotifyViewModel : ViewModel() {
         if (savedSource == "spotify") {
             prefs.edit().remove("audio_source").apply()
         }
-        instantTapPlay.value = prefs.getBoolean("instant_tap_play", false)
         lyricsAnimDirection.value = prefs.getString("lyrics_anim_direction", "vertical") ?: "vertical"
         appLanguage.value = prefs.getString("app_language", "system") ?: "system"
         // Apply saved language on startup
@@ -1874,6 +1922,7 @@ class SpotifyViewModel : ViewModel() {
             context.resources.updateConfiguration(config, context.resources.displayMetrics)
         }
         canvasEnabled.value = prefs.getBoolean("canvas_enabled", true)
+        playerGradientBg.value = prefs.getBoolean("player_gradient_bg", true)
         contentRegion.value = prefs.getString("content_region", "nearest") ?: "nearest"
         notificationLeftButton.value = prefs.getString("notification_left_button", "repeat") ?: "repeat"
         notificationRightButton.value = prefs.getString("notification_right_button", "like") ?: "like"
@@ -1904,6 +1953,12 @@ class SpotifyViewModel : ViewModel() {
         context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
             .edit().putBoolean("canvas_enabled", enabled).apply()
         if (!enabled) canvasUrl.value = null
+    }
+
+    fun setPlayerGradientBg(enabled: Boolean, context: Context) {
+        playerGradientBg.value = enabled
+        context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
+            .edit().putBoolean("player_gradient_bg", enabled).apply()
     }
 
     private fun fetchCanvasForTrack(trackUri: String) {
@@ -2016,6 +2071,27 @@ class SpotifyViewModel : ViewModel() {
      * ExoPlayer lifecycle events — track transitions, errors, end-of-track,
      * and the crucial onReady that completes the cold-start handoff.
      */
+    /**
+     * When the 1s silent ad clip ends, KotifyClient's engine normally advances off the ad on its own.
+     * But if it stalls (COMMAND_FAILED, a slow post-ad reveal, a dealer drop) nothing advances and we're
+     * stuck ON the ad until the user manually skips. Mirror the normal-track fallback: if we're STILL on
+     * the ad after the grace window (isAd set AND no real track has taken over), force the advance —
+     * the same local advance a manual skip does.
+     */
+    private fun armAdAdvanceWatchdog() {
+        val adStuckUri = currentStreamUri
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                delay(AD_ADVANCE_WATCHDOG_MS)
+                if (_playback.value.isAd && currentStreamUri == adStuckUri) {
+                    LokiLogger.w(TAG, "Ad advance didn't fire (still on the ad) — forcing local advance")
+                    player?.forceAdvance()
+                }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { handleAdvanceFailure(e) }
+        }
+    }
+
     private fun wirePlaybackLifecycleCallbacks(svc: MusicPlaybackService) {
         svc.onTrackTransition = {
             // ExoPlayer auto-advanced to the pre-buffered next track. The
@@ -2043,7 +2119,9 @@ class SpotifyViewModel : ViewModel() {
             // ad out and drives the post-ad advance itself. Forcing an advance here would skip a
             // real track. Ignore — the next real track's setMediaItem replaces the clip.
             if (_playback.value.isAd) {
-                LokiLogger.d(TAG, "Silent ad clip ended — engine drives the post-ad advance, skipping fallback")
+                if (adSkipStartTs > 0) LokiLogger.i(TAG, "[AdTiming] silent clip ended (+${System.currentTimeMillis() - adSkipStartTs}ms from T0)")
+                LokiLogger.d(TAG, "Silent ad clip ended — engine drives the post-ad advance")
+                armAdAdvanceWatchdog()
                 return@onEnded
             }
             if (maybeLoopRepeatTrack()) return@onEnded
@@ -2084,6 +2162,7 @@ class SpotifyViewModel : ViewModel() {
             val playUrlToReady = if (playUrlAt > 0) now - playUrlAt else -1L
             val cmdToReady = if (lastCommandTs > 0) now - lastCommandTs else -1L
             LokiLogger.i(TAG, "[Timing-CDN] ExoPlayer ready — playUrl→ready=${playUrlToReady}ms, cmd→ready=${cmdToReady}ms")
+            if (currentStreamUri?.startsWith("spotify:ad:") == false) logAdSkipDone()
             // A track reached STATE_READY — maybe refill the transient-error retry budget.
             refillRetryBudgetOnReady(currentStreamUri)
 
@@ -2097,6 +2176,9 @@ class SpotifyViewModel : ViewModel() {
                 val pos = MusicPlaybackService.instance?.getCurrentPosition() ?: _playback.value.positionMs
                 LokiLogger.i(TAG, "[ColdStart] ExoPlayer producing at ${pos}ms — resuming Spotify Connect")
                 coldStartPending = false
+                // Cold start done: audio is producing and we're about to resume Connect, so real
+                // remote pauses (e.g. from another device) must apply again.
+                suppressRemotePause = false
                 _playback.value = _playback.value.copy(isPlaying = true, isPaused = false, positionMs = pos)
                 startPositionTicker()
                 viewModelScope.launch(Dispatchers.IO) {
@@ -2144,9 +2226,24 @@ class SpotifyViewModel : ViewModel() {
         return free?.first
     }
 
+    /** Diagnostic: log the final ad-skip delta once the post-ad real track's audio is producing. */
+    private fun logAdSkipDone() {
+        if (adSkipStartTs <= 0) return
+        LokiLogger.i(TAG, "[AdTiming] post-ad audio PRODUCING (+${System.currentTimeMillis() - adSkipStartTs}ms from T0) — skip done")
+        adSkipStartTs = 0L
+    }
+
     /** Test seam: set the account's premium flag so [safeMediaFileId] can be exercised. */
     internal fun setPremiumForTest(premium: Boolean) {
         _account.value = _account.value.copy(isPremium = premium)
+    }
+
+    /**
+     * Test seam: simulate being inside the cold-start window (or reconnect) where [suppressRemotePause]
+     * is held, so [handleRemotePause] must ignore the self-inflicted restore_paused echo.
+     */
+    internal fun setSuppressRemotePauseForTest(suppress: Boolean) {
+        suppressRemotePause = suppress
     }
 
     private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent) {
@@ -2887,7 +2984,19 @@ class SpotifyViewModel : ViewModel() {
     }
 
     fun followArtist(artistId: String) {
-        launchWithSession("followArtist") { sess -> Artist(sess).follow(artistId) }
+        launchWithSession("followArtist") { sess ->
+            Artist(sess).follow(artistId)
+            _snackbarMessage.tryEmit("Following artist")
+        }
+    }
+
+    fun savePlaylist(playlistId: String) {
+        launchWithSession("savePlaylist") { sess ->
+            // Playlists live in the rootlist, not the generic library (which rejects PLAYLIST uris),
+            // so saveToLibrary needs the current username.
+            kotify.api.playlist.Playlist(sess).saveToLibrary(playlistId, username)
+            _snackbarMessage.tryEmit("Saved to Library")
+        }
     }
 
     fun unfollowArtist(artistId: String) {
@@ -2930,6 +3039,12 @@ class SpotifyViewModel : ViewModel() {
          *  lands within ~1.5s; 5s gives generous headroom so we don't double-skip
          *  when the natural advance arrives just past a tighter timeout. */
         private const val AUTO_ADVANCE_GRACE_MS = 5000L
+
+        /** How long to wait after the 1s silent ad clip ends for the engine to advance off the ad on
+         *  its own before we force it. The post-ad track normally lands ~2-3s after the ad started
+         *  (~1-2s after the clip ends), so this gives headroom without racing the natural advance —
+         *  but still unsticks a stalled ad automatically instead of leaving the user to skip manually. */
+        private const val AD_ADVANCE_WATCHDOG_MS = 3000L
 
         // Slack allowed when bounds-checking a remote seek target against the track duration, so a
         // seek to the very end isn't rejected on rounding/boundary jitter.

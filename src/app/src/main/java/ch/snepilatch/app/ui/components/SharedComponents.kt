@@ -38,16 +38,20 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.DialogWindowProvider
 import android.os.Build
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -66,7 +70,7 @@ import ch.snepilatch.app.ui.theme.SpotifyGray
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
 import ch.snepilatch.app.util.formatTime
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
-import coil.compose.SubcomposeAsyncImage
+import coil.compose.AsyncImage
 
 /**
  * Match the app's transparent, edge-to-edge nav bar inside a ModalBottomSheet. The sheet
@@ -119,38 +123,62 @@ fun SpotifyImage(
     shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(8.dp),
     icon: ImageVector = Icons.Rounded.MusicNote
 ) {
-    SubcomposeAsyncImage(
-        model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
-            .data(url)
-            .crossfade(600)
-            .build(),
-        contentDescription = contentDescription,
-        modifier = modifier.clip(shape),
-        contentScale = ContentScale.Crop,
-        loading = {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(SpotifyGray),
-                contentAlignment = Alignment.Center
-            ) {
-                LoadingIndicator(
-                    color = SpotifyLightGray.copy(alpha = 0.5f),
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        },
-        error = {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(SpotifyGray),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, null, tint = SpotifyLightGray.copy(alpha = 0.5f), modifier = Modifier.size(32.dp))
+    // AsyncImage instead of SubcomposeAsyncImage: subcomposition per row is expensive in a
+    // scrolling list, and the old `loading` slot ran an infinite LoadingIndicator animation
+    // in *every* not-yet-loaded row. A static placeholder box with a faint icon sits behind
+    // the image; the opaque cropped artwork covers it once loaded (crossfade), and it stays
+    // visible while loading or on error — same look, none of the per-row cost.
+    Box(
+        modifier
+            .clip(shape)
+            .background(SpotifyGray),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, null, tint = SpotifyLightGray.copy(alpha = 0.5f), modifier = Modifier.size(32.dp))
+        if (!url.isNullOrEmpty()) {
+            AsyncImage(
+                model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                    .data(url)
+                    .crossfade(300)
+                    .build(),
+                contentDescription = contentDescription,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        }
+    }
+}
+
+// --- Smooth playback position ---
+
+/**
+ * A playback position (ms) that advances at the display's native refresh rate instead of stepping
+ * when the upstream [positionMs] StateFlow ticks.
+ *
+ * Each authoritative [positionMs] (and every play/pause flip) becomes an anchor; while playing,
+ * withFrameNanos advances the returned value once per frame from that anchor, so the progress bar
+ * glides with no visible steps. It stays honest because every upstream tick re-anchors it to the
+ * true position (for local streaming that is ExoPlayer's own clock), correcting any drift twice a
+ * second. Costs nothing when paused or off-screen — no frames are requested.
+ */
+@Composable
+fun rememberSmoothPositionMs(positionMs: Long, durationMs: Long, isPlaying: Boolean): Long {
+    var displayed by remember { mutableLongStateOf(positionMs) }
+    LaunchedEffect(positionMs, isPlaying, durationMs) {
+        if (!isPlaying) {
+            displayed = positionMs
+            return@LaunchedEffect
+        }
+        val cap = if (durationMs > 0) durationMs else Long.MAX_VALUE
+        var anchorFrame = -1L
+        while (true) {
+            withFrameNanos { frame ->
+                if (anchorFrame < 0) anchorFrame = frame
+                displayed = (positionMs + (frame - anchorFrame) / 1_000_000L).coerceIn(0L, cap)
             }
         }
-    )
+    }
+    return displayed
 }
 
 // --- Track Row ---
@@ -160,8 +188,12 @@ fun SpotifyImage(
 fun TrackRow(track: TrackInfo, vm: SpotifyViewModel, contextUri: String? = null, trackIndex: Int? = null) {
     var showMenu by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
-    val playback by vm.playback.collectAsState()
-    val isPlaying = playback.track?.uri == track.uri && playback.isPlaying
+    // Subscribe only to the two projections that affect a row (which track is current +
+    // whether it's playing), not the whole PlaybackUiState — otherwise every position tick
+    // recomposes every visible row and scrolling janks.
+    val currentUri by vm.currentTrackUri.collectAsState()
+    val playing by vm.isPlayingFlow.collectAsState()
+    val isPlaying = currentUri == track.uri && playing
     val theme by vm.themeColors.collectAsState()
     val accent = theme.primary
 
@@ -280,6 +312,89 @@ fun TrackRow(track: TrackInfo, vm: SpotifyViewModel, contextUri: String? = null,
     }
 }
 
+// --- Reusable overflow (3-dots) context menu ---
+
+/** One action row in an [OverflowMenu]. */
+data class OverflowAction(val icon: ImageVector, val label: String, val onClick: () -> Unit)
+
+/**
+ * A 3-dots button that opens a bottom-sheet context menu (same styling as [TrackRow]'s), driven by a
+ * caller-supplied list of [actions] with a header from [title]/[subtitle]/[imageUrl]. Used by the
+ * search-result cards so songs/artists/albums/playlists all get a menu (go to artist/album, add to
+ * playlist, share, …). Renders nothing when [actions] is empty.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun OverflowMenu(
+    title: String,
+    subtitle: String,
+    imageUrl: String?,
+    circular: Boolean,
+    actions: List<OverflowAction>,
+    modifier: Modifier = Modifier
+) {
+    if (actions.isEmpty()) return
+    var showMenu by remember { mutableStateOf(false) }
+    IconButton(onClick = { showMenu = true }, modifier = modifier.size(36.dp)) {
+        Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SpotifyLightGray, modifier = Modifier.size(20.dp))
+    }
+    if (showMenu) {
+        val sheetState = rememberBottomSheetState(
+            initialValue = SheetValue.Hidden,
+            enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+        )
+        ModalBottomSheet(
+            onDismissRequest = { showMenu = false },
+            sheetState = sheetState,
+            containerColor = SpotifyElevated,
+            dragHandle = {
+                Box(
+                    Modifier
+                        .padding(vertical = 12.dp)
+                        .width(40.dp)
+                        .height(4.dp)
+                        .background(SpotifyLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
+                )
+            }
+        ) {
+            SheetNavBarFix()
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SpotifyImage(
+                    url = imageUrl,
+                    modifier = Modifier.size(48.dp),
+                    shape = if (circular) androidx.compose.foundation.shape.CircleShape else RoundedCornerShape(8.dp)
+                )
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(title, color = SpotifyWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (subtitle.isNotBlank()) {
+                        Text(subtitle, color = SpotifyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            HorizontalDivider(color = SpotifyLightGray.copy(alpha = 0.15f))
+            actions.forEach { action ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { action.onClick(); showMenu = false }
+                        .padding(horizontal = 20.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(action.icon, null, tint = SpotifyWhite, modifier = Modifier.size(24.dp))
+                    Spacer(Modifier.width(16.dp))
+                    Text(action.label, color = SpotifyWhite, fontSize = 15.sp)
+                }
+            }
+            Spacer(Modifier.navigationBarsPadding().height(12.dp))
+        }
+    }
+}
+
 // --- Profile Info Item ---
 
 @Composable
@@ -290,4 +405,65 @@ fun ProfileInfoItem(label: String, value: String, icon: ImageVector) {
         leadingContent = { Icon(icon, null, tint = SpotifyLightGray) },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     )
+}
+
+/**
+ * Album cover with spicy-lyrics' cover transition: on [url] change the NEW cover slides in from the
+ * right (translate 100%→0 over 750ms, cubic-bezier(0.835,-0.008,0.149,0.866)) over the previous cover,
+ * casting a soft shadow (their `MB_anim_enter` + `.ti_ToImage` box-shadow). Prefetch the next cover
+ * with [prefetchCover] so the slide starts instantly instead of waiting on the network.
+ */
+@Composable
+fun SlidingCoverImage(
+    url: String?,
+    modifier: Modifier = Modifier,
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(8.dp)
+) {
+    var currentUrl by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(url) }
+    var previousUrl by androidx.compose.runtime.remember {
+        androidx.compose.runtime.mutableStateOf<String?>(null)
+    }
+    val anim = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(1f) }
+    androidx.compose.runtime.LaunchedEffect(url) {
+        if (url != currentUrl) {
+            previousUrl = currentUrl
+            currentUrl = url
+            anim.snapTo(0f)
+            anim.animateTo(
+                1f,
+                tween(750, easing = androidx.compose.animation.core.CubicBezierEasing(0.835f, -0.008f, 0.149f, 0.866f))
+            )
+            previousUrl = null
+        }
+    }
+    // Clip to the cover frame (like spicy's `overflow: hidden` MediaImageContainer) so the incoming
+    // cover slides in from the frame's own right edge, not from off-screen.
+    Box(modifier.clip(shape)) {
+        previousUrl?.let { prev ->
+            SpotifyImage(url = prev, modifier = Modifier.matchParentSize(), shape = shape)
+        }
+        val sliding = previousUrl != null
+        SpotifyImage(
+            url = currentUrl,
+            modifier = Modifier
+                .matchParentSize()
+                .graphicsLayer {
+                    translationX = size.width * (1f - anim.value)
+                    if (sliding) {
+                        shadowElevation = 24f
+                        this.shape = shape
+                        clip = true
+                    }
+                },
+            shape = shape
+        )
+    }
+}
+
+/** Warm Coil's cache with a cover URL so a later [SlidingCoverImage] shows it instantly (no load gap
+ *  on skip). Safe to call with null/blank — it no-ops. */
+fun prefetchCover(context: android.content.Context, url: String?) {
+    if (url.isNullOrBlank()) return
+    val request = coil.request.ImageRequest.Builder(context).data(url).build()
+    coil.Coil.imageLoader(context).enqueue(request)
 }

@@ -94,13 +94,15 @@ fun MiniPlayerContent(
 ) {
     val playback by vm.playback.collectAsState()
     val track = playback.track ?: return
-    // While skipping an ad, show a "Skipping ad…" placeholder instead of the lingering track.
-    val displayTitle = if (playback.isAd) stringResource(R.string.now_playing_skipping_ad) else track.name
-    val displayArtist = if (playback.isAd) "" else track.artist
-    val displayArtUrl: String? = if (playback.isAd) null else track.albumArt
+    // Ads are handled invisibly: keep the current song shown and let the play button spin (below) for
+    // the skip, so it reads as loading the next track rather than "Skipping ad".
+    val displayTitle = track.name
+    val displayArtist = track.artist
+    val displayArtUrl: String? = track.albumArt
     val theme by vm.themeColors.collectAsState()
     val animatedPrimary by animateColorAsState(theme.primary, tween(800), label = "miniPrimary")
     val streamLoading by vm.isStreamLoading.collectAsState()
+    val spinnerActive = streamLoading || playback.isAd
 
     Column(modifier.fillMaxWidth()) {
         Row(
@@ -121,8 +123,8 @@ fun MiniPlayerContent(
                 Text(displayArtist, color = SpotifyLightGray, fontSize = 12.sp,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            IconButton(onClick = { if (!streamLoading) vm.togglePlayPause() }, modifier = Modifier.size(40.dp)) {
-                if (streamLoading) {
+            IconButton(onClick = { if (!spinnerActive) vm.togglePlayPause() }, modifier = Modifier.size(40.dp)) {
+                if (spinnerActive) {
                     LoadingIndicator(
                         color = SpotifyWhite,
                         modifier = Modifier.size(20.dp)
@@ -144,8 +146,9 @@ fun MiniPlayerContent(
             }
         }
         if (playback.durationMs > 0) {
+            val smoothPos = rememberSmoothPositionMs(playback.positionMs, playback.durationMs, playback.isPlaying)
             LinearProgressIndicator(
-                progress = { (playback.positionMs.toFloat() / playback.durationMs).coerceIn(0f, 1f) },
+                progress = { (smoothPos.toFloat() / playback.durationMs).coerceIn(0f, 1f) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(2.dp)

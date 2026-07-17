@@ -310,22 +310,21 @@ fun AccountScreen(vm: SpotifyViewModel) {
             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
         )
 
-        // EXPERIMENTAL: instant tap-to-play (Mode 2). Self-resolves the tapped track and starts audio
-        // before the Connect echo. Literal strings — experimental, not localized yet.
-        val instantTap by vm.instantTapPlay.collectAsState()
+        // Player background style: album-colour gradient vs. the fluid Kawarp album-art warp.
+        val gradientBg by vm.playerGradientBg.collectAsState()
         ListItem(
-            headlineContent = { Text("Instant play (experimental)", color = SpotifyWhite) },
+            headlineContent = { Text("Gradient background", color = SpotifyWhite) },
             supportingContent = {
                 Text(
-                    if (instantTap) "On — tapped songs start instantly" else "Off — waits for Spotify",
+                    if (gradientBg) "Album colour gradient" else "Flowing album art",
                     color = SpotifyLightGray
                 )
             },
-            leadingContent = { Icon(Icons.Rounded.Bolt, null, tint = SpotifyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.Gradient, null, tint = SpotifyLightGray) },
             trailingContent = {
                 Switch(
-                    checked = instantTap,
-                    onCheckedChange = { vm.setInstantTapPlay(it, audioContext) },
+                    checked = gradientBg,
+                    onCheckedChange = { vm.setPlayerGradientBg(it, audioContext) },
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = animatedPrimary,
                         checkedTrackColor = animatedPrimary.copy(alpha = 0.5f),

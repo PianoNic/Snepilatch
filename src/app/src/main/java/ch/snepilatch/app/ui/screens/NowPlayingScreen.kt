@@ -11,8 +11,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
@@ -23,11 +21,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -35,7 +31,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
-import coil.compose.AsyncImage
 import android.graphics.SurfaceTexture
 import android.net.Uri
 import android.view.TextureView
@@ -47,6 +42,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import ch.snepilatch.app.ui.components.SheetNavBarFix
 import ch.snepilatch.app.ui.components.SpotifyImage
 import ch.snepilatch.app.ui.components.TightAlertDialog
+import ch.snepilatch.app.ui.components.rememberSmoothPositionMs
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.util.formatTime
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
@@ -65,6 +61,8 @@ fun PlayerBackground(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
     val track = playback.track
     val theme by vm.themeColors.collectAsState()
     val animatedPrimary by animateColorAsState(theme.primary, tween(800), label = "bgPrimary")
+    val animatedPrimaryDark by animateColorAsState(theme.primaryDark, tween(800), label = "bgPrimaryDark")
+    val gradientBg by vm.playerGradientBg.collectAsState()
     val canvasVideoUrl by vm.canvasUrl.collectAsState()
     val canvasOn by vm.canvasEnabled.collectAsState()
     val hasCanvas = canvasOn && canvasVideoUrl != null
@@ -180,31 +178,44 @@ fun PlayerBackground(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
                 )
             }
         } else {
-            // Solid one-colour base (the album's accent) under the blurred art.
-            Box(Modifier.fillMaxSize().background(animatedPrimary))
-            // Blurred album art.
-            var displayedArt by remember { mutableStateOf(track?.albumArt) }
-            if (track?.albumArt != null) displayedArt = track.albumArt
-            androidx.compose.animation.Crossfade(
-                targetState = displayedArt,
-                animationSpec = tween(800),
-                label = "bgArt"
-            ) { artUrl ->
-                if (artUrl != null) {
-                    AsyncImage(
-                        model = artUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize().blur(80.dp)
-                    )
-                }
-            }
+            AlbumBackdrop(
+                gradientBg, animatedPrimary, animatedPrimaryDark, track?.albumArt,
+                isPlaying = playback.isPlaying && !playback.isPaused
+            )
         }
-        // Dark overlay
+        // Dark overlay — lighter over the gradient (it already darkens toward the bottom) so the album
+        // colour stays vivid; heavier over the blurred art / canvas for text legibility.
+        val overlayAlpha = when {
+            hasCanvas -> 0.35f
+            gradientBg -> 0.18f
+            // The fluid Kawarp background already darkens itself (brightness 0.65), so a lighter scrim.
+            else -> 0.28f
+        }
         Box(
             Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = if (hasCanvas) 0.35f else 0.45f))
+                .background(Color.Black.copy(alpha = overlayAlpha))
+        )
+    }
+}
+
+/** The non-canvas player backdrop: an album-colour gradient (Spotify/YTM/Metrolist style) when
+ *  [gradient] is on, otherwise a fluid, flowing warp of the album art (spicy-lyrics style) over the
+ *  accent colour — falling back to a static blur on pre-Android-13 devices. */
+@Composable
+private fun AlbumBackdrop(gradient: Boolean, top: Color, mid: Color, artUrl: String?, isPlaying: Boolean) {
+    if (gradient) {
+        Box(
+            Modifier.fillMaxSize().background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(listOf(top, mid, Color(0xFF121212)))
+            )
+        )
+    } else {
+        ch.snepilatch.app.ui.components.FluidAlbumBackground(
+            artUrl = artUrl,
+            isPlaying = isPlaying,
+            baseColor = top,
+            modifier = Modifier.fillMaxSize()
         )
     }
 }
@@ -224,16 +235,23 @@ fun NowPlayingScreen(
 ) {
     val playback by vm.playback.collectAsState()
     val track = playback.track
-    // While an ad is being skipped, KotifyClient plays a local silent clip; show a "Skipping ad…"
-    // placeholder (no art, no metadata) instead of the lingering previous track's info.
-    val displayTitle = when {
-        playback.isAd -> stringResource(R.string.now_playing_skipping_ad)
-        else -> track?.name ?: stringResource(R.string.now_playing_not_playing)
-    }
-    val displayArtist = if (playback.isAd) "" else track?.artist ?: ""
-    val displayArtUrl: String? = if (playback.isAd) null else track?.albumArt
+    // While an ad is being skipped we keep the CURRENT song frozen on screen (cover/title/progress)
+    // and show a loading spinner (see spinnerActive) — so the ~2.5s ad skip reads as "loading the next
+    // track", not an interruption. `track` is unchanged during an ad, so no blanking is needed.
+    val displayTitle = track?.name ?: stringResource(R.string.now_playing_not_playing)
+    val displayArtist = track?.artist ?: ""
+    val displayArtUrl: String? = track?.albumArt
     val streamLoading by vm.isStreamLoading.collectAsState()
+    // Spinner spans the whole ad skip: isAd covers the ad dwell, streamLoading the post-ad resolve.
+    val spinnerActive = streamLoading || playback.isAd
     val theme by vm.themeColors.collectAsState()
+
+    // Prefetch the next track's cover so the slide-in on skip is instant (no load gap).
+    val prefetchCtx = LocalContext.current
+    val nextPreview by vm.nextTrackPreview.collectAsState()
+    LaunchedEffect(nextPreview?.albumArt) {
+        ch.snepilatch.app.ui.components.prefetchCover(prefetchCtx, nextPreview?.albumArt)
+    }
 
     val animatedPrimary by animateColorAsState(theme.primary, tween(800), label = "primary")
     val buttonBg = Color.White.copy(alpha = 0.12f)
@@ -283,7 +301,7 @@ fun NowPlayingScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        SpotifyImage(
+                        ch.snepilatch.app.ui.components.SlidingCoverImage(
                             url = displayArtUrl,
                             modifier = Modifier
                                 .fillMaxHeight(0.85f)
@@ -318,11 +336,19 @@ fun NowPlayingScreen(
                                 Icon(Icons.Rounded.KeyboardArrowDown, stringResource(R.string.close), modifier = Modifier.size(24.dp))
                             }
                             val ctx by vm.playingContext.collectAsState()
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            // weight(1f) so the header text takes only the space between the two
+                            // buttons; without it a long album name grows to its full width and
+                            // pushes the right-hand menu button off-screen instead of ellipsizing.
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                            ) {
                                 Text(
                                     ctx?.let { stringResource(R.string.now_playing_playing_from, it.type) } ?: stringResource(R.string.now_playing),
                                     color = SpotifyLightGray,
-                                    fontSize = 10.sp
+                                    fontSize = 10.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 ctx?.let {
                                     Text(
@@ -410,8 +436,10 @@ fun NowPlayingScreen(
                         // Progress bar
                         var seekDragging by remember { mutableStateOf(false) }
                         var seekDragValue by remember { mutableFloatStateOf(0f) }
+                        val smoothPos =
+                            rememberSmoothPositionMs(playback.positionMs, playback.durationMs, playback.isPlaying)
                         val sliderValue = if (seekDragging) seekDragValue
-                        else if (playback.durationMs > 0) (playback.positionMs.toFloat() / playback.durationMs) else 0f
+                        else if (playback.durationMs > 0) (smoothPos.toFloat() / playback.durationMs) else 0f
                         Slider(
                             value = sliderValue,
                             onValueChange = { seekDragging = true; seekDragValue = it },
@@ -434,7 +462,7 @@ fun NowPlayingScreen(
                             modifier = Modifier.fillMaxWidth()
                         )
                         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(formatTime(playback.positionMs), color = SpotifyLightGray, fontSize = 11.sp)
+                            Text(formatTime(smoothPos), color = SpotifyLightGray, fontSize = 11.sp)
                             Text(formatTime(playback.durationMs), color = SpotifyLightGray, fontSize = 11.sp)
                         }
 
@@ -470,14 +498,14 @@ fun NowPlayingScreen(
                                 Icon(Icons.Rounded.SkipPrevious, stringResource(R.string.previous), modifier = Modifier.size(28.dp))
                             }
                             FilledIconButton(
-                                onClick = { if (!streamLoading) vm.togglePlayPause() },
+                                onClick = { if (!spinnerActive) vm.togglePlayPause() },
                                 colors = IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = if (streamLoading) animatedPrimary.copy(alpha = 0.5f) else animatedPrimary,
+                                    containerColor = if (spinnerActive) animatedPrimary.copy(alpha = 0.5f) else animatedPrimary,
                                     contentColor = SpotifyWhite,
                                 ),
                                 modifier = Modifier.size(60.dp),
                             ) {
-                                if (streamLoading) {
+                                if (spinnerActive) {
                                     LoadingIndicator(color = SpotifyWhite, modifier = Modifier.size(26.dp))
                                 } else {
                                     Icon(
@@ -668,14 +696,21 @@ fun NowPlayingScreen(
                                 Icon(Icons.Rounded.KeyboardArrowDown, stringResource(R.string.close), modifier = Modifier.size(28.dp))
                             }
                             val ctx by vm.playingContext.collectAsState()
+                            // weight(1f) so a long album name ellipsizes instead of pushing the
+                            // right-hand EQ button off-screen (see the portrait header above).
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.clickable(enabled = ctx?.uri != null) { vm.navigateToContext() }
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(horizontal = 8.dp)
+                                    .clickable(enabled = ctx?.uri != null) { vm.navigateToContext() }
                             ) {
                                 Text(
                                     ctx?.let { stringResource(R.string.now_playing_playing_from, it.type) } ?: stringResource(R.string.now_playing),
                                     color = secondaryText,
-                                    fontSize = 11.sp
+                                    fontSize = 11.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 ctx?.let {
                                     Text(
@@ -716,8 +751,8 @@ fun NowPlayingScreen(
                         // Invisible placeholder — same size as album art to keep layout stable
                         Box(Modifier.fillMaxWidth().aspectRatio(1f))
                     } else {
-                        // Album art — large with rounded corners
-                        SpotifyImage(
+                        // Album art — large with rounded corners; slides in from the right on song change.
+                        ch.snepilatch.app.ui.components.SlidingCoverImage(
                             url = displayArtUrl,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -800,8 +835,10 @@ fun NowPlayingScreen(
                     // Progress bar — thick rounded bar
                     var seekDragging by remember { mutableStateOf(false) }
                     var seekDragValue by remember { mutableFloatStateOf(0f) }
+                    val smoothPos =
+                        rememberSmoothPositionMs(playback.positionMs, playback.durationMs, playback.isPlaying)
                     val sliderValue = if (seekDragging) seekDragValue
-                        else if (playback.durationMs > 0) (playback.positionMs.toFloat() / playback.durationMs) else 0f
+                        else if (playback.durationMs > 0) (smoothPos.toFloat() / playback.durationMs) else 0f
                     Slider(
                         value = sliderValue,
                         onValueChange = { seekDragging = true; seekDragValue = it },
@@ -824,7 +861,7 @@ fun NowPlayingScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
                     Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(formatTime(playback.positionMs), color = secondaryText, fontSize = 12.sp)
+                        Text(formatTime(smoothPos), color = secondaryText, fontSize = 12.sp)
                         Text(formatTime(playback.durationMs), color = secondaryText, fontSize = 12.sp)
                     }
 
@@ -863,14 +900,14 @@ fun NowPlayingScreen(
                         }
                         // Play/Pause — large prominent button
                         FilledIconButton(
-                            onClick = { if (!streamLoading) vm.togglePlayPause() },
+                            onClick = { if (!spinnerActive) vm.togglePlayPause() },
                             colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = if (streamLoading) animatedPrimary.copy(alpha = 0.5f) else animatedPrimary,
+                                containerColor = if (spinnerActive) animatedPrimary.copy(alpha = 0.5f) else animatedPrimary,
                                 contentColor = SpotifyWhite,
                             ),
                             modifier = Modifier.size(72.dp),
                         ) {
-                            if (streamLoading) {
+                            if (spinnerActive) {
                                 LoadingIndicator(
                                     color = SpotifyWhite,
                                     modifier = Modifier.size(30.dp)
@@ -1025,8 +1062,11 @@ fun NowPlayingScreen(
             title = { Text(stringResource(R.string.add_to_playlist), color = SpotifyWhite) },
             containerColor = SpotifyGray,
             text = {
-                LazyColumn(Modifier.fillMaxWidth()) {
-                    items(playlists) { playlist ->
+                // TightAlertDialog wraps `text` in a height-bounded verticalScroll Box, which
+                // gives its child infinite max height — a LazyColumn there throws "infinity
+                // maximum height". Use a plain Column; the dialog provides the scrolling.
+                Column(Modifier.fillMaxWidth()) {
+                    playlists.forEach { playlist ->
                         Row(
                             Modifier
                                 .fillMaxWidth()

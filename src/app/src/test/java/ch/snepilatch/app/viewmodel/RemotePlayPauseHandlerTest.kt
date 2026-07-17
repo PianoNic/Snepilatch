@@ -57,6 +57,24 @@ class RemotePlayPauseHandlerTest {
     }
 
     /**
+     * The cold-start double-play regression: transferPlaybackHere(restore_paused=true) makes Spotify
+     * echo a paused cluster state mid-start. While the cold-start (or reconnect) suppress guard is
+     * held, that echo MUST NOT pause the ExoPlayer we're bringing up — otherwise audio stays silent,
+     * the UI/Connect say playing, and the user has to tap play a second time.
+     */
+    @Test
+    fun remotePauseWhileStreaming_suppressed_doesNotPause() {
+        rig.seedStreaming(positionMs = 50_000L, isPaused = false)
+        rig.vm.setSuppressRemotePauseForTest(true)
+
+        rig.vm.handleRemotePause(positionMs = 50_000L)
+
+        verify(exactly = 0) { rig.service.syncPause() }
+        assertTrue("playback should stay playing during cold start", rig.vm.playback.value.isPlaying)
+        assertFalse("playback should NOT be marked paused during cold start", rig.vm.playback.value.isPaused)
+    }
+
+    /**
      * Remote play while streaming + currently paused → resume locally.
      */
     @Test

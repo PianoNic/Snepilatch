@@ -235,15 +235,15 @@ fun NowPlayingScreen(
 ) {
     val playback by vm.playback.collectAsState()
     val track = playback.track
-    // While an ad is being skipped, KotifyClient plays a local silent clip; show a "Skipping ad…"
-    // placeholder (no art, no metadata) instead of the lingering previous track's info.
-    val displayTitle = when {
-        playback.isAd -> stringResource(R.string.now_playing_skipping_ad)
-        else -> track?.name ?: stringResource(R.string.now_playing_not_playing)
-    }
-    val displayArtist = if (playback.isAd) "" else track?.artist ?: ""
-    val displayArtUrl: String? = if (playback.isAd) null else track?.albumArt
+    // While an ad is being skipped we keep the CURRENT song frozen on screen (cover/title/progress)
+    // and show a loading spinner (see spinnerActive) — so the ~2.5s ad skip reads as "loading the next
+    // track", not an interruption. `track` is unchanged during an ad, so no blanking is needed.
+    val displayTitle = track?.name ?: stringResource(R.string.now_playing_not_playing)
+    val displayArtist = track?.artist ?: ""
+    val displayArtUrl: String? = track?.albumArt
     val streamLoading by vm.isStreamLoading.collectAsState()
+    // Spinner spans the whole ad skip: isAd covers the ad dwell, streamLoading the post-ad resolve.
+    val spinnerActive = streamLoading || playback.isAd
     val theme by vm.themeColors.collectAsState()
 
     // Prefetch the next track's cover so the slide-in on skip is instant (no load gap).
@@ -498,14 +498,14 @@ fun NowPlayingScreen(
                                 Icon(Icons.Rounded.SkipPrevious, stringResource(R.string.previous), modifier = Modifier.size(28.dp))
                             }
                             FilledIconButton(
-                                onClick = { if (!streamLoading) vm.togglePlayPause() },
+                                onClick = { if (!spinnerActive) vm.togglePlayPause() },
                                 colors = IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = if (streamLoading) animatedPrimary.copy(alpha = 0.5f) else animatedPrimary,
+                                    containerColor = if (spinnerActive) animatedPrimary.copy(alpha = 0.5f) else animatedPrimary,
                                     contentColor = SpotifyWhite,
                                 ),
                                 modifier = Modifier.size(60.dp),
                             ) {
-                                if (streamLoading) {
+                                if (spinnerActive) {
                                     LoadingIndicator(color = SpotifyWhite, modifier = Modifier.size(26.dp))
                                 } else {
                                     Icon(
@@ -900,14 +900,14 @@ fun NowPlayingScreen(
                         }
                         // Play/Pause — large prominent button
                         FilledIconButton(
-                            onClick = { if (!streamLoading) vm.togglePlayPause() },
+                            onClick = { if (!spinnerActive) vm.togglePlayPause() },
                             colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = if (streamLoading) animatedPrimary.copy(alpha = 0.5f) else animatedPrimary,
+                                containerColor = if (spinnerActive) animatedPrimary.copy(alpha = 0.5f) else animatedPrimary,
                                 contentColor = SpotifyWhite,
                             ),
                             modifier = Modifier.size(72.dp),
                         ) {
-                            if (streamLoading) {
+                            if (spinnerActive) {
                                 LoadingIndicator(
                                     color = SpotifyWhite,
                                     modifier = Modifier.size(30.dp)

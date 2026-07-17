@@ -537,11 +537,11 @@ class SpotifyViewModel : ViewModel() {
             adSkipStartTs = System.currentTimeMillis()
             LokiLogger.i(TAG, "[AdTiming] onAd received (clip=${durationMs}ms) — T0")
             LokiLogger.i(TAG, "Ad — skipping with local silent clip (~${durationMs}ms)")
-            // Reset position and show the ad's real (~1s) duration so the progress bar reflects the
-            // short skip instead of the previous track's length.
-            _playback.value = _playback.value.copy(
-                isAd = true, isPlaying = true, isPaused = false, positionMs = 0, durationMs = durationMs
-            )
+            // Ad is handled invisibly: keep the CURRENT song's cover/title/progress frozen on screen
+            // (track is unchanged during an ad) and let the UI show a loading spinner (driven by isAd)
+            // for the ~2.5s skip, so it reads as "loading the next track", not an ad interruption. The
+            // next real track's state clears isAd and slides its cover in.
+            _playback.value = _playback.value.copy(isAd = true, isPlaying = true, isPaused = false)
             viewModelScope.launch(Dispatchers.Main) {
                 MusicPlaybackService.instance?.playSilentAd()
             }

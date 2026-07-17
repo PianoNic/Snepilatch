@@ -91,38 +91,12 @@ private fun KawarpBackground(
         }
     }
 
-    // Song-change transition: the new cover's warped background slides in from the right while the old
-    // one slides out to the left (spicy-lyrics' SDB_StaticBG slide), with the accent colour behind
-    // already cross-animating in PlayerBackground. `progress` runs 0→1 over the slide.
-    var currentUrl by remember { mutableStateOf(artUrl) }
-    var previousUrl by remember { mutableStateOf<String?>(null) }
-    val progress = remember { androidx.compose.animation.core.Animatable(1f) }
-    LaunchedEffect(artUrl) {
-        if (artUrl != currentUrl) {
-            previousUrl = currentUrl
-            currentUrl = artUrl
-            progress.snapTo(0f)
-            progress.animateTo(1f, tween(700, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-            previousUrl = null
-        }
-    }
-
     Box(modifier.onSizeChanged { size = it }) {
-        // Accent colour behind, in case a clamped warp ever samples a transparent texel / during slide.
+        // Accent colour behind, in case a clamped warp ever samples a transparent texel.
         Box(Modifier.fillMaxSize().background(baseColor))
-        val p = progress.value
-        // Outgoing cover: 0 → -width (slides off to the left).
-        previousUrl?.let { prev ->
-            WarpedLayer(
-                prev, warpShader, gradeShader, size, time,
-                Modifier.graphicsLayer { translationX = -size.width * p }
-            )
-        }
-        // Incoming cover: +width → 0 (slides in from the right).
-        WarpedLayer(
-            currentUrl, warpShader, gradeShader, size, time,
-            Modifier.graphicsLayer { translationX = size.width * (1f - p) }
-        )
+        // The background just cross-fades on song change (the accent colour behind also cross-animates
+        // in PlayerBackground); the *cover* is what slides. Coil's crossfade morphs old→new smoothly.
+        WarpedLayer(artUrl, warpShader, gradeShader, size, time, Modifier)
     }
 }
 
@@ -142,7 +116,7 @@ private fun WarpedLayer(
     // Kawarp works at 128px; the upscale strips fine detail so warp+blur reads as flowing colour blobs.
     val lowResModel = remember(artUrl) {
         coil.request.ImageRequest.Builder(context).data(artUrl).size(128).allowHardware(false)
-            .crossfade(false).build()
+            .crossfade(700).build()
     }
     AsyncImage(
         model = lowResModel,

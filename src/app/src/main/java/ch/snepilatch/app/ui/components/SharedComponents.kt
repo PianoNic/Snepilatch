@@ -51,6 +51,7 @@ import androidx.compose.ui.window.DialogWindowProvider
 import android.os.Build
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -404,4 +405,63 @@ fun ProfileInfoItem(label: String, value: String, icon: ImageVector) {
         leadingContent = { Icon(icon, null, tint = SpotifyLightGray) },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     )
+}
+
+/**
+ * Album cover with spicy-lyrics' cover transition: on [url] change the NEW cover slides in from the
+ * right (translate 100%→0 over 750ms, cubic-bezier(0.835,-0.008,0.149,0.866)) over the previous cover,
+ * casting a soft shadow (their `MB_anim_enter` + `.ti_ToImage` box-shadow). Prefetch the next cover
+ * with [prefetchCover] so the slide starts instantly instead of waiting on the network.
+ */
+@Composable
+fun SlidingCoverImage(
+    url: String?,
+    modifier: Modifier = Modifier,
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(8.dp)
+) {
+    var currentUrl by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(url) }
+    var previousUrl by androidx.compose.runtime.remember {
+        androidx.compose.runtime.mutableStateOf<String?>(null)
+    }
+    val anim = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(1f) }
+    androidx.compose.runtime.LaunchedEffect(url) {
+        if (url != currentUrl) {
+            previousUrl = currentUrl
+            currentUrl = url
+            anim.snapTo(0f)
+            anim.animateTo(
+                1f,
+                tween(750, easing = androidx.compose.animation.core.CubicBezierEasing(0.835f, -0.008f, 0.149f, 0.866f))
+            )
+            previousUrl = null
+        }
+    }
+    Box(modifier) {
+        previousUrl?.let { prev ->
+            SpotifyImage(url = prev, modifier = Modifier.matchParentSize(), shape = shape)
+        }
+        val sliding = previousUrl != null
+        SpotifyImage(
+            url = currentUrl,
+            modifier = Modifier
+                .matchParentSize()
+                .graphicsLayer {
+                    translationX = size.width * (1f - anim.value)
+                    if (sliding) {
+                        shadowElevation = 24f
+                        this.shape = shape
+                        clip = true
+                    }
+                },
+            shape = shape
+        )
+    }
+}
+
+/** Warm Coil's cache with a cover URL so a later [SlidingCoverImage] shows it instantly (no load gap
+ *  on skip). Safe to call with null/blank — it no-ops. */
+fun prefetchCover(context: android.content.Context, url: String?) {
+    if (url.isNullOrBlank()) return
+    val request = coil.request.ImageRequest.Builder(context).data(url).build()
+    coil.Coil.imageLoader(context).enqueue(request)
 }

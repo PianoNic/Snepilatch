@@ -246,6 +246,13 @@ fun NowPlayingScreen(
     val streamLoading by vm.isStreamLoading.collectAsState()
     val theme by vm.themeColors.collectAsState()
 
+    // Prefetch the next track's cover so the slide-in on skip is instant (no load gap).
+    val prefetchCtx = LocalContext.current
+    val nextPreview by vm.nextTrackPreview.collectAsState()
+    LaunchedEffect(nextPreview?.albumArt) {
+        ch.snepilatch.app.ui.components.prefetchCover(prefetchCtx, nextPreview?.albumArt)
+    }
+
     val animatedPrimary by animateColorAsState(theme.primary, tween(800), label = "primary")
     val buttonBg = Color.White.copy(alpha = 0.12f)
 
@@ -294,7 +301,7 @@ fun NowPlayingScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        SpotifyImage(
+                        ch.snepilatch.app.ui.components.SlidingCoverImage(
                             url = displayArtUrl,
                             modifier = Modifier
                                 .fillMaxHeight(0.85f)
@@ -744,8 +751,8 @@ fun NowPlayingScreen(
                         // Invisible placeholder — same size as album art to keep layout stable
                         Box(Modifier.fillMaxWidth().aspectRatio(1f))
                     } else {
-                        // Album art — large with rounded corners
-                        SpotifyImage(
+                        // Album art — large with rounded corners; slides in from the right on song change.
+                        ch.snepilatch.app.ui.components.SlidingCoverImage(
                             url = displayArtUrl,
                             modifier = Modifier
                                 .fillMaxWidth()

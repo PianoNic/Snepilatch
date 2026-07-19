@@ -42,6 +42,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import ch.snepilatch.app.ui.components.SheetNavBarFix
 import ch.snepilatch.app.ui.components.SpotifyImage
 import ch.snepilatch.app.ui.components.TightAlertDialog
+import ch.snepilatch.app.ui.components.JukeboxTimeline
 import ch.snepilatch.app.ui.components.rememberSmoothPositionMs
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.util.formatTime
@@ -196,6 +197,27 @@ fun PlayerBackground(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = overlayAlpha))
         )
+        // Bottom-weighted scrim — canvas only. The looping video is bright and busy, so the
+        // title/artist/context/progress/transport in the lower half need a gradient behind them to
+        // stay legible (echo/Spotify do the same). The fluid/gradient/blur backdrops already darken
+        // themselves, so the extra band there just looked heavy — skip it. Fade starts high up the
+        // frame and ramps to dark at the bottom so there's no hard edge.
+        if (hasCanvas) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            // Transparent at the very top, already noticeably dark by the vertical
+                            // centre, ramping to a strong scrim at the bottom so the text/controls read
+                            // clearly over a bright canvas video.
+                            0.0f to Color.Transparent,
+                            0.5f to Color.Black.copy(alpha = 0.45f),
+                            1.0f to Color.Black.copy(alpha = 0.92f)
+                        )
+                    )
+            )
+        }
     }
 }
 
@@ -433,37 +455,55 @@ fun NowPlayingScreen(
 
                         Spacer(Modifier.height(8.dp))
 
-                        // Progress bar
+                        // Progress bar — or the jukebox remix map while remixing.
+                        val jukeboxOnL by vm.jukeboxEnabled.collectAsState()
+                        val jukeboxVizL by vm.jukeboxViz.collectAsState()
+                        var jukeboxElapsedMsL by remember { mutableLongStateOf(0L) }
+                        LaunchedEffect(jukeboxOnL) {
+                            jukeboxElapsedMsL = 0L
+                            while (jukeboxOnL) {
+                                kotlinx.coroutines.delay(1000)
+                                jukeboxElapsedMsL += 1000
+                            }
+                        }
                         var seekDragging by remember { mutableStateOf(false) }
                         var seekDragValue by remember { mutableFloatStateOf(0f) }
                         val smoothPos =
                             rememberSmoothPositionMs(playback.positionMs, playback.durationMs, playback.isPlaying)
                         val sliderValue = if (seekDragging) seekDragValue
                         else if (playback.durationMs > 0) (smoothPos.toFloat() / playback.durationMs) else 0f
-                        Slider(
-                            value = sliderValue,
-                            onValueChange = { seekDragging = true; seekDragValue = it },
-                            onValueChangeFinished = {
-                                vm.seekTo((seekDragValue * playback.durationMs).toLong())
-                                seekDragging = false
-                            },
-                            thumb = {
-                                Box(
-                                    Modifier
-                                        .size(width = 6.dp, height = 30.dp)
-                                        .background(animatedPrimary, RoundedCornerShape(3.dp))
-                                )
-                            },
-                            colors = SliderDefaults.colors(
-                                thumbColor = animatedPrimary,
-                                activeTrackColor = animatedPrimary,
-                                inactiveTrackColor = SpotifyWhite.copy(alpha = 0.15f)
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        if (jukeboxOnL) {
+                            JukeboxTimeline(
+                                viz = jukeboxVizL,
+                                primary = animatedPrimary,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        } else {
+                            Slider(
+                                value = sliderValue,
+                                onValueChange = { seekDragging = true; seekDragValue = it },
+                                onValueChangeFinished = {
+                                    vm.seekTo((seekDragValue * playback.durationMs).toLong())
+                                    seekDragging = false
+                                },
+                                thumb = {
+                                    Box(
+                                        Modifier
+                                            .size(width = 6.dp, height = 30.dp)
+                                            .background(animatedPrimary, RoundedCornerShape(3.dp))
+                                    )
+                                },
+                                colors = SliderDefaults.colors(
+                                    thumbColor = animatedPrimary,
+                                    activeTrackColor = animatedPrimary,
+                                    inactiveTrackColor = SpotifyWhite.copy(alpha = 0.15f)
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(formatTime(smoothPos), color = SpotifyLightGray, fontSize = 11.sp)
-                            Text(formatTime(playback.durationMs), color = SpotifyLightGray, fontSize = 11.sp)
+                            Text(if (jukeboxOnL) "" else formatTime(smoothPos), color = SpotifyLightGray, fontSize = 11.sp)
+                            Text(if (jukeboxOnL) formatTime(jukeboxElapsedMsL) else formatTime(playback.durationMs), color = SpotifyLightGray, fontSize = 11.sp)
                         }
 
                         Spacer(Modifier.weight(0.2f))
@@ -575,6 +615,11 @@ fun NowPlayingScreen(
                             "usb" -> Icons.Rounded.Usb
                             else -> Icons.Rounded.Speaker
                         }
+                        // Playing on another Spotify Connect device: show it with a computer icon + name
+                        // instead of the (then-irrelevant) local Bluetooth/wired output.
+                        val activeDevice by vm.activeDeviceName.collectAsState()
+                        val remoteDevice = if (!streaming) activeDevice?.takeIf { it != android.os.Build.MODEL } else null
+                        val outIcon = if (remoteDevice != null) Icons.Rounded.Computer else audioIcon
                         Row(
                             Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -595,11 +640,15 @@ fun NowPlayingScreen(
                                         checkedContentColor = SpotifyWhite,
                                     ),
                                 ) {
-                                    Icon(audioIcon, stringResource(R.string.audio_output), modifier = Modifier.size(20.dp))
+                                    Icon(outIcon, stringResource(R.string.audio_output), modifier = Modifier.size(20.dp))
                                 }
                                 Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                    audioOutput?.let { InfoPill(audioIcon, it) }
-                                    provider?.let { SourcePill(it) }
+                                    if (remoteDevice != null) {
+                                        InfoPill(Icons.Rounded.Computer, remoteDevice)
+                                    } else {
+                                        audioOutput?.let { InfoPill(audioIcon, it) }
+                                        provider?.let { SourcePill(it) }
+                                    }
                                 }
                             }
                             Row(
@@ -832,37 +881,55 @@ fun NowPlayingScreen(
 
                     Spacer(Modifier.height(20.dp))
 
-                    // Progress bar — thick rounded bar
+                    // Progress bar — thick rounded bar, or the jukebox remix map while remixing.
+                    val jukeboxOn by vm.jukeboxEnabled.collectAsState()
+                    val jukeboxViz by vm.jukeboxViz.collectAsState()
+                    var jukeboxElapsedMs by remember { mutableLongStateOf(0L) }
+                    LaunchedEffect(jukeboxOn) {
+                        jukeboxElapsedMs = 0L
+                        while (jukeboxOn) {
+                            kotlinx.coroutines.delay(1000)
+                            jukeboxElapsedMs += 1000
+                        }
+                    }
                     var seekDragging by remember { mutableStateOf(false) }
                     var seekDragValue by remember { mutableFloatStateOf(0f) }
                     val smoothPos =
                         rememberSmoothPositionMs(playback.positionMs, playback.durationMs, playback.isPlaying)
                     val sliderValue = if (seekDragging) seekDragValue
                         else if (playback.durationMs > 0) (smoothPos.toFloat() / playback.durationMs) else 0f
-                    Slider(
-                        value = sliderValue,
-                        onValueChange = { seekDragging = true; seekDragValue = it },
-                        onValueChangeFinished = {
-                            vm.seekTo((seekDragValue * playback.durationMs).toLong())
-                            seekDragging = false
-                        },
-                        thumb = {
-                            Box(
-                                Modifier
-                                    .size(width = 6.dp, height = 30.dp)
-                                    .background(animatedPrimary, RoundedCornerShape(3.dp))
-                            )
-                        },
-                        colors = SliderDefaults.colors(
-                            thumbColor = animatedPrimary,
-                            activeTrackColor = animatedPrimary,
-                            inactiveTrackColor = SpotifyWhite.copy(alpha = 0.15f)
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    if (jukeboxOn) {
+                        JukeboxTimeline(
+                            viz = jukeboxViz,
+                            primary = animatedPrimary,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    } else {
+                        Slider(
+                            value = sliderValue,
+                            onValueChange = { seekDragging = true; seekDragValue = it },
+                            onValueChangeFinished = {
+                                vm.seekTo((seekDragValue * playback.durationMs).toLong())
+                                seekDragging = false
+                            },
+                            thumb = {
+                                Box(
+                                    Modifier
+                                        .size(width = 6.dp, height = 30.dp)
+                                        .background(animatedPrimary, RoundedCornerShape(3.dp))
+                                )
+                            },
+                            colors = SliderDefaults.colors(
+                                thumbColor = animatedPrimary,
+                                activeTrackColor = animatedPrimary,
+                                inactiveTrackColor = SpotifyWhite.copy(alpha = 0.15f)
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                     Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(formatTime(smoothPos), color = secondaryText, fontSize = 12.sp)
-                        Text(formatTime(playback.durationMs), color = secondaryText, fontSize = 12.sp)
+                        Text(if (jukeboxOn) "" else formatTime(smoothPos), color = secondaryText, fontSize = 12.sp)
+                        Text(if (jukeboxOn) formatTime(jukeboxElapsedMs) else formatTime(playback.durationMs), color = secondaryText, fontSize = 12.sp)
                     }
 
                     Spacer(Modifier.weight(0.15f))
@@ -981,6 +1048,12 @@ fun NowPlayingScreen(
                         "usb" -> Icons.Rounded.Usb
                         else -> Icons.Rounded.Speaker
                     }
+                    // When audio is playing on another Spotify Connect device (not this phone / not the
+                    // local stream), the local Bluetooth/wired output is misleading — show that Connect
+                    // device with a computer icon and its own name instead.
+                    val activeDevice by vm.activeDeviceName.collectAsState()
+                    val remoteDevice = if (!streaming) activeDevice?.takeIf { it != android.os.Build.MODEL } else null
+                    val outIcon = if (remoteDevice != null) Icons.Rounded.Computer else audioIcon
                     Row(
                         Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1001,11 +1074,16 @@ fun NowPlayingScreen(
                                     checkedContentColor = SpotifyWhite,
                                 ),
                             ) {
-                                Icon(audioIcon, stringResource(R.string.audio_output), modifier = Modifier.size(22.dp))
+                                Icon(outIcon, stringResource(R.string.audio_output), modifier = Modifier.size(22.dp))
                             }
                             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                audioOutput?.let { InfoPill(audioIcon, it) }
-                                provider?.let { SourcePill(it) }
+                                if (remoteDevice != null) {
+                                    InfoPill(Icons.Rounded.Computer, remoteDevice)
+                                } else {
+                                    audioOutput?.let { InfoPill(audioIcon, it) }
+                                }
+                                // Always show the source pill (idle "No CDN" state when nothing streams).
+                                SourcePill(provider)
                             }
                         }
                         Row(
@@ -1121,23 +1199,33 @@ private fun InfoPill(icon: androidx.compose.ui.graphics.vector.ImageVector, text
     }
 }
 
+/**
+ * The audio-source pill. Always visible: when a stream is active it names the source (Spotify CDN,
+ * Qobuz, …); when nothing is streaming locally ([provider] == null — idle, or playing on a remote
+ * Connect device) it shows a dimmed "No CDN" idle state instead of vanishing.
+ */
 @Composable
-private fun SourcePill(provider: String) {
+private fun SourcePill(provider: String?) {
+    val active = provider != null
     val label = when (provider) {
+        null -> "No CDN"
         "qobuz" -> "Qobuz"
         "deezer" -> "Deezer"
         else -> provider.replaceFirstChar { it.uppercase() }
     }
+    val icon = if (active) Icons.Rounded.MusicNote else Icons.Rounded.CloudOff
+    val bgAlpha = if (active) 0.10f else 0.06f
+    val fgAlpha = if (active) 1f else 0.55f
     Row(
         Modifier
             .height(20.dp)
-            .background(Color.White.copy(alpha = 0.10f), RoundedCornerShape(50))
+            .background(Color.White.copy(alpha = bgAlpha), RoundedCornerShape(50))
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
-        Icon(Icons.Rounded.MusicNote, null, tint = SpotifyWhite, modifier = Modifier.size(9.dp))
-        Text(label, color = SpotifyWhite, fontSize = 9.sp, maxLines = 1)
+        Icon(icon, null, tint = SpotifyWhite.copy(alpha = fgAlpha), modifier = Modifier.size(9.dp))
+        Text(label, color = SpotifyWhite.copy(alpha = fgAlpha), fontSize = 9.sp, maxLines = 1)
     }
 }
 
@@ -1255,6 +1343,23 @@ private fun NowPlayingMenu(
                     Spacer(Modifier.width(16.dp))
                     Text(label, color = SpotifyWhite, fontSize = 15.sp)
                 }
+            }
+
+            // Eternal Jukebox toggle — endless, ever-varying playback of the current track. Tinted
+            // Spotify-green while active. Only does something while streaming a track locally.
+            val jukeboxOn by vm.jukeboxEnabled.collectAsState()
+            val jukeboxLabel = stringResource(R.string.eternal_jukebox)
+            val jukeboxTint = if (jukeboxOn) Color(0xFF1ED760) else SpotifyWhite
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { vm.toggleJukebox(); onShowMore(false) }
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Rounded.AllInclusive, null, tint = jukeboxTint, modifier = Modifier.size(24.dp))
+                Spacer(Modifier.width(16.dp))
+                Text(jukeboxLabel, color = jukeboxTint, fontSize = 15.sp)
             }
             Spacer(Modifier.navigationBarsPadding().height(12.dp))
         }

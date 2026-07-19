@@ -8,6 +8,8 @@ import ch.snepilatch.app.util.LokiLogger
 import ch.snepilatch.app.util.detectActiveAudioOutput
 import ch.snepilatch.app.util.extractThemeColorsFromArt
 import ch.snepilatch.app.util.normalizeSpotifyImageUrl
+import ch.snepilatch.app.playback.JukeboxController
+import ch.snepilatch.app.playback.JukeboxViz
 import ch.snepilatch.app.playback.MusicPlaybackService
 import ch.snepilatch.app.playback.PositionInterpolator
 import ch.snepilatch.app.playback.SessionHolder
@@ -94,6 +96,18 @@ class SpotifyViewModel : ViewModel() {
         }
     )
     private var currentStreamUri: String? = null
+
+    // Eternal Jukebox: fetches the current track's audio-analysis, builds a beat-similarity graph, and
+    // seeks ExoPlayer to similar beats so the song plays forever. Logic only — toggle via toggleJukebox().
+    private val jukebox = JukeboxController(
+        scope = viewModelScope,
+        currentTrackId = { currentStreamUri?.takeIf { it.startsWith("spotify:track:") }?.substringAfterLast(":") },
+    )
+    val jukeboxEnabled: StateFlow<Boolean> = jukebox.enabled
+    val jukeboxViz: StateFlow<JukeboxViz?> = jukebox.viz
+    private var savedRepeatForJukebox: String? = null
+    private var jukeboxRepeatObserverStarted = false
+
     private var nextStreamUrl: String? = null
     private var nextTrackInfo: TrackInfo? = null
     private var nextStreamProvider: String? = null
@@ -313,6 +327,7 @@ class SpotifyViewModel : ViewModel() {
     }
 
     fun initialize(cookies: Map<String, String>) {
+        startJukeboxRepeatGuard()
         // Clean up any leftover from previous session
         SessionHolder.player?.let {
             try { kotlinx.coroutines.runBlocking { it.disconnect() } } catch (_: Exception) {}
@@ -813,13 +828,66 @@ class SpotifyViewModel : ViewModel() {
 
     // --- Playback ---
 
+    // artist_uri -> resolved artist name. Artist-context autoplay is the one play origin whose cluster
+    // metadata omits every artist-name key (verified live: 5 onState pushes + onTrackChange, all with
+    // artistName=null, only artist_uri set), so the big player would show "Unknown". We resolve the
+    // name from the URI once and reuse it for every later track from the same artist.
+    private val artistNameCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private val resolvingArtistUris = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
     /**
      * All credited artists joined for display, e.g. "Post Malone, Swae Lee". Spotify's cluster
      * metadata lists extra artists under indexed keys which KotifyClient collects into [artistNames];
-     * falls back to the single [artistName] (also the show name for episodes) then "Unknown".
+     * falls back to the single [artistName] (also the show name for episodes). When a track was played
+     * from an artist context, Spotify omits the name entirely and only ships [artistUri]; resolve that
+     * to a name (cached, async) rather than showing "Unknown".
      */
-    private fun PlayerTrack.displayArtist(): String =
-        artistNames.takeIf { it.isNotEmpty() }?.joinToString(", ") ?: artistName ?: "Unknown"
+    private fun PlayerTrack.displayArtist(): String {
+        artistNames.takeIf { it.isNotEmpty() }?.let { return it.joinToString(", ") }
+        artistName?.takeIf { it.isNotBlank() }?.let { return it }
+        val uri = artistUri?.takeIf { it.startsWith("spotify:artist:") }
+        if (uri != null) {
+            artistNameCache[uri]?.let { return it }
+            resolveArtistName(uri, this.uri)
+        }
+        return "Unknown"
+    }
+
+    /**
+     * Resolve an artist name from its URI and cache it, then patch the currently-shown track so the
+     * "Unknown" placeholder is replaced in place. Deduped per URI (and skipped once cached) so the
+     * heavier artist-overview call fires at most once per artist. Patches only if [forTrackUri] is
+     * still the track on screen, so a fast track change doesn't get another track's artist stamped on.
+     */
+    private fun resolveArtistName(artistUri: String, forTrackUri: String) {
+        if (artistNameCache.containsKey(artistUri) || !resolvingArtistUris.add(artistUri)) return
+        launchWithSession("resolveArtistName") { sess ->
+            try {
+                val id = artistUri.removePrefix("spotify:artist:")
+                val name = Artist(sess).getArtist(id).name.takeIf { it.isNotBlank() } ?: return@launchWithSession
+                artistNameCache[artistUri] = name
+                withContext(Dispatchers.Main) { patchCurrentArtist(forTrackUri, name) }
+            } finally {
+                resolvingArtistUris.remove(artistUri)
+            }
+        }
+    }
+
+    /** Replace the on-screen artist with [name] if [forTrackUri] is still current and unresolved. */
+    private fun patchCurrentArtist(forTrackUri: String, name: String) {
+        val cur = _playback.value
+        val t = cur.track ?: return
+        if (t.uri != forTrackUri) return
+        if (t.artist.isNotBlank() && t.artist != "Unknown") return
+        _playback.value = cur.copy(track = t.copy(artist = name))
+        // Mirror the resolved name onto the media-session card (both idle + streaming paths).
+        val svc = MusicPlaybackService.instance
+        if (isStreaming.value) {
+            svc?.refreshStreamingMetadata(t.name, name)
+        } else {
+            svc?.setIdleMetadata(title = t.name, artist = name, albumArtUrl = t.albumArt, durationMs = t.durationMs)
+        }
+    }
 
     private suspend fun updatePlaybackFromState(state: PlayerStateData) {
         val track = state.track
@@ -1014,12 +1082,60 @@ class SpotifyViewModel : ViewModel() {
             }
             contextUri.contains(":album:") -> PlayingContext("Album", track?.albumName ?: "Album", contextUri)
             contextUri.contains(":artist:") -> PlayingContext("Artist", track?.artistName ?: "Artist", contextUri)
+            // A single track played with no collection context (search result, shared link, home
+            // shortcut) comes back with context_uri == the track's own uri. Spotify labels this
+            // "Playing from Search"; without this branch the header fell back to the bare "Now playing"
+            // placeholder. uri = null so the header isn't clickable (there's no context to open).
+            contextUri.startsWith("spotify:track:") ->
+                PlayingContext("Search", track?.displayArtist()?.takeIf { it != "Unknown" } ?: "Search", uri = null)
             else -> null
         }
     }
 
     private fun startPositionTicker() = positionInterpolator.start()
     private fun stopPositionTicker() = positionInterpolator.stop()
+
+    /**
+     * Toggle the Eternal Jukebox for the currently-streaming track. Only meaningful while streaming a
+     * track locally (it drives ExoPlayer seeks); a no-op otherwise. Logic only — no UI wired.
+     */
+    /**
+     * While the jukebox owns playback, force the Spotify Connect session to repeat the current track so
+     * the cloud never auto-advances the queue when the track's duration elapses (which would tear the
+     * engine down and jump to the next song). Restores the prior repeat mode when the jukebox turns off.
+     */
+    private fun startJukeboxRepeatGuard() {
+        if (jukeboxRepeatObserverStarted) return
+        jukeboxRepeatObserverStarted = true
+        viewModelScope.launch {
+            jukebox.enabled.collect { on ->
+                if (on && savedRepeatForJukebox == null) {
+                    savedRepeatForJukebox = _playback.value.repeatMode
+                    runCatching { player?.setRepeat("track") }
+                    _playback.value = _playback.value.copy(repeatMode = "track")
+                } else if (!on) {
+                    savedRepeatForJukebox?.let { prev ->
+                        runCatching { player?.setRepeat(prev) }
+                        _playback.value = _playback.value.copy(repeatMode = prev)
+                        savedRepeatForJukebox = null
+                    }
+                }
+            }
+        }
+    }
+
+    fun toggleJukebox() {
+        if (jukebox.isEnabled()) {
+            jukebox.disable()
+            return
+        }
+        val uri = currentStreamUri?.takeIf { it.startsWith("spotify:track:") }
+        if (uri == null) {
+            LokiLogger.i(TAG, "jukebox: not streaming a track, ignoring toggle")
+            return
+        }
+        jukebox.enable(uri)
+    }
 
     fun togglePlayPause() {
         commandJob?.cancel()
@@ -1426,6 +1542,7 @@ class SpotifyViewModel : ViewModel() {
             val newMode = if (_playback.value.isShuffling) "off" else "on"
             pc.setShuffle(newMode)
             _playback.value = _playback.value.copy(isShuffling = newMode != "off")
+            pushTransportButtonsToNotification()
         }
     }
 
@@ -1438,6 +1555,20 @@ class SpotifyViewModel : ViewModel() {
             }
             pc.setRepeat(newMode)
             _playback.value = _playback.value.copy(repeatMode = newMode)
+            pushTransportButtonsToNotification()
+        }
+    }
+
+    /** Mirror an in-app shuffle/repeat toggle onto the media-session notification's custom buttons,
+     *  which otherwise only refresh when toggled from the notification itself (same gap the like fix
+     *  closed for the heart). */
+    private fun pushTransportButtonsToNotification() {
+        viewModelScope.launch(Dispatchers.Main) {
+            MusicPlaybackService.instance?.let {
+                it.isShuffling = _playback.value.isShuffling
+                it.repeatMode = _playback.value.repeatMode
+                it.updateNotification()
+            }
         }
     }
 

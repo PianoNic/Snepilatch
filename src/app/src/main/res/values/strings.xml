@@ -183,6 +183,7 @@
     <string name="audio_output">Audio Output</string>
     <string name="equalizer">Equalizer</string>
     <string name="lyrics">Lyrics</string>
+    <string name="eternal_jukebox">Eternal Jukebox</string>
     <string name="view_queue">View Queue</string>
     <string name="visit_artist">Visit Artist</string>
     <string name="devices">Devices</string>

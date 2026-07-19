@@ -31,7 +31,11 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.RawResourceDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.SeekParameters
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import kotlinx.coroutines.CoroutineScope
@@ -65,6 +69,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     private val deezerProxy = DeezerDecryptProxy()
     lateinit var player: ExoPlayer
         private set
+
+    // Taps the decoded PCM in the audio pipeline — the foundation of the waveform-based seamless
+    // jukebox. Pass-through; only observes when analyzing is toggled on.
+    private val jukeboxTap = JukeboxAudioTap()
 
     private data class TrackMetadata(
         val title: String,
@@ -104,6 +112,11 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     var isLiked: Boolean = false
     var isShuffling: Boolean = false
     var repeatMode: String = "off"  // "off", "context", "track"
+
+    // True while the silent ad clip is skipping an ad: the media-session card keeps the previous
+    // track's metadata (no "Skipping ad…") and reports BUFFERING so the system notification shows a
+    // loading spinner, matching the in-app UI. Cleared when the next real track loads.
+    @Volatile private var isAdSkipping = false
     // Which extra buttons to show: "like", "shuffle", "repeat"
     var notificationLeftButton: String = "repeat"
     var notificationRightButton: String = "like"
@@ -208,10 +221,26 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 1_500,    // playback start buffer: 1.5s
                 3_000     // rebuffer: 3s
             )
+            // Retain up to 3 min of already-played audio. Costs no extra data (it just keeps what was
+            // downloaded) and lets the Eternal Jukebox's backward loop-jumps replay instantly instead
+            // of re-fetching from the CDN.
+            .setBackBuffer(180_000, true)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
-        player = ExoPlayer.Builder(this)
+        // Custom renderers factory so our PCM tap sits in the audio processor chain and can read the
+        // decoded waveform (for the seamless-jukebox engine). It passes audio through untouched.
+        val renderersFactory = object : DefaultRenderersFactory(this) {
+            override fun buildAudioSink(
+                context: android.content.Context,
+                enableFloatOutput: Boolean,
+                enableAudioTrackPlaybackParams: Boolean
+            ): AudioSink = DefaultAudioSink.Builder(context)
+                .setAudioProcessors(arrayOf(jukeboxTap))
+                .build()
+        }
+
+        player = ExoPlayer.Builder(this, renderersFactory)
             .setAudioAttributes(audioAttributes, true)
             .setLoadControl(loadControl)
             // Let ExoPlayer manage a wake/Wi-Fi lock for its OWN network needs (buffering). Note this
@@ -240,6 +269,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             }
 
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                // Pause/resume the remix engine with the session instead of tearing it down — a pause
+                // should hold the remix where it is, not drop out to the muted underlying track.
+                pauseJukebox(!playWhenReady)
+
                 // Keep the control plane (dealer socket + advance) awake for the whole play session,
                 // not just while ExoPlayer is buffering. Released on pause/stop to spare the battery.
                 if (playWhenReady) acquireControlPlaneLocks() else releaseControlPlaneLocks()
@@ -289,6 +322,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             }
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                // A real track change (skip / auto-advance / new queue) — not our own repeat loop —
+                // means the jukebox's captured song is no longer what's playing: tear it down.
+                if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) stopJukebox()
                 if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && metadataQueue.size > 1) {
                     // ExoPlayer auto-advanced to next track — swap metadata
                     metadataQueue.removeAt(0)
@@ -405,6 +441,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         startPositionMs: Long = 0L
     ) {
         LokiLogger.i(TAG, "Loading: $title by $artist -> ${url.take(80)} (play=$startPlaying, headers=${headers.keys}, pos=${startPositionMs}ms)")
+        isAdSkipping = false  // a real track is loading — end the ad-skip buffering state
         val meta = TrackMetadata(title, artist, albumArtUrl)
         metadataQueue.clear()
         metadataQueue.add(meta)
@@ -467,12 +504,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     @OptIn(UnstableApi::class)
     fun playSilentAd() {
         LokiLogger.i(TAG, "Ad — playing local silent clip (skipping)")
-        val meta = TrackMetadata("Skipping ad…", "", null)
-        metadataQueue.clear()
-        metadataQueue.add(meta)
-        currentTitle = "Skipping ad…"
-        currentArtist = ""
-        currentArt = null
+        // Keep the previous track's metadata frozen on the card (no "Skipping ad…"); the isAdSkipping
+        // flag makes updatePlaybackState report BUFFERING so the notification shows a loading spinner.
+        isAdSkipping = true
         val uri = RawResourceDataSource.buildRawResourceUri(ch.snepilatch.app.R.raw.silent_ad)
         mainHandler.post {
             val source = ProgressiveMediaSource.Factory(DefaultDataSource.Factory(this))
@@ -504,7 +538,38 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         }
     }
 
-    fun getCurrentPosition(): Long = player.currentPosition
+    // While the Eternal Jukebox engine owns the speaker, the true "where are we" is its playhead
+    // (which jumps around), not ExoPlayer's linear muted clock. When set, it overrides the reported
+    // position so the UI scrubber and the Spotify Connect reports jump with the audio.
+    @Volatile private var jukeboxPositionSource: (() -> Long)? = null
+    fun setJukeboxPositionSource(src: (() -> Long)?) { jukeboxPositionSource = src }
+
+    // Registered by the jukebox controller so the service can tear the detached engine down on ANY real
+    // playback change — a skip, an auto-advance, the app being swiped away, or the service dying. Without
+    // this the engine's own AudioTrack keeps playing the old track after a skip / with the app gone.
+    @Volatile private var jukeboxStopHook: (() -> Unit)? = null
+    fun setJukeboxStopHook(hook: (() -> Unit)?) { jukeboxStopHook = hook }
+    private fun stopJukebox() { jukeboxStopHook?.invoke() }
+
+    // Pausing should PAUSE the remix (keep the engine, just stop its audio), not tear it down. The
+    // controller registers this; the service calls it when playback is paused/resumed.
+    @Volatile private var jukeboxPauseHook: ((Boolean) -> Unit)? = null
+    fun setJukeboxPauseHook(hook: ((Boolean) -> Unit)?) { jukeboxPauseHook = hook }
+    private fun pauseJukebox(paused: Boolean) { jukeboxPauseHook?.invoke(paused) }
+
+    // While remixing, the track no longer has a meaningful linear position/duration, and the system
+    // media notification's seekbar would otherwise fight the engine (and can trigger an auto-advance
+    // when it "reaches the end"). Blank the duration/position so no seekbar is shown.
+    @Volatile private var jukeboxRemixing = false
+    fun setJukeboxRemixing(on: Boolean) {
+        jukeboxRemixing = on
+        mainHandler.post {
+            updateMediaSessionMetadata()
+            updatePlaybackState()
+        }
+    }
+
+    fun getCurrentPosition(): Long = jukeboxPositionSource?.invoke() ?: player.currentPosition
     fun isPlaying(): Boolean = player.isPlaying
 
     fun syncSeek(positionMs: Long) {
@@ -516,7 +581,76 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         }
     }
 
+    /**
+     * Toggle jukebox seek behaviour. When on, seeks snap to the nearest audio sync frame
+     * ([SeekParameters.CLOSEST_SYNC]) instead of exact-seeking, which avoids re-decoding from a distant
+     * keyframe on every beat jump — far smoother, at the cost of a few ms of position accuracy that's
+     * inaudible for beat matching. Restores exact seeking when off.
+     */
+    fun setJukeboxSeekMode(enabled: Boolean) {
+        mainHandler.post {
+            player.setSeekParameters(if (enabled) SeekParameters.CLOSEST_SYNC else SeekParameters.DEFAULT)
+            if (!enabled) player.volume = 1f // undo any in-flight jump fade
+        }
+    }
+
+    /** Turn the decoded-PCM waveform capture on/off; resets the buffer when turning on. */
+    fun setJukeboxAnalyzing(enabled: Boolean) {
+        if (enabled) jukeboxTap.resetCapture()
+        jukeboxTap.analyzing = enabled
+    }
+
+    fun jukeboxSampleRate(): Int = jukeboxTap.sampleRate()
+    fun jukeboxChannels(): Int = jukeboxTap.channelCount()
+    fun jukeboxCapturedFrames(): Int = jukeboxTap.capturedFrames()
+    fun jukeboxSnapshotMono(): ShortArray = jukeboxTap.snapshotMono()
+    fun jukeboxSnapshotInterleaved(): ShortArray = jukeboxTap.snapshotInterleaved()
+
+    /** Track duration in ms — MUST be called on the main thread. */
+    fun jukeboxDurationMs(): Long = player.duration
+
+    fun jukeboxSeekToStart() = mainHandler.post { if (player.mediaItemCount > 0) player.seekTo(0) }
+
+    /** Raw ExoPlayer position (NOT the jukebox override) — for the code-side loop guard. Main thread. */
+    fun jukeboxRawPositionMs(): Long = player.currentPosition
+
+    /**
+     * Hand the speaker to the PCM jukebox engine while keeping ExoPlayer's clock alive: mute it and keep
+     * it playing so [getCurrentPosition]'s underlying clock keeps advancing. We do NOT enable repeat here
+     * — the controller loops the muted player in code (seek back near the end), since ExoPlayer's own
+     * repeat sometimes fails to loop and lets the track end.
+     */
+    fun jukeboxSilentKeepAlive() = mainHandler.post {
+        player.volume = 0f
+        player.playWhenReady = true
+    }
+
+    /** Undo [jukeboxSilentKeepAlive]: unmute, keeping playback going. */
+    fun jukeboxRestorePlayback() = mainHandler.post {
+        player.volume = 1f
+    }
+
+    /**
+     * Jump for the Eternal Jukebox: cut the volume, seek, then fade back in over ~145ms so the seek's
+     * unavoidable decoder-flush gap happens in silence and the new beat eases in — masking the seam a
+     * plain [seekTo] would expose. (A true gapless crossfade isn't possible here: the audio is
+     * Widevine-DRM'd, so we can't decode it to PCM and mix two streams.)
+     */
+    fun jukeboxJump(positionMs: Long) {
+        mainHandler.post {
+            if (player.mediaItemCount == 0) return@post
+            val restore = if (player.volume > 0.1f) player.volume else 1f
+            player.volume = 0f
+            player.seekTo(positionMs)
+            val steps = 8
+            for (i in 1..steps) {
+                mainHandler.postDelayed({ player.volume = restore * (i.toFloat() / steps) }, i * 18L)
+            }
+        }
+    }
+
     fun stop() {
+        stopJukebox()
         metadataQueue.clear()
         currentDurationMs = 0L
         idleArtUrl = null
@@ -714,6 +848,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                    startPositionMs: Long = 0L,
                    pssh: String? = null) {
         LokiLogger.i(TAG, "Loading DRM: $title by $artist -> ${url.take(80)} (play=$startPlaying, pos=${startPositionMs}ms, pssh=${pssh != null})")
+        isAdSkipping = false  // a real track is loading — end the ad-skip buffering state
         val meta = TrackMetadata(title, artist, albumArtUrl)
         metadataQueue.clear()
         metadataQueue.add(meta)
@@ -776,6 +911,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         // fall back to currentDurationMs which is set by setIdleMetadata so
         // the system shows the right duration before the song actually loads.
         val duration = when {
+            jukeboxRemixing -> 0L // no seekbar in remix mode
             player.duration > 0 -> player.duration
             currentDurationMs > 0 -> currentDurationMs
             else -> 0L
@@ -791,22 +927,26 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
     private fun updatePlaybackState() {
         val state = when {
+            // While skipping an ad the silent clip is technically "playing"; report BUFFERING so the
+            // system notification shows a loading spinner instead of a play/pause on a frozen track.
+            isAdSkipping -> PlaybackStateCompat.STATE_BUFFERING
             player.isPlaying -> PlaybackStateCompat.STATE_PLAYING
             player.playbackState == Player.STATE_BUFFERING -> PlaybackStateCompat.STATE_BUFFERING
             player.playWhenReady -> PlaybackStateCompat.STATE_PAUSED
             else -> PlaybackStateCompat.STATE_PAUSED
         }
+        var actions = PlaybackStateCompat.ACTION_PLAY or
+            PlaybackStateCompat.ACTION_PAUSE or
+            PlaybackStateCompat.ACTION_PLAY_PAUSE or
+            PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
+            PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
+            PlaybackStateCompat.ACTION_STOP
+        if (!jukeboxRemixing) actions = actions or PlaybackStateCompat.ACTION_SEEK_TO
+        // In remix mode report an unknown position so the notification shows no seekbar to auto-advance.
+        val reportedPos = if (jukeboxRemixing) PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN else player.currentPosition
         val builder = PlaybackStateCompat.Builder()
-            .setActions(
-                PlaybackStateCompat.ACTION_PLAY or
-                PlaybackStateCompat.ACTION_PAUSE or
-                PlaybackStateCompat.ACTION_PLAY_PAUSE or
-                PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
-                PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
-                PlaybackStateCompat.ACTION_SEEK_TO or
-                PlaybackStateCompat.ACTION_STOP
-            )
-            .setState(state, player.currentPosition, 1f)
+            .setActions(actions)
+            .setState(state, reportedPos, 1f)
 
         // Add custom actions for left and right buttons
         fun addButtonAction(type: String, actionName: String) {
@@ -999,6 +1139,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         // App swiped from recents — kill everything
+        stopJukebox()
         player.stop()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -1059,6 +1200,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     }
 
     override fun onDestroy() {
+        stopJukebox()
         unregisterNetworkCallback()
         runCatching { unregisterReceiver(screenReceiver) }
         releaseControlPlaneLocks()

@@ -25,11 +25,13 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.TextUnit
 import ch.snepilatch.app.R
 import android.graphics.SurfaceTexture
 import android.net.Uri
@@ -49,6 +51,78 @@ import ch.snepilatch.app.util.formatTime
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
 
 /**
+ * The seek bar + elapsed/duration labels (or the jukebox remix timeline), pulled into its own leaf
+ * composable. rememberSmoothPositionMs updates once per display frame while playing; keeping that read
+ * — and the eager Slider `value`/formatTime reads it feeds — inside this leaf confines the per-frame
+ * invalidation here instead of recomposing the whole orientation Column each frame.
+ */
+@Composable
+private fun PlaybackProgress(
+    vm: SpotifyViewModel,
+    animatedPrimary: Color,
+    timeColor: Color,
+    timeFontSize: TextUnit,
+) {
+    // Self-contained on narrow projections: positionFlow (the only 2Hz source) is collected here so
+    // its ticks recompose this leaf, not the ~400-line orientation Column that hosts it.
+    val positionMs by vm.positionFlow.collectAsState()
+    val durationMs by vm.durationFlow.collectAsState()
+    val isPlaying by vm.isPlayingFlow.collectAsState()
+    val jukeboxOn by vm.jukeboxEnabled.collectAsState()
+    val jukeboxViz by vm.jukeboxViz.collectAsState()
+    var jukeboxElapsedMs by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(jukeboxOn) {
+        jukeboxElapsedMs = 0L
+        while (jukeboxOn) {
+            kotlinx.coroutines.delay(1000)
+            jukeboxElapsedMs += 1000
+        }
+    }
+    var seekDragging by remember { mutableStateOf(false) }
+    var seekDragValue by remember { mutableFloatStateOf(0f) }
+    val smoothPos = rememberSmoothPositionMs(positionMs, durationMs, isPlaying)
+    val sliderValue = if (seekDragging) seekDragValue
+        else if (durationMs > 0) (smoothPos.value.toFloat() / durationMs) else 0f
+    // Elapsed label at ~1Hz: the inner derived tracks whole seconds (recomputes per frame but only
+    // does integer division), the outer only re-runs formatTime when the second actually changes.
+    val elapsedSec by remember { derivedStateOf { smoothPos.value / 1000 } }
+    val elapsedLabel by remember { derivedStateOf { formatTime(elapsedSec * 1000) } }
+    if (jukeboxOn) {
+        JukeboxTimeline(
+            viz = jukeboxViz,
+            primary = animatedPrimary,
+            modifier = Modifier.fillMaxWidth()
+        )
+    } else {
+        Slider(
+            value = sliderValue,
+            onValueChange = { seekDragging = true; seekDragValue = it },
+            onValueChangeFinished = {
+                vm.seekTo((seekDragValue * durationMs).toLong())
+                seekDragging = false
+            },
+            thumb = {
+                Box(
+                    Modifier
+                        .size(width = 6.dp, height = 30.dp)
+                        .background(animatedPrimary, RoundedCornerShape(3.dp))
+                )
+            },
+            colors = SliderDefaults.colors(
+                thumbColor = animatedPrimary,
+                activeTrackColor = animatedPrimary,
+                inactiveTrackColor = SpotifyWhite.copy(alpha = 0.15f)
+            ),
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+    Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(if (jukeboxOn) "" else elapsedLabel, color = timeColor, fontSize = timeFontSize)
+        Text(if (jukeboxOn) formatTime(jukeboxElapsedMs) else formatTime(durationMs), color = timeColor, fontSize = timeFontSize)
+    }
+}
+
+/**
  * The now-playing background: Canvas video when enabled, otherwise the album's
  * accent colour with the blurred album art over it, topped by a dark scrim.
  * Extracted so the expanding-player morph (SpotifyApp) can render the same *live*
@@ -56,10 +130,143 @@ import ch.snepilatch.app.viewmodel.SpotifyViewModel
  * of a still. The video transform is recomputed on view resize so it stays
  * fit-cropped while the card grows.
  */
+/**
+ * Sizes the canvas video view to COVER a [boxW]x[boxH] box at the clip's own aspect ratio.
+ * requiredSize, not size: the cover width can exceed the box (1080px) and must NOT be clamped to it,
+ * or the video gets squished horizontally. The overflow is clipped by the caller's clipToBounds.
+ */
+private fun coverModifier(vw: Int, vh: Int, boxW: Float, boxH: Float, density: Density): Modifier {
+    if (vw <= 0 || vh <= 0 || minOf(boxW, boxH) <= 0f) return Modifier.fillMaxSize()
+    val scale = maxOf(boxW / vw, boxH / vh)
+    return Modifier.requiredSize(
+        with(density) { (vw * scale).toDp() },
+        with(density) { (vh * scale).toDp() }
+    )
+}
+
+/**
+ * The looping, muted Canvas clip behind the player, rendered into a TextureView sized to COVER the
+ * (possibly growing) card. Split out of PlayerBackground so the decoder/lifecycle wiring stays
+ * readable and isolated. [audioPlaying] gates the decoder: it runs only while audio actually plays
+ * and the screen is foreground, so a paused song freezes the last frame instead of decoding forever.
+ */
+@Composable
+private fun CanvasVideoBackground(canvasVideoUrl: String, audioPlaying: Boolean) {
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    var canvasPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
+    var textureRef by remember { mutableStateOf<TextureView?>(null) }
+    var surfaceReady by remember { mutableStateOf(false) }
+    var videoSizePx by remember { mutableStateOf(0 to 0) }
+    // Tracks whether the player screen is foreground (STARTED+). Combined with audioPlaying it
+    // decides whether the video decoder runs — so a paused song no longer decodes indefinitely.
+    var isForeground by remember { mutableStateOf(true) }
+
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(canvasVideoUrl, lifecycleOwner) {
+        val player = ExoPlayer.Builder(context).build().apply {
+            setMediaItem(MediaItem.fromUri(Uri.parse(canvasVideoUrl)))
+            repeatMode = Player.REPEAT_MODE_ALL
+            volume = 0f
+            playWhenReady = audioPlaying
+            addListener(object : Player.Listener {
+                override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
+                    videoSizePx = videoSize.width to videoSize.height
+                }
+            })
+            prepare()
+        }
+        canvasPlayer = player
+        if (surfaceReady) {
+            textureRef?.let { player.setVideoTextureView(it) }
+        }
+
+        // Track foreground state with the activity lifecycle (handles backgrounding); the
+        // playWhenReady value itself is driven by the LaunchedEffect below (audio-gated).
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_START,
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> {
+                    isForeground = true
+                    // Re-attach surface to force frame refresh after resume
+                    if (surfaceReady) {
+                        textureRef?.let {
+                            player.clearVideoTextureView(it)
+                            player.setVideoTextureView(it)
+                        }
+                    }
+                }
+                androidx.lifecycle.Lifecycle.Event.ON_STOP -> {
+                    isForeground = false
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            player.release()
+            canvasPlayer = null
+        }
+    }
+
+    // Freeze the canvas video whenever audio is paused or the screen is backgrounded. This second
+    // ExoPlayer otherwise keeps hardware-decoding the looping clip every frame regardless of
+    // playback state — a continuous decoder + GPU-composite load as hot as the fluid warp.
+    LaunchedEffect(canvasPlayer, audioPlaying, isForeground) {
+        canvasPlayer?.playWhenReady = audioPlaying && isForeground
+    }
+
+    // Size the TextureView to COVER the (growing) card at the video's aspect
+    // ratio, then centre + clip it. The view's own bounds already match the
+    // video aspect, so the raw TextureView fills them without distortion — no
+    // per-frame matrix that loses the race with layout while the card resizes.
+    BoxWithConstraints(Modifier.fillMaxSize().clipToBounds()) {
+        val (vw, vh) = videoSizePx
+        val coverMod = coverModifier(
+            vw, vh, constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat(), density
+        )
+        AndroidView(
+            factory = { ctx ->
+                TextureView(ctx).apply {
+                    surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+                        override fun onSurfaceTextureAvailable(
+                            surface: SurfaceTexture, width: Int, height: Int
+                        ) {
+                            surfaceReady = true
+                            textureRef = this@apply
+                            canvasPlayer?.setVideoTextureView(this@apply)
+                        }
+                        override fun onSurfaceTextureSizeChanged(
+                            surface: SurfaceTexture, width: Int, height: Int
+                        ) {}
+                        override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
+                            surfaceReady = false
+                            canvasPlayer?.clearVideoTextureView(this@apply)
+                            return true
+                        }
+                        override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {}
+                    }
+                    textureRef = this
+                }
+            },
+            update = { texture ->
+                if (surfaceReady) {
+                    canvasPlayer?.setVideoTextureView(texture)
+                }
+            },
+            modifier = coverMod.align(Alignment.Center)
+        )
+    }
+}
+
 @Composable
 fun PlayerBackground(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
-    val playback by vm.playback.collectAsState()
-    val track = playback.track
+    // Narrow projections only — the background never shows position, so it must not recompose at 2Hz.
+    val track by vm.currentTrack.collectAsState()
+    val isPlaying by vm.isPlayingFlow.collectAsState()
+    val isPaused by vm.isPausedFlow.collectAsState()
     val theme by vm.themeColors.collectAsState()
     val animatedPrimary by animateColorAsState(theme.primary, tween(800), label = "bgPrimary")
     val animatedPrimaryDark by animateColorAsState(theme.primaryDark, tween(800), label = "bgPrimaryDark")
@@ -67,121 +274,18 @@ fun PlayerBackground(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
     val canvasVideoUrl by vm.canvasUrl.collectAsState()
     val canvasOn by vm.canvasEnabled.collectAsState()
     val hasCanvas = canvasOn && canvasVideoUrl != null
+    // Whether audio is actively playing (not merely non-paused): gates the Canvas video decoder below.
+    val audioPlaying = isPlaying && !isPaused
 
     Box(modifier) {
         // Canvas video background (looping, muted)
-        if (canvasOn && canvasVideoUrl != null) {
-            val context = LocalContext.current
-            val density = LocalDensity.current
-            var canvasPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
-            var textureRef by remember { mutableStateOf<TextureView?>(null) }
-            var surfaceReady by remember { mutableStateOf(false) }
-            var videoSizePx by remember { mutableStateOf(0 to 0) }
-
-            val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-            DisposableEffect(canvasVideoUrl, lifecycleOwner) {
-                val player = ExoPlayer.Builder(context).build().apply {
-                    setMediaItem(MediaItem.fromUri(Uri.parse(canvasVideoUrl!!)))
-                    repeatMode = Player.REPEAT_MODE_ALL
-                    volume = 0f
-                    playWhenReady = true
-                    addListener(object : Player.Listener {
-                        override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
-                            videoSizePx = videoSize.width to videoSize.height
-                        }
-                    })
-                    prepare()
-                }
-                canvasPlayer = player
-                if (surfaceReady) {
-                    textureRef?.let { player.setVideoTextureView(it) }
-                }
-
-                // Pause/resume canvas with activity lifecycle (handles backgrounding)
-                val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-                    when (event) {
-                        androidx.lifecycle.Lifecycle.Event.ON_START,
-                        androidx.lifecycle.Lifecycle.Event.ON_RESUME -> {
-                            player.playWhenReady = true
-                            // Re-attach surface to force frame refresh after resume
-                            if (surfaceReady) {
-                                textureRef?.let {
-                                    player.clearVideoTextureView(it)
-                                    player.setVideoTextureView(it)
-                                }
-                            }
-                        }
-                        androidx.lifecycle.Lifecycle.Event.ON_STOP -> {
-                            player.playWhenReady = false
-                        }
-                        else -> {}
-                    }
-                }
-                lifecycleOwner.lifecycle.addObserver(observer)
-
-                onDispose {
-                    lifecycleOwner.lifecycle.removeObserver(observer)
-                    player.release()
-                    canvasPlayer = null
-                }
-            }
-
-            // Size the TextureView to COVER the (growing) card at the video's aspect
-            // ratio, then centre + clip it. The view's own bounds already match the
-            // video aspect, so the raw TextureView fills them without distortion — no
-            // per-frame matrix that loses the race with layout while the card resizes.
-            BoxWithConstraints(Modifier.fillMaxSize().clipToBounds()) {
-                val (vw, vh) = videoSizePx
-                val boxW = constraints.maxWidth.toFloat()
-                val boxH = constraints.maxHeight.toFloat()
-                val coverMod = if (vw > 0 && vh > 0 && minOf(boxW, boxH) > 0f) {
-                    val scale = maxOf(boxW / vw, boxH / vh)
-                    // requiredSize, not size: the cover width can exceed the box
-                    // (1080px) and must NOT be clamped to it, or the video gets
-                    // squished horizontally. The overflow is clipped by clipToBounds.
-                    Modifier.requiredSize(
-                        with(density) { (vw * scale).toDp() },
-                        with(density) { (vh * scale).toDp() }
-                    )
-                } else {
-                    Modifier.fillMaxSize()
-                }
-                AndroidView(
-                    factory = { ctx ->
-                        TextureView(ctx).apply {
-                            surfaceTextureListener = object : TextureView.SurfaceTextureListener {
-                                override fun onSurfaceTextureAvailable(
-                                    surface: SurfaceTexture, width: Int, height: Int
-                                ) {
-                                    surfaceReady = true
-                                    textureRef = this@apply
-                                    canvasPlayer?.setVideoTextureView(this@apply)
-                                }
-                                override fun onSurfaceTextureSizeChanged(
-                                    surface: SurfaceTexture, width: Int, height: Int
-                                ) {}
-                                override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
-                                    surfaceReady = false
-                                    canvasPlayer?.clearVideoTextureView(this@apply)
-                                    return true
-                                }
-                                override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {}
-                            }
-                            textureRef = this
-                        }
-                    },
-                    update = { texture ->
-                        if (surfaceReady) {
-                            canvasPlayer?.setVideoTextureView(texture)
-                        }
-                    },
-                    modifier = coverMod.align(Alignment.Center)
-                )
-            }
+        val url = canvasVideoUrl
+        if (canvasOn && url != null) {
+            CanvasVideoBackground(url, audioPlaying)
         } else {
             AlbumBackdrop(
                 gradientBg, animatedPrimary, animatedPrimaryDark, track?.albumArt,
-                isPlaying = playback.isPlaying && !playback.isPaused
+                isPlaying = audioPlaying
             )
         }
         // Dark overlay — lighter over the gradient (it already darkens toward the bottom) so the album
@@ -255,8 +359,14 @@ fun NowPlayingScreen(
     /** Drag release with vertical velocity (px/s) so the morph can settle. */
     onMorphDragEnd: ((Float) -> Unit)? = null
 ) {
-    val playback by vm.playback.collectAsState()
-    val track = playback.track
+    // Narrow projections only — positionMs (the 2Hz field) is read exclusively inside PlaybackProgress,
+    // so the ~400-line orientation Columns below never recompose on position ticks.
+    val track by vm.currentTrack.collectAsState()
+    val isPlaying by vm.isPlayingFlow.collectAsState()
+    val isPaused by vm.isPausedFlow.collectAsState()
+    val isAd by vm.isAdFlow.collectAsState()
+    val isShuffling by vm.isShufflingFlow.collectAsState()
+    val repeatMode by vm.repeatModeFlow.collectAsState()
     // While an ad is being skipped we keep the CURRENT song frozen on screen (cover/title/progress)
     // and show a loading spinner (see spinnerActive) — so the ~2.5s ad skip reads as "loading the next
     // track", not an interruption. `track` is unchanged during an ad, so no blanking is needed.
@@ -265,7 +375,7 @@ fun NowPlayingScreen(
     val displayArtUrl: String? = track?.albumArt
     val streamLoading by vm.isStreamLoading.collectAsState()
     // Spinner spans the whole ad skip: isAd covers the ad dwell, streamLoading the post-ad resolve.
-    val spinnerActive = streamLoading || playback.isAd
+    val spinnerActive = streamLoading || isAd
     val theme by vm.themeColors.collectAsState()
 
     // Prefetch the next track's cover so the slide-in on skip is instant (no load gap).
@@ -455,56 +565,14 @@ fun NowPlayingScreen(
 
                         Spacer(Modifier.height(8.dp))
 
-                        // Progress bar — or the jukebox remix map while remixing.
-                        val jukeboxOnL by vm.jukeboxEnabled.collectAsState()
-                        val jukeboxVizL by vm.jukeboxViz.collectAsState()
-                        var jukeboxElapsedMsL by remember { mutableLongStateOf(0L) }
-                        LaunchedEffect(jukeboxOnL) {
-                            jukeboxElapsedMsL = 0L
-                            while (jukeboxOnL) {
-                                kotlinx.coroutines.delay(1000)
-                                jukeboxElapsedMsL += 1000
-                            }
-                        }
-                        var seekDragging by remember { mutableStateOf(false) }
-                        var seekDragValue by remember { mutableFloatStateOf(0f) }
-                        val smoothPos =
-                            rememberSmoothPositionMs(playback.positionMs, playback.durationMs, playback.isPlaying)
-                        val sliderValue = if (seekDragging) seekDragValue
-                        else if (playback.durationMs > 0) (smoothPos.toFloat() / playback.durationMs) else 0f
-                        if (jukeboxOnL) {
-                            JukeboxTimeline(
-                                viz = jukeboxVizL,
-                                primary = animatedPrimary,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        } else {
-                            Slider(
-                                value = sliderValue,
-                                onValueChange = { seekDragging = true; seekDragValue = it },
-                                onValueChangeFinished = {
-                                    vm.seekTo((seekDragValue * playback.durationMs).toLong())
-                                    seekDragging = false
-                                },
-                                thumb = {
-                                    Box(
-                                        Modifier
-                                            .size(width = 6.dp, height = 30.dp)
-                                            .background(animatedPrimary, RoundedCornerShape(3.dp))
-                                    )
-                                },
-                                colors = SliderDefaults.colors(
-                                    thumbColor = animatedPrimary,
-                                    activeTrackColor = animatedPrimary,
-                                    inactiveTrackColor = SpotifyWhite.copy(alpha = 0.15f)
-                                ),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(if (jukeboxOnL) "" else formatTime(smoothPos), color = SpotifyLightGray, fontSize = 11.sp)
-                            Text(if (jukeboxOnL) formatTime(jukeboxElapsedMsL) else formatTime(playback.durationMs), color = SpotifyLightGray, fontSize = 11.sp)
-                        }
+                        // Progress bar — or the jukebox remix map while remixing. Extracted to a leaf so
+                        // its per-frame smooth-position updates recompose only the bar, not this Column.
+                        PlaybackProgress(
+                            vm = vm,
+                            animatedPrimary = animatedPrimary,
+                            timeColor = SpotifyLightGray,
+                            timeFontSize = 11.sp,
+                        )
 
                         Spacer(Modifier.weight(0.2f))
 
@@ -515,7 +583,7 @@ fun NowPlayingScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             FilledTonalIconToggleButton(
-                                checked = playback.isShuffling,
+                                checked = isShuffling,
                                 onCheckedChange = { vm.toggleShuffle() },
                                 colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
                                     containerColor = buttonBg,
@@ -549,7 +617,7 @@ fun NowPlayingScreen(
                                     LoadingIndicator(color = SpotifyWhite, modifier = Modifier.size(26.dp))
                                 } else {
                                     Icon(
-                                        if (playback.isPaused || !playback.isPlaying) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
+                                        if (isPaused || !isPlaying) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
                                         stringResource(R.string.play_pause), modifier = Modifier.size(32.dp)
                                     )
                                 }
@@ -572,7 +640,7 @@ fun NowPlayingScreen(
                                 }
                             }
                             FilledTonalIconToggleButton(
-                                checked = playback.repeatMode != "off",
+                                checked = repeatMode != "off",
                                 onCheckedChange = { vm.cycleRepeat() },
                                 colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
                                     containerColor = buttonBg,
@@ -583,7 +651,7 @@ fun NowPlayingScreen(
                                 modifier = Modifier.size(44.dp),
                             ) {
                                 Icon(
-                                    when (playback.repeatMode) { "track" -> Icons.Rounded.RepeatOne; else -> Icons.Rounded.Repeat },
+                                    when (repeatMode) { "track" -> Icons.Rounded.RepeatOne; else -> Icons.Rounded.Repeat },
                                     stringResource(R.string.repeat),
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -823,6 +891,7 @@ fun NowPlayingScreen(
                                 text = displayTitle,
                                 color = SpotifyWhite,
                                 fontSize = 22.sp,
+                                isPlaying = isPlaying,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(Modifier.height(2.dp))
@@ -830,14 +899,16 @@ fun NowPlayingScreen(
                                 text = displayArtist,
                                 color = secondaryText,
                                 fontSize = 15.sp,
+                                isPlaying = isPlaying,
                                 modifier = Modifier.clickable { vm.openArtistFromCurrentTrack() }
                             )
-                            track?.albumName?.takeIf { !playback.isAd }?.let {
+                            track?.albumName?.takeIf { !isAd }?.let {
                                 Spacer(Modifier.height(2.dp))
                                 MarqueeText(
                                     text = it,
                                     color = tertiaryText,
                                     fontSize = 13.sp,
+                                    isPlaying = isPlaying,
                                     modifier = Modifier.clickable { vm.openAlbumFromCurrentTrack() }
                                 )
                             }
@@ -881,56 +952,14 @@ fun NowPlayingScreen(
 
                     Spacer(Modifier.height(20.dp))
 
-                    // Progress bar — thick rounded bar, or the jukebox remix map while remixing.
-                    val jukeboxOn by vm.jukeboxEnabled.collectAsState()
-                    val jukeboxViz by vm.jukeboxViz.collectAsState()
-                    var jukeboxElapsedMs by remember { mutableLongStateOf(0L) }
-                    LaunchedEffect(jukeboxOn) {
-                        jukeboxElapsedMs = 0L
-                        while (jukeboxOn) {
-                            kotlinx.coroutines.delay(1000)
-                            jukeboxElapsedMs += 1000
-                        }
-                    }
-                    var seekDragging by remember { mutableStateOf(false) }
-                    var seekDragValue by remember { mutableFloatStateOf(0f) }
-                    val smoothPos =
-                        rememberSmoothPositionMs(playback.positionMs, playback.durationMs, playback.isPlaying)
-                    val sliderValue = if (seekDragging) seekDragValue
-                        else if (playback.durationMs > 0) (smoothPos.toFloat() / playback.durationMs) else 0f
-                    if (jukeboxOn) {
-                        JukeboxTimeline(
-                            viz = jukeboxViz,
-                            primary = animatedPrimary,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    } else {
-                        Slider(
-                            value = sliderValue,
-                            onValueChange = { seekDragging = true; seekDragValue = it },
-                            onValueChangeFinished = {
-                                vm.seekTo((seekDragValue * playback.durationMs).toLong())
-                                seekDragging = false
-                            },
-                            thumb = {
-                                Box(
-                                    Modifier
-                                        .size(width = 6.dp, height = 30.dp)
-                                        .background(animatedPrimary, RoundedCornerShape(3.dp))
-                                )
-                            },
-                            colors = SliderDefaults.colors(
-                                thumbColor = animatedPrimary,
-                                activeTrackColor = animatedPrimary,
-                                inactiveTrackColor = SpotifyWhite.copy(alpha = 0.15f)
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(if (jukeboxOn) "" else formatTime(smoothPos), color = secondaryText, fontSize = 12.sp)
-                        Text(if (jukeboxOn) formatTime(jukeboxElapsedMs) else formatTime(playback.durationMs), color = secondaryText, fontSize = 12.sp)
-                    }
+                    // Progress bar — thick rounded bar, or the jukebox remix map while remixing. Extracted
+                    // to a leaf so its per-frame smooth-position updates recompose only the bar, not this Column.
+                    PlaybackProgress(
+                        vm = vm,
+                        animatedPrimary = animatedPrimary,
+                        timeColor = secondaryText,
+                        timeFontSize = 12.sp,
+                    )
 
                     Spacer(Modifier.weight(0.15f))
 
@@ -942,7 +971,7 @@ fun NowPlayingScreen(
                     ) {
                         // Shuffle
                         FilledTonalIconToggleButton(
-                            checked = playback.isShuffling,
+                            checked = isShuffling,
                             onCheckedChange = { vm.toggleShuffle() },
                             colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
                                 containerColor = buttonBg,
@@ -981,7 +1010,7 @@ fun NowPlayingScreen(
                                 )
                             } else {
                                 Icon(
-                                    if (playback.isPaused || !playback.isPlaying) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
+                                    if (isPaused || !isPlaying) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
                                     stringResource(R.string.play_pause), modifier = Modifier.size(38.dp)
                                 )
                             }
@@ -1006,7 +1035,7 @@ fun NowPlayingScreen(
                         }
                         // Repeat
                         FilledTonalIconToggleButton(
-                            checked = playback.repeatMode != "off",
+                            checked = repeatMode != "off",
                             onCheckedChange = { vm.cycleRepeat() },
                             colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
                                 containerColor = buttonBg,
@@ -1017,7 +1046,7 @@ fun NowPlayingScreen(
                             modifier = Modifier.size(52.dp),
                         ) {
                             Icon(
-                                when (playback.repeatMode) { "track" -> Icons.Rounded.RepeatOne; else -> Icons.Rounded.Repeat },
+                                when (repeatMode) { "track" -> Icons.Rounded.RepeatOne; else -> Icons.Rounded.Repeat },
                                 stringResource(R.string.repeat),
                                 modifier = Modifier.size(22.dp)
                             )
@@ -1372,6 +1401,7 @@ private fun MarqueeText(
     text: String,
     color: androidx.compose.ui.graphics.Color,
     fontSize: androidx.compose.ui.unit.TextUnit,
+    isPlaying: Boolean,
     fontWeight: FontWeight? = null,
     modifier: Modifier = Modifier
 ) {
@@ -1381,8 +1411,10 @@ private fun MarqueeText(
         fontSize = fontSize,
         fontWeight = fontWeight,
         maxLines = 1,
+        // Scroll forever while playing (so long titles always reveal their tail), but disable the
+        // animation when paused (iterations = 0) so this per-frame marquee loop stops requesting frames.
         modifier = modifier.basicMarquee(
-            iterations = Int.MAX_VALUE,
+            iterations = if (isPlaying) Int.MAX_VALUE else 0,
             velocity = 40.dp
         )
     )

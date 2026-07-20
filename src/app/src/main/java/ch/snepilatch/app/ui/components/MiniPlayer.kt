@@ -92,17 +92,24 @@ fun MiniPlayerContent(
     vm: SpotifyViewModel,
     modifier: Modifier = Modifier
 ) {
-    val playback by vm.playback.collectAsState()
-    val track = playback.track ?: return
+    // Collect only the fields the mini bar draws, each distinctUntilChanged, instead of the whole
+    // PlaybackUiState — otherwise the 2Hz positionMs rewrite recomposes this whole bar on every screen
+    // twice a second. positionMs is read only inside MiniProgressBar below.
+    val track by vm.currentTrack.collectAsState()
+    val trackInfo = track ?: return
+    val isPlaying by vm.isPlayingFlow.collectAsState()
+    val isPaused by vm.isPausedFlow.collectAsState()
+    val isAd by vm.isAdFlow.collectAsState()
+    val durationMs by vm.durationFlow.collectAsState()
     // Ads are handled invisibly: keep the current song shown and let the play button spin (below) for
     // the skip, so it reads as loading the next track rather than "Skipping ad".
-    val displayTitle = track.name
-    val displayArtist = track.artist
-    val displayArtUrl: String? = track.albumArt
+    val displayTitle = trackInfo.name
+    val displayArtist = trackInfo.artist
+    val displayArtUrl: String? = trackInfo.albumArt
     val theme by vm.themeColors.collectAsState()
     val animatedPrimary by animateColorAsState(theme.primary, tween(800), label = "miniPrimary")
     val streamLoading by vm.isStreamLoading.collectAsState()
-    val spinnerActive = streamLoading || playback.isAd
+    val spinnerActive = streamLoading || isAd
 
     Column(modifier.fillMaxWidth()) {
         Row(
@@ -131,7 +138,7 @@ fun MiniPlayerContent(
                     )
                 } else {
                     Icon(
-                        if (playback.isPaused || !playback.isPlaying) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
+                        if (isPaused || !isPlaying) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
                         stringResource(R.string.play_pause), tint = SpotifyWhite, modifier = Modifier.size(28.dp)
                     )
                 }
@@ -145,18 +152,31 @@ fun MiniPlayerContent(
                 )
             }
         }
-        if (playback.durationMs > 0) {
-            val smoothPos = rememberSmoothPositionMs(playback.positionMs, playback.durationMs, playback.isPlaying)
-            LinearProgressIndicator(
-                progress = { (smoothPos.toFloat() / playback.durationMs).coerceIn(0f, 1f) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(2.dp)
-                    .padding(horizontal = 10.dp),
-                color = animatedPrimary,
-                trackColor = SpotifyLightGray.copy(alpha = 0.2f),
-            )
+        if (durationMs > 0) {
+            MiniProgressBar(vm, durationMs, animatedPrimary)
         }
         Spacer(Modifier.height(6.dp))
     }
+}
+
+/**
+ * The 2dp progress bar as its own leaf. It — and only it — collects the 2Hz positionFlow, so the
+ * interpolator's position ticks recompose this tiny bar instead of the whole MiniPlayerContent body.
+ */
+@Composable
+private fun MiniProgressBar(vm: SpotifyViewModel, durationMs: Long, color: Color) {
+    val positionMs by vm.positionFlow.collectAsState()
+    val isPlaying by vm.isPlayingFlow.collectAsState()
+    val smoothPos = rememberSmoothPositionMs(positionMs, durationMs, isPlaying)
+    LinearProgressIndicator(
+        // Read .value inside the progress lambda (draw phase) so per-frame position updates
+        // redraw only this 2dp bar, not this composable's body.
+        progress = { (smoothPos.value.toFloat() / durationMs).coerceIn(0f, 1f) },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(2.dp)
+            .padding(horizontal = 10.dp),
+        color = color,
+        trackColor = SpotifyLightGray.copy(alpha = 0.2f),
+    )
 }

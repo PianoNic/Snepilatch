@@ -96,7 +96,9 @@ private val MorphCardPadV = 6.dp
 @Composable
 fun SpotifyApp(vm: SpotifyViewModel) {
     val screen by vm.currentScreen.collectAsState()
-    val playback by vm.playback.collectAsState()
+    // Only whether a track exists — collecting the whole PlaybackUiState here would recompose the
+    // entire app root twice a second, since the interpolator rewrites positionMs at 2Hz.
+    val currentTrackUri by vm.currentTrackUri.collectAsState()
     val showDevices by vm.showDevices.collectAsState()
     val hazeState = remember { HazeState() }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -104,7 +106,7 @@ fun SpotifyApp(vm: SpotifyViewModel) {
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
 
-    val hasTrack = playback.track != null
+    val hasTrack = currentTrackUri != null
     // 0f = mini bar, 1f = full player. Single source of truth for the morph.
     val expand = remember { Animatable(0f) }
     // The full player counts as "open" for NOW_PLAYING and for LYRICS (which

@@ -70,13 +70,15 @@ Don't try to extract playback. The handler-extraction + test rig pattern (see `R
 
 ## KotifyClient is a local jar
 
-`app/libs/KotifyClient.jar` is the obfuscated jar from `../KotifyClient`, gitignored. To rebuild after a Kotify change:
+`app/libs/KotifyClient.jar` is the obfuscated jar from `../KotifyClient`, gitignored. To rebuild after a Kotify change (paths are relative to this repo root):
 
 ```sh
 cd ../KotifyClient
 ./gradlew obfuscate
-cp build/libs/KotifyClient-obfuscated.jar ../snepilatch/src/app/libs/KotifyClient.jar
+cp build/libs/KotifyClient-obfuscated.jar ../Snepilatch/src/app/libs/KotifyClient.jar
 ```
+
+**Symptom of a stale jar:** `:app:compileProdDebugKotlin` fails with a wall of unresolved references in `SpotifyViewModel.kt` (`onAd`, `onSeek`, `artistNames`, `passthroughUrl`, `saveToLibrary`, wrong `playTrack` arity). That is the committed jar lagging the app source — rebuild it with the recipe above. It is not a bug in whatever file you were editing.
 
 ## Logging
 

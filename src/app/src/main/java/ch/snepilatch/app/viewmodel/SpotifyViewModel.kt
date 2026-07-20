@@ -192,6 +192,39 @@ class SpotifyViewModel : ViewModel() {
         .map { it.isPlaying }
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    // Further single-field projections so the mini-player and player screens can collect exactly what
+    // they draw instead of the whole PlaybackUiState — otherwise the interpolator's 2Hz positionMs
+    // rewrite recomposes every one of those composables twice a second, app-wide. positionFlow is the
+    // only 2Hz projection and must be collected ONLY inside a progress-bar leaf.
+    val currentTrack: StateFlow<TrackInfo?> = _playback
+        .map { it.track }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    val isPausedFlow: StateFlow<Boolean> = _playback
+        .map { it.isPaused }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val isAdFlow: StateFlow<Boolean> = _playback
+        .map { it.isAd }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val durationFlow: StateFlow<Long> = _playback
+        .map { it.durationMs }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0L)
+    val isShufflingFlow: StateFlow<Boolean> = _playback
+        .map { it.isShuffling }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val repeatModeFlow: StateFlow<String> = _playback
+        .map { it.repeatMode }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "off")
+    val positionFlow: StateFlow<Long> = _playback
+        .map { it.positionMs }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0L)
     private val positionInterpolator = PositionInterpolator(
         scope = viewModelScope,
         playback = _playback,

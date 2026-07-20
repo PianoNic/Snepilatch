@@ -29,7 +29,7 @@ import coil.compose.AsyncImage
  *   2. BLUR  — a heavy blur that melts the warped art into flowing colour blobs (Kawarp runs 8 Kawase
  *              passes at 128px; we use a large native RenderEffect blur to the same end).
  *   3. GRADE — un-scale, vignette, saturation boost (1.5) and temporal dithering.
- * The warp clock runs fast while playing and nearly freezes when paused. Android 13+ (RuntimeShader);
+ * The warp clock runs (throttled to ~30fps) while playing and stops entirely when paused. Android 13+ (RuntimeShader);
  * older devices fall back to a static blurred cover.
  */
 @Composable
@@ -80,12 +80,22 @@ private fun KawarpBackground(
     val time = remember { mutableFloatStateOf(0f) }
 
     LaunchedEffect(isPlaying) {
+        // Frozen when paused: stop requesting frames entirely so the graphicsLayer below (which
+        // rebuilds a 3-effect native RenderEffect chain on every read of time) stops invalidating.
+        // The effect is keyed on isPlaying, so it restarts cleanly on resume.
+        if (!isPlaying) return@LaunchedEffect
         var last = 0L
+        var acc = 0f
         while (true) {
             val frame = withFrameNanos { it }
             if (last != 0L) {
-                val dt = (frame - last) / 1_000_000_000f
-                time.floatValue += dt * (if (isPlaying) 1f else 0.15f)
+                acc += (frame - last) / 1_000_000_000f
+                // Throttle to ~30fps: only advance the clock (and thus invalidate the warp/blur/grade
+                // rebuild) once ~33ms of real time has accumulated, instead of every 120Hz vsync.
+                if (acc >= 0.033f) {
+                    time.floatValue += acc
+                    acc = 0f
+                }
             }
             last = frame
         }

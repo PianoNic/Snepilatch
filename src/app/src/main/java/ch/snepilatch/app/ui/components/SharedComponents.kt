@@ -40,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -162,11 +163,13 @@ fun SpotifyImage(
  * second. Costs nothing when paused or off-screen — no frames are requested.
  */
 @Composable
-fun rememberSmoothPositionMs(positionMs: Long, durationMs: Long, isPlaying: Boolean): Long {
-    var displayed by remember { mutableLongStateOf(positionMs) }
+fun rememberSmoothPositionMs(positionMs: Long, durationMs: Long, isPlaying: Boolean): State<Long> {
+    // Returns the State rather than its value so the per-frame write only recomposes/redraws the
+    // leaf that reads `.value` (ideally inside a draw-phase lambda), not the caller's whole body.
+    val displayed = remember { mutableLongStateOf(positionMs) }
     LaunchedEffect(positionMs, isPlaying, durationMs) {
         if (!isPlaying) {
-            displayed = positionMs
+            displayed.longValue = positionMs
             return@LaunchedEffect
         }
         val cap = if (durationMs > 0) durationMs else Long.MAX_VALUE
@@ -174,7 +177,7 @@ fun rememberSmoothPositionMs(positionMs: Long, durationMs: Long, isPlaying: Bool
         while (true) {
             withFrameNanos { frame ->
                 if (anchorFrame < 0) anchorFrame = frame
-                displayed = (positionMs + (frame - anchorFrame) / 1_000_000L).coerceIn(0L, cap)
+                displayed.longValue = (positionMs + (frame - anchorFrame) / 1_000_000L).coerceIn(0L, cap)
             }
         }
     }

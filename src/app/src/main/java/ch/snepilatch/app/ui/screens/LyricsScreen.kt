@@ -50,8 +50,12 @@ import kotify.api.lyrics.SyncedLine
 
 @Composable
 fun LyricsScreen(vm: SpotifyViewModel) {
-    val playback by vm.playback.collectAsState()
-    val track = playback.track
+    // Narrow projections — the lyrics scaffold must not recompose on the 2Hz position tick; position
+    // is consumed only through the smoothPosition state below (mutated off the flow, not read here).
+    val track by vm.currentTrack.collectAsState()
+    val isPlayingRaw by vm.isPlayingFlow.collectAsState()
+    val isPaused by vm.isPausedFlow.collectAsState()
+    val repeatMode by vm.repeatModeFlow.collectAsState()
     val theme by vm.themeColors.collectAsState()
     val lyrics by vm.lyrics.collectAsState()
     val isLoading by vm.isLyricsLoading.collectAsState()
@@ -65,26 +69,34 @@ fun LyricsScreen(vm: SpotifyViewModel) {
     // Smooth position interpolation:
     // We remember the wall-clock time when the ViewModel last gave us a position,
     // then each frame we compute: lastKnownPos + (now - lastKnownWallClock)
-    val smoothPosition = remember { mutableLongStateOf(playback.positionMs) }
-    val lastKnownPos = remember { mutableLongStateOf(playback.positionMs) }
+    val smoothPosition = remember { mutableLongStateOf(vm.positionFlow.value) }
+    val lastKnownPos = remember { mutableLongStateOf(vm.positionFlow.value) }
     val lastKnownWallClock = remember { mutableLongStateOf(System.currentTimeMillis()) }
-    val isPlaying = playback.isPlaying && !playback.isPaused
+    val isPlaying = isPlayingRaw && !isPaused
 
-    // When ViewModel position changes, record the new anchor point
-    LaunchedEffect(playback.positionMs) {
-        lastKnownPos.longValue = playback.positionMs
-        lastKnownWallClock.longValue = System.currentTimeMillis()
-        smoothPosition.longValue = playback.positionMs
+    // Re-anchor whenever an authoritative position arrives. Collecting the flow inside the coroutine
+    // (instead of keying a LaunchedEffect on a composition read) keeps the 2Hz ticks from recomposing
+    // the whole lyrics scaffold — only smoothPosition mutates, which only the lyric leaves read.
+    LaunchedEffect(Unit) {
+        vm.positionFlow.collect { pos ->
+            lastKnownPos.longValue = pos
+            lastKnownWallClock.longValue = System.currentTimeMillis()
+            smoothPosition.longValue = pos
+        }
     }
 
-    // Each frame, compute interpolated position from anchor
-    LaunchedEffect(isPlaying) {
-        if (!isPlaying) return@LaunchedEffect
+    // Only LINE/SYLLABLE-synced lyrics drive a per-frame karaoke reveal; unsynced/loading/no-lyrics
+    // tracks don't need the frame loop at all (the coarse anchor effect above already tracks position).
+    val syncedReveal = lyrics?.syncType == "LINE_SYNCED" || lyrics?.syncType == "SYLLABLE_SYNCED"
+
+    // Each frame, compute interpolated position from anchor — but only when a synced reveal needs it.
+    LaunchedEffect(isPlaying, syncedReveal) {
+        if (!isPlaying || !syncedReveal) return@LaunchedEffect
         while (true) {
             withFrameNanos { }
             val elapsed = System.currentTimeMillis() - lastKnownWallClock.longValue
             val interpolated = lastKnownPos.longValue + elapsed
-            smoothPosition.longValue = interpolated.coerceAtMost(playback.durationMs.coerceAtLeast(1))
+            smoothPosition.longValue = interpolated.coerceAtMost(vm.durationFlow.value.coerceAtLeast(1))
         }
     }
 
@@ -161,9 +173,9 @@ fun LyricsScreen(vm: SpotifyViewModel) {
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    when (playback.repeatMode) { "track" -> Icons.Rounded.RepeatOne; else -> Icons.Rounded.Repeat },
+                                    when (repeatMode) { "track" -> Icons.Rounded.RepeatOne; else -> Icons.Rounded.Repeat },
                                     stringResource(R.string.repeat),
-                                    tint = if (playback.repeatMode != "off") animatedPrimary else SpotifyWhite.copy(alpha = 0.7f),
+                                    tint = if (repeatMode != "off") animatedPrimary else SpotifyWhite.copy(alpha = 0.7f),
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -185,7 +197,7 @@ fun LyricsScreen(vm: SpotifyViewModel) {
                                     LoadingIndicator(color = SpotifyWhite, modifier = Modifier.size(20.dp))
                                 } else {
                                     Icon(
-                                        if (playback.isPaused || !playback.isPlaying) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
+                                        if (isPaused || !isPlayingRaw) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
                                         stringResource(R.string.play_pause), tint = SpotifyWhite, modifier = Modifier.size(26.dp)
                                     )
                                 }

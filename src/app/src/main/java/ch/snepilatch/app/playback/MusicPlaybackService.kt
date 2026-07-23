@@ -146,20 +146,6 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     private var wakeLock: android.os.PowerManager.WakeLock? = null
     private var wifiLock: android.net.wifi.WifiManager.WifiLock? = null
 
-    // Logs screen on/off so we can confirm on-device that a track advance no longer waits for unlock
-    // (before the control-plane locks, the server-driven advance flushed the instant the screen came on).
-    private val screenReceiver = object : android.content.BroadcastReceiver() {
-        override fun onReceive(context: android.content.Context?, intent: Intent?) {
-            val state = when (intent?.action) {
-                Intent.ACTION_SCREEN_ON -> "ON"
-                Intent.ACTION_SCREEN_OFF -> "OFF"
-                else -> return
-            }
-            val playing = runCatching { player.isPlaying }.getOrDefault(false)
-            LokiLogger.i(TAG, "[Screen] $state (playing=$playing, wakeHeld=${wakeLock?.isHeld == true})")
-        }
-    }
-
     /** Keep the CPU and Wi-Fi radio awake so the dealer socket + advance stay responsive with the screen off. */
     private fun acquireControlPlaneLocks() {
         try {
@@ -214,11 +200,6 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         createNotificationChannel()
         deezerProxy.start()
         registerNetworkCallback()
-        val screenFilter = android.content.IntentFilter().apply {
-            addAction(Intent.ACTION_SCREEN_ON)
-            addAction(Intent.ACTION_SCREEN_OFF)
-        }
-        registerReceiver(screenReceiver, screenFilter)
 
         val audioAttributes = AudioAttributes.Builder()
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
@@ -1191,7 +1172,6 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     override fun onDestroy() {
         stopJukebox()
         unregisterNetworkCallback()
-        runCatching { unregisterReceiver(screenReceiver) }
         releaseControlPlaneLocks()
         if (openAudioEffectSession) {
             broadcastAudioEffectAction(AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION)

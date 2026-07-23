@@ -2436,6 +2436,63 @@ class SpotifyViewModel : ViewModel() {
         suppressRemotePause = suppress
     }
 
+    /**
+     * Acquire the Spotify-CDN [SpotifyStream] for [trackUri]: reuse the pre-resolved next-track CDN URL
+     * when its file id matches, else wait for the state-machine file id (up to ~1.5s), self-resolve if
+     * still absent, and resolve mirrors. Throws if the resolver is uninitialised or no file id is
+     * available — the caller's try/catch falls through to the third-party CDN on any throw.
+     */
+    private suspend fun resolveSpotifyCdnStream(
+        event: kotify.api.playerstatus.TrackChangeEvent,
+        trackUri: String
+    ): SpotifyStream {
+        val resolver = cdnResolver ?: throw IllegalStateException("CdnResolver not initialized")
+
+        // Check if we already pre-resolved this CDN URL
+        // IMPORTANT: nextCdnUrl is for the NEXT track. Only use it if the
+        // file ID matches what we need for the CURRENT track.
+        val currentFileId = event.currentFileId ?: latestFileId
+        val cachedCdnUrl = if (currentFileId != null && nextCdnFileId == currentFileId) nextCdnUrl else null
+        return if (cachedCdnUrl != null) {
+            LokiLogger.i(TAG, "SpotifyCDN: Using pre-resolved CDN URL (fileId=$currentFileId)")
+            nextCdnUrl = null
+            nextCdnFileId = null
+            resolver.buildStreamForCachedUrl(cachedCdnUrl, currentFileId)
+        } else {
+            // Use file ID from cluster state or from onPlaybackId (state machine)
+            var fileId = event.currentFileId ?: latestFileId
+            if (fileId == null) {
+                // Wait for onPlaybackId — the state machine pushes the account's ENTITLED file id
+                // (MP4_128 on free). Give it real time before self-resolving, because the media
+                // endpoint below only offers premium MP4_256 on many accounts, which a free CDM
+                // can't license. Cheap: only runs when the cluster hasn't supplied a file id yet.
+                LokiLogger.d(TAG, "SpotifyCDN: Waiting for state-machine file ID...")
+                for (i in 1..15) {
+                    delay(100)
+                    fileId = latestFileId
+                    if (fileId != null) break
+                }
+            }
+            // Still null: self-resolve. Use the media endpoint only when the file id is
+            // licensable for this account (see safeMediaFileId), else metadata/4/track.
+            if (fileId == null) {
+                LokiLogger.i(TAG, "SpotifyCDN: No file ID from state machine, self-resolving...")
+                fileId = safeMediaFileId(trackUri) ?: resolver.fetchFileIdFromMetadata(trackUri)
+                if (fileId != null) {
+                    LokiLogger.i(TAG, "SpotifyCDN: Got file ID from self-resolve: $fileId")
+                    latestFileId = fileId
+                }
+            }
+            if (fileId == null) {
+                throw IllegalStateException("No file ID available")
+            }
+            LokiLogger.i(TAG, "SpotifyCDN: Resolving fileId=$fileId")
+            val resolved = resolver.resolveForFileId(fileId)
+            LokiLogger.i(TAG, "SpotifyCDN: Resolved ${resolved.mirrorCount} mirrors")
+            resolved
+        }
+    }
+
     private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent) {
         val resolveStart = System.currentTimeMillis()
         val current = event.current ?: return
@@ -2519,51 +2576,7 @@ class SpotifyViewModel : ViewModel() {
         // Spotify CDN path: resolve CDN URL directly from Spotify's infrastructure
         if (preferredAudioSource.value == null) {
             try {
-                val resolver = cdnResolver ?: throw IllegalStateException("CdnResolver not initialized")
-
-                // Check if we already pre-resolved this CDN URL
-                // IMPORTANT: nextCdnUrl is for the NEXT track. Only use it if the
-                // file ID matches what we need for the CURRENT track.
-                val currentFileId = event.currentFileId ?: latestFileId
-                val cachedCdnUrl = if (currentFileId != null && nextCdnFileId == currentFileId) nextCdnUrl else null
-                val stream: SpotifyStream = if (cachedCdnUrl != null) {
-                    LokiLogger.i(TAG, "SpotifyCDN: Using pre-resolved CDN URL (fileId=$currentFileId)")
-                    nextCdnUrl = null
-                    nextCdnFileId = null
-                    resolver.buildStreamForCachedUrl(cachedCdnUrl, currentFileId)
-                } else {
-                    // Use file ID from cluster state or from onPlaybackId (state machine)
-                    var fileId = event.currentFileId ?: latestFileId
-                    if (fileId == null) {
-                        // Wait for onPlaybackId — the state machine pushes the account's ENTITLED file id
-                        // (MP4_128 on free). Give it real time before self-resolving, because the media
-                        // endpoint below only offers premium MP4_256 on many accounts, which a free CDM
-                        // can't license. Cheap: only runs when the cluster hasn't supplied a file id yet.
-                        LokiLogger.d(TAG, "SpotifyCDN: Waiting for state-machine file ID...")
-                        for (i in 1..15) {
-                            delay(100)
-                            fileId = latestFileId
-                            if (fileId != null) break
-                        }
-                    }
-                    // Still null: self-resolve. Use the media endpoint only when the file id is
-                    // licensable for this account (see safeMediaFileId), else metadata/4/track.
-                    if (fileId == null) {
-                        LokiLogger.i(TAG, "SpotifyCDN: No file ID from state machine, self-resolving...")
-                        fileId = safeMediaFileId(trackUri) ?: resolver.fetchFileIdFromMetadata(trackUri)
-                        if (fileId != null) {
-                            LokiLogger.i(TAG, "SpotifyCDN: Got file ID from self-resolve: $fileId")
-                            latestFileId = fileId
-                        }
-                    }
-                    if (fileId == null) {
-                        throw IllegalStateException("No file ID available")
-                    }
-                    LokiLogger.i(TAG, "SpotifyCDN: Resolving fileId=$fileId")
-                    val resolved = resolver.resolveForFileId(fileId)
-                    LokiLogger.i(TAG, "SpotifyCDN: Resolved ${resolved.mirrorCount} mirrors")
-                    resolved
-                }
+                val stream = resolveSpotifyCdnStream(event, trackUri)
                 // DRM: must stop old player to close the Widevine session cleanly.
                 // Unlike non-DRM, we can't seamlessly replace — each track needs its own license.
                 withContext(Dispatchers.Main) {

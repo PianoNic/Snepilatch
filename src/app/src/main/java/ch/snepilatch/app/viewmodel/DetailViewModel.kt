@@ -1,6 +1,5 @@
 package ch.snepilatch.app.viewmodel
 
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import ch.snepilatch.app.data.*
 import ch.snepilatch.app.playback.SessionHolder
@@ -11,9 +10,7 @@ import kotify.api.playlist.Playlist
 import kotify.api.podcast.Podcast
 import kotify.api.song.Song
 import kotify.session.Session
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -31,9 +28,7 @@ import kotlinx.coroutines.launch
  * need PlayerConnect / playingContext, so they stay there and reach the openers
  * through [DetailRoutes] rather than holding a reference to this ViewModel.
  */
-class DetailViewModel : ViewModel() {
-
-    private val tag = "DetailVM"
+class DetailViewModel : SessionViewModel("DetailVM") {
 
     private val _detail = MutableStateFlow(DetailData())
     val detail: StateFlow<DetailData> = _detail
@@ -54,9 +49,9 @@ class DetailViewModel : ViewModel() {
 
     /** Navigate to a detail screen and load it under [isLoading]; a null result leaves the previous
      *  detail unchanged (used by openShow when the podcast has no info). */
-    private fun openDetail(screen: Screen, tag: String, load: suspend (Session) -> DetailData?) {
+    private fun openDetail(screen: Screen, op: String, load: suspend (Session) -> DetailData?) {
         Navigator.navigateTo(screen)
-        launchLoading(tag) { sess -> load(sess)?.let { _detail.value = it } }
+        launchWithSessionLoading(op, isLoading) { sess -> load(sess)?.let { _detail.value = it } }
     }
 
     fun openLikedSongs() = openDetail(Screen.PLAYLIST_DETAIL, "openLikedSongs") { sess ->
@@ -84,23 +79,23 @@ class DetailViewModel : ViewModel() {
         openDetail(Screen.SHOW_DETAIL, "openShow") { sess ->
             Podcast(sess, showId).getPodcastInfo(limit = 50, offset = 0)
                 ?.toDetailData(showId, publisher, imageUrl)
-                .also { if (it == null) LokiLogger.e(tag, "openShow: no podcast info for $showId") }
+                .also { if (it == null) LokiLogger.e(logTag, "openShow: no podcast info for $showId") }
         }
 
     fun openAlbumForTrack(trackUri: String) {
-        launchSession("openAlbumForTrack") { sess ->
+        launchWithSession("openAlbumForTrack") { sess ->
             val trackId = trackUri.removePrefix("spotify:track:")
-            val track = Song(sess).getSong(trackId) ?: return@launchSession
-            val albumUri = track.album.uri.takeIf { it.isNotBlank() } ?: return@launchSession
+            val track = Song(sess).getSong(trackId) ?: return@launchWithSession
+            val albumUri = track.album.uri.takeIf { it.isNotBlank() } ?: return@launchWithSession
             openAlbum(albumUri.substringAfterLast(":"))
         }
     }
 
     fun openArtistForTrack(trackUri: String) {
-        launchSession("openArtistForTrack") { sess ->
+        launchWithSession("openArtistForTrack") { sess ->
             val trackId = trackUri.removePrefix("spotify:track:")
-            val track = Song(sess).getSong(trackId) ?: return@launchSession
-            val artistUri = track.artists.firstOrNull()?.uri?.takeIf { it.isNotBlank() } ?: return@launchSession
+            val track = Song(sess).getSong(trackId) ?: return@launchWithSession
+            val artistUri = track.artists.firstOrNull()?.uri?.takeIf { it.isNotBlank() } ?: return@launchWithSession
             openArtist(artistUri.substringAfterLast(":"))
         }
     }
@@ -165,7 +160,7 @@ class DetailViewModel : ViewModel() {
                     )
                 }
             } catch (e: Exception) {
-                LokiLogger.e(tag, "loadMoreDetail", e)
+                LokiLogger.e(logTag, "loadMoreDetail", e)
             } finally {
                 _isLoadingMore.value = false
             }
@@ -186,7 +181,7 @@ class DetailViewModel : ViewModel() {
     }
 
     fun toggleDetailSaved(type: String, id: String) {
-        launchSession("toggleDetailSaved") { sess ->
+        launchWithSession("toggleDetailSaved") { sess ->
             val currentlySaved = detailSaved.value
             when (type) {
                 "album" -> if (currentlySaved) Album(sess).removeFromLibrary(id) else Album(sess).saveToLibrary(id)
@@ -195,33 +190,6 @@ class DetailViewModel : ViewModel() {
             detailSaved.value = !currentlySaved
         }
     }
-
-    private fun launchSession(tag: String, block: suspend (Session) -> Unit): Job =
-        viewModelScope.launch(Dispatchers.IO) {
-            val sess = SessionHolder.session ?: return@launch
-            try {
-                block(sess)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                LokiLogger.e(this@DetailViewModel.tag, tag, e)
-            }
-        }
-
-    private fun launchLoading(tag: String, block: suspend (Session) -> Unit): Job =
-        viewModelScope.launch(Dispatchers.IO) {
-            val sess = SessionHolder.session ?: return@launch
-            isLoading.value = true
-            try {
-                block(sess)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                LokiLogger.e(this@DetailViewModel.tag, tag, e)
-            } finally {
-                isLoading.value = false
-            }
-        }
 
     companion object {
         private const val DETAIL_PAGE_SIZE = 50

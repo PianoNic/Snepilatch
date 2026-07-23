@@ -49,7 +49,6 @@ import ch.snepilatch.app.viewmodel.SpotifyViewModel
 fun HomeScreen(vm: SpotifyViewModel) {
     val homeData by vm.homeData.collectAsState()
     val isHomeLoading by vm.isHomeLoading.collectAsState()
-    val account by vm.account.collectAsState()
 
     if (isHomeLoading && homeData == null) {
         HomeShimmer()

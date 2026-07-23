@@ -83,7 +83,6 @@ private const val LIKED_SONGS_IMAGE = "https://image-cdn-ak.spotifycdn.com/image
 fun LibraryScreen(vm: SpotifyViewModel) {
     val library by vm.library.collectAsState()
     val libraryTotal by vm.libraryTotal.collectAsState()
-    val account by vm.account.collectAsState()
     val libraryHasMore = libraryTotal < 0 || library.size < libraryTotal
     var showCreateDialog by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -95,21 +94,25 @@ fun LibraryScreen(vm: SpotifyViewModel) {
     var searchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
-    val filteredLibrary = when (selectedFilter) {
-        "Playlists" -> library.filter { it.type == "playlist" || it.type == "collection" }
-        "Artists" -> library.filter { it.type == "artist" }
-        "Albums" -> library.filter { it.type == "album" }
-        else -> library
-    }
-    val searchedLibrary = if (searchQuery.isBlank()) filteredLibrary
-    else filteredLibrary.filter {
-        it.name.contains(searchQuery, ignoreCase = true) ||
-        (it.owner?.contains(searchQuery, ignoreCase = true) == true)
-    }
-    val sortedLibrary = when (sortMode) {
-        "alpha" -> searchedLibrary.sortedBy { it.name.lowercase() }
-        "type" -> searchedLibrary.sortedBy { it.type }
-        else -> searchedLibrary
+    // Recompute the filter/search/sort pipeline only when an input actually changes, not on every
+    // recomposition (e.g. a position tick or unrelated state update).
+    val sortedLibrary = remember(library, selectedFilter, searchQuery, sortMode) {
+        val filteredLibrary = when (selectedFilter) {
+            "Playlists" -> library.filter { it.type == "playlist" || it.type == "collection" }
+            "Artists" -> library.filter { it.type == "artist" }
+            "Albums" -> library.filter { it.type == "album" }
+            else -> library
+        }
+        val searchedLibrary = if (searchQuery.isBlank()) filteredLibrary
+        else filteredLibrary.filter {
+            it.name.contains(searchQuery, ignoreCase = true) ||
+            (it.owner?.contains(searchQuery, ignoreCase = true) == true)
+        }
+        when (sortMode) {
+            "alpha" -> searchedLibrary.sortedBy { it.name.lowercase() }
+            "type" -> searchedLibrary.sortedBy { it.type }
+            else -> searchedLibrary
+        }
     }
 
     Column(Modifier.fillMaxSize().padding(top = 8.dp)) {

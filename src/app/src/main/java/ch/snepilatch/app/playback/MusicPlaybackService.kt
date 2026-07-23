@@ -673,17 +673,6 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     }
 
     /**
-     * Push idle metadata to the notification + MediaSession without loading
-     * anything into ExoPlayer. Used right after init to surface whatever
-     * track Spotify Connect's cluster reports as "current", so the system
-     * media notification shows the correct song before the user has pressed
-     * play. Pressing play / next / pause from the notification then runs the
-     * normal cold-start protocol.
-     *
-     * Skipped if a track is already loaded (we don't want to overwrite live
-     * playback metadata).
-     */
-    /**
      * Refresh the media-session text for the CURRENTLY streaming item when its real name/artist
      * arrive after [playUrl] (cold-start plays with placeholder "Unknown" names before the state
      * machine resolves the track). Only ever upgrades to a real name — a blank or "Unknown" title is
@@ -700,6 +689,17 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         }
     }
 
+    /**
+     * Push idle metadata to the notification + MediaSession without loading
+     * anything into ExoPlayer. Used right after init to surface whatever
+     * track Spotify Connect's cluster reports as "current", so the system
+     * media notification shows the correct song before the user has pressed
+     * play. Pressing play / next / pause from the notification then runs the
+     * normal cold-start protocol.
+     *
+     * Skipped if a track is already loaded (we don't want to overwrite live
+     * playback metadata).
+     */
     fun setIdleMetadata(title: String, artist: String, albumArtUrl: String?, durationMs: Long) {
         if (player.mediaItemCount > 0) return
         currentTitle = title

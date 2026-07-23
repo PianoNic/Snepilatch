@@ -35,6 +35,7 @@ import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.util.UpdateInfo
 import ch.snepilatch.app.util.UpdateService
 import ch.snepilatch.app.util.clearCookies
+import ch.snepilatch.app.viewmodel.AppSettings
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -141,7 +142,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
         val audioContext = androidx.compose.ui.platform.LocalContext.current
 
         // Language picker
-        val appLanguage by vm.appLanguage.collectAsState()
+        val appLanguage by AppSettings.appLanguage.collectAsState()
         var showLanguagePicker by remember { mutableStateOf(false) }
         val systemDefaultLabel = stringResource(R.string.language_system_default)
         val languages = remember(systemDefaultLabel) {
@@ -169,7 +170,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
                 selected = appLanguage,
                 selectedColor = animatedPrimary,
                 onSelect = {
-                    vm.setAppLanguage(it, audioContext)
+                    AppSettings.setAppLanguage(it, audioContext)
                     showLanguagePicker = false
                 },
                 onDismiss = { showLanguagePicker = false }
@@ -177,7 +178,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
         }
 
         // Lyrics animation direction (Appearance)
-        val lyricsAnim by vm.lyricsAnimDirection.collectAsState()
+        val lyricsAnim by AppSettings.lyricsAnimDirection.collectAsState()
         var showLyricsPicker by remember { mutableStateOf(false) }
         val lyricsLabel = if (lyricsAnim == "horizontal") stringResource(R.string.lyrics_horizontal) else stringResource(R.string.lyrics_vertical)
         ListItem(
@@ -199,7 +200,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
                 selected = lyricsAnim,
                 selectedColor = animatedPrimary,
                 onSelect = {
-                    vm.setLyricsAnimDirection(it, audioContext)
+                    AppSettings.setLyricsAnimDirection(it, audioContext)
                     showLyricsPicker = false
                 },
                 onDismiss = { showLyricsPicker = false }
@@ -210,7 +211,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
         AccountSectionHeader(stringResource(R.string.account_section_playback))
 
         // Audio settings
-        val audioSource by vm.preferredAudioSource.collectAsState()
+        val audioSource by AppSettings.preferredAudioSource.collectAsState()
         val isLossless = audioSource != null
         val losslessSubtitle = if (isLossless) {
             stringResource(R.string.lossless_on_flac)
@@ -228,7 +229,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
                 Switch(
                     checked = isLossless,
                     onCheckedChange = { enabled ->
-                        vm.setPreferredAudioSource(if (enabled) "lossless" else null, audioContext)
+                        AppSettings.setPreferredAudioSource(if (enabled) "lossless" else null, audioContext)
                     },
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = animatedPrimary,
@@ -242,7 +243,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
         )
 
         // Canvas background
-        val canvasOn by vm.canvasEnabled.collectAsState()
+        val canvasOn by AppSettings.canvasEnabled.collectAsState()
         ListItem(
             headlineContent = { Text(stringResource(R.string.canvas_background), color = SpotifyWhite) },
             supportingContent = { Text(
@@ -266,7 +267,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
         )
 
         // Player background style: album-colour gradient vs. the fluid Kawarp album-art warp.
-        val gradientBg by vm.playerGradientBg.collectAsState()
+        val gradientBg by AppSettings.playerGradientBg.collectAsState()
         ListItem(
             headlineContent = { Text("Gradient background", color = SpotifyWhite) },
             supportingContent = {
@@ -279,7 +280,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
             trailingContent = {
                 Switch(
                     checked = gradientBg,
-                    onCheckedChange = { vm.setPlayerGradientBg(it, audioContext) },
+                    onCheckedChange = { AppSettings.setPlayerGradientBg(it, audioContext) },
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = animatedPrimary,
                         checkedTrackColor = animatedPrimary.copy(alpha = 0.5f),
@@ -292,7 +293,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
         )
 
         // Content region picker
-        val currentRegion by vm.contentRegion.collectAsState()
+        val currentRegion by AppSettings.contentRegion.collectAsState()
         var showRegionPicker by remember { mutableStateOf(false) }
         val regionLabel = if (currentRegion == "nearest") {
             stringResource(R.string.region_nearest)
@@ -328,7 +329,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
                 selected = currentRegion,
                 selectedColor = animatedPrimary,
                 onSelect = {
-                    vm.setContentRegion(it, audioContext)
+                    AppSettings.setContentRegion(it, audioContext)
                     showRegionPicker = false
                 },
                 onDismiss = { showRegionPicker = false }
@@ -375,7 +376,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
         }
 
         // Left notification button
-        val leftButton by vm.notificationLeftButton.collectAsState()
+        val leftButton by AppSettings.notificationLeftButton.collectAsState()
         var showLeftPicker by remember { mutableStateOf(false) }
         ListItem(
             headlineContent = { Text(stringResource(R.string.notification_left_button), color = SpotifyWhite) },
@@ -392,7 +393,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
                 selected = leftButton,
                 selectedColor = animatedPrimary,
                 onSelect = {
-                    vm.setNotificationLeftButton(it, audioContext)
+                    AppSettings.setNotificationLeftButton(it, audioContext)
                     showLeftPicker = false
                 },
                 onDismiss = { showLeftPicker = false }
@@ -400,7 +401,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
         }
 
         // Right notification button
-        val rightButton by vm.notificationRightButton.collectAsState()
+        val rightButton by AppSettings.notificationRightButton.collectAsState()
         var showRightPicker by remember { mutableStateOf(false) }
         ListItem(
             headlineContent = { Text(stringResource(R.string.notification_right_button), color = SpotifyWhite) },
@@ -417,7 +418,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
                 selected = rightButton,
                 selectedColor = animatedPrimary,
                 onSelect = {
-                    vm.setNotificationRightButton(it, audioContext)
+                    AppSettings.setNotificationRightButton(it, audioContext)
                     showRightPicker = false
                 },
                 onDismiss = { showRightPicker = false }

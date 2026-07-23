@@ -51,6 +51,7 @@ import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.util.formatTime
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.viewmodel.LibraryViewModel
+import ch.snepilatch.app.viewmodel.AppSettings
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 
 /**
@@ -273,9 +274,9 @@ fun PlayerBackground(vm: PlaybackViewModel, modifier: Modifier = Modifier) {
     val theme by vm.themeColors.collectAsState()
     val animatedPrimary by animateColorAsState(theme.primary, tween(800), label = "bgPrimary")
     val animatedPrimaryDark by animateColorAsState(theme.primaryDark, tween(800), label = "bgPrimaryDark")
-    val gradientBg by vm.playerGradientBg.collectAsState()
+    val gradientBg by AppSettings.playerGradientBg.collectAsState()
     val canvasVideoUrl by vm.canvasUrl.collectAsState()
-    val canvasOn by vm.canvasEnabled.collectAsState()
+    val canvasOn by AppSettings.canvasEnabled.collectAsState()
     val hasCanvas = canvasOn && canvasVideoUrl != null
     // Whether audio is actively playing (not merely non-paused): gates the Canvas video decoder below.
     val audioPlaying = isPlaying && !isPaused
@@ -396,7 +397,7 @@ fun NowPlayingScreen(
     val shareContext = LocalContext.current
     val shareTrackLabel = stringResource(R.string.share_track_chooser)
     val canvasVideoUrl by vm.canvasUrl.collectAsState()
-    val canvasOn by vm.canvasEnabled.collectAsState()
+    val canvasOn by AppSettings.canvasEnabled.collectAsState()
     val hasCanvas = canvasOn && canvasVideoUrl != null
     // Brighter text in canvas mode for readability over video
     val secondaryText = if (hasCanvas) SpotifyWhite.copy(alpha = 0.85f) else SpotifyLightGray

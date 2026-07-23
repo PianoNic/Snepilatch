@@ -285,23 +285,8 @@ class PlaybackViewModel : ViewModel() {
     val audioOutputName = MutableStateFlow<String?>(null)
     val audioOutputType = MutableStateFlow("speaker") // "speaker", "bluetooth", "wired", "usb"
 
-    // Audio source preference: null = Spotify (default), "lossless" = third-party FLAC chain.
-    val preferredAudioSource = MutableStateFlow<String?>(null)
-    // Lyrics animation direction for line-synced (non word-synced): "vertical" or "horizontal"
-    val lyricsAnimDirection = MutableStateFlow("vertical")
-    // Language preference: "system", "en", "de", "ru", "gsw"
-    val appLanguage = MutableStateFlow("system")
-    // Notification button preferences: "like", "shuffle", "repeat"
-    val notificationLeftButton = MutableStateFlow("repeat")
-    val notificationRightButton = MutableStateFlow("like")
-    // Content region for CDN resolution
-    val contentRegion = MutableStateFlow("nearest")
-
-    // Player background style: true = album-colour gradient (Spotify/YTM style), false = blurred art.
-    val playerGradientBg = MutableStateFlow(true)
-
-    // Canvas background
-    val canvasEnabled = MutableStateFlow(false)
+    // Persisted user settings moved to AppSettings. canvasUrl stays here: it's the current track's
+    // video URL (playback-derived), while the on/off toggle is AppSettings.canvasEnabled.
     val canvasUrl = MutableStateFlow<String?>(null)
     private var lastCanvasTrackUri: String? = null
 
@@ -540,7 +525,7 @@ class PlaybackViewModel : ViewModel() {
         }
 
         pc.onNextPlaybackId { fileId, _, name ->
-            if (preferredAudioSource.value != null) return@onNextPlaybackId
+            if (AppSettings.preferredAudioSource.value != null) return@onNextPlaybackId
             // Deduplicate — don't re-resolve if we already have this file ID cached
             if (fileId == nextCdnFileId && nextCdnUrl != null) return@onNextPlaybackId
             viewModelScope.launch(Dispatchers.IO) {
@@ -1278,14 +1263,14 @@ class PlaybackViewModel : ViewModel() {
             // Lossless mode: resolve via the third-party chain (Qobuz → Deezer →
             // Deezer) and play locally instead of Spotify's Widevine CDN, so
             // resume-from-idle stays consistent with the rest of the lossless flow.
-            if (preferredAudioSource.value != null) {
+            if (AppSettings.preferredAudioSource.value != null) {
                 val trackId = trackUri.removePrefix("spotify:track:")
                 val query = listOf(artist, title)
                     .filter { it.isNotBlank() && it != "Unknown" }
                     .joinToString(" ")
                 val result = cdn.resolveStreamUrl(
-                    trackId, region = effectiveRegion(),
-                    searchQuery = query, preferredSource = preferredAudioSource.value
+                    trackId, region = AppSettings.effectiveRegion(),
+                    searchQuery = query, preferredSource = AppSettings.preferredAudioSource.value
                 )
                 if (result is StreamResult.Success) {
                     val info = result.info
@@ -1382,7 +1367,7 @@ class PlaybackViewModel : ViewModel() {
      */
     internal suspend fun recoverFromPlaybackError(failedUri: String?, positionMs: Long) {
         // Nothing to reload locally, or lossless mode: hand back to Spotify (previous behaviour).
-        if (failedUri == null || preferredAudioSource.value != null) {
+        if (failedUri == null || AppSettings.preferredAudioSource.value != null) {
             fallbackResume()
             return
         }
@@ -1638,7 +1623,7 @@ class PlaybackViewModel : ViewModel() {
      * call site keeps a simple condition.
      */
     private fun shouldInstantTap(trackUri: String): Boolean =
-        preferredAudioSource.value == null &&
+        AppSettings.preferredAudioSource.value == null &&
             trackUri.startsWith("spotify:track:") && !coldStartPending
 
     /**
@@ -1925,134 +1910,14 @@ class PlaybackViewModel : ViewModel() {
         } catch (e: Exception) { LokiLogger.e(TAG, "refreshState", e) }
     }
 
-    // --- Streaming ---
-
-    fun setPreferredAudioSource(source: String?, context: Context) {
-        preferredAudioSource.value = source
-        prefs(context)
-            .edit().apply {
-                if (source == null) remove("audio_source") else putString("audio_source", source)
-            }.apply()
-    }
-
-    fun setContentRegion(region: String, context: Context) {
-        contentRegion.value = region
-        prefs(context)
-            .edit().putString("content_region", region).apply()
-    }
-
-    /**
-     * The 2-letter region passed to the CDN resolver. "nearest" resolves to the
-     * device's real country at call time, preferring the mobile-network country
-     * (where you physically are, roaming-aware), then the SIM's home country,
-     * then the system locale region. The telephony signals are tried first
-     * because the locale region only reflects the language/region *setting* — a
-     * user in Switzerland with an English phone would otherwise resolve to the
-     * wrong region. Any value other than "nearest" is used as-is.
-     */
-    private fun effectiveRegion(): String {
-        if (contentRegion.value != "nearest") return contentRegion.value
-        val tm = appContext?.getSystemService(Context.TELEPHONY_SERVICE) as? android.telephony.TelephonyManager
-        val net = tm?.networkCountryIso
-        val sim = tm?.simCountryIso
-        val locale = android.content.res.Resources.getSystem().configuration.locales[0].country
-        // Keep only letters so a dual-SIM phone's "ch," collapses to "ch", then
-        // take the first signal that yields a 2-letter code.
-        val region = listOf(net, sim, locale)
-            .firstNotNullOfOrNull { it?.filter(Char::isLetter)?.take(2)?.takeIf { c -> c.length == 2 } }
-            ?.uppercase(java.util.Locale.ROOT)
-            ?: "US"
-        LokiLogger.i(TAG, "Content region 'nearest' -> net='$net' sim='$sim' locale='$locale' -> $region")
-        return region
-    }
-
-    fun setLyricsAnimDirection(direction: String, context: Context) {
-        lyricsAnimDirection.value = direction
-        prefs(context)
-            .edit().putString("lyrics_anim_direction", direction).apply()
-    }
-
-    fun setAppLanguage(language: String, context: Context) {
-        appLanguage.value = language
-        prefs(context)
-            .edit().putString("app_language", language).apply()
-        // Apply locale change
-        val locale = if (language == "system") {
-            java.util.Locale.getDefault()
-        } else {
-            java.util.Locale.forLanguageTag(language)
-        }
-        val config = context.resources.configuration
-        config.setLocale(locale)
-        @Suppress("DEPRECATION")
-        context.resources.updateConfiguration(config, context.resources.displayMetrics)
-        // Restart activity to apply
-        (context as? android.app.Activity)?.recreate()
-    }
-
-    private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-
-    fun loadPreferences(context: Context) {
-        val prefs = prefs(context)
-        val savedSource = prefs.getString("audio_source", null)
-        // Migrate: old "spotify" value → null (Spotify CDN is now the default)
-        preferredAudioSource.value = if (savedSource == "spotify") null else savedSource
-        if (savedSource == "spotify") {
-            prefs.edit().remove("audio_source").apply()
-        }
-        lyricsAnimDirection.value = prefs.getString("lyrics_anim_direction", "vertical") ?: "vertical"
-        appLanguage.value = prefs.getString("app_language", "system") ?: "system"
-        // Apply saved language on startup
-        val lang = appLanguage.value
-        if (lang != "system") {
-            val locale = java.util.Locale.forLanguageTag(lang)
-            val config = context.resources.configuration
-            config.setLocale(locale)
-            @Suppress("DEPRECATION")
-            context.resources.updateConfiguration(config, context.resources.displayMetrics)
-        }
-        canvasEnabled.value = prefs.getBoolean("canvas_enabled", true)
-        playerGradientBg.value = prefs.getBoolean("player_gradient_bg", true)
-        contentRegion.value = prefs.getString("content_region", "nearest") ?: "nearest"
-        notificationLeftButton.value = prefs.getString("notification_left_button", "repeat") ?: "repeat"
-        notificationRightButton.value = prefs.getString("notification_right_button", "like") ?: "like"
-    }
-
-    fun setNotificationLeftButton(button: String, context: Context) {
-        notificationLeftButton.value = button
-        prefs(context)
-            .edit().putString("notification_left_button", button).apply()
-        MusicPlaybackService.instance?.let { svc ->
-            svc.notificationLeftButton = button
-            svc.updateNotification()
-        }
-    }
-
-    fun setNotificationRightButton(button: String, context: Context) {
-        notificationRightButton.value = button
-        prefs(context)
-            .edit().putString("notification_right_button", button).apply()
-        MusicPlaybackService.instance?.let { svc ->
-            svc.notificationRightButton = button
-            svc.updateNotification()
-        }
-    }
-
+    /** Persist the canvas toggle (via AppSettings) and clear the current URL when turning it off. */
     fun setCanvasEnabled(enabled: Boolean, context: Context) {
-        canvasEnabled.value = enabled
-        prefs(context)
-            .edit().putBoolean("canvas_enabled", enabled).apply()
+        AppSettings.setCanvasEnabled(enabled, context)
         if (!enabled) canvasUrl.value = null
     }
 
-    fun setPlayerGradientBg(enabled: Boolean, context: Context) {
-        playerGradientBg.value = enabled
-        prefs(context)
-            .edit().putBoolean("player_gradient_bg", enabled).apply()
-    }
-
     private fun fetchCanvasForTrack(trackUri: String) {
-        if (!canvasEnabled.value) return
+        if (!AppSettings.canvasEnabled.value) return
         if (trackUri == lastCanvasTrackUri) return
         lastCanvasTrackUri = trackUri
         // Canvas is a track-only visual; podcast episodes have none. Skip the futile lookup + clear.
@@ -2125,9 +1990,9 @@ class PlaybackViewModel : ViewModel() {
 
     /** Like / shuffle / repeat buttons shown in the notification, plus their saved preferences. */
     private fun wireNotificationButtonCallbacks(svc: MusicPlaybackService) {
-        val prefs = prefs(svc)
-        svc.notificationLeftButton = prefs.getString("notification_left_button", "repeat") ?: "repeat"
-        svc.notificationRightButton = prefs.getString("notification_right_button", "like") ?: "like"
+        val (left, right) = AppSettings.savedNotificationButtons(svc)
+        svc.notificationLeftButton = left
+        svc.notificationRightButton = right
 
         svc.onLikeToggle = lambda@{
             val track = _playback.value.track ?: return@lambda
@@ -2286,7 +2151,7 @@ class PlaybackViewModel : ViewModel() {
                 viewModelScope.launch(Dispatchers.IO) {
                     try {
                         // For Spotify CDN: resume Spotify so other clients show us as playing
-                        if (preferredAudioSource.value == null) {
+                        if (AppSettings.preferredAudioSource.value == null) {
                             player?.resume()
                         }
                     } catch (_: Exception) {}
@@ -2434,7 +2299,7 @@ class PlaybackViewModel : ViewModel() {
         // ExoPlayer's setMediaItem() in playUrl/playDrmUrl will seamlessly replace it.
         // Pause Spotify so it doesn't advance while we resolve the stream
         // Skip for Spotify CDN — we want Spotify to keep showing us as "playing"
-        if (preferredAudioSource.value != null) {
+        if (AppSettings.preferredAudioSource.value != null) {
             try { player?.pause() } catch (_: Exception) {}
         }
         val art = normalizeSpotifyImageUrl(current.imageLargeUrl ?: current.imageUrl)
@@ -2479,10 +2344,10 @@ class PlaybackViewModel : ViewModel() {
             return
         }
 
-        LokiLogger.i(TAG, "Resolving stream for $trackUri (source=${preferredAudioSource.value})")
+        LokiLogger.i(TAG, "Resolving stream for $trackUri (source=${AppSettings.preferredAudioSource.value})")
 
         // Spotify CDN path: resolve CDN URL directly from Spotify's infrastructure
-        if (preferredAudioSource.value == null) {
+        if (AppSettings.preferredAudioSource.value == null) {
             try {
                 val stream = resolveSpotifyCdnStream(event, trackUri)
                 // DRM: must stop old player to close the Widevine session cleanly.
@@ -2512,7 +2377,7 @@ class PlaybackViewModel : ViewModel() {
         }
 
         try {
-            val result = cdn.resolveFromTrack(event, region = effectiveRegion(), preferredSource = preferredAudioSource.value)
+            val result = cdn.resolveFromTrack(event, region = AppSettings.effectiveRegion(), preferredSource = AppSettings.preferredAudioSource.value)
             when (result) {
                 is StreamResult.Success -> {
                     // Don't resume Spotify yet — onReady callback will sync after ExoPlayer buffers
@@ -2719,8 +2584,8 @@ class PlaybackViewModel : ViewModel() {
                 val art = normalizeSpotifyImageUrl(track.imageLargeUrl ?: track.imageUrl)
 
                 val result = cdn.resolveStreamUrl(
-                    trackId, region = effectiveRegion(),
-                    searchQuery = searchQuery, preferredSource = preferredAudioSource.value
+                    trackId, region = AppSettings.effectiveRegion(),
+                    searchQuery = searchQuery, preferredSource = AppSettings.preferredAudioSource.value
                 )
                 when (result) {
                     is StreamResult.Success -> {
@@ -2754,7 +2619,7 @@ class PlaybackViewModel : ViewModel() {
 
     private suspend fun preResolveNextTrack() {
         // Skip pre-resolution for Spotify CDN — file IDs only come at play time from the state machine
-        if (preferredAudioSource.value == null) {
+        if (AppSettings.preferredAudioSource.value == null) {
             isNextReady.value = true
             return
         }
@@ -2777,7 +2642,12 @@ class PlaybackViewModel : ViewModel() {
                 .joinToString(" ").takeIf { it.isNotBlank() }
 
             LokiLogger.i(TAG, "Pre-resolving next: $title by $artist")
-            val result = cdn.resolveStreamUrl(nextId, region = effectiveRegion(), searchQuery = searchQuery, preferredSource = preferredAudioSource.value)
+            val result = cdn.resolveStreamUrl(
+                nextId,
+                region = AppSettings.effectiveRegion(),
+                searchQuery = searchQuery,
+                preferredSource = AppSettings.preferredAudioSource.value
+            )
             if (result is StreamResult.Success) {
                 val info = result.info
                 val key = info.decryptionKey
@@ -2895,7 +2765,6 @@ class PlaybackViewModel : ViewModel() {
 
     companion object {
         /** SharedPreferences file name for all persisted settings. */
-        const val PREFS = "kotify_prefs"
 
         /** Delay before re-reading true state to repaint the notification after a button command. */
         private const val NOTIFICATION_RESYNC_MS = 300L

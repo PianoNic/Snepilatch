@@ -458,12 +458,24 @@ private fun sectionFor(
     vm: SpotifyViewModel,
     ctx: Context
 ): Pair<SearchViewModel.SearchFilter, List<UnifiedResult>>? = when (type) {
-    "TRACKS" -> SearchViewModel.SearchFilter.SONGS to results.tracks.items.map { it.toUnified(vm, ctx) }
-    "ARTISTS" -> SearchViewModel.SearchFilter.ARTISTS to results.artists.items.map { it.toUnified(vm, ctx) }
-    "ALBUMS" -> SearchViewModel.SearchFilter.ALBUMS to results.albums.items.map { it.toUnified(vm, ctx) }
-    "PLAYLISTS" -> SearchViewModel.SearchFilter.PLAYLISTS to results.playlists.items.map { it.toUnified(vm, ctx) }
-    "PODCASTS" -> SearchViewModel.SearchFilter.PODCASTS to results.podcasts.items.map { it.toUnified(vm, ctx) }
-    "USERS" -> SearchViewModel.SearchFilter.PROFILES to results.users.items.map { it.toUnified(ctx) }
+    "TRACKS" ->
+        SearchViewModel.SearchFilter.SONGS to results.tracks.items.take(SECTION_PREVIEW)
+            .map { it.toUnified(vm, ctx) }
+    "ARTISTS" ->
+        SearchViewModel.SearchFilter.ARTISTS to results.artists.items.take(SECTION_PREVIEW)
+            .map { it.toUnified(vm, ctx) }
+    "ALBUMS" ->
+        SearchViewModel.SearchFilter.ALBUMS to results.albums.items.take(SECTION_PREVIEW)
+            .map { it.toUnified(vm, ctx) }
+    "PLAYLISTS" ->
+        SearchViewModel.SearchFilter.PLAYLISTS to results.playlists.items.take(SECTION_PREVIEW)
+            .map { it.toUnified(vm, ctx) }
+    "PODCASTS" ->
+        SearchViewModel.SearchFilter.PODCASTS to results.podcasts.items.take(SECTION_PREVIEW)
+            .map { it.toUnified(vm, ctx) }
+    "USERS" ->
+        SearchViewModel.SearchFilter.PROFILES to results.users.items.take(SECTION_PREVIEW)
+            .map { it.toUnified(ctx) }
     else -> null
 }
 

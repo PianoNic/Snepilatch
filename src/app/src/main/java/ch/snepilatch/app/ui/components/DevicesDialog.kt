@@ -37,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -155,10 +156,20 @@ fun DevicesDialog(vm: SpotifyViewModel) {
                     ) {
                         Icon(Icons.AutoMirrored.Rounded.VolumeDown, null, tint = SpotifyLightGray, modifier = Modifier.size(20.dp))
                         var volumeValue by remember { mutableFloatStateOf(playback.volume.toFloat()) }
+                        var dragging by remember { mutableStateOf(false) }
+                        // Track external volume changes when the user isn't dragging (equal writes to
+                        // mutableFloatStateOf don't invalidate, so this is cheap).
+                        if (!dragging) volumeValue = playback.volume.toFloat()
                         Slider(
                             value = volumeValue,
-                            onValueChange = { volumeValue = it },
-                            onValueChangeFinished = { vm.setSpotifyVolume(volumeValue.toDouble()) },
+                            onValueChange = {
+                                dragging = true
+                                volumeValue = it
+                            },
+                            onValueChangeFinished = {
+                                vm.setSpotifyVolume(volumeValue.toDouble())
+                                dragging = false
+                            },
                             modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
                             colors = SliderDefaults.colors(
                                 thumbColor = accentColor,

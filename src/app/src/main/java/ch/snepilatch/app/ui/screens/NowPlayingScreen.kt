@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.TextUnit
@@ -408,6 +409,7 @@ fun NowPlayingScreen(
 
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val isLandscape = maxWidth > maxHeight
+            AudioDeviceEffect(vm)
 
             if (isLandscape) {
                 // === LANDSCAPE LAYOUT ===
@@ -571,185 +573,11 @@ fun NowPlayingScreen(
 
                         Spacer(Modifier.weight(0.2f))
 
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            FilledTonalIconToggleButton(
-                                checked = isShuffling,
-                                onCheckedChange = { vm.toggleShuffle() },
-                                colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
-                                    containerColor = buttonBg,
-                                    contentColor = SpotifyWhite,
-                                    checkedContainerColor = buttonBg,
-                                    checkedContentColor = animatedPrimary,
-                                ),
-                                modifier = Modifier.size(44.dp),
-                            ) {
-                                Icon(Icons.Rounded.Shuffle, stringResource(R.string.shuffle), modifier = Modifier.size(20.dp))
-                            }
-                            FilledTonalIconButton(
-                                onClick = { vm.skipPrevious() },
-                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                    containerColor = buttonBg,
-                                    contentColor = SpotifyWhite
-                                ),
-                                modifier = Modifier.size(48.dp),
-                            ) {
-                                Icon(Icons.Rounded.SkipPrevious, stringResource(R.string.previous), modifier = Modifier.size(28.dp))
-                            }
-                            FilledIconButton(
-                                onClick = { if (!spinnerActive) vm.togglePlayPause() },
-                                colors = IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = if (spinnerActive) animatedPrimary.copy(alpha = 0.5f) else animatedPrimary,
-                                    contentColor = SpotifyWhite,
-                                ),
-                                modifier = Modifier.size(60.dp),
-                            ) {
-                                if (spinnerActive) {
-                                    LoadingIndicator(color = SpotifyWhite, modifier = Modifier.size(26.dp))
-                                } else {
-                                    Icon(
-                                        if (isPaused || !isPlaying) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
-                                        stringResource(R.string.play_pause), modifier = Modifier.size(32.dp)
-                                    )
-                                }
-                            }
-                            val nextReady by vm.isNextReady.collectAsState()
-                            val isCurrentlyStreaming by vm.isStreaming.collectAsState()
-                            val nextLoading = !nextReady && isCurrentlyStreaming
-                            FilledTonalIconButton(
-                                onClick = { vm.skipNext() },
-                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                    containerColor = buttonBg,
-                                    contentColor = SpotifyWhite
-                                ),
-                                modifier = Modifier.size(48.dp),
-                            ) {
-                                if (nextLoading) {
-                                    LoadingIndicator(color = SpotifyWhite, modifier = Modifier.size(20.dp))
-                                } else {
-                                    Icon(Icons.Rounded.SkipNext, stringResource(R.string.next), modifier = Modifier.size(28.dp))
-                                }
-                            }
-                            FilledTonalIconToggleButton(
-                                checked = repeatMode != "off",
-                                onCheckedChange = { vm.cycleRepeat() },
-                                colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
-                                    containerColor = buttonBg,
-                                    contentColor = SpotifyWhite,
-                                    checkedContainerColor = buttonBg,
-                                    checkedContentColor = animatedPrimary,
-                                ),
-                                modifier = Modifier.size(44.dp),
-                            ) {
-                                Icon(
-                                    when (repeatMode) { "track" -> Icons.Rounded.RepeatOne; else -> Icons.Rounded.Repeat },
-                                    stringResource(R.string.repeat),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
+                        PlayerControls(vm, animatedPrimary, buttonBg, spinnerActive, compact = true)
 
                         Spacer(Modifier.weight(0.2f))
 
-                        // Bottom bar: device button + stacked pills (left), share + queue (right)
-                        val provider by vm.streamProvider.collectAsState()
-                        val streaming by vm.isStreaming.collectAsState()
-                        val audioOutput by vm.audioOutputName.collectAsState()
-                        val audioType by vm.audioOutputType.collectAsState()
-                        val audioCtx = LocalContext.current
-                        DisposableEffect(Unit) {
-                            val am = audioCtx.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
-                            vm.updateAudioOutput(audioCtx)
-                            val cb = object : android.media.AudioDeviceCallback() {
-                                override fun onAudioDevicesAdded(added: Array<out android.media.AudioDeviceInfo>?) { vm.updateAudioOutput(audioCtx) }
-                                override fun onAudioDevicesRemoved(removed: Array<out android.media.AudioDeviceInfo>?) { vm.updateAudioOutput(audioCtx) }
-                            }
-                            am.registerAudioDeviceCallback(cb, null)
-                            onDispose { am.unregisterAudioDeviceCallback(cb) }
-                        }
-                        val audioIcon = when (audioType) {
-                            "bluetooth" -> Icons.Rounded.Bluetooth
-                            "wired" -> Icons.Rounded.Headphones
-                            "usb" -> Icons.Rounded.Usb
-                            else -> Icons.Rounded.Speaker
-                        }
-                        // Playing on another Spotify Connect device: show it with a computer icon + name
-                        // instead of the (then-irrelevant) local Bluetooth/wired output.
-                        val activeDevice by vm.activeDeviceName.collectAsState()
-                        val remoteDevice = if (!streaming) activeDevice?.takeIf { it != android.os.Build.MODEL } else null
-                        val outIcon = if (remoteDevice != null) Icons.Rounded.Computer else audioIcon
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                FilledTonalIconToggleButton(
-                                    checked = streaming,
-                                    onCheckedChange = { vm.loadDevices(); vm.showDevices.value = true },
-                                    modifier = Modifier.size(38.dp),
-                                    colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
-                                        containerColor = buttonBg,
-                                        contentColor = SpotifyWhite,
-                                        checkedContainerColor = animatedPrimary,
-                                        checkedContentColor = SpotifyWhite,
-                                    ),
-                                ) {
-                                    Icon(outIcon, stringResource(R.string.audio_output), modifier = Modifier.size(20.dp))
-                                }
-                                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                    if (remoteDevice != null) {
-                                        InfoPill(Icons.Rounded.Computer, remoteDevice)
-                                    } else {
-                                        audioOutput?.let { InfoPill(audioIcon, it) }
-                                        provider?.let { SourcePill(it) }
-                                    }
-                                }
-                            }
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                FilledTonalIconButton(
-                                    onClick = {
-                                        track?.uri?.removePrefix("spotify:track:")?.let { id ->
-                                            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                                type = "text/plain"
-                                                putExtra(android.content.Intent.EXTRA_TEXT, "https://open.spotify.com/track/$id")
-                                            }
-                                            shareContext.startActivity(android.content.Intent.createChooser(intent, shareTrackLabel))
-                                        }
-                                    },
-                                    modifier = Modifier.size(38.dp),
-                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                        containerColor = buttonBg,
-                                        contentColor = SpotifyWhite,
-                                    ),
-                                ) {
-                                    Icon(Icons.Rounded.Share, stringResource(R.string.share), modifier = Modifier.size(20.dp))
-                                }
-                                FilledTonalIconButton(
-                                    onClick = { vm.openQueue() },
-                                    modifier = Modifier.size(38.dp),
-                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                        containerColor = buttonBg,
-                                        contentColor = SpotifyWhite,
-                                    ),
-                                ) {
-                                    Icon(
-                                        Icons.AutoMirrored.Rounded.QueueMusic,
-                                        stringResource(R.string.queue),
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
-                        }
+                        PlayerBottomBar(vm, animatedPrimary, buttonBg, shareTrackLabel, compact = true)
 
                         Spacer(Modifier.height(8.dp))
                     }
@@ -954,190 +782,11 @@ fun NowPlayingScreen(
 
                     Spacer(Modifier.weight(0.15f))
 
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        FilledTonalIconToggleButton(
-                            checked = isShuffling,
-                            onCheckedChange = { vm.toggleShuffle() },
-                            colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
-                                containerColor = buttonBg,
-                                contentColor = SpotifyWhite,
-                                checkedContainerColor = buttonBg,
-                                checkedContentColor = animatedPrimary,
-                            ),
-                            modifier = Modifier.size(52.dp),
-                        ) {
-                            Icon(Icons.Rounded.Shuffle, stringResource(R.string.shuffle), modifier = Modifier.size(22.dp))
-                        }
-                        FilledTonalIconButton(
-                            onClick = { vm.skipPrevious() },
-                            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor = buttonBg,
-                                contentColor = SpotifyWhite
-                            ),
-                            modifier = Modifier.size(56.dp),
-                        ) {
-                            Icon(Icons.Rounded.SkipPrevious, stringResource(R.string.previous), modifier = Modifier.size(32.dp))
-                        }
-                        FilledIconButton(
-                            onClick = { if (!spinnerActive) vm.togglePlayPause() },
-                            colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = if (spinnerActive) animatedPrimary.copy(alpha = 0.5f) else animatedPrimary,
-                                contentColor = SpotifyWhite,
-                            ),
-                            modifier = Modifier.size(72.dp),
-                        ) {
-                            if (spinnerActive) {
-                                LoadingIndicator(
-                                    color = SpotifyWhite,
-                                    modifier = Modifier.size(30.dp)
-                                )
-                            } else {
-                                Icon(
-                                    if (isPaused || !isPlaying) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
-                                    stringResource(R.string.play_pause), modifier = Modifier.size(38.dp)
-                                )
-                            }
-                        }
-                        val nextReady by vm.isNextReady.collectAsState()
-                        val isCurrentlyStreaming by vm.isStreaming.collectAsState()
-                        val nextLoading = !nextReady && isCurrentlyStreaming
-                        FilledTonalIconButton(
-                            onClick = { vm.skipNext() },
-                            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor = buttonBg,
-                                contentColor = SpotifyWhite
-                            ),
-                            modifier = Modifier.size(56.dp),
-                        ) {
-                            if (nextLoading) {
-                                LoadingIndicator(color = SpotifyWhite, modifier = Modifier.size(22.dp))
-                            } else {
-                                Icon(Icons.Rounded.SkipNext, stringResource(R.string.next), modifier = Modifier.size(32.dp))
-                            }
-                        }
-                        FilledTonalIconToggleButton(
-                            checked = repeatMode != "off",
-                            onCheckedChange = { vm.cycleRepeat() },
-                            colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
-                                containerColor = buttonBg,
-                                contentColor = SpotifyWhite,
-                                checkedContainerColor = buttonBg,
-                                checkedContentColor = animatedPrimary,
-                            ),
-                            modifier = Modifier.size(52.dp),
-                        ) {
-                            Icon(
-                                when (repeatMode) { "track" -> Icons.Rounded.RepeatOne; else -> Icons.Rounded.Repeat },
-                                stringResource(R.string.repeat),
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                    }
+                    PlayerControls(vm, animatedPrimary, buttonBg, spinnerActive, compact = false)
 
                     Spacer(Modifier.weight(0.2f))
 
-                    // Bottom bar: device button + stacked pills (left), share + queue (right)
-                    val provider by vm.streamProvider.collectAsState()
-                    val streaming by vm.isStreaming.collectAsState()
-                    val audioOutput by vm.audioOutputName.collectAsState()
-                    val audioType by vm.audioOutputType.collectAsState()
-                    val audioCtx2 = LocalContext.current
-                    DisposableEffect(Unit) {
-                        val am = audioCtx2.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
-                        vm.updateAudioOutput(audioCtx2)
-                        val cb = object : android.media.AudioDeviceCallback() {
-                            override fun onAudioDevicesAdded(added: Array<out android.media.AudioDeviceInfo>?) { vm.updateAudioOutput(audioCtx2) }
-                            override fun onAudioDevicesRemoved(removed: Array<out android.media.AudioDeviceInfo>?) { vm.updateAudioOutput(audioCtx2) }
-                        }
-                        am.registerAudioDeviceCallback(cb, null)
-                        onDispose { am.unregisterAudioDeviceCallback(cb) }
-                    }
-                    val audioIcon = when (audioType) {
-                        "bluetooth" -> Icons.Rounded.Bluetooth
-                        "wired" -> Icons.Rounded.Headphones
-                        "usb" -> Icons.Rounded.Usb
-                        else -> Icons.Rounded.Speaker
-                    }
-                    // When audio is playing on another Spotify Connect device (not this phone / not the
-                    // local stream), the local Bluetooth/wired output is misleading — show that Connect
-                    // device with a computer icon and its own name instead.
-                    val activeDevice by vm.activeDeviceName.collectAsState()
-                    val remoteDevice = if (!streaming) activeDevice?.takeIf { it != android.os.Build.MODEL } else null
-                    val outIcon = if (remoteDevice != null) Icons.Rounded.Computer else audioIcon
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            FilledTonalIconToggleButton(
-                                checked = streaming,
-                                onCheckedChange = { vm.loadDevices(); vm.showDevices.value = true },
-                                modifier = Modifier.size(44.dp),
-                                colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
-                                    containerColor = buttonBg,
-                                    contentColor = SpotifyWhite,
-                                    checkedContainerColor = animatedPrimary,
-                                    checkedContentColor = SpotifyWhite,
-                                ),
-                            ) {
-                                Icon(outIcon, stringResource(R.string.audio_output), modifier = Modifier.size(22.dp))
-                            }
-                            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                if (remoteDevice != null) {
-                                    InfoPill(Icons.Rounded.Computer, remoteDevice)
-                                } else {
-                                    audioOutput?.let { InfoPill(audioIcon, it) }
-                                }
-                                // Always show the source pill (idle "No CDN" state when nothing streams).
-                                SourcePill(provider)
-                            }
-                        }
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            FilledTonalIconButton(
-                                onClick = {
-                                    track?.uri?.removePrefix("spotify:track:")?.let { id ->
-                                        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                            type = "text/plain"
-                                            putExtra(android.content.Intent.EXTRA_TEXT, "https://open.spotify.com/track/$id")
-                                        }
-                                        shareContext.startActivity(android.content.Intent.createChooser(intent, shareTrackLabel))
-                                    }
-                                },
-                                modifier = Modifier.size(44.dp),
-                                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                    containerColor = buttonBg,
-                                    contentColor = SpotifyWhite,
-                                ),
-                            ) {
-                                Icon(Icons.Rounded.Share, stringResource(R.string.share), modifier = Modifier.size(22.dp))
-                            }
-                            FilledTonalIconButton(
-                                onClick = { vm.openQueue() },
-                                modifier = Modifier.size(44.dp),
-                                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                    containerColor = buttonBg,
-                                    contentColor = SpotifyWhite,
-                                ),
-                            ) {
-                                Icon(
-                                    Icons.AutoMirrored.Rounded.QueueMusic,
-                                    stringResource(R.string.queue),
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
-                        }
-                    }
+                    PlayerBottomBar(vm, animatedPrimary, buttonBg, shareTrackLabel, compact = false)
 
                     Spacer(Modifier.height(12.dp))
                 }
@@ -1218,6 +867,217 @@ private fun InfoPill(icon: androidx.compose.ui.graphics.vector.ImageVector, text
  * Qobuz, …); when nothing is streaming locally ([provider] == null — idle, or playing on a remote
  * Connect device) it shows a dimmed "No CDN" idle state instead of vanishing.
  */
+/** Share the current track as an open.spotify.com link via the system chooser. */
+private fun shareTrack(context: android.content.Context, trackUri: String?, chooserLabel: String) {
+    trackUri?.removePrefix("spotify:track:")?.let { id ->
+        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(android.content.Intent.EXTRA_TEXT, "https://open.spotify.com/track/$id")
+        }
+        context.startActivity(android.content.Intent.createChooser(intent, chooserLabel))
+    }
+}
+
+/** Keep the audio-output name current while the player is shown (registers an AudioDeviceCallback). */
+@Composable
+private fun AudioDeviceEffect(vm: SpotifyViewModel) {
+    val ctx = LocalContext.current
+    DisposableEffect(Unit) {
+        val am = ctx.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
+        vm.updateAudioOutput(ctx)
+        val cb = object : android.media.AudioDeviceCallback() {
+            override fun onAudioDevicesAdded(added: Array<out android.media.AudioDeviceInfo>?) { vm.updateAudioOutput(ctx) }
+            override fun onAudioDevicesRemoved(removed: Array<out android.media.AudioDeviceInfo>?) { vm.updateAudioOutput(ctx) }
+        }
+        am.registerAudioDeviceCallback(cb, null)
+        onDispose { am.unregisterAudioDeviceCallback(cb) }
+    }
+}
+
+/** A tonal icon button at a fixed size with the standard player button colours. */
+@Composable
+private fun TonalIconBtn(onClick: () -> Unit, size: Dp, buttonBg: Color, content: @Composable () -> Unit) {
+    FilledTonalIconButton(
+        onClick = onClick,
+        modifier = Modifier.size(size),
+        colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = buttonBg, contentColor = SpotifyWhite),
+    ) { content() }
+}
+
+@Composable
+private fun TonalIconToggle(
+    checked: Boolean,
+    onToggle: () -> Unit,
+    size: Dp,
+    buttonBg: Color,
+    accent: Color,
+    content: @Composable () -> Unit,
+) {
+    FilledTonalIconToggleButton(
+        checked = checked,
+        onCheckedChange = { onToggle() },
+        modifier = Modifier.size(size),
+        colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
+            containerColor = buttonBg,
+            contentColor = SpotifyWhite,
+            checkedContainerColor = buttonBg,
+            checkedContentColor = accent,
+        ),
+    ) { content() }
+}
+
+/** The 5-button transport row (shuffle, prev, play/pause, next, repeat), shared by both orientations.
+ *  compact = landscape (smaller controls). Collects its play-state projections internally so caller
+ *  bodies don't recompose on those flows. */
+@Composable
+private fun PlayerControls(
+    vm: SpotifyViewModel,
+    animatedPrimary: Color,
+    buttonBg: Color,
+    spinnerActive: Boolean,
+    compact: Boolean,
+) {
+    val isPlaying by vm.isPlayingFlow.collectAsState()
+    val isPaused by vm.isPausedFlow.collectAsState()
+    val isShuffling by vm.isShufflingFlow.collectAsState()
+    val repeatMode by vm.repeatModeFlow.collectAsState()
+    val nextReady by vm.isNextReady.collectAsState()
+    val isCurrentlyStreaming by vm.isStreaming.collectAsState()
+    val nextLoading = !nextReady && isCurrentlyStreaming
+    val sideBtn = if (compact) 44.dp else 52.dp
+    val skipBtn = if (compact) 48.dp else 56.dp
+    val playBtn = if (compact) 60.dp else 72.dp
+    val sideIcon = if (compact) 20.dp else 22.dp
+    val skipIcon = if (compact) 28.dp else 32.dp
+    val playIcon = if (compact) 32.dp else 38.dp
+    val playSpinnerSize = if (compact) 26.dp else 30.dp
+    val nextSpinnerSize = if (compact) 20.dp else 22.dp
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        TonalIconToggle(isShuffling, { vm.toggleShuffle() }, sideBtn, buttonBg, animatedPrimary) {
+            Icon(Icons.Rounded.Shuffle, stringResource(R.string.shuffle), modifier = Modifier.size(sideIcon))
+        }
+        TonalIconBtn({ vm.skipPrevious() }, skipBtn, buttonBg) {
+            Icon(Icons.Rounded.SkipPrevious, stringResource(R.string.previous), modifier = Modifier.size(skipIcon))
+        }
+        FilledIconButton(
+            onClick = { if (!spinnerActive) vm.togglePlayPause() },
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = if (spinnerActive) animatedPrimary.copy(alpha = 0.5f) else animatedPrimary,
+                contentColor = SpotifyWhite,
+            ),
+            modifier = Modifier.size(playBtn),
+        ) {
+            if (spinnerActive) {
+                LoadingIndicator(color = SpotifyWhite, modifier = Modifier.size(playSpinnerSize))
+            } else {
+                Icon(
+                    if (isPaused || !isPlaying) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
+                    stringResource(R.string.play_pause), modifier = Modifier.size(playIcon)
+                )
+            }
+        }
+        TonalIconBtn({ vm.skipNext() }, skipBtn, buttonBg) {
+            if (nextLoading) {
+                LoadingIndicator(color = SpotifyWhite, modifier = Modifier.size(nextSpinnerSize))
+            } else {
+                Icon(Icons.Rounded.SkipNext, stringResource(R.string.next), modifier = Modifier.size(skipIcon))
+            }
+        }
+        TonalIconToggle(repeatMode != "off", { vm.cycleRepeat() }, sideBtn, buttonBg, animatedPrimary) {
+            Icon(
+                when (repeatMode) { "track" -> Icons.Rounded.RepeatOne; else -> Icons.Rounded.Repeat },
+                stringResource(R.string.repeat),
+                modifier = Modifier.size(sideIcon)
+            )
+        }
+    }
+}
+
+/** Bottom bar: device-output toggle + stacked pills (left), share + queue (right). Shared by both
+ *  orientations; compact = landscape. Collects its audio/provider projections internally. */
+@Composable
+private fun PlayerBottomBar(
+    vm: SpotifyViewModel,
+    animatedPrimary: Color,
+    buttonBg: Color,
+    shareTrackLabel: String,
+    compact: Boolean,
+) {
+    val track by vm.currentTrack.collectAsState()
+    val provider by vm.streamProvider.collectAsState()
+    val streaming by vm.isStreaming.collectAsState()
+    val audioOutput by vm.audioOutputName.collectAsState()
+    val audioType by vm.audioOutputType.collectAsState()
+    val activeDevice by vm.activeDeviceName.collectAsState()
+    val context = LocalContext.current
+    val audioIcon = when (audioType) {
+        "bluetooth" -> Icons.Rounded.Bluetooth
+        "wired" -> Icons.Rounded.Headphones
+        "usb" -> Icons.Rounded.Usb
+        else -> Icons.Rounded.Speaker
+    }
+    // Playing on another Spotify Connect device: show it with a computer icon + name instead of the
+    // (then-irrelevant) local Bluetooth/wired output.
+    val remoteDevice = if (!streaming) activeDevice?.takeIf { it != android.os.Build.MODEL } else null
+    val outIcon = if (remoteDevice != null) Icons.Rounded.Computer else audioIcon
+    val actionBtn = if (compact) 38.dp else 44.dp
+    val actionIcon = if (compact) 20.dp else 22.dp
+    val leftSpacing = if (compact) 6.dp else 8.dp
+    val rightSpacing = if (compact) 10.dp else 12.dp
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(leftSpacing)
+        ) {
+            FilledTonalIconToggleButton(
+                checked = streaming,
+                onCheckedChange = { vm.loadDevices(); vm.showDevices.value = true },
+                modifier = Modifier.size(actionBtn),
+                colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
+                    containerColor = buttonBg,
+                    contentColor = SpotifyWhite,
+                    checkedContainerColor = animatedPrimary,
+                    checkedContentColor = SpotifyWhite,
+                ),
+            ) {
+                Icon(outIcon, stringResource(R.string.audio_output), modifier = Modifier.size(actionIcon))
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                if (remoteDevice != null) {
+                    InfoPill(Icons.Rounded.Computer, remoteDevice)
+                } else {
+                    audioOutput?.let { InfoPill(audioIcon, it) }
+                }
+                // Always show the source pill (idle "No CDN" state when nothing streams).
+                SourcePill(provider)
+            }
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(rightSpacing)
+        ) {
+            TonalIconBtn({ shareTrack(context, track?.uri, shareTrackLabel) }, actionBtn, buttonBg) {
+                Icon(Icons.Rounded.Share, stringResource(R.string.share), modifier = Modifier.size(actionIcon))
+            }
+            TonalIconBtn({ vm.openQueue() }, actionBtn, buttonBg) {
+                Icon(
+                    Icons.AutoMirrored.Rounded.QueueMusic,
+                    stringResource(R.string.queue),
+                    modifier = Modifier.size(actionIcon)
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun SourcePill(provider: String?) {
     val active = provider != null
@@ -1334,13 +1194,7 @@ private fun NowPlayingMenu(
                 },
                 Triple(Icons.Rounded.Share, shareLabel) {
                     onShowMore(false)
-                    track?.uri?.removePrefix("spotify:track:")?.let { id ->
-                        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(android.content.Intent.EXTRA_TEXT, "https://open.spotify.com/track/$id")
-                        }
-                        shareContext.startActivity(android.content.Intent.createChooser(intent, shareTrackLabel))
-                    }
+                    shareTrack(shareContext, track?.uri, shareTrackLabel)
                 }
             )
 

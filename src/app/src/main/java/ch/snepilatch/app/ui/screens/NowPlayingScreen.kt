@@ -49,6 +49,8 @@ import ch.snepilatch.app.ui.components.JukeboxTimeline
 import ch.snepilatch.app.ui.components.rememberSmoothPositionMs
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.util.formatTime
+import androidx.lifecycle.viewmodel.compose.viewModel
+import ch.snepilatch.app.viewmodel.LibraryViewModel
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
 
 /**
@@ -359,6 +361,7 @@ fun NowPlayingScreen(
     /** Drag release with vertical velocity (px/s) so the morph can settle. */
     onMorphDragEnd: ((Float) -> Unit)? = null
 ) {
+    val libraryVm: LibraryViewModel = viewModel()
     // Narrow projections only — positionMs (the 2Hz field) is read exclusively inside PlaybackProgress,
     // so the ~400-line orientation Columns below never recompose on position ticks.
     val track by vm.currentTrack.collectAsState()
@@ -796,7 +799,7 @@ fun NowPlayingScreen(
 
     // Playlist picker dialog
     if (showPlaylistPicker) {
-        val libraryItems by vm.library.collectAsState()
+        val libraryItems by libraryVm.library.collectAsState()
         val playlists = libraryItems.filter { it.type == "playlist" }
         TightAlertDialog(
             onDismissRequest = { showPlaylistPicker = false },

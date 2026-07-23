@@ -57,6 +57,7 @@ import ch.snepilatch.app.ui.theme.SpotifyGray
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.viewmodel.DetailViewModel
+import ch.snepilatch.app.viewmodel.LibraryViewModel
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
@@ -100,6 +101,9 @@ fun SpotifyApp(vm: SpotifyViewModel) {
     // Eagerly create the DetailViewModel from the post-login shell so it registers itself in
     // DetailRoutes before any deep link or playback-context bridge tries to open a detail.
     viewModel<DetailViewModel>()
+    // LibraryViewModel loads the library in its init; creating it here preloads it for the
+    // playlist picker (openable from any screen's track menu), and backs the picker's list below.
+    val libraryVm: LibraryViewModel = viewModel()
     val screen by vm.currentScreen.collectAsState()
     // Only whether a track exists — collecting the whole PlaybackUiState here would recompose the
     // entire app root twice a second, since the interpolator rewrites positionMs at 2Hz.
@@ -287,7 +291,7 @@ fun SpotifyApp(vm: SpotifyViewModel) {
         // Global playlist picker (triggered from TrackRow menu)
         val showPicker by vm.showPlaylistPicker.collectAsState()
         if (showPicker) {
-            val library by vm.library.collectAsState()
+            val library by libraryVm.library.collectAsState()
             val playlists = library.filter { it.type == "playlist" }
             TightAlertDialog(
                 onDismissRequest = { vm.showPlaylistPicker.value = false },
@@ -340,6 +344,7 @@ fun SpotifyApp(vm: SpotifyViewModel) {
 
 @Composable
 private fun MainContent(screen: Screen, vm: SpotifyViewModel, hazeState: HazeState) {
+    val libraryVm: LibraryViewModel = viewModel()
     Box(
         Modifier
             .fillMaxSize()
@@ -349,7 +354,7 @@ private fun MainContent(screen: Screen, vm: SpotifyViewModel, hazeState: HazeSta
         when (screen) {
             Screen.HOME -> HomeScreen(vm)
             Screen.SEARCH -> SearchScreen(vm)
-            Screen.LIBRARY -> { LaunchedEffect(Unit) { vm.loadLibrary() }; LibraryScreen(vm) }
+            Screen.LIBRARY -> { LaunchedEffect(Unit) { libraryVm.loadLibrary() }; LibraryScreen() }
             Screen.ACCOUNT -> AccountScreen(vm)
             Screen.QUEUE -> QueueScreen(vm)
             Screen.PLAYLIST_DETAIL, Screen.ALBUM_DETAIL, Screen.ARTIST_DETAIL, Screen.SHOW_DETAIL -> DetailScreen(vm)

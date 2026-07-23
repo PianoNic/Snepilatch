@@ -74,7 +74,7 @@ import ch.snepilatch.app.ui.theme.SpotifyGray
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.viewmodel.DetailViewModel
-import ch.snepilatch.app.viewmodel.SpotifyViewModel
+import ch.snepilatch.app.viewmodel.LibraryViewModel
 
 private const val PREFS_NAME = "kotify_prefs"
 private const val LIKED_SONGS_IMAGE = "https://image-cdn-ak.spotifycdn.com/image/ab67706c0000da84587ecba4a27774b2f6f07174"
@@ -82,9 +82,10 @@ private const val LIKED_SONGS_IMAGE = "https://image-cdn-ak.spotifycdn.com/image
 // --- Library Screen ---
 
 @Composable
-fun LibraryScreen(vm: SpotifyViewModel) {
-    val library by vm.library.collectAsState()
-    val libraryTotal by vm.libraryTotal.collectAsState()
+fun LibraryScreen() {
+    val libraryVm: LibraryViewModel = viewModel()
+    val library by libraryVm.library.collectAsState()
+    val libraryTotal by libraryVm.libraryTotal.collectAsState()
     val libraryHasMore = libraryTotal < 0 || library.size < libraryTotal
     var showCreateDialog by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -262,12 +263,12 @@ fun LibraryScreen(vm: SpotifyViewModel) {
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 itemsIndexed(sortedLibrary, key = { _, item -> item.uri }) { index, item ->
-                    LibraryGridCard(item, vm)
+                    LibraryGridCard(item)
                     // Key the near-end trigger on the VISIBLE (filtered/searched) list, not the raw
                     // library — otherwise a filter that shrinks the list below library.size - 10 never
                     // reaches the threshold and pagination silently stops.
                     if (libraryHasMore && index >= sortedLibrary.size - 10) {
-                        LaunchedEffect(sortedLibrary.size) { vm.loadMoreLibrary() }
+                        LaunchedEffect(sortedLibrary.size) { libraryVm.loadMoreLibrary() }
                     }
                 }
             }
@@ -277,11 +278,11 @@ fun LibraryScreen(vm: SpotifyViewModel) {
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
                 itemsIndexed(sortedLibrary, key = { _, item -> item.uri }) { index, item ->
-                    LibraryListItem(item, vm)
+                    LibraryListItem(item)
                     // See the grid branch: trigger on the visible list size, not the raw library, so
                     // pagination still fires when a filter/search shrinks the list.
                     if (libraryHasMore && index >= sortedLibrary.size - 10) {
-                        LaunchedEffect(sortedLibrary.size) { vm.loadMoreLibrary() }
+                        LaunchedEffect(sortedLibrary.size) { libraryVm.loadMoreLibrary() }
                     }
                 }
             }
@@ -291,7 +292,7 @@ fun LibraryScreen(vm: SpotifyViewModel) {
     if (showCreateDialog) {
         CreatePlaylistDialog(
             onDismiss = { showCreateDialog = false },
-            onCreate = { vm.createPlaylist(it); showCreateDialog = false }
+            onCreate = { libraryVm.createPlaylist(it); showCreateDialog = false }
         )
     }
 }
@@ -320,12 +321,12 @@ fun libraryItemClick(item: LibraryItem, detailVm: DetailViewModel) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun LibraryGridCard(item: LibraryItem, vm: SpotifyViewModel) {
+fun LibraryGridCard(item: LibraryItem) {
     val detailVm: DetailViewModel = viewModel()
     val isArtist = item.type == "artist"
     var showRemove by remember { mutableStateOf(false) }
     if (showRemove && item.type != "collection") {
-        LibraryRemoveDialog(item, vm, onDismiss = { showRemove = false })
+        LibraryRemoveDialog(item, onDismiss = { showRemove = false })
     }
     Column(
         Modifier
@@ -366,12 +367,12 @@ fun LibraryGridCard(item: LibraryItem, vm: SpotifyViewModel) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun LibraryListItem(item: LibraryItem, vm: SpotifyViewModel) {
+fun LibraryListItem(item: LibraryItem) {
     val detailVm: DetailViewModel = viewModel()
     val isArtist = item.type == "artist"
     var showRemove by remember { mutableStateOf(false) }
     if (showRemove && item.type != "collection") {
-        LibraryRemoveDialog(item, vm, onDismiss = { showRemove = false })
+        LibraryRemoveDialog(item, onDismiss = { showRemove = false })
     }
     Row(
         Modifier
@@ -453,7 +454,8 @@ fun CreatePlaylistDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
 }
 
 @Composable
-private fun LibraryRemoveDialog(item: LibraryItem, vm: SpotifyViewModel, onDismiss: () -> Unit) {
+private fun LibraryRemoveDialog(item: LibraryItem, onDismiss: () -> Unit) {
+    val libraryVm: LibraryViewModel = viewModel()
     TightAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.library_remove_title), color = SpotifyWhite) },
@@ -461,7 +463,7 @@ private fun LibraryRemoveDialog(item: LibraryItem, vm: SpotifyViewModel, onDismi
         containerColor = SpotifyGray,
         confirmButton = {
             TextButton(onClick = {
-                vm.removeFromLibrary(item)
+                libraryVm.removeFromLibrary(item)
                 onDismiss()
             }) {
                 Text(stringResource(R.string.library_remove_button), color = Color.Red)

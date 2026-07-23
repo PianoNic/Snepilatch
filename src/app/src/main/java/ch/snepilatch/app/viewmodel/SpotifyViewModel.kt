@@ -16,7 +16,6 @@ import ch.snepilatch.app.playback.SessionHolder
 import ch.snepilatch.app.playback.engine.SpotifyCdnResolver
 import ch.snepilatch.app.playback.engine.SpotifyStream
 import ch.snepilatch.app.data.*
-import kotify.api.album.Album
 import kotify.api.artist.Artist
 import kotify.api.home.Home
 import kotify.api.home.HomeData
@@ -241,13 +240,8 @@ class SpotifyViewModel : ViewModel() {
 
     // Search state was extracted into SearchViewModel — see viewmodel/SearchViewModel.kt
 
-    // Library
-    private val _library = MutableStateFlow<List<LibraryItem>>(emptyList())
-    val library: StateFlow<List<LibraryItem>> = _library
-    private val _libraryTotal = MutableStateFlow(-1)
-    val libraryTotal: StateFlow<Int> = _libraryTotal
-    private val _isLoadingMoreLibrary = MutableStateFlow(false)
-    val isLoadingMoreLibrary: StateFlow<Boolean> = _isLoadingMoreLibrary
+    // Library list + pagination moved to LibraryViewModel. followArtist/savePlaylist and the
+    // add-to-playlist picker stay here (snackbar + non-composable callers).
 
     // Queue
     private val _queue = MutableStateFlow<List<TrackInfo>>(emptyList())
@@ -389,14 +383,14 @@ class SpotifyViewModel : ViewModel() {
                 cdnResolver = SpotifyCdnResolver(sess, sp)
                 LokiLogger.i(TAG, "Session loaded")
 
-                // Start loading home and library immediately after session is ready
-                // These run in parallel with user profile and player setup
+                // Start loading home immediately after session is ready, in parallel with user
+                // profile and player setup. The library loads itself from LibraryViewModel.init.
                 loadHome()
-                loadLibrary()
 
                 val userApi = User(sess)
                 val me = userApi.getCurrentUser()
                 username = me.username
+                SessionHolder.username = me.username
                 val isPremium = userApi.hasPremium()
                 // Get public profile (display name + avatar) from user-profile-view API
                 val pubProfile = userApi.getProfile(username)
@@ -2835,48 +2829,6 @@ class SpotifyViewModel : ViewModel() {
         }
     }
 
-    // --- Library ---
-
-    fun loadLibrary() {
-        launchWithSession("loadLibrary") { sess ->
-            val page = Playlist(sess).getLibrary(limit = 50, offset = 0)
-            _library.value = page.toUiLibraryList()
-            _libraryTotal.value = page.total
-        }
-    }
-
-    fun loadMoreLibrary() {
-        if (_isLoadingMoreLibrary.value) return
-        val loaded = _library.value.size
-        val total = _libraryTotal.value
-        if (total in 0..loaded) return
-        _isLoadingMoreLibrary.value = true
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val sess = session ?: return@launch
-                val page = Playlist(sess).getLibrary(limit = 50, offset = loaded)
-                val more = page.toUiLibraryList()
-                _library.value = _library.value + more
-                _libraryTotal.value = page.total
-            } catch (e: Exception) { LokiLogger.e(TAG, "loadMoreLibrary", e) }
-            finally { _isLoadingMoreLibrary.value = false }
-        }
-    }
-
-    // --- Library actions ---
-
-    fun removeFromLibrary(item: ch.snepilatch.app.data.LibraryItem) {
-        launchWithSession("removeFromLibrary") { sess ->
-            val id = item.uri.substringAfterLast(":")
-            when (item.type) {
-                "album" -> Album(sess).removeFromLibrary(id)
-                "artist" -> Artist(sess).unfollow(id)
-                "playlist" -> kotify.api.playlist.Playlist(sess).deletePlaylist(id, username)
-            }
-            loadLibrary()
-        }
-    }
-
     // --- Devices ---
 
     fun loadDevices() {
@@ -2908,14 +2860,6 @@ class SpotifyViewModel : ViewModel() {
 
     // --- Playlist Management ---
 
-    fun createPlaylist(name: String) {
-        launchWithSession("createPlaylist") { sess ->
-            Playlist(sess).createPlaylist(name, username)
-            delay(1000)
-            loadLibrary()
-        }
-    }
-
     fun followArtist(artistId: String) {
         launchWithSession("followArtist") { sess ->
             Artist(sess).follow(artistId)
@@ -2930,10 +2874,6 @@ class SpotifyViewModel : ViewModel() {
             kotify.api.playlist.Playlist(sess).saveToLibrary(playlistId, username)
             _snackbarMessage.tryEmit("Saved to Library")
         }
-    }
-
-    fun unfollowArtist(artistId: String) {
-        launchWithSession("unfollowArtist") { sess -> Artist(sess).unfollow(artistId) }
     }
 
     /** Extract a fresh palette only when the art URL actually changed since the last extraction. */

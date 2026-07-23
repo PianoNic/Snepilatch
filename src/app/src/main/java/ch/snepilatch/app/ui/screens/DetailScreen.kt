@@ -79,7 +79,6 @@ fun DetailScreen(vm: SpotifyViewModel) {
                             startY = if (isArtist) 400f else 150f
                         ))
                 )
-                // Back button
                 Box(
                     Modifier
                         .align(Alignment.TopStart)
@@ -107,8 +106,9 @@ fun DetailScreen(vm: SpotifyViewModel) {
         if (detail.type == "playlist") {
             item {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-                    if (detail.description != null) {
-                        Text(stripHtml(detail.description!!), color = SpotifyLightGray, fontSize = 13.sp, maxLines = 2)
+                    val desc = remember(detail.description) { detail.description?.let { stripHtml(it) } }
+                    if (desc != null) {
+                        Text(desc, color = SpotifyLightGray, fontSize = 13.sp, maxLines = 2)
                         Spacer(Modifier.height(4.dp))
                     }
                     // Owner · songs · duration all on one line
@@ -149,7 +149,8 @@ fun DetailScreen(vm: SpotifyViewModel) {
                         )
                     }
                     // Type + date + summary all on one line
-                    val meta = listOfNotNull(detail.albumType, detail.releaseDate, detail.description?.let { stripHtml(it) }).joinToString(" · ")
+                    val summary = remember(detail.description) { detail.description?.let { stripHtml(it) } }
+                    val meta = listOfNotNull(detail.albumType, detail.releaseDate, summary).joinToString(" · ")
                     if (meta.isNotBlank()) {
                         Text(meta, color = SpotifyLightGray, fontSize = 13.sp)
                     }
@@ -191,9 +192,12 @@ fun DetailScreen(vm: SpotifyViewModel) {
         // Action buttons row
         item {
             val playback by vm.playback.collectAsState()
+            // Collect unconditionally: this collectAsState() was on the RHS of && and skipped when the
+            // track was null/paused, making a @Composable call conditional.
+            val playingContext by vm.playingContext.collectAsState()
             val isPlayingThis = playback.track != null && playback.isPlaying &&
-                (vm.playingContext.collectAsState().value?.let { detail.uri.contains(it.name) || detail.name == it.name } == true)
-            val shuffling by remember { derivedStateOf { playback.isShuffling } }
+                (playingContext?.let { detail.uri.contains(it.name) || detail.name == it.name } == true)
+            val shuffling = playback.isShuffling
             val context = androidx.compose.ui.platform.LocalContext.current
 
             Row(
@@ -259,7 +263,6 @@ fun DetailScreen(vm: SpotifyViewModel) {
 
                 Spacer(Modifier.weight(1f))
 
-                // Shuffle
                 IconButton(onClick = { vm.toggleShuffle() }) {
                     Icon(
                         Icons.Rounded.Shuffle, stringResource(R.string.shuffle),
@@ -270,7 +273,6 @@ fun DetailScreen(vm: SpotifyViewModel) {
 
                 Spacer(Modifier.width(8.dp))
 
-                // Play/Pause — large green circle
                 Box(
                     Modifier
                         .size(48.dp)
@@ -421,6 +423,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
         // Bio (artist pages)
         if (isArtist && detail.biography != null) {
             item {
+                val bio = remember(detail.biography) { stripHtml(detail.biography!!) }
                 Spacer(Modifier.height(16.dp))
                 Text(
                     stringResource(R.string.about),
@@ -430,7 +433,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
                 Text(
-                    stripHtml(detail.biography!!),
+                    bio,
                     color = SpotifyLightGray,
                     fontSize = 14.sp,
                     maxLines = 4,
@@ -521,14 +524,12 @@ private fun ArtistTrackRow(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Track number
         Text(
             "$number",
             color = if (isPlaying) accent else SpotifyLightGray,
             fontSize = 15.sp,
             modifier = Modifier.width(28.dp)
         )
-        // Album art
         SpotifyImage(
             url = track.albumArt,
             modifier = Modifier.size(44.dp),

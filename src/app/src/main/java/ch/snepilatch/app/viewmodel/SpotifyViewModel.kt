@@ -1838,8 +1838,8 @@ class SpotifyViewModel : ViewModel() {
     }
 
     fun openLyrics() {
+        // The lyrics screen fetches on its own via LaunchedEffect(track?.uri); don't double-fetch here.
         navigateTo(Screen.LYRICS)
-        fetchLyrics()
     }
 
     fun fetchLyrics() {

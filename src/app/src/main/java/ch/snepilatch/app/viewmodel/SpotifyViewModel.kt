@@ -811,6 +811,29 @@ class SpotifyViewModel : ViewModel() {
             }
         }
 
+    /**
+     * Same shape as [launchWithSession] but flips [loading] true around the block and always
+     * resets it in a finally. For loaders whose only extra work is a loading-spinner flag.
+     */
+    private fun launchWithSessionLoading(
+        tag: String,
+        loading: MutableStateFlow<Boolean>,
+        block: suspend (Session) -> Unit
+    ): Job =
+        viewModelScope.launch(Dispatchers.IO) {
+            val sess = session ?: return@launch
+            loading.value = true
+            try {
+                block(sess)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                LokiLogger.e(TAG, tag, e)
+            } finally {
+                loading.value = false
+            }
+        }
+
     fun showLogin() {
         needsLogin.value = true
     }
@@ -1823,97 +1846,89 @@ class SpotifyViewModel : ViewModel() {
         val trackUri = _playback.value.track?.uri ?: return
         if (trackUri == lastLyricsTrackUri && _lyrics.value != null) return
         lastLyricsTrackUri = trackUri
-        isLyricsLoading.value = true
-        viewModelScope.launch(Dispatchers.IO) {
+        launchWithSessionLoading("fetchLyrics", isLyricsLoading) { sess ->
             try {
-                val sess = session ?: return@launch
                 val trackId = trackUri.removePrefix("spotify:track:")
-                val data = Lyrics(sess).getLyrics(trackId)
-                _lyrics.value = data
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) {
-                LokiLogger.e(TAG, "fetchLyrics", e)
+                _lyrics.value = Lyrics(sess).getLyrics(trackId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Clear stale lyrics on failure, then rethrow so the helper logs it.
                 _lyrics.value = null
-            } finally {
-                isLyricsLoading.value = false
+                throw e
             }
         }
     }
 
     fun refreshQueue() {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val state = player?.getState() ?: return@launch
-                val sess = session ?: return@launch
-                val songApi = Song(sess)
+        launchWithSession("refreshQueue") { sess ->
+            val state = player?.getState() ?: return@launchWithSession
+            val songApi = Song(sess)
 
-                // Parse what we have from the typed cluster queue first.
-                data class ParsedTrack(
-                    val uri: String,
-                    val info: TrackInfo,
-                    val needsFetch: Boolean
+            // Parse what we have from the typed cluster queue first.
+            data class ParsedTrack(
+                val uri: String,
+                val info: TrackInfo,
+                val needsFetch: Boolean
+            )
+            val parsed = state.next_tracks.map { qt ->
+                val art = normalizeSpotifyImageUrl(qt.imageUrl)
+                val needsFetch = qt.name.isNullOrEmpty() || qt.artistName.isNullOrEmpty() || art == null
+                val info = TrackInfo(
+                    uri = qt.uri,
+                    name = qt.name ?: "Unknown",
+                    artist = qt.artistName ?: "Unknown",
+                    albumArt = art,
+                    durationMs = qt.durationMs,
+                    uid = qt.uid,
                 )
-                val parsed = state.next_tracks.map { qt ->
-                    val art = normalizeSpotifyImageUrl(qt.imageUrl)
-                    val needsFetch = qt.name.isNullOrEmpty() || qt.artistName.isNullOrEmpty() || art == null
-                    val info = TrackInfo(
-                        uri = qt.uri,
-                        name = qt.name ?: "Unknown",
-                        artist = qt.artistName ?: "Unknown",
-                        albumArt = art,
-                        durationMs = qt.durationMs,
-                        uid = qt.uid,
-                    )
-                    ParsedTrack(qt.uri, info, needsFetch)
-                }
+                ParsedTrack(qt.uri, info, needsFetch)
+            }
 
-                // Show immediately with what we have
-                _queue.value = parsed.map { it.info }
+            // Show immediately with what we have
+            _queue.value = parsed.map { it.info }
 
-                // Fetch missing metadata concurrently
-                val needFetch = parsed.filter { it.needsFetch }
-                if (needFetch.isNotEmpty()) {
-                    val fetched = coroutineScope {
-                        needFetch.map { pt ->
-                            async {
-                                try {
-                                    val trackId = pt.uri.removePrefix("spotify:track:")
-                                    songApi.getSong(trackId)?.toTrackInfo() ?: pt.info
-                                } catch (e: Exception) {
-                                    LokiLogger.e(TAG, "refreshQueue fetch ${pt.uri}", e)
-                                    pt.info
-                                }
+            // Fetch missing metadata concurrently
+            val needFetch = parsed.filter { it.needsFetch }
+            if (needFetch.isNotEmpty()) {
+                val fetched = coroutineScope {
+                    needFetch.map { pt ->
+                        async {
+                            try {
+                                val trackId = pt.uri.removePrefix("spotify:track:")
+                                songApi.getSong(trackId)?.toTrackInfo() ?: pt.info
+                            } catch (e: Exception) {
+                                LokiLogger.e(TAG, "refreshQueue fetch ${pt.uri}", e)
+                                pt.info
                             }
-                        }.awaitAll()
-                    }
-
-                    // Rebuild the full list with fetched data, preserving UIDs
-                    var fetchIdx = 0
-                    _queue.value = parsed.map { pt ->
-                        if (pt.needsFetch) {
-                            val f = fetched[fetchIdx++]
-                            f.copy(uid = pt.info.uid ?: f.uid)
-                        } else pt.info
-                    }
+                        }
+                    }.awaitAll()
                 }
-            } catch (e: Exception) { LokiLogger.e(TAG, "refreshQueue", e) }
+
+                // Rebuild the full list with fetched data, preserving UIDs
+                var fetchIdx = 0
+                _queue.value = parsed.map { pt ->
+                    if (pt.needsFetch) {
+                        val f = fetched[fetchIdx++]
+                        f.copy(uid = pt.info.uid ?: f.uid)
+                    } else pt.info
+                }
+            }
         }
     }
 
     fun openAlbumFromCurrentTrack() {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val state = player?.getState() ?: return@launch
-                val track = state.track ?: return@launch
-                val albumUri = track.albumUri?.takeIf { it.isNotBlank() }
-                    ?: state.context_uri?.takeIf { it.contains(":album:") }
-                if (albumUri != null) {
-                    val albumId = albumUri.removePrefix("spotify:album:")
-                    openAlbum(albumId)
-                } else {
-                    LokiLogger.w(TAG, "No album URI on current track")
-                }
-            } catch (e: Exception) { LokiLogger.e(TAG, "openAlbumFromCurrentTrack", e) }
+        launchWithPlayer("openAlbumFromCurrentTrack") { pc ->
+            val state = pc.getState() ?: return@launchWithPlayer
+            val track = state.track ?: return@launchWithPlayer
+            val albumUri = track.albumUri?.takeIf { it.isNotBlank() }
+                ?: state.context_uri?.takeIf { it.contains(":album:") }
+            if (albumUri != null) {
+                val albumId = albumUri.removePrefix("spotify:album:")
+                openAlbum(albumId)
+            } else {
+                LokiLogger.w(TAG, "No album URI on current track")
+            }
         }
     }
 
@@ -1947,16 +1962,14 @@ class SpotifyViewModel : ViewModel() {
     }
 
     fun openArtistFromCurrentTrack() {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val state = player?.getState() ?: return@launch
-                val track = state.track ?: return@launch
-                val artistUri = track.artistUri?.takeIf { it.isNotBlank() }
-                if (artistUri != null) {
-                    val artistId = artistUri.removePrefix("spotify:artist:")
-                    openArtist(artistId)
-                }
-            } catch (e: Exception) { LokiLogger.e(TAG, "openArtistFromCurrentTrack", e) }
+        launchWithPlayer("openArtistFromCurrentTrack") { pc ->
+            val state = pc.getState() ?: return@launchWithPlayer
+            val track = state.track ?: return@launchWithPlayer
+            val artistUri = track.artistUri?.takeIf { it.isNotBlank() }
+            if (artistUri != null) {
+                val artistId = artistUri.removePrefix("spotify:artist:")
+                openArtist(artistId)
+            }
         }
     }
 
@@ -2928,14 +2941,9 @@ class SpotifyViewModel : ViewModel() {
 
     fun openLikedSongs() {
         navigateTo(Screen.PLAYLIST_DETAIL)
-        viewModelScope.launch(Dispatchers.IO) {
-            isLoading.value = true
-            try {
-                val sess = session ?: return@launch
-                val data = Playlist(sess).getLikedSongs(limit = 50)
-                _detail.value = data.toDetailData(offset = 0)
-            } catch (e: Exception) { LokiLogger.e(TAG, "openLikedSongs", e) }
-            finally { isLoading.value = false }
+        launchWithSessionLoading("openLikedSongs", isLoading) { sess ->
+            val data = Playlist(sess).getLikedSongs(limit = 50)
+            _detail.value = data.toDetailData(offset = 0)
         }
     }
 
@@ -3006,39 +3014,24 @@ class SpotifyViewModel : ViewModel() {
 
     fun openPlaylist(playlistId: String) {
         navigateTo(Screen.PLAYLIST_DETAIL)
-        viewModelScope.launch(Dispatchers.IO) {
-            isLoading.value = true
-            try {
-                val sess = session ?: return@launch
-                _detail.value = Playlist(sess).getPlaylist(playlistId, limit = 50).toDetailData(playlistId)
-            } catch (e: Exception) { LokiLogger.e(TAG, "openPlaylist", e) }
-            finally { isLoading.value = false }
+        launchWithSessionLoading("openPlaylist", isLoading) { sess ->
+            _detail.value = Playlist(sess).getPlaylist(playlistId, limit = 50).toDetailData(playlistId)
         }
     }
 
 
     fun openAlbum(albumId: String) {
         navigateTo(Screen.ALBUM_DETAIL)
-        viewModelScope.launch(Dispatchers.IO) {
-            isLoading.value = true
-            try {
-                val sess = session ?: return@launch
-                _detail.value = Album(sess).getAlbum(albumId, limit = 50).toDetailData(albumId)
-            } catch (e: Exception) { LokiLogger.e(TAG, "openAlbum", e) }
-            finally { isLoading.value = false }
+        launchWithSessionLoading("openAlbum", isLoading) { sess ->
+            _detail.value = Album(sess).getAlbum(albumId, limit = 50).toDetailData(albumId)
         }
     }
 
 
     fun openArtist(artistId: String) {
         navigateTo(Screen.ARTIST_DETAIL)
-        viewModelScope.launch(Dispatchers.IO) {
-            isLoading.value = true
-            try {
-                val sess = session ?: return@launch
-                _detail.value = Artist(sess).getArtist(artistId).toDetailData(artistId)
-            } catch (e: Exception) { LokiLogger.e(TAG, "openArtist", e) }
-            finally { isLoading.value = false }
+        launchWithSessionLoading("openArtist", isLoading) { sess ->
+            _detail.value = Artist(sess).getArtist(artistId).toDetailData(artistId)
         }
     }
 
@@ -3049,18 +3042,13 @@ class SpotifyViewModel : ViewModel() {
      */
     fun openShow(showId: String, publisher: String? = null, imageUrl: String? = null) {
         navigateTo(Screen.SHOW_DETAIL)
-        viewModelScope.launch(Dispatchers.IO) {
-            isLoading.value = true
-            try {
-                val sess = session ?: return@launch
-                val info = Podcast(sess, showId).getPodcastInfo(limit = 50, offset = 0)
-                if (info != null) {
-                    _detail.value = info.toDetailData(showId, publisher, imageUrl)
-                } else {
-                    LokiLogger.e(TAG, "openShow: no podcast info for $showId")
-                }
-            } catch (e: Exception) { LokiLogger.e(TAG, "openShow", e) }
-            finally { isLoading.value = false }
+        launchWithSessionLoading("openShow", isLoading) { sess ->
+            val info = Podcast(sess, showId).getPodcastInfo(limit = 50, offset = 0)
+            if (info != null) {
+                _detail.value = info.toDetailData(showId, publisher, imageUrl)
+            } else {
+                LokiLogger.e(TAG, "openShow: no podcast info for $showId")
+            }
         }
     }
 
@@ -3083,52 +3071,44 @@ class SpotifyViewModel : ViewModel() {
     }
 
     fun toggleDetailSaved(type: String, id: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val sess = session ?: return@launch
-                val currentlySaved = detailSaved.value
-                when (type) {
-                    "album" -> if (currentlySaved) Album(sess).removeFromLibrary(id) else Album(sess).saveToLibrary(id)
-                    "artist" -> if (currentlySaved) Artist(sess).unfollow(id) else Artist(sess).follow(id)
-                }
-                detailSaved.value = !currentlySaved
-            } catch (e: Exception) { LokiLogger.e(TAG, "toggleDetailSaved", e) }
+        launchWithSession("toggleDetailSaved") { sess ->
+            val currentlySaved = detailSaved.value
+            when (type) {
+                "album" -> if (currentlySaved) Album(sess).removeFromLibrary(id) else Album(sess).saveToLibrary(id)
+                "artist" -> if (currentlySaved) Artist(sess).unfollow(id) else Artist(sess).follow(id)
+            }
+            detailSaved.value = !currentlySaved
         }
     }
 
     fun removeFromLibrary(item: ch.snepilatch.app.data.LibraryItem) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val sess = session ?: return@launch
-                val id = item.uri.substringAfterLast(":")
-                when (item.type) {
-                    "album" -> Album(sess).removeFromLibrary(id)
-                    "artist" -> Artist(sess).unfollow(id)
-                    "playlist" -> kotify.api.playlist.Playlist(sess).deletePlaylist(id, username)
-                }
-                loadLibrary()
-            } catch (e: Exception) { LokiLogger.e(TAG, "removeFromLibrary", e) }
+        launchWithSession("removeFromLibrary") { sess ->
+            val id = item.uri.substringAfterLast(":")
+            when (item.type) {
+                "album" -> Album(sess).removeFromLibrary(id)
+                "artist" -> Artist(sess).unfollow(id)
+                "playlist" -> kotify.api.playlist.Playlist(sess).deletePlaylist(id, username)
+            }
+            loadLibrary()
         }
     }
 
     // --- Devices ---
 
     fun loadDevices() {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val devicesInfo = player?.getDevices() ?: return@launch
-                // Filter out hobs_ duplicates — they're internal Spotify IDs for the same device
-                _devices.value = devicesInfo.devices.filter { !it.key.startsWith("hobs_") }.values.toList()
-                val activeId = devicesInfo.activeDeviceId
-                LokiLogger.i(TAG, "Devices: ${devicesInfo.devices.keys}, activeId=$activeId")
-                activeDeviceName.value = if (activeId != null) {
-                    // Try exact match first, then with/without hobs_ prefix
-                    devicesInfo.devices[activeId]?.name
-                        ?: devicesInfo.devices["hobs_$activeId"]?.name
-                        ?: devicesInfo.devices.entries.firstOrNull { it.key == activeId || it.key == "hobs_$activeId" || "hobs_${it.key}" == activeId }?.value?.name
-                } else null
-                LokiLogger.i(TAG, "Active device name: ${activeDeviceName.value}")
-            } catch (e: Exception) { LokiLogger.e(TAG, "loadDevices", e) }
+        launchWithPlayer("loadDevices") { pc ->
+            val devicesInfo = pc.getDevices() ?: return@launchWithPlayer
+            // Filter out hobs_ duplicates — they're internal Spotify IDs for the same device
+            _devices.value = devicesInfo.devices.filter { !it.key.startsWith("hobs_") }.values.toList()
+            val activeId = devicesInfo.activeDeviceId
+            LokiLogger.i(TAG, "Devices: ${devicesInfo.devices.keys}, activeId=$activeId")
+            activeDeviceName.value = if (activeId != null) {
+                // Try exact match first, then with/without hobs_ prefix
+                devicesInfo.devices[activeId]?.name
+                    ?: devicesInfo.devices["hobs_$activeId"]?.name
+                    ?: devicesInfo.devices.entries.firstOrNull { it.key == activeId || it.key == "hobs_$activeId" || "hobs_${it.key}" == activeId }?.value?.name
+            } else null
+            LokiLogger.i(TAG, "Active device name: ${activeDeviceName.value}")
         }
     }
 

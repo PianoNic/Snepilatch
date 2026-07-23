@@ -6,7 +6,8 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
+import coil.request.ImageRequest
 import android.media.audiofx.AudioEffect
 import android.net.ConnectivityManager
 import android.net.Network
@@ -42,8 +43,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.net.URL
 
 class MusicPlaybackService : MediaBrowserServiceCompat() {
 
@@ -1123,14 +1122,24 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         }
     }
 
-    private suspend fun loadBitmap(url: String): Bitmap? = withContext(Dispatchers.IO) {
-        try {
-            // Spotify's cluster API returns art as `spotify:image:<id>` URIs.
-            // Rewrite to the i.scdn.co CDN URL before handing to URL().
-            val resolved = if (url.startsWith("spotify:image:")) {
-                "https://i.scdn.co/image/" + url.removePrefix("spotify:image:")
-            } else url
-            URL(resolved).openStream().use { BitmapFactory.decodeStream(it) }
+    private suspend fun loadBitmap(url: String): Bitmap? {
+        // Spotify's cluster API returns art as `spotify:image:<id>` URIs.
+        // Rewrite to the i.scdn.co CDN URL before requesting.
+        val resolved = if (url.startsWith("spotify:image:")) {
+            "https://i.scdn.co/image/" + url.removePrefix("spotify:image:")
+        } else url
+        // Route through the shared Coil singleton the UI already populated: a repeated URL (idle->play,
+        // prefetch->skip) is a memory-cache hit with no re-fetch or re-decode, size(256) downsamples the
+        // ~1.6MB full-res decode to notification-icon scale, allowHardware(false) yields a software
+        // bitmap MediaMetadata requires, and Coil's OkHttp bounds the request (no indefinite IO hang).
+        return try {
+            val request = ImageRequest.Builder(this)
+                .data(resolved)
+                .size(256)
+                .allowHardware(false)
+                .build()
+            val result = coil.Coil.imageLoader(this).execute(request)
+            (result.drawable as? BitmapDrawable)?.bitmap
         } catch (e: Exception) {
             LokiLogger.e(TAG, "Failed to load art: $url", e)
             null

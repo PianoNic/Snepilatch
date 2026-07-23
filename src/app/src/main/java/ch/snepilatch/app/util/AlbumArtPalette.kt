@@ -5,7 +5,6 @@ import android.graphics.drawable.BitmapDrawable
 import androidx.compose.ui.graphics.Color
 import androidx.palette.graphics.Palette
 import ch.snepilatch.app.data.ThemeColors
-import coil.ImageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
 
@@ -17,9 +16,13 @@ import coil.request.SuccessResult
  * Returns null if the image fails to load or if no usable swatches are produced.
  */
 suspend fun extractThemeColorsFromArt(context: Context, imageUrl: String): ThemeColors? {
-    val loader = ImageLoader(context)
+    // Reuse the app's shared Coil singleton (same instance the UI already populated) instead of a
+    // fresh ImageLoader with an empty cache, and downsample to 112px — Palette's internal resize
+    // target (resizeBitmapArea 112x112) — so we skip a wasted full-res software decode per skip.
+    val loader = coil.Coil.imageLoader(context)
     val request = ImageRequest.Builder(context)
         .data(imageUrl)
+        .size(112)
         .allowHardware(false)
         .build()
     val result = loader.execute(request)

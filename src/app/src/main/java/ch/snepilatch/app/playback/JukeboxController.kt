@@ -48,7 +48,11 @@ class JukeboxController(
         const val VIZ_BUCKETS = 56 // number of pillars in the remix map
         const val VIZ_TICK_MS = 120L // how often the remix map refreshes
         const val PREVIEW_START_S = 10 // run the first similarity search ~10s in (populates the remix map)
-        const val PREVIEW_EVERY_S = 5 // refresh the preview similarities every +5s until the centre handoff
+
+        // Refresh cadence for the preview similarities until the centre handoff. Was 5s, but each refresh
+        // is a whole-buffer FFT + O(n^2) pass feeding only the cosmetic 56-bar histogram, so ~18s cuts the
+        // reanalysis count ~4x with no correctness/handoff impact.
+        const val PREVIEW_EVERY_S = 18
         const val HANDOFF_OVERLAP_MS = 180L // overlap engine + ExoPlayer briefly so the takeover has no gap
         const val LOOP_MARGIN_MS = 3000L // seek the muted keep-alive player back this far before the end
     }

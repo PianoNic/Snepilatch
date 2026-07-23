@@ -35,6 +35,10 @@ object WaveformAnalyzer {
     private const val TIMBRE_BANDS = 8
     private const val SILENCE_GATE = 0.05 // frames below 5% of peak energy can't be jump points
 
+    // The Hann window is immutable and FFT_SIZE-sized; compute it once instead of rebuilding it on
+    // every analyze() call (which runs repeatedly over the capture half during a jukebox session).
+    private val WINDOW = DoubleArray(FFT_SIZE) { 0.5 - 0.5 * cos(2.0 * Math.PI * it / (FFT_SIZE - 1)) }
+
     /**
      * Analyse [mono] PCM at [sampleRate]. [minGapMs] keeps jumps from being trivially close; [maxDistance]
      * is the similarity cutoff (z-scored feature distance); [maxParallels] caps the returned list.
@@ -52,7 +56,7 @@ object WaveformAnalyzer {
         val dim = CHROMA_BINS + TIMBRE_BANDS
         val feats = Array(nFrames) { DoubleArray(dim) }
         val energy = DoubleArray(nFrames)
-        val window = hann(FFT_SIZE)
+        val window = WINDOW
         val re = DoubleArray(FFT_SIZE)
         val im = DoubleArray(FFT_SIZE)
         val mag = DoubleArray(FFT_SIZE / 2)
@@ -168,8 +172,6 @@ object WaveformAnalyzer {
         }
         return sqrt(s)
     }
-
-    private fun hann(n: Int): DoubleArray = DoubleArray(n) { 0.5 - 0.5 * cos(2.0 * Math.PI * it / (n - 1)) }
 
     /** In-place iterative radix-2 FFT ([re]/[im] length must be a power of two). */
     private fun fft(re: DoubleArray, im: DoubleArray) {

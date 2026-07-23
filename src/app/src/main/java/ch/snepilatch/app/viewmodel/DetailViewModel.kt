@@ -21,9 +21,9 @@ import kotlinx.coroutines.launch
  * Owns the detail data + its pagination + the follow/save toggle, and the
  * openers that navigate to a detail and load it. Navigation goes through the
  * process-scoped [Navigator]; the session comes from [SessionHolder]. Screens
- * obtain this via `viewModel()` alongside [SpotifyViewModel].
+ * obtain this via `viewModel()` alongside [PlaybackViewModel].
  *
- * [SpotifyViewModel]'s deep-link handler and playback-context bridges
+ * [PlaybackViewModel]'s deep-link handler and playback-context bridges
  * (openAlbumFromCurrentTrack / openArtistFromCurrentTrack / navigateToContext)
  * need PlayerConnect / playingContext, so they stay there and reach the openers
  * through [DetailRoutes] rather than holding a reference to this ViewModel.
@@ -197,7 +197,7 @@ class DetailViewModel : SessionViewModel("DetailVM") {
 }
 
 /**
- * Process-scoped hop so [SpotifyViewModel]'s deep-link + playback-context code can open a detail
+ * Process-scoped hop so [PlaybackViewModel]'s deep-link + playback-context code can open a detail
  * without a reference to the (screen-scoped) [DetailViewModel]. The live ViewModel registers itself
  * on construction; calls before one exists are dropped (in practice a screen — normally Home — is
  * always composed before a deep link is processed, so one is registered).

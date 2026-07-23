@@ -31,10 +31,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import ch.snepilatch.app.util.parseCookieString
 import ch.snepilatch.app.util.saveCookies
-import ch.snepilatch.app.viewmodel.SpotifyViewModel
+import ch.snepilatch.app.viewmodel.PlaybackViewModel
 
 @Composable
-fun SpotifyLoginScreen(vm: SpotifyViewModel) {
+fun SpotifyLoginScreen(vm: PlaybackViewModel) {
     Column(
         Modifier
             .fillMaxSize()

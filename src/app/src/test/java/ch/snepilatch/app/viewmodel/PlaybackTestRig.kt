@@ -15,7 +15,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 
 /**
- * Test rig for [SpotifyViewModel] playback logic. Wires up:
+ * Test rig for [PlaybackViewModel] playback logic. Wires up:
  *  - a mocked [MusicPlaybackService.instance] so handler calls can be observed
  *  - the Main dispatcher swapped for an unconfined test dispatcher so the
  *    ViewModel's coroutines run synchronously
@@ -29,7 +29,7 @@ class PlaybackTestRig {
     val testScope = TestScope(testDispatcher)
     lateinit var service: MusicPlaybackService
         private set
-    lateinit var vm: SpotifyViewModel
+    lateinit var vm: PlaybackViewModel
         private set
 
     fun install() {
@@ -37,7 +37,7 @@ class PlaybackTestRig {
         service = mockk(relaxed = true)
         mockkObject(MusicPlaybackService.Companion)
         every { MusicPlaybackService.instance } returns service
-        vm = SpotifyViewModel()
+        vm = PlaybackViewModel()
     }
 
     fun uninstall() {

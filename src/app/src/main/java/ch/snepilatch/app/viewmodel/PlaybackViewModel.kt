@@ -47,9 +47,9 @@ import kotlinx.coroutines.withContext
 import kotlin.coroutines.cancellation.CancellationException
 
 @Suppress("TooManyFunctions") // central view-model; split-by-feature is tracked separately
-class SpotifyViewModel : ViewModel() {
+class PlaybackViewModel : ViewModel() {
 
-    private val TAG = "SpotifyVM"
+    private val TAG = "PlaybackVM"
 
     // Navigation lives in the process-scoped Navigator; the ViewModel delegates (see navigateTo/goBack
     // below). Reset on construction so a fresh ViewModel (cold process / recreated Activity) starts at
@@ -244,7 +244,7 @@ class SpotifyViewModel : ViewModel() {
     // Next track info (always available from WebSocket state for mini player swipe)
     val nextTrackPreview = MutableStateFlow<TrackInfo?>(null)
 
-    // Detail state + openers live in DetailViewModel; SpotifyViewModel's deep-link/playback bridges
+    // Detail state + openers live in DetailViewModel; PlaybackViewModel's deep-link/playback bridges
     // reach them through DetailRoutes.
 
     // Devices

@@ -49,12 +49,12 @@ import ch.snepilatch.app.ui.theme.SpotifyLightGray
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.HomeViewModel
-import ch.snepilatch.app.viewmodel.SpotifyViewModel
+import ch.snepilatch.app.viewmodel.PlaybackViewModel
 
 // --- Home Screen ---
 
 @Composable
-fun HomeScreen(vm: SpotifyViewModel) {
+fun HomeScreen(vm: PlaybackViewModel) {
     val homeVm: HomeViewModel = viewModel()
     val homeData by homeVm.homeData.collectAsState()
     val isHomeLoading by homeVm.isLoading.collectAsState()
@@ -117,7 +117,7 @@ fun HomeScreen(vm: SpotifyViewModel) {
 }
 
 @Composable
-fun QuickPickGrid(items: List<kotify.api.home.HomeSectionItem>, vm: SpotifyViewModel) {
+fun QuickPickGrid(items: List<kotify.api.home.HomeSectionItem>, vm: PlaybackViewModel) {
     val detailVm: DetailViewModel = viewModel()
     Column(
         Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -218,7 +218,7 @@ fun HomeShimmer() {
 }
 
 @Composable
-fun HomeSectionCard(item: kotify.api.home.HomeSectionItem, vm: SpotifyViewModel, modifier: Modifier = Modifier) {
+fun HomeSectionCard(item: kotify.api.home.HomeSectionItem, vm: PlaybackViewModel, modifier: Modifier = Modifier) {
     val detailVm: DetailViewModel = viewModel()
     val isArtist = item.type == "artist"
     Column(

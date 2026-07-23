@@ -41,7 +41,7 @@ import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.theme.SpotifyElevated
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
-import ch.snepilatch.app.viewmodel.SpotifyViewModel
+import ch.snepilatch.app.viewmodel.PlaybackViewModel
 
 /**
  * Base fill colour of the mini-player card. Shared with the expanding-player morph
@@ -57,7 +57,7 @@ fun miniCardBaseColor(primary: Color): Color = lerp(SpotifyElevated, primary, 0.
  */
 @Composable
 fun MiniPlayer(
-    vm: SpotifyViewModel,
+    vm: PlaybackViewModel,
     modifier: Modifier = Modifier
 ) {
     val theme by vm.themeColors.collectAsState()
@@ -89,7 +89,7 @@ fun MiniPlayer(
  */
 @Composable
 fun MiniPlayerContent(
-    vm: SpotifyViewModel,
+    vm: PlaybackViewModel,
     modifier: Modifier = Modifier
 ) {
     // Collect only the fields the mini bar draws, each distinctUntilChanged, instead of the whole
@@ -164,7 +164,7 @@ fun MiniPlayerContent(
  * interpolator's position ticks recompose this tiny bar instead of the whole MiniPlayerContent body.
  */
 @Composable
-private fun MiniProgressBar(vm: SpotifyViewModel, durationMs: Long, color: Color) {
+private fun MiniProgressBar(vm: PlaybackViewModel, durationMs: Long, color: Color) {
     val positionMs by vm.positionFlow.collectAsState()
     val isPlaying by vm.isPlayingFlow.collectAsState()
     val smoothPos = rememberSmoothPositionMs(positionMs, durationMs, isPlaying)

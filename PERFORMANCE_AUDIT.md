@@ -77,7 +77,7 @@ The completeness-critic pass re-checked the plan against source and found correc
   _Thermal:_ Low. Background snapshot churn only; the service wakelock keeps the CPU awake regardless, so the incremental cost is small. Include only if cheap. · _Effort:_ M (broad but mechanical)
 
 
-_Critic scoping note:_ The plan's four P0 frame-loop items are well-targeted and correctly identified as the dominant continuous heat, and I verified each in source (FluidBackground.kt L82-92; SharedComponents.kt rememberSmoothPositionMs L164-182; NowPlayingScreen.kt MarqueeText L1371-1389 iterations=Int.MAX_VALUE; LyricsScreen.kt L81-89 gated only on isPlaying). Secondary items also check out: DeezerDecryptProxy creates a fresh Cipher.getInstance per block (L213-216), Jukebox viz emits at 120ms with no paused/unchanged skip (JukeboxController.kt L311-330), and the derived flows currentTrackUri/isPlayingFlow already use distinctUntilChanged (SpotifyViewModel L187-193). Derived StateFlows are clean and SpotifyImage relies on Coil's automatic target-size downsampling, so no gap there. Two continuous-load sources are MISSING from the plan: (1) the Canvas video ExoPlayer, which is as hot as the Fluid warp when enabled and is never paused when audio pauses; and (2) the app-wide 2Hz whole-PlaybackUiState recomposition of MiniPlayerContent, which survives the planned rememberSmoothPositionMs fix and affects every screen, not just the player. Important scoping context the plan slightly overstates: the Fluid warp only runs when the user's background mode is 'fluid' (gradient off; AlbumBackdrop picks one or the other at NowPlayingScreen L228-243) AND only while the full player is expanded (bgFade>0.001, SpotifyApp L417) — likewise Canvas — so 'always-on during normal use' is accurate for the expanded-player screen but not while browsing with the mini bar (where gap #2 is the relevant continuous cost). The three plan risks above (FluidBackground fix semantics, MarqueeText UX, out-of-repo HttpClient target) should be resolved before implementation.
+_Critic scoping note:_ The plan's four P0 frame-loop items are well-targeted and correctly identified as the dominant continuous heat, and I verified each in source (FluidBackground.kt L82-92; SharedComponents.kt rememberSmoothPositionMs L164-182; NowPlayingScreen.kt MarqueeText L1371-1389 iterations=Int.MAX_VALUE; LyricsScreen.kt L81-89 gated only on isPlaying). Secondary items also check out: DeezerDecryptProxy creates a fresh Cipher.getInstance per block (L213-216), Jukebox viz emits at 120ms with no paused/unchanged skip (JukeboxController.kt L311-330), and the derived flows currentTrackUri/isPlayingFlow already use distinctUntilChanged (PlaybackViewModel L187-193). Derived StateFlows are clean and SpotifyImage relies on Coil's automatic target-size downsampling, so no gap there. Two continuous-load sources are MISSING from the plan: (1) the Canvas video ExoPlayer, which is as hot as the Fluid warp when enabled and is never paused when audio pauses; and (2) the app-wide 2Hz whole-PlaybackUiState recomposition of MiniPlayerContent, which survives the planned rememberSmoothPositionMs fix and affects every screen, not just the player. Important scoping context the plan slightly overstates: the Fluid warp only runs when the user's background mode is 'fluid' (gradient off; AlbumBackdrop picks one or the other at NowPlayingScreen L228-243) AND only while the full player is expanded (bgFade>0.001, SpotifyApp L417) — likewise Canvas — so 'always-on during normal use' is accurate for the expanded-player screen but not while browsing with the mini bar (where gap #2 is the relevant continuous cost). The three plan risks above (FluidBackground fix semantics, MarqueeText UX, out-of-repo HttpClient target) should be resolved before implementation.
 
 
 ---
@@ -486,7 +486,7 @@ _Risk:_ None if the Cipher stays local to the streaming thread. Verified: doFina
 **severity** low · **thermal** low (radio waste while remote, not local decode) · **effort** S
 
 
-_Files:_ `app/viewmodel/SpotifyViewModel.kt`
+_Files:_ `app/viewmodel/PlaybackViewModel.kt`
 
 
 _Steps:_
@@ -784,7 +784,7 @@ _Acceptance:_
 _Risk:_ Over-migrating a collector a background code path needs could freeze state; audit each site. Broad but mechanical.
 
 
-## P2 · WS-P2-VIEWMODEL — SpotifyViewModel decomposition and de-duplication (KISS)
+## P2 · WS-P2-VIEWMODEL — PlaybackViewModel decomposition and de-duplication (KISS)
 
 Zero runtime/thermal cost, but the 3199-line god-object and its repeated boilerplate (duplicate stream-commit helpers, 15 hand-rolled IO launches, 5 copy-paste detail loaders, a 190-line resolveAndPlay, ~12 loose state flags) impede reasoning about which coroutine touches which state. Continue the incremental feature-ViewModel extraction (SearchViewModel is the one already split out) and land each with its own tests. Order: cheap mechanical dedups first; the god-object extraction and the state-flag refactor (the riskiest, touching the fragile cold-start ordering) LAST.
 
@@ -794,7 +794,7 @@ Zero runtime/thermal cost, but the 3199-line god-object and its repeated boilerp
 **severity** medium · **thermal** none · **effort** M
 
 
-_Files:_ `app/viewmodel/SpotifyViewModel.kt`
+_Files:_ `app/viewmodel/PlaybackViewModel.kt`
 
 
 _Steps:_
@@ -821,7 +821,7 @@ _Risk:_ Call sites differ in startPlaying/startPositionMs — parameterize expli
 **severity** low · **thermal** none · **effort** M
 
 
-_Files:_ `app/viewmodel/SpotifyViewModel.kt`
+_Files:_ `app/viewmodel/PlaybackViewModel.kt`
 
 
 _Steps:_
@@ -848,7 +848,7 @@ _Risk:_ A few sites set extra state in finally — keep explicit or extend the h
 **severity** low · **thermal** none · **effort** M
 
 
-_Files:_ `app/viewmodel/SpotifyViewModel.kt`
+_Files:_ `app/viewmodel/PlaybackViewModel.kt`
 
 
 _Steps:_
@@ -873,7 +873,7 @@ _Risk:_ Low, mechanical; preserve per-type specifics in the load lambda.
 **severity** low · **thermal** none · **effort** S
 
 
-_Files:_ `app/viewmodel/SpotifyViewModel.kt`
+_Files:_ `app/viewmodel/PlaybackViewModel.kt`
 
 
 _Steps:_
@@ -898,7 +898,7 @@ _Risk:_ None — identical semantics.
 **severity** low · **thermal** none · **effort** S
 
 
-_Files:_ `app/viewmodel/SpotifyViewModel.kt`
+_Files:_ `app/viewmodel/PlaybackViewModel.kt`
 
 
 _Steps:_
@@ -923,7 +923,7 @@ _Risk:_ None — same observable behavior. Confirm the delayed re-sync is still 
 **severity** medium · **thermal** none · **effort** M · **depends on** P2-VM1
 
 
-_Files:_ `app/viewmodel/SpotifyViewModel.kt`
+_Files:_ `app/viewmodel/PlaybackViewModel.kt`
 
 
 _Steps:_
@@ -948,14 +948,14 @@ _Risk:_ Highest-traffic correctness path. Preserve the fallback catch; run the r
 **severity** medium · **thermal** none · **effort** L · **depends on** P2-VM2, P2-VM3
 
 
-_Files:_ `app/viewmodel/SpotifyViewModel.kt`
+_Files:_ `app/viewmodel/PlaybackViewModel.kt`
 
 
 _Steps:_
 
 - [ ] Follow the the code plan (Search done -> Library -> Account -> Lyrics -> Detail). Extract read-only areas first as feature ViewModels that read Session from SessionHolder and reuse the launchWithSession shape SearchViewModel already uses: LibraryViewModel (library + detail loaders + save/follow), LyricsViewModel, DevicesViewModel, and a SettingsRepository for loadPreferences/effectiveRegion/setX.
 
-- [ ] Screens call viewModel<FeatureViewModel>() instead of pulling the field off SpotifyViewModel. Move state+methods verbatim; no behavior change.
+- [ ] Screens call viewModel<FeatureViewModel>() instead of pulling the field off PlaybackViewModel. Move state+methods verbatim; no behavior change.
 
 - [ ] Inline or event-bus cross-feature triggers (loadLibrary after createPlaylist L3113/L3071, refreshQueue after onTrackChange L597).
 
@@ -964,7 +964,7 @@ _Steps:_
 
 _Acceptance:_
 
-- [ ] Each extracted feature compiles with its screen calling viewModel<Feature>(); SpotifyViewModel shrinks per feature.
+- [ ] Each extracted feature compiles with its screen calling viewModel<Feature>(); PlaybackViewModel shrinks per feature.
 
 - [ ] Full suite green after each landing: `:app:assembleDebug`, `:app:testProdDebugUnitTest`, detekt.
 
@@ -977,7 +977,7 @@ _Risk:_ Mechanical but touches many screens and cross-feature triggers; extract 
 **severity** low · **thermal** none · **effort** M · **depends on** P2-VM7
 
 
-_Files:_ `app/viewmodel/SpotifyViewModel.kt`
+_Files:_ `app/viewmodel/PlaybackViewModel.kt`
 
 
 _Steps:_
@@ -1004,7 +1004,7 @@ _Risk:_ Riskiest item in the set — touches the fragile cold-start ordering the
 **severity** low · **thermal** none · **effort** M · **depends on** P2-VM6
 
 
-_Files:_ `app/viewmodel/SpotifyViewModel.kt`
+_Files:_ `app/viewmodel/PlaybackViewModel.kt`
 
 
 _Steps:_
@@ -1228,7 +1228,7 @@ _Risk:_ Low — preview already shows only 4; slicing raw items first is behavio
 **severity** low · **thermal** none · **effort** S
 
 
-_Files:_ `app/ui/screens/QueueScreen.kt`, `app/viewmodel/SpotifyViewModel.kt`
+_Files:_ `app/ui/screens/QueueScreen.kt`, `app/viewmodel/PlaybackViewModel.kt`
 
 
 _Steps:_
@@ -1397,7 +1397,7 @@ _Risk:_ None; progress advances in 1% steps.
 **severity** low · **thermal** low · **effort** S
 
 
-_Files:_ `app/viewmodel/SpotifyViewModel.kt`
+_Files:_ `app/viewmodel/PlaybackViewModel.kt`
 
 
 _Steps:_
@@ -1445,12 +1445,12 @@ _Risk:_ A wrong readiness signal could reintroduce the wire/autoplay race the de
 Zero runtime impact. Fix the four misplaced KDoc blocks that actively mislead (they document the wrong function), remove dead diagnostic scaffolding and cargo-cult suppressions, and trim pure widget-naming restatement comments. Preserve the load-bearing protocol/rationale comments (ad-skip, cold-start, DRM, wake-lock, karaoke-mask) this repo intentionally keeps.
 
 
-#### [ ] `P3-1` — SpotifyViewModel: reattach 4 misplaced KDoc blocks and delete 3 cast-free @Suppress
+#### [ ] `P3-1` — PlaybackViewModel: reattach 4 misplaced KDoc blocks and delete 3 cast-free @Suppress
 
 **severity** low · **thermal** none · **effort** S
 
 
-_Files:_ `app/viewmodel/SpotifyViewModel.kt`
+_Files:_ `app/viewmodel/PlaybackViewModel.kt`
 
 
 _Steps:_
@@ -1677,13 +1677,13 @@ _Risk:_ None.
   `app/ui/components/FluidBackground.kt` — KawarpBackground warp clock L82-92; WarpedLayer graphicsLayer L127-149
 
 - **[low/therm:low]** File-id 100ms poll loops duplicate the event-driven CompletableDeferred cold-start already uses  
-  `app/viewmodel/SpotifyViewModel.kt` — resolveAndPlay L2487-2491 (`for (i in 1..15) { delay(100); fileId = latestFileId; if (fileId != null) break }`) and resolveAndPlayEpisode L2661-2666 (`for (i in 1..8) { delay(100); ... }`); cold-start deferred armed L1231/completed L510-513/awaited L1251
+  `app/viewmodel/PlaybackViewModel.kt` — resolveAndPlay L2487-2491 (`for (i in 1..15) { delay(100); fileId = latestFileId; if (fileId != null) break }`) and resolveAndPlayEpisode L2661-2666 (`for (i in 1..8) { delay(100); ... }`); cold-start deferred armed L1231/completed L510-513/awaited L1251
 
 - **[low/therm:low]** Queue-skip no-uid fallback fires localNext() index+1 times at 300ms intervals  
-  `app/viewmodel/SpotifyViewModel.kt` — skipToQueueIndex L1729-1745, specifically L1741 `repeat(index + 1) { p.localNext(); delay(300) }`
+  `app/viewmodel/PlaybackViewModel.kt` — skipToQueueIndex L1729-1745, specifically L1741 `repeat(index + 1) { p.localNext(); delay(300) }`
 
 - **[low/therm:low]** Position ticker cancel+relaunched on every state push, resetting the 30s Connect-report counter  
-  `app/viewmodel/SpotifyViewModel.kt` — startPositionTicker() L1095 called per-push from updatePlaybackFromState L1011-1012 (+ L647, L725, L1155, L2314, L2324); PositionInterpolator.start() L29-33 (`job?.cancel(); tickCount = 0; job = scope.launch{ while(true){...} }`), report gate L45 `if (isStreaming.value && tickCount % 60 == 0)`
+  `app/viewmodel/PlaybackViewModel.kt` — startPositionTicker() L1095 called per-push from updatePlaybackFromState L1011-1012 (+ L647, L725, L1155, L2314, L2324); PositionInterpolator.start() L29-33 (`job?.cancel(); tickCount = 0; job = scope.launch{ while(true){...} }`), report gate L45 `if (isStreaming.value && tickCount % 60 == 0)`
 
 - **[low/therm:low · PLAUSIBLE]** PARTIAL_WAKE_LOCK held through transient focus loss and past STATE_ENDED  
   `app/playback/MusicPlaybackService.kt` — onPlayWhenReadyChanged lines 271-300; onPlaybackSuppressionReasonChanged lines 302-322; acquire/release L153-198
@@ -1812,7 +1812,7 @@ _Risk:_ None.
   `app/MainActivity.kt` — LaunchedEffect(Unit) L89-111 (updateInfo remember L86, loadPreferences L90, loadCookies L92, checkForUpdates L102-110); AndroidManifest.xml L26-31 (MainActivity has no android:configChanges)
 
 - **[low/therm:low]** loadDevices() fires a network getDevices() on every state push while a foreign device is active  
-  `app/viewmodel/SpotifyViewModel.kt` — updatePlaybackFromState L1038-1045 (`else if (state.has_active_device) { loadDevices() }`), invoked per onState push at L567-570; loadDevices L3078-3095 (`player?.getDevices()`)
+  `app/viewmodel/PlaybackViewModel.kt` — updatePlaybackFromState L1038-1045 (`else if (state.has_active_device) { loadDevices() }`), invoked per onState push at L567-570; loadDevices L3078-3095 (`player?.getDevices()`)
 
 - **[low/therm:low]** Palette request decodes full-resolution art though Palette only needs ~112px  
   `app/util/AlbumArtPalette.kt` — extractThemeColorsFromArt, request builder L21-24; Palette.from(bitmap).generate() L28
@@ -1841,20 +1841,20 @@ _Risk:_ None.
 
 ### KISS / structure (19)
 
-- **[medium/therm:none]** SpotifyViewModel is a 3199-line god-object owning ~15 unrelated feature domains  
-  `app/viewmodel/SpotifyViewModel.kt` — whole file; class decl L55-56 (@Suppress("TooManyFunctions")); 3199 lines; 50 viewModelScope.launch sites
+- **[medium/therm:none]** PlaybackViewModel is a 3199-line god-object owning ~15 unrelated feature domains  
+  `app/viewmodel/PlaybackViewModel.kt` — whole file; class decl L55-56 (@Suppress("TooManyFunctions")); 3199 lines; 50 viewModelScope.launch sites
 
 - **[medium/therm:none]** Five near-identical RadioButton picker dialogs are copy-pasted inline in AccountScreen (~250 lines of duplication)  
   `app/ui/screens/AccountScreen.kt` — Language 163-190, Lyrics 204-252, Region 355-413, Left notif 454-482, Right notif 495-523
 
 - **[medium/therm:none]** God-object ViewModel: ~18 unrelated responsibilities in one 3199-line class  
-  `src/app/src/main/java/ch/snepilatch/app/viewmodel/SpotifyViewModel.kt` — whole class SpotifyViewModel, L56-3199 (@Suppress("TooManyFunctions") L55)
+  `src/app/src/main/java/ch/snepilatch/app/viewmodel/PlaybackViewModel.kt` — whole class PlaybackViewModel, L56-3199 (@Suppress("TooManyFunctions") L55)
 
 - **[medium/therm:none]** Two byte-identical stream-commit helpers + ~6 copies of the DRM stop→play→commit tail  
-  `src/app/src/main/java/ch/snepilatch/app/viewmodel/SpotifyViewModel.kt` — commitRecoveredStream L1481-1485 & commitEpisodeStream L2636-2640 (identical bodies); DRM load+commit tail at L1327-1337, L1673-1684, L1468-1477, L2513-2528, L2614-2622, L2692-2703
+  `src/app/src/main/java/ch/snepilatch/app/viewmodel/PlaybackViewModel.kt` — commitRecoveredStream L1481-1485 & commitEpisodeStream L2636-2640 (identical bodies); DRM load+commit tail at L1327-1337, L1673-1684, L1468-1477, L2513-2528, L2614-2622, L2692-2703
 
 - **[medium/therm:none]** resolveAndPlay is a ~190-line, deeply-nested method with a duplicated load tail  
-  `src/app/src/main/java/ch/snepilatch/app/viewmodel/SpotifyViewModel.kt` — resolveAndPlay L2380-2570; Spotify-CDN branch L2464-2535
+  `src/app/src/main/java/ch/snepilatch/app/viewmodel/PlaybackViewModel.kt` — resolveAndPlay L2380-2570; Spotify-CDN branch L2464-2535
 
 - **[medium/therm:low]** NowPlayingScreen portrait and landscape branches duplicate ~400 lines of controls, progress, bottom bar and effects  
   `app/ui/screens/NowPlayingScreen.kt` — Landscape L303-695 vs Portrait L696-1129. Duplicates: jukebox ticker L462-468 vs L888-894; smooth/seek/slider L469-503 vs L895-929; time Row L504-507 vs L930-933; transport Row L512-591 vs L938-1025; AudioDeviceCallback DisposableEffect L602-611 vs L1035-1044; audioIcon/remoteDevice/outIcon L612-622 vs L1045-1056; bottom bar L623-691 vs L1057-1126. Share intent triplicated L659-666, L1095-1101, L1324-1330.
@@ -1875,22 +1875,22 @@ _Risk:_ None.
   `app/MainActivity.kt` — LaunchedEffect(initialized) L114-119 (delay 500 before wireServiceControls); autoplay LaunchedEffect(initialized) L125-133 (delay 600)
 
 - **[low/therm:none]** 15 hand-rolled IO launches duplicate the boilerplate launchWithSession exists to replace  
-  `src/app/src/main/java/ch/snepilatch/app/viewmodel/SpotifyViewModel.kt` — fetchLyrics L1784, refreshQueue L1801, openAlbumFromCurrentTrack L1862, openArtistFromCurrentTrack L1908, fetchCanvasForTrack L2106, loadMoreLibrary L2873, openLikedSongs L2893, loadMoreDetail L2910, openPlaylist L2971, openAlbum L2984, openArtist L2997, openShow L3014, checkDetailSaved L3035, toggleDetailSaved L3048, removeFromLibrary L3062, loadDevices L3079
+  `src/app/src/main/java/ch/snepilatch/app/viewmodel/PlaybackViewModel.kt` — fetchLyrics L1784, refreshQueue L1801, openAlbumFromCurrentTrack L1862, openArtistFromCurrentTrack L1908, fetchCanvasForTrack L2106, loadMoreLibrary L2873, openLikedSongs L2893, loadMoreDetail L2910, openPlaylist L2971, openAlbum L2984, openArtist L2997, openShow L3014, checkDetailSaved L3035, toggleDetailSaved L3048, removeFromLibrary L3062, loadDevices L3079
 
 - **[low/therm:none]** 5 near-identical open* detail loaders and 7 identical SharedPreferences setters ("kotify_prefs" ×10)  
-  `src/app/src/main/java/ch/snepilatch/app/viewmodel/SpotifyViewModel.kt` — openLikedSongs/openPlaylist/openAlbum/openArtist/openShow L2891-3027; setPreferredAudioSource/setContentRegion/setLyricsAnimDirection/setNotificationLeftButton/setNotificationRightButton/setCanvasEnabled/setPlayerGradientBg L1973-2093
+  `src/app/src/main/java/ch/snepilatch/app/viewmodel/PlaybackViewModel.kt` — openLikedSongs/openPlaylist/openAlbum/openArtist/openShow L2891-3027; setPreferredAudioSource/setContentRegion/setLyricsAnimDirection/setNotificationLeftButton/setNotificationRightButton/setCanvasEnabled/setPlayerGradientBg L1973-2093
 
 - **[low/therm:none]** `art != lastPaletteUrl` palette-update guard duplicated 3×  
-  `src/app/src/main/java/ch/snepilatch/app/viewmodel/SpotifyViewModel.kt` — updatePlaybackFromState L998-1001, optimisticTapPlay L1669, resolveAndPlay L2425-2428
+  `src/app/src/main/java/ch/snepilatch/app/viewmodel/PlaybackViewModel.kt` — updatePlaybackFromState L998-1001, optimisticTapPlay L1669, resolveAndPlay L2425-2428
 
 - **[low/therm:none]** resolve paths poll latestFileId with delay(100) loops instead of awaiting the existing deferred  
-  `src/app/src/main/java/ch/snepilatch/app/viewmodel/SpotifyViewModel.kt` — resolveAndPlay L2487-2491 (1..15 ×100ms), resolveAndPlayEpisode L2661-2666 (1..8 ×100ms); cold-start deferred L1231/L1251, completed L510-513
+  `src/app/src/main/java/ch/snepilatch/app/viewmodel/PlaybackViewModel.kt` — resolveAndPlay L2487-2491 (1..15 ×100ms), resolveAndPlayEpisode L2661-2666 (1..8 ×100ms); cold-start deferred L1231/L1251, completed L510-513
 
 - **[low/therm:none]** Cold-start / ad / recovery state machines coordinated by ~12 loose mutable flags  
-  `src/app/src/main/java/ch/snepilatch/app/viewmodel/SpotifyViewModel.kt` — coldStartPending/coldStartFileId L142-143, suppressRemotePause L161, pendingUserPlay L123, advancePendingReconnect L167, isStreamLoading L245, adSkipStartTs L132, playbackErrorRetries L149, recoveringUri L156, savedRepeatForJukebox/jukeboxRepeatObserverStarted L108-109, authRecovering L294; resetColdStart L1349
+  `src/app/src/main/java/ch/snepilatch/app/viewmodel/PlaybackViewModel.kt` — coldStartPending/coldStartFileId L142-143, suppressRemotePause L161, pendingUserPlay L123, advancePendingReconnect L167, isStreamLoading L245, adSkipStartTs L132, playbackErrorRetries L149, recoveringUri L156, savedRepeatForJukebox/jukeboxRepeatObserverStarted L108-109, authRecovering L294; resetColdStart L1349
 
 - **[low/therm:none]** delay(300)→sync-notification block copy-pasted across three notification callbacks  
-  `src/app/src/main/java/ch/snepilatch/app/viewmodel/SpotifyViewModel.kt` — wireNotificationButtonCallbacks onLikeToggle L2177-2181, onShuffleToggle L2185-2189, onRepeatToggle L2193-2197 (cf pushLikeToNotification L1941, pushTransportButtonsToNotification L1565)
+  `src/app/src/main/java/ch/snepilatch/app/viewmodel/PlaybackViewModel.kt` — wireNotificationButtonCallbacks onLikeToggle L2177-2181, onShuffleToggle L2185-2189, onRepeatToggle L2193-2197 (cf pushLikeToNotification L1941, pushTransportButtonsToNotification L1565)
 
 - **[low/therm:none]** formatReleaseDate uses redundant non-null assertions after an in-range check  
   `app/data/KotifyMappers.kt` — formatReleaseDate L34-63 (`MONTHS[month!! - 1]` at L44 and L54).
@@ -1902,7 +1902,7 @@ _Risk:_ None.
 ### Comments (8)
 
 - **[low/therm:none]** Four orphaned/misplaced KDoc blocks document the wrong function; ~627 comment lines  
-  `app/viewmodel/SpotifyViewModel.kt` — L1098-1106 (toggleJukebox doc sits above startJukeboxRepeatGuard; real toggleJukebox at L1127 has no doc), L1361-1377 (recoverFromPlaybackError doc sits above refillRetryBudgetOnReady), L2201-2212 (lifecycle-callbacks doc sits above armAdAdvanceWatchdog), L2571-2588 (episode-path doc sits above resolveEpisodeViaSoundfinder)
+  `app/viewmodel/PlaybackViewModel.kt` — L1098-1106 (toggleJukebox doc sits above startJukeboxRepeatGuard; real toggleJukebox at L1127 has no doc), L1361-1377 (recoverFromPlaybackError doc sits above refillRetryBudgetOnReady), L2201-2212 (lifecycle-callbacks doc sits above armAdAdvanceWatchdog), L2571-2588 (episode-path doc sits above resolveEpisodeViaSoundfinder)
 
 - **[low/therm:none]** Screen ON/OFF BroadcastReceiver exists only to emit a diagnostic Loki log on every screen toggle  
   `app/playback/MusicPlaybackService.kt` — screenReceiver lines 140-150; register L206-210; unregister in onDestroy L1205
@@ -1911,7 +1911,7 @@ _Risk:_ None.
   `app/playback/MusicPlaybackService.kt` — lines 663-679 (two consecutive KDoc blocks before fun refreshStreamingMetadata at 680); setIdleMetadata at 692
 
 - **[low/therm:none]** Misattached KDoc blocks (×4) + three cargo-cult @Suppress("UNCHECKED_CAST") with no cast  
-  `src/app/src/main/java/ch/snepilatch/app/viewmodel/SpotifyViewModel.kt` — KDoc L1098-1101, L1361-1369, L2201-2204, L2572-2581; @Suppress("UNCHECKED_CAST") L1768, L1860, L2786
+  `src/app/src/main/java/ch/snepilatch/app/viewmodel/PlaybackViewModel.kt` — KDoc L1098-1101, L1361-1369, L2201-2204, L2572-2581; @Suppress("UNCHECKED_CAST") L1768, L1860, L2786
 
 - **[low/therm:none]** MusicPlaybackService: orphaned KDoc leaves setIdleMetadata undocumented  
   `app/playback/MusicPlaybackService.kt` — L663-692

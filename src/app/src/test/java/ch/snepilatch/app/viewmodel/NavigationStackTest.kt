@@ -17,11 +17,11 @@ import org.junit.Test
 class NavigationStackTest {
 
     private val dispatcher = UnconfinedTestDispatcher()
-    private lateinit var vm: SpotifyViewModel
+    private lateinit var vm: PlaybackViewModel
 
     @Before fun setUp() {
         Dispatchers.setMain(dispatcher)
-        vm = SpotifyViewModel()
+        vm = PlaybackViewModel()
     }
 
     @After fun tearDown() {

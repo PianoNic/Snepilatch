@@ -44,14 +44,14 @@ import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.components.SpotifyImage
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.viewmodel.LyricsViewModel
-import ch.snepilatch.app.viewmodel.SpotifyViewModel
+import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotify.api.lyrics.LyricsData
 import kotify.api.lyrics.SyncedLine
 
 @Composable
-fun LyricsScreen(vm: SpotifyViewModel) {
+fun LyricsScreen(vm: PlaybackViewModel) {
     val lyricsVm: LyricsViewModel = viewModel()
     // Narrow projections — the lyrics scaffold must not recompose on the 2Hz position tick; position
     // is consumed only through the smoothPosition state below (mutated off the flow, not read here).

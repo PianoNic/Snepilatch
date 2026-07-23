@@ -69,7 +69,7 @@ import ch.snepilatch.app.ui.theme.SpotifyLightGray
 import ch.snepilatch.app.util.formatTime
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.viewmodel.DetailViewModel
-import ch.snepilatch.app.viewmodel.SpotifyViewModel
+import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import coil.compose.AsyncImage
 
 /**
@@ -189,7 +189,7 @@ fun rememberSmoothPositionMs(positionMs: Long, durationMs: Long, isPlaying: Bool
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TrackRow(track: TrackInfo, vm: SpotifyViewModel, contextUri: String? = null, trackIndex: Int? = null) {
+fun TrackRow(track: TrackInfo, vm: PlaybackViewModel, contextUri: String? = null, trackIndex: Int? = null) {
     val detailVm: DetailViewModel = viewModel()
     var showMenu by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current

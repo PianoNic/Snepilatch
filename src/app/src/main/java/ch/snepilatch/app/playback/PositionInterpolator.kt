@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
  * position from ExoPlayer when streaming locally, and periodically reports the
  * position back to Spotify Connect so other clients stay in sync.
  *
- * Extracted from SpotifyViewModel as a pure refactor — behavior is unchanged.
+ * Extracted from PlaybackViewModel as a pure refactor — behavior is unchanged.
  */
 class PositionInterpolator(
     private val scope: CoroutineScope,

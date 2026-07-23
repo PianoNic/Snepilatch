@@ -8,11 +8,11 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewModel for the Home feed. Loads the feed in [init] — the old eager load lived in
- * `SpotifyViewModel.initialize`, which runs before any composable exists; loading here fires as soon
+ * `PlaybackViewModel.initialize`, which runs before any composable exists; loading here fires as soon
  * as the Home screen composes (the default post-login screen), with [isLoading] driving the shimmer
  * until the first feed arrives.
  *
- * HomeScreen keeps [SpotifyViewModel] (for `playTrack`) and [DetailViewModel] (for opening items);
+ * HomeScreen keeps [PlaybackViewModel] (for `playTrack`) and [DetailViewModel] (for opening items);
  * this VM only owns the feed data.
  */
 class HomeViewModel : SessionViewModel("HomeVM") {

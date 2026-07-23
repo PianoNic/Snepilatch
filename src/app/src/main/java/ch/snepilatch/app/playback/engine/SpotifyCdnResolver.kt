@@ -20,7 +20,7 @@ data class SpotifyStream(
 
 /**
  * Resolves Spotify CDN URLs for a given file id and builds the Widevine
- * license request metadata. Extracted from SpotifyViewModel to remove
+ * license request metadata. Extracted from PlaybackViewModel to remove
  * duplication between coldStartPlay and resolveAndPlay.
  */
 class SpotifyCdnResolver(

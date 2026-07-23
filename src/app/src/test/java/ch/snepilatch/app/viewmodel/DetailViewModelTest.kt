@@ -59,7 +59,7 @@ class DetailViewModelTest {
     }
 
     @Test fun detailRoutesForwardsToTheConstructedViewModel() {
-        // SpotifyViewModel's deep-link/playback bridges reach the detail openers through this hop.
+        // PlaybackViewModel's deep-link/playback bridges reach the detail openers through this hop.
         DetailRoutes.openArtist("a2")
         assertEquals(Screen.ARTIST_DETAIL, Navigator.currentScreen.value)
     }

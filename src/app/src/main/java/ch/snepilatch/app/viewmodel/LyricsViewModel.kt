@@ -11,9 +11,9 @@ import kotlinx.coroutines.flow.StateFlow
  *
  * Owns only the lyrics *data* concern (fetch + result + loading flag). The
  * [ch.snepilatch.app.ui.screens.LyricsScreen] still reads playback state,
- * transport controls and theme from [SpotifyViewModel]; the two ViewModels
+ * transport controls and theme from [PlaybackViewModel]; the two ViewModels
  * sit side by side. Navigation to the overlay stays on
- * [SpotifyViewModel.openLyrics] — this class never navigates.
+ * [PlaybackViewModel.openLyrics] — this class never navigates.
  */
 class LyricsViewModel : SessionViewModel("LyricsVM") {
 

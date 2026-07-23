@@ -45,10 +45,10 @@ import ch.snepilatch.app.util.stripHtml
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.viewmodel.DetailRoutes
 import ch.snepilatch.app.viewmodel.DetailViewModel
-import ch.snepilatch.app.viewmodel.SpotifyViewModel
+import ch.snepilatch.app.viewmodel.PlaybackViewModel
 
 @Composable
-fun DetailScreen(vm: SpotifyViewModel) {
+fun DetailScreen(vm: PlaybackViewModel) {
     val detailVm: DetailViewModel = viewModel()
     val detail by detailVm.detail.collectAsState()
     val isLoading by detailVm.isLoading.collectAsState()
@@ -512,7 +512,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
 private fun ArtistTrackRow(
     number: Int,
     track: ch.snepilatch.app.data.TrackInfo,
-    vm: SpotifyViewModel,
+    vm: PlaybackViewModel,
     contextUri: String,
     playcount: String? = null
 ) {
@@ -652,7 +652,7 @@ private fun ArtistTrackRow(
 @Composable
 private fun AlbumTrackRow(
     track: ch.snepilatch.app.data.TrackInfo,
-    vm: SpotifyViewModel,
+    vm: PlaybackViewModel,
     contextUri: String,
     trackIndex: Int? = null
 ) {
@@ -786,7 +786,7 @@ private fun AlbumTrackRow(
 @Composable
 private fun DetailHeaderMenu(
     detail: ch.snepilatch.app.data.DetailData,
-    vm: ch.snepilatch.app.viewmodel.SpotifyViewModel,
+    vm: ch.snepilatch.app.viewmodel.PlaybackViewModel,
     context: android.content.Context,
     onDismiss: () -> Unit,
 ) {

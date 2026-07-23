@@ -8,7 +8,7 @@ import kotify.session.Session
 /**
  * Process-scoped holder for the Kotify session and its derived objects.
  *
- * Ownership used to live on [ch.snepilatch.app.viewmodel.SpotifyViewModel] (which
+ * Ownership used to live on [ch.snepilatch.app.viewmodel.PlaybackViewModel] (which
  * ties lifetime to the Activity) and was duplicated onto
  * [MusicPlaybackService] static fields for the service to reach. Neither
  * location works when we need to start playback from a cold process — e.g.

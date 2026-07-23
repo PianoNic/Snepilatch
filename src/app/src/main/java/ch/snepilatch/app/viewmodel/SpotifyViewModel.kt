@@ -2027,7 +2027,7 @@ class SpotifyViewModel : ViewModel() {
 
     fun setPreferredAudioSource(source: String?, context: Context) {
         preferredAudioSource.value = source
-        context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
+        prefs(context)
             .edit().apply {
                 if (source == null) remove("audio_source") else putString("audio_source", source)
             }.apply()
@@ -2035,7 +2035,7 @@ class SpotifyViewModel : ViewModel() {
 
     fun setContentRegion(region: String, context: Context) {
         contentRegion.value = region
-        context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
+        prefs(context)
             .edit().putString("content_region", region).apply()
     }
 
@@ -2066,13 +2066,13 @@ class SpotifyViewModel : ViewModel() {
 
     fun setLyricsAnimDirection(direction: String, context: Context) {
         lyricsAnimDirection.value = direction
-        context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
+        prefs(context)
             .edit().putString("lyrics_anim_direction", direction).apply()
     }
 
     fun setAppLanguage(language: String, context: Context) {
         appLanguage.value = language
-        context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
+        prefs(context)
             .edit().putString("app_language", language).apply()
         // Apply locale change
         val locale = if (language == "system") {
@@ -2088,8 +2088,10 @@ class SpotifyViewModel : ViewModel() {
         (context as? android.app.Activity)?.recreate()
     }
 
+    private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
     fun loadPreferences(context: Context) {
-        val prefs = context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
+        val prefs = prefs(context)
         val savedSource = prefs.getString("audio_source", null)
         // Migrate: old "spotify" value → null (Spotify CDN is now the default)
         preferredAudioSource.value = if (savedSource == "spotify") null else savedSource
@@ -2116,7 +2118,7 @@ class SpotifyViewModel : ViewModel() {
 
     fun setNotificationLeftButton(button: String, context: Context) {
         notificationLeftButton.value = button
-        context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
+        prefs(context)
             .edit().putString("notification_left_button", button).apply()
         MusicPlaybackService.instance?.let { svc ->
             svc.notificationLeftButton = button
@@ -2126,7 +2128,7 @@ class SpotifyViewModel : ViewModel() {
 
     fun setNotificationRightButton(button: String, context: Context) {
         notificationRightButton.value = button
-        context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
+        prefs(context)
             .edit().putString("notification_right_button", button).apply()
         MusicPlaybackService.instance?.let { svc ->
             svc.notificationRightButton = button
@@ -2136,14 +2138,14 @@ class SpotifyViewModel : ViewModel() {
 
     fun setCanvasEnabled(enabled: Boolean, context: Context) {
         canvasEnabled.value = enabled
-        context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
+        prefs(context)
             .edit().putBoolean("canvas_enabled", enabled).apply()
         if (!enabled) canvasUrl.value = null
     }
 
     fun setPlayerGradientBg(enabled: Boolean, context: Context) {
         playerGradientBg.value = enabled
-        context.getSharedPreferences("kotify_prefs", Context.MODE_PRIVATE)
+        prefs(context)
             .edit().putBoolean("player_gradient_bg", enabled).apply()
     }
 
@@ -2221,7 +2223,7 @@ class SpotifyViewModel : ViewModel() {
 
     /** Like / shuffle / repeat buttons shown in the notification, plus their saved preferences. */
     private fun wireNotificationButtonCallbacks(svc: MusicPlaybackService) {
-        val prefs = svc.getSharedPreferences("kotify_prefs", android.content.Context.MODE_PRIVATE)
+        val prefs = prefs(svc)
         svc.notificationLeftButton = prefs.getString("notification_left_button", "repeat") ?: "repeat"
         svc.notificationRightButton = prefs.getString("notification_right_button", "like") ?: "like"
 
@@ -2939,12 +2941,15 @@ class SpotifyViewModel : ViewModel() {
     private val _isLoadingMore = MutableStateFlow(false)
     val isLoadingMore: StateFlow<Boolean> = _isLoadingMore
 
-    fun openLikedSongs() {
-        navigateTo(Screen.PLAYLIST_DETAIL)
-        launchWithSessionLoading("openLikedSongs", isLoading) { sess ->
-            val data = Playlist(sess).getLikedSongs(limit = 50)
-            _detail.value = data.toDetailData(offset = 0)
-        }
+    /** Navigate to a detail screen and load it under the shared isLoading flag; a null result leaves
+     *  the previous detail unchanged (used by openShow when the podcast has no info). */
+    private fun openDetail(screen: Screen, tag: String, load: suspend (Session) -> DetailData?) {
+        navigateTo(screen)
+        launchWithSessionLoading(tag, isLoading) { sess -> load(sess)?.let { _detail.value = it } }
+    }
+
+    fun openLikedSongs() = openDetail(Screen.PLAYLIST_DETAIL, "openLikedSongs") { sess ->
+        Playlist(sess).getLikedSongs(limit = 50).toDetailData(offset = 0)
     }
 
     fun loadMoreDetail() {
@@ -3012,27 +3017,16 @@ class SpotifyViewModel : ViewModel() {
     }
 
 
-    fun openPlaylist(playlistId: String) {
-        navigateTo(Screen.PLAYLIST_DETAIL)
-        launchWithSessionLoading("openPlaylist", isLoading) { sess ->
-            _detail.value = Playlist(sess).getPlaylist(playlistId, limit = 50).toDetailData(playlistId)
-        }
+    fun openPlaylist(playlistId: String) = openDetail(Screen.PLAYLIST_DETAIL, "openPlaylist") { sess ->
+        Playlist(sess).getPlaylist(playlistId, limit = 50).toDetailData(playlistId)
     }
 
-
-    fun openAlbum(albumId: String) {
-        navigateTo(Screen.ALBUM_DETAIL)
-        launchWithSessionLoading("openAlbum", isLoading) { sess ->
-            _detail.value = Album(sess).getAlbum(albumId, limit = 50).toDetailData(albumId)
-        }
+    fun openAlbum(albumId: String) = openDetail(Screen.ALBUM_DETAIL, "openAlbum") { sess ->
+        Album(sess).getAlbum(albumId, limit = 50).toDetailData(albumId)
     }
 
-
-    fun openArtist(artistId: String) {
-        navigateTo(Screen.ARTIST_DETAIL)
-        launchWithSessionLoading("openArtist", isLoading) { sess ->
-            _detail.value = Artist(sess).getArtist(artistId).toDetailData(artistId)
-        }
+    fun openArtist(artistId: String) = openDetail(Screen.ARTIST_DETAIL, "openArtist") { sess ->
+        Artist(sess).getArtist(artistId).toDetailData(artistId)
     }
 
     /**
@@ -3040,17 +3034,12 @@ class SpotifyViewModel : ViewModel() {
      * (the `queryPodcastEpisodes` payload doesn't carry them); they fall back to the first episode's
      * cover art. Episodes render as episode-URI [TrackInfo]s and play through the normal [playTrack].
      */
-    fun openShow(showId: String, publisher: String? = null, imageUrl: String? = null) {
-        navigateTo(Screen.SHOW_DETAIL)
-        launchWithSessionLoading("openShow", isLoading) { sess ->
-            val info = Podcast(sess, showId).getPodcastInfo(limit = 50, offset = 0)
-            if (info != null) {
-                _detail.value = info.toDetailData(showId, publisher, imageUrl)
-            } else {
-                LokiLogger.e(TAG, "openShow: no podcast info for $showId")
-            }
+    fun openShow(showId: String, publisher: String? = null, imageUrl: String? = null) =
+        openDetail(Screen.SHOW_DETAIL, "openShow") { sess ->
+            Podcast(sess, showId).getPodcastInfo(limit = 50, offset = 0)
+                ?.toDetailData(showId, publisher, imageUrl)
+                .also { if (it == null) LokiLogger.e(TAG, "openShow: no podcast info for $showId") }
         }
-    }
 
 
     // --- Library actions (save/follow) ---
@@ -3191,6 +3180,9 @@ class SpotifyViewModel : ViewModel() {
     }
 
     companion object {
+        /** SharedPreferences file name for all persisted settings. */
+        const val PREFS = "kotify_prefs"
+
         /** How long to wait after ExoPlayer's STATE_ENDED before falling back to
          *  a forced player.skipNext(). Spotify's natural onTrackChange reliably
          *  lands within ~1.5s; 5s gives generous headroom so we don't double-skip

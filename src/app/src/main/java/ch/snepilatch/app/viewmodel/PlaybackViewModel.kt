@@ -6,7 +6,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import ch.snepilatch.app.util.LokiLogger
 import ch.snepilatch.app.util.detectActiveAudioOutput
-import ch.snepilatch.app.util.extractThemeColorsFromArt
 import ch.snepilatch.app.util.normalizeSpotifyImageUrl
 import ch.snepilatch.app.playback.JukeboxController
 import ch.snepilatch.app.playback.JukeboxViz
@@ -276,10 +275,7 @@ class PlaybackViewModel : ViewModel() {
     val currentTrackLiked = MutableStateFlow(false)
     private var lastLikeCheckUri: String? = null
 
-    // Dynamic theme
-    val themeColors = MutableStateFlow(ThemeColors())
-    private var appContext: Context? = null
-    private var lastPaletteUrl: String? = null
+    // Dynamic theme palette moved to ThemeController; PlaybackViewModel feeds it art via updateFromArt.
 
     // Audio output device (Bluetooth, speaker, wired)
     val audioOutputName = MutableStateFlow<String?>(null)
@@ -977,7 +973,7 @@ class PlaybackViewModel : ViewModel() {
         // Only update theme/liked/canvas for the track we're ACTUALLY displaying
         val displayUri = displayTrack?.uri
         if (!isTrackMismatch) {
-            maybeUpdatePalette(imageUrl)
+            ThemeController.updateFromArt(imageUrl)
             if (displayUri != null) {
                 checkLikedState(displayUri)
                 fetchCanvasForTrack(displayUri)
@@ -1650,7 +1646,7 @@ class PlaybackViewModel : ViewModel() {
             val art = normalizeSpotifyImageUrl(track.albumArt)
             // Reflect the tapped track in the UI immediately (echo's onState corrects any stale metadata).
             _playback.value = _playback.value.copy(track = track.copy(albumArt = art), positionMs = 0)
-            maybeUpdatePalette(art)
+            ThemeController.updateFromArt(art)
             checkLikedState(trackUri)
             fetchCanvasForTrack(trackUri)
             // DRM: stop the old player to close its Widevine session, then load the new track.
@@ -1949,7 +1945,7 @@ class PlaybackViewModel : ViewModel() {
     }
 
     fun startService(context: Context) {
-        appContext = context.applicationContext
+        ThemeController.setContext(context)
         val intent = Intent(context, MusicPlaybackService::class.java)
         context.startForegroundService(intent)
     }
@@ -2311,7 +2307,7 @@ class PlaybackViewModel : ViewModel() {
             durationMs = if (current.durationMs > 0) current.durationMs else _playback.value.durationMs
         )
         _playback.value = _playback.value.copy(track = newTrack, positionMs = 0)
-        maybeUpdatePalette(art)
+        ThemeController.updateFromArt(art)
         checkLikedState(trackUri)
         fetchCanvasForTrack(trackUri)
 
@@ -2722,29 +2718,6 @@ class PlaybackViewModel : ViewModel() {
             // so saveToLibrary needs the current username.
             kotify.api.playlist.Playlist(sess).saveToLibrary(playlistId, username)
             _snackbarMessage.tryEmit("Saved to Library")
-        }
-    }
-
-    /** Extract a fresh palette only when the art URL actually changed since the last extraction. */
-    private fun maybeUpdatePalette(art: String?) {
-        if (art != null && art != lastPaletteUrl) {
-            lastPaletteUrl = art
-            extractColorsFromArt(art)
-        }
-    }
-
-    private fun extractColorsFromArt(imageUrl: String) {
-        val ctx = appContext ?: return
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val colors = extractThemeColorsFromArt(ctx, imageUrl)
-                if (colors != null) {
-                    themeColors.value = colors
-                    LokiLogger.d(TAG, "Palette updated from $imageUrl")
-                }
-            } catch (e: Exception) {
-                LokiLogger.e(TAG, "extractColors", e)
-            }
         }
     }
 

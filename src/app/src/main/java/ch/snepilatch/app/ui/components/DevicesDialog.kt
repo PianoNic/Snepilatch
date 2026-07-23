@@ -50,6 +50,7 @@ import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.theme.SpotifyElevated
 import ch.snepilatch.app.ui.theme.SpotifyGray
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
+import ch.snepilatch.app.viewmodel.ThemeController
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -57,7 +58,7 @@ import ch.snepilatch.app.viewmodel.PlaybackViewModel
 fun DevicesDialog(vm: PlaybackViewModel) {
     val devices by vm.devices.collectAsState()
     val playback by vm.playback.collectAsState()
-    val theme by vm.themeColors.collectAsState()
+    val theme by ThemeController.themeColors.collectAsState()
     val accentColor by androidx.compose.animation.animateColorAsState(theme.primary, androidx.compose.animation.core.tween(800), label = "devAccent")
     val sheetState = rememberBottomSheetState(
         initialValue = SheetValue.Hidden,

@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.theme.SpotifyElevated
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
+import ch.snepilatch.app.viewmodel.ThemeController
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 
 /**
@@ -60,7 +61,7 @@ fun MiniPlayer(
     vm: PlaybackViewModel,
     modifier: Modifier = Modifier
 ) {
-    val theme by vm.themeColors.collectAsState()
+    val theme by ThemeController.themeColors.collectAsState()
     val animatedCardBg by animateColorAsState(
         miniCardBaseColor(theme.primary),
         tween(800), label = "miniCardBg"
@@ -106,7 +107,7 @@ fun MiniPlayerContent(
     val displayTitle = trackInfo.name
     val displayArtist = trackInfo.artist
     val displayArtUrl: String? = trackInfo.albumArt
-    val theme by vm.themeColors.collectAsState()
+    val theme by ThemeController.themeColors.collectAsState()
     val animatedPrimary by animateColorAsState(theme.primary, tween(800), label = "miniPrimary")
     val streamLoading by vm.isStreamLoading.collectAsState()
     val spinnerActive = streamLoading || isAd

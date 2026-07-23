@@ -56,6 +56,7 @@ import ch.snepilatch.app.ui.components.TightAlertDialog
 import ch.snepilatch.app.ui.theme.SpotifyGray
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
 import androidx.lifecycle.viewmodel.compose.viewModel
+import ch.snepilatch.app.viewmodel.ThemeController
 import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.LibraryViewModel
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
@@ -380,7 +381,7 @@ private fun PlayerMorph(
     val f = expand.value
     if (f <= 0.001f) return
     val density = LocalDensity.current
-    val theme by vm.themeColors.collectAsState()
+    val theme by ThemeController.themeColors.collectAsState()
     val cardBg by animateColorAsState(
         miniCardBaseColor(theme.primary),
         tween(800), label = "morphCardBg"

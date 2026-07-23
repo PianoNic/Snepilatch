@@ -50,6 +50,7 @@ import ch.snepilatch.app.ui.components.rememberSmoothPositionMs
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.util.formatTime
 import androidx.lifecycle.viewmodel.compose.viewModel
+import ch.snepilatch.app.viewmodel.ThemeController
 import ch.snepilatch.app.viewmodel.LibraryViewModel
 import ch.snepilatch.app.viewmodel.AppSettings
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
@@ -271,7 +272,7 @@ fun PlayerBackground(vm: PlaybackViewModel, modifier: Modifier = Modifier) {
     val track by vm.currentTrack.collectAsState()
     val isPlaying by vm.isPlayingFlow.collectAsState()
     val isPaused by vm.isPausedFlow.collectAsState()
-    val theme by vm.themeColors.collectAsState()
+    val theme by ThemeController.themeColors.collectAsState()
     val animatedPrimary by animateColorAsState(theme.primary, tween(800), label = "bgPrimary")
     val animatedPrimaryDark by animateColorAsState(theme.primaryDark, tween(800), label = "bgPrimaryDark")
     val gradientBg by AppSettings.playerGradientBg.collectAsState()
@@ -380,7 +381,7 @@ fun NowPlayingScreen(
     val streamLoading by vm.isStreamLoading.collectAsState()
     // Spinner spans the whole ad skip: isAd covers the ad dwell, streamLoading the post-ad resolve.
     val spinnerActive = streamLoading || isAd
-    val theme by vm.themeColors.collectAsState()
+    val theme by ThemeController.themeColors.collectAsState()
 
     // Prefetch the next track's cover so the slide-in on skip is instant (no load gap).
     val prefetchCtx = LocalContext.current

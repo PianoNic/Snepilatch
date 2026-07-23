@@ -43,6 +43,7 @@ import coil.compose.AsyncImage
 import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.components.SpotifyImage
 import ch.snepilatch.app.ui.theme.*
+import ch.snepilatch.app.viewmodel.ThemeController
 import ch.snepilatch.app.viewmodel.LyricsViewModel
 import ch.snepilatch.app.viewmodel.AppSettings
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
@@ -60,7 +61,7 @@ fun LyricsScreen(vm: PlaybackViewModel) {
     val isPlayingRaw by vm.isPlayingFlow.collectAsState()
     val isPaused by vm.isPausedFlow.collectAsState()
     val repeatMode by vm.repeatModeFlow.collectAsState()
-    val theme by vm.themeColors.collectAsState()
+    val theme by ThemeController.themeColors.collectAsState()
     val lyrics by lyricsVm.lyrics.collectAsState()
     val isLoading by lyricsVm.isLoading.collectAsState()
     val animatedPrimary by animateColorAsState(theme.primary, tween(800), label = "lyricsPrimary")

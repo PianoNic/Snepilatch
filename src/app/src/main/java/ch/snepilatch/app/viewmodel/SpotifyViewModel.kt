@@ -26,8 +26,6 @@ import kotify.api.podcast.Podcast
 import kotify.api.playerstatus.DeviceInfo
 import kotify.api.playerstatus.PlayerStateData
 import kotify.api.playerstatus.PlayerTrack
-import kotify.api.lyrics.Lyrics
-import kotify.api.lyrics.LyricsData
 import kotify.api.song.Song
 import kotify.api.user.User
 import kotify.api.canvas.Canvas
@@ -319,11 +317,7 @@ class SpotifyViewModel : ViewModel() {
     val canvasUrl = MutableStateFlow<String?>(null)
     private var lastCanvasTrackUri: String? = null
 
-    // Lyrics
-    private val _lyrics = MutableStateFlow<LyricsData?>(null)
-    val lyrics: StateFlow<LyricsData?> = _lyrics
-    val isLyricsLoading = MutableStateFlow(false)
-    private var lastLyricsTrackUri: String? = null
+    // Lyrics content moved to LyricsViewModel; this VM only navigates to the overlay (openLyrics).
 
 
     // Single-flight guard for onAuthLost recovery so a run of anonymous-token blips can't spawn
@@ -1838,26 +1832,8 @@ class SpotifyViewModel : ViewModel() {
     }
 
     fun openLyrics() {
-        // The lyrics screen fetches on its own via LaunchedEffect(track?.uri); don't double-fetch here.
+        // The lyrics screen (via LyricsViewModel) fetches on its own from LaunchedEffect(track?.uri).
         navigateTo(Screen.LYRICS)
-    }
-
-    fun fetchLyrics() {
-        val trackUri = _playback.value.track?.uri ?: return
-        if (trackUri == lastLyricsTrackUri && _lyrics.value != null) return
-        lastLyricsTrackUri = trackUri
-        launchWithSessionLoading("fetchLyrics", isLyricsLoading) { sess ->
-            try {
-                val trackId = trackUri.removePrefix("spotify:track:")
-                _lyrics.value = Lyrics(sess).getLyrics(trackId)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                // Clear stale lyrics on failure, then rethrow so the helper logs it.
-                _lyrics.value = null
-                throw e
-            }
-        }
     }
 
     fun refreshQueue() {

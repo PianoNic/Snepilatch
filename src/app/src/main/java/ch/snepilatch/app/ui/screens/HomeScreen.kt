@@ -48,14 +48,16 @@ import ch.snepilatch.app.ui.theme.SpotifyCardBg
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.viewmodel.DetailViewModel
+import ch.snepilatch.app.viewmodel.HomeViewModel
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
 
 // --- Home Screen ---
 
 @Composable
 fun HomeScreen(vm: SpotifyViewModel) {
-    val homeData by vm.homeData.collectAsState()
-    val isHomeLoading by vm.isHomeLoading.collectAsState()
+    val homeVm: HomeViewModel = viewModel()
+    val homeData by homeVm.homeData.collectAsState()
+    val isHomeLoading by homeVm.isLoading.collectAsState()
 
     if (isHomeLoading && homeData == null) {
         HomeShimmer()

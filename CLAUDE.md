@@ -58,7 +58,7 @@ The pre-resolved cache (`nextCdnUrl` + `nextCdnFileId` from `onNextPlaybackId`) 
 
 ## ViewModel split strategy
 
-`SpotifyViewModel` is large (~3k lines). We extract feature-scoped ViewModels incrementally. **Extracted so far: `SearchViewModel`, `LyricsViewModel`, `DetailViewModel`, `LibraryViewModel`** (the last two built on the shared `Navigator`). Each lands with its own tests.
+`SpotifyViewModel` is large (~3k lines). We extract feature-scoped ViewModels incrementally. **Extracted so far: `SearchViewModel`, `LyricsViewModel`, `DetailViewModel`, `LibraryViewModel`, `HomeViewModel`** (Detail/Library built on the shared `Navigator`; Home/Library load their feed in `init`). Each lands with its own tests. That's the clean feature set — what's left on `SpotifyViewModel` is playback, the playback-coupled features (Queue/Account/Devices), and cross-cutting settings/theme.
 
 **Navigation is a process-scoped `Navigator`** (like `SessionHolder`): it owns `currentScreen` + the back stack + `navigateTo`/`navigateToTab`/`goBack`. `SpotifyViewModel` delegates to it and `reset()`s it on construction. Feature VMs navigate through `Navigator` directly — that's what unblocked the Detail extraction. For a feature VM whose openers must also be reachable from `SpotifyViewModel`'s own code (deep links, playback-context bridges) or from non-composable UI builders, add a tiny process-scoped router object next to the VM (see `DetailRoutes`): the live VM registers itself in `init` and the callers hop through it, so no one holds a cross-VM reference. A screen (normally Home) is always composed before any deep link is processed, so a VM is always registered in time.
 

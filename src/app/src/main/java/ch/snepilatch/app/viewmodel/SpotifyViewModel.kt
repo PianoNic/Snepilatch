@@ -17,8 +17,6 @@ import ch.snepilatch.app.playback.engine.SpotifyCdnResolver
 import ch.snepilatch.app.playback.engine.SpotifyStream
 import ch.snepilatch.app.data.*
 import kotify.api.artist.Artist
-import kotify.api.home.Home
-import kotify.api.home.HomeData
 import kotify.api.playerconnect.PlayerConnect
 import kotify.api.playlist.Playlist
 import kotify.api.playerstatus.DeviceInfo
@@ -233,10 +231,7 @@ class SpotifyViewModel : ViewModel() {
     private var commandJob: Job? = null
     private var userPlayJob: Job? = null  // Cancel an in-flight user-initiated play when another track is tapped
 
-    // Home
-    private val _homeData = MutableStateFlow<HomeData?>(null)
-    val homeData: StateFlow<HomeData?> = _homeData
-    val isHomeLoading = MutableStateFlow(true)
+    // Home feed moved to HomeViewModel.
 
     // Search state was extracted into SearchViewModel — see viewmodel/SearchViewModel.kt
 
@@ -383,9 +378,7 @@ class SpotifyViewModel : ViewModel() {
                 cdnResolver = SpotifyCdnResolver(sess, sp)
                 LokiLogger.i(TAG, "Session loaded")
 
-                // Start loading home immediately after session is ready, in parallel with user
-                // profile and player setup. The library loads itself from LibraryViewModel.init.
-                loadHome()
+                // Home and library load themselves from HomeViewModel.init / LibraryViewModel.init.
 
                 val userApi = User(sess)
                 val me = userApi.getCurrentUser()
@@ -2812,20 +2805,6 @@ class SpotifyViewModel : ViewModel() {
             }
         } catch (e: Exception) {
             LokiLogger.e(TAG, "preResolveNextTrack failed", e)
-        }
-    }
-
-    // --- Home ---
-
-    private fun loadHome() {
-        launchWithSession("loadHome") { sess ->
-            try {
-                val feed = Home(sess).getHomeFeed()
-                _homeData.value = feed
-                LokiLogger.i(TAG, "Home loaded: ${feed?.sections?.size} sections")
-            } finally {
-                isHomeLoading.value = false
-            }
         }
     }
 

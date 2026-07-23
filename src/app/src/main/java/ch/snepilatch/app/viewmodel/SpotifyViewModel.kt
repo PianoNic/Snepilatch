@@ -1139,10 +1139,6 @@ class SpotifyViewModel : ViewModel() {
     private fun stopPositionTicker() = positionInterpolator.stop()
 
     /**
-     * Toggle the Eternal Jukebox for the currently-streaming track. Only meaningful while streaming a
-     * track locally (it drives ExoPlayer seeks); a no-op otherwise. Logic only — no UI wired.
-     */
-    /**
      * While the jukebox owns playback, force the Spotify Connect session to repeat the current track so
      * the cloud never auto-advances the queue when the track's duration elapses (which would tear the
      * engine down and jump to the next song). Restores the prior repeat mode when the jukebox turns off.
@@ -1167,6 +1163,10 @@ class SpotifyViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Toggle the Eternal Jukebox for the currently-streaming track. Only meaningful while streaming a
+     * track locally (it drives ExoPlayer seeks); a no-op otherwise. Logic only — no UI wired.
+     */
     fun toggleJukebox() {
         if (jukebox.isEnabled()) {
             jukebox.disable()
@@ -1402,15 +1402,6 @@ class SpotifyViewModel : ViewModel() {
     }
 
     /**
-     * Auto-recover from a transient ExoPlayer/DRM error (most commonly
-     * `ERROR_CODE_DRM_LICENSE_ACQUISITION_FAILED` — a throttled Widevine license). Rather than going
-     * silent until the user taps play, re-resolve the SAME track and reload it at [positionMs], up to
-     * [MAX_PLAYBACK_ERROR_RETRIES] times. A fresh resolve also rebuilds the license headers with a
-     * current access token, which is what clears a transient throttle. Spotify-CDN / podcast path only;
-     * the lossless (third-party) path keeps the old hand-back-to-Spotify behaviour. The retry budget
-     * resets on the next successful [MusicPlaybackService.onReady], so an unplayable track can't loop.
-     */
-    /**
      * Refill the auto-recovery retry budget when a track reaches STATE_READY — but ONLY when the ready
      * track differs from the one being recovered. A recovery reload of the same failing track also
      * reaches READY (it buffers a few seconds, then fails again at the same spot); refilling there
@@ -1424,6 +1415,15 @@ class SpotifyViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Auto-recover from a transient ExoPlayer/DRM error (most commonly
+     * `ERROR_CODE_DRM_LICENSE_ACQUISITION_FAILED` — a throttled Widevine license). Rather than going
+     * silent until the user taps play, re-resolve the SAME track and reload it at [positionMs], up to
+     * [MAX_PLAYBACK_ERROR_RETRIES] times. A fresh resolve also rebuilds the license headers with a
+     * current access token, which is what clears a transient throttle. Spotify-CDN / podcast path only;
+     * the lossless (third-party) path keeps the old hand-back-to-Spotify behaviour. The retry budget
+     * resets on the next successful [MusicPlaybackService.onReady], so an unplayable track can't loop.
+     */
     internal suspend fun recoverFromPlaybackError(failedUri: String?, positionMs: Long) {
         // Nothing to reload locally, or lossless mode: hand back to Spotify (previous behaviour).
         if (failedUri == null || preferredAudioSource.value != null) {
@@ -1808,7 +1808,6 @@ class SpotifyViewModel : ViewModel() {
         }
     }
 
-    @Suppress("UNCHECKED_CAST")
     fun openQueue() {
         navigateTo(Screen.QUEUE)
         refreshQueue()
@@ -1900,7 +1899,6 @@ class SpotifyViewModel : ViewModel() {
         }
     }
 
-    @Suppress("UNCHECKED_CAST")
     fun openAlbumFromCurrentTrack() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -2242,10 +2240,6 @@ class SpotifyViewModel : ViewModel() {
     }
 
     /**
-     * ExoPlayer lifecycle events — track transitions, errors, end-of-track,
-     * and the crucial onReady that completes the cold-start handoff.
-     */
-    /**
      * When the 1s silent ad clip ends, KotifyClient's engine normally advances off the ad on its own.
      * But if it stalls (COMMAND_FAILED, a slow post-ad reveal, a dealer drop) nothing advances and we're
      * stuck ON the ad until the user manually skips. Mirror the normal-track fallback: if we're STILL on
@@ -2266,6 +2260,10 @@ class SpotifyViewModel : ViewModel() {
         }
     }
 
+    /**
+     * ExoPlayer lifecycle events — track transitions, errors, end-of-track,
+     * and the crucial onReady that completes the cold-start handoff.
+     */
     private fun wirePlaybackLifecycleCallbacks(svc: MusicPlaybackService) {
         svc.onTrackTransition = {
             // ExoPlayer auto-advanced to the pre-buffered next track. The
@@ -2613,16 +2611,6 @@ class SpotifyViewModel : ViewModel() {
     }
 
     /**
-     * Resolve + play a podcast episode. Two shapes, both fed from the same connect-state/track-playback
-     * state machine (never third-party):
-     *  - **Hosted** (Spotify-hosted): carries a Spotify file id (via onPlaybackId / cluster state) →
-     *    Widevine CDN, identical to a track.
-     *  - **External/RSS**: no file id; a direct https audio url surfaced via onExternalUrl → streamed
-     *    as-is, no DRM.
-     * onPlaybackId / onExternalUrl race onTrackChange, so we wait briefly for either to arrive. On
-     * failure we stop cleanly — we do NOT fall back to the third-party music CDN (wrong for podcasts).
-     */
-    /**
      * Resolve + play an episode via soundfinder (`soundfinder/v1/unauth/episode`), the web player's
      * episode path. Passthrough episodes stream their direct DRM-free url (no Widevine); hosted
      * episodes resolve the Widevine file id with the corrected v2 seektable PSSH. Returns true if
@@ -2682,6 +2670,16 @@ class SpotifyViewModel : ViewModel() {
         streamProvider.value = provider
     }
 
+    /**
+     * Resolve + play a podcast episode. Two shapes, both fed from the same connect-state/track-playback
+     * state machine (never third-party):
+     *  - **Hosted** (Spotify-hosted): carries a Spotify file id (via onPlaybackId / cluster state) →
+     *    Widevine CDN, identical to a track.
+     *  - **External/RSS**: no file id; a direct https audio url surfaced via onExternalUrl → streamed
+     *    as-is, no DRM.
+     * onPlaybackId / onExternalUrl race onTrackChange, so we wait briefly for either to arrive. On
+     * failure we stop cleanly — we do NOT fall back to the third-party music CDN (wrong for podcasts).
+     */
     private suspend fun resolveAndPlayEpisode(
         trackUri: String,
         event: kotify.api.playerstatus.TrackChangeEvent,
@@ -2826,7 +2824,6 @@ class SpotifyViewModel : ViewModel() {
         }
     }
 
-    @Suppress("UNCHECKED_CAST")
     private suspend fun preResolveNextTrack() {
         // Skip pre-resolution for Spotify CDN — file IDs only come at play time from the state machine
         if (preferredAudioSource.value == null) {

@@ -54,10 +54,30 @@ class JukeboxAudioTap : BaseAudioProcessor() {
         return out
     }
 
+    /** Allocate the (up to ~63MB) capture buffer once the format is known. Cheap no-op if already sized. */
+    @Synchronized
+    private fun ensureBuffer() {
+        val needed = capturedRate * capturedChannels * 60 * MAX_MINUTES
+        if (pcm.size < needed && capturedRate > 0 && capturedChannels > 0) pcm = ShortArray(needed)
+    }
+
     @Synchronized
     fun resetCapture() {
+        ensureBuffer()
         len = 0
     }
+
+    /** Release the ~63MB capture buffer when analysis stops, instead of holding it for the sink lifetime. */
+    @Synchronized
+    fun releaseBuffer() {
+        pcm = ShortArray(0)
+        len = 0
+    }
+
+    // Only participate in the audio chain while analyzing: when the jukebox is off ExoPlayer bypasses
+    // this processor entirely, so there is no per-buffer queueInput copy. isActive is re-read on a
+    // pipeline flush — the enable path sets analyzing before seeking, so the seek's flush activates it.
+    override fun isActive(): Boolean = analyzing
 
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
         sampleRate = inputAudioFormat.sampleRate
@@ -65,8 +85,9 @@ class JukeboxAudioTap : BaseAudioProcessor() {
         pcm16 = inputAudioFormat.encoding == C.ENCODING_PCM_16BIT
         capturedRate = sampleRate
         capturedChannels = channels
-        val needed = sampleRate * channels * 60 * MAX_MINUTES
-        if (pcm.size < needed && sampleRate > 0 && channels > 0) pcm = ShortArray(needed)
+        // Allocate only if analysis is already running (e.g. capturing across a format change);
+        // otherwise stay unallocated until resetCapture() on the next enable.
+        if (analyzing) ensureBuffer()
         LokiLogger.i(TAG, "tap configured: ${sampleRate}Hz ch=$channels enc=${inputAudioFormat.encoding} pcm16=$pcm16")
         return inputAudioFormat
     }
@@ -88,12 +109,13 @@ class JukeboxAudioTap : BaseAudioProcessor() {
 
     @Synchronized
     private fun capture(buf: ByteBuffer) {
-        var i = len
-        val cap = pcm.size
-        while (buf.remaining() >= 2 && i < cap) {
-            pcm[i++] = buf.short
+        // Bulk copy instead of per-sample buf.short: asShortBuffer() inherits the duplicate's
+        // LITTLE_ENDIAN order; count is clamped to the remaining capacity to keep the overflow guard.
+        val count = minOf(buf.remaining() / 2, pcm.size - len)
+        if (count > 0) {
+            buf.asShortBuffer().get(pcm, len, count)
+            len += count
         }
-        len = i
     }
 
     private companion object {

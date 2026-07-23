@@ -55,9 +55,11 @@ class SpotifyViewModel : ViewModel() {
 
     private val TAG = "SpotifyVM"
 
-    // Navigation
-    val currentScreen = MutableStateFlow(Screen.HOME)
-    private var screenStack = mutableListOf<Screen>()
+    // Navigation lives in the process-scoped Navigator; the ViewModel delegates (see navigateTo/goBack
+    // below). Reset on construction so a fresh ViewModel (cold process / recreated Activity) starts at
+    // HOME — config changes retain the ViewModel, so rotation keeps the current screen.
+    init { Navigator.reset() }
+    val currentScreen: StateFlow<Screen> get() = Navigator.currentScreen
     val needsLogin = MutableStateFlow(false)
 
     // Session state — ownership lives in SessionHolder (process-scoped).
@@ -832,32 +834,11 @@ class SpotifyViewModel : ViewModel() {
         needsLogin.value = true
     }
 
-    /** The player and lyrics are overlays, not pages — they never sit on the back stack. */
-    private fun isOverlay(s: Screen) = s == Screen.NOW_PLAYING || s == Screen.LYRICS
+    fun navigateTo(screen: Screen) = Navigator.navigateTo(screen)
 
-    fun navigateTo(screen: Screen) {
-        val current = currentScreen.value
-        if (screen == current) return
-        // Don't record an overlay we're leaving for a real page, else back re-opens the
-        // player instead of returning to the page beneath it.
-        if (!isOverlay(current) || isOverlay(screen)) screenStack.add(current)
-        currentScreen.value = screen
-    }
+    fun navigateToTab(screen: Screen) = Navigator.navigateToTab(screen)
 
-    /** Tabs are roots: switching resets the stack so back returns to Home, not a stale page. */
-    fun navigateToTab(screen: Screen) {
-        screenStack.clear()
-        if (screen != Screen.HOME) screenStack.add(Screen.HOME)
-        currentScreen.value = screen
-    }
-
-    fun goBack(): Boolean {
-        if (screenStack.isNotEmpty()) {
-            currentScreen.value = screenStack.removeAt(screenStack.lastIndex)
-            return true
-        }
-        return false
-    }
+    fun goBack(): Boolean = Navigator.goBack()
 
     /**
      * Handle a deep link URI from open.spotify.com.

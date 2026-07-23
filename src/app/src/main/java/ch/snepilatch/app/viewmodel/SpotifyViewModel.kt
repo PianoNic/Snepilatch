@@ -22,7 +22,6 @@ import kotify.api.home.Home
 import kotify.api.home.HomeData
 import kotify.api.playerconnect.PlayerConnect
 import kotify.api.playlist.Playlist
-import kotify.api.podcast.Podcast
 import kotify.api.playerstatus.DeviceInfo
 import kotify.api.playerstatus.PlayerStateData
 import kotify.api.playerstatus.PlayerTrack
@@ -256,9 +255,8 @@ class SpotifyViewModel : ViewModel() {
     // Next track info (always available from WebSocket state for mini player swipe)
     val nextTrackPreview = MutableStateFlow<TrackInfo?>(null)
 
-    // Detail
-    private val _detail = MutableStateFlow(DetailData())
-    val detail: StateFlow<DetailData> = _detail
+    // Detail state + openers live in DetailViewModel; SpotifyViewModel's deep-link/playback bridges
+    // reach them through DetailRoutes.
 
     // Devices
     private val _devices = MutableStateFlow<List<DeviceInfo>>(emptyList())
@@ -278,8 +276,7 @@ class SpotifyViewModel : ViewModel() {
     private var lastDeviceIndicatorKey: Pair<Boolean, Boolean>? = null
     private val playlistNameCache = mutableMapOf<String, String>()
 
-    // Loading
-    val isLoading = MutableStateFlow(false)
+    // Loading (detail loading moved to DetailViewModel.isLoading)
     val isStreamLoading = MutableStateFlow(false)
 
     // Snackbar messages
@@ -807,29 +804,6 @@ class SpotifyViewModel : ViewModel() {
             }
         }
 
-    /**
-     * Same shape as [launchWithSession] but flips [loading] true around the block and always
-     * resets it in a finally. For loaders whose only extra work is a loading-spinner flag.
-     */
-    private fun launchWithSessionLoading(
-        tag: String,
-        loading: MutableStateFlow<Boolean>,
-        block: suspend (Session) -> Unit
-    ): Job =
-        viewModelScope.launch(Dispatchers.IO) {
-            val sess = session ?: return@launch
-            loading.value = true
-            try {
-                block(sess)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                LokiLogger.e(TAG, tag, e)
-            } finally {
-                loading.value = false
-            }
-        }
-
     fun showLogin() {
         needsLogin.value = true
     }
@@ -855,9 +829,9 @@ class SpotifyViewModel : ViewModel() {
 
         when (type) {
             "track" -> playTrack("spotify:track:$id")
-            "album" -> openAlbum(id)
-            "playlist" -> openPlaylist(id)
-            "artist" -> openArtist(id)
+            "album" -> DetailRoutes.openAlbum(id)
+            "playlist" -> DetailRoutes.openPlaylist(id)
+            "artist" -> DetailRoutes.openArtist(id)
             else -> LokiLogger.i(TAG, "Unsupported deep link type: $type")
         }
     }
@@ -1874,6 +1848,8 @@ class SpotifyViewModel : ViewModel() {
         }
     }
 
+    // Playback-context bridges: these read PlayerConnect / playingContext (playback-owned), then hand
+    // off to DetailViewModel via DetailRoutes to open the resolved page.
     fun openAlbumFromCurrentTrack() {
         launchWithPlayer("openAlbumFromCurrentTrack") { pc ->
             val state = pc.getState() ?: return@launchWithPlayer
@@ -1882,7 +1858,7 @@ class SpotifyViewModel : ViewModel() {
                 ?: state.context_uri?.takeIf { it.contains(":album:") }
             if (albumUri != null) {
                 val albumId = albumUri.removePrefix("spotify:album:")
-                openAlbum(albumId)
+                DetailRoutes.openAlbum(albumId)
             } else {
                 LokiLogger.w(TAG, "No album URI on current track")
             }
@@ -1893,28 +1869,10 @@ class SpotifyViewModel : ViewModel() {
         val ctx = playingContext.value ?: return
         val uri = ctx.uri ?: return
         when {
-            uri.contains(":playlist:") -> openPlaylist(uri.substringAfter(":playlist:"))
-            uri.contains(":album:") -> openAlbum(uri.substringAfter(":album:"))
-            uri.contains(":artist:") -> openArtist(uri.substringAfter(":artist:"))
-            uri.contains(":collection:tracks") -> openLikedSongs()
-        }
-    }
-
-    fun openAlbumForTrack(trackUri: String) {
-        launchWithSession("openAlbumForTrack") { sess ->
-            val trackId = trackUri.removePrefix("spotify:track:")
-            val track = Song(sess).getSong(trackId) ?: return@launchWithSession
-            val albumUri = track.album.uri.takeIf { it.isNotBlank() } ?: return@launchWithSession
-            openAlbum(albumUri.substringAfterLast(":"))
-        }
-    }
-
-    fun openArtistForTrack(trackUri: String) {
-        launchWithSession("openArtistForTrack") { sess ->
-            val trackId = trackUri.removePrefix("spotify:track:")
-            val track = Song(sess).getSong(trackId) ?: return@launchWithSession
-            val artistUri = track.artists.firstOrNull()?.uri?.takeIf { it.isNotBlank() } ?: return@launchWithSession
-            openArtist(artistUri.substringAfterLast(":"))
+            uri.contains(":playlist:") -> DetailRoutes.openPlaylist(uri.substringAfter(":playlist:"))
+            uri.contains(":album:") -> DetailRoutes.openAlbum(uri.substringAfter(":album:"))
+            uri.contains(":artist:") -> DetailRoutes.openArtist(uri.substringAfter(":artist:"))
+            uri.contains(":collection:tracks") -> DetailRoutes.openLikedSongs()
         }
     }
 
@@ -1925,7 +1883,7 @@ class SpotifyViewModel : ViewModel() {
             val artistUri = track.artistUri?.takeIf { it.isNotBlank() }
             if (artistUri != null) {
                 val artistId = artistUri.removePrefix("spotify:artist:")
-                openArtist(artistId)
+                DetailRoutes.openArtist(artistId)
             }
         }
     }
@@ -2905,140 +2863,7 @@ class SpotifyViewModel : ViewModel() {
         }
     }
 
-
-    // --- Detail ---
-
-    private val _isLoadingMore = MutableStateFlow(false)
-    val isLoadingMore: StateFlow<Boolean> = _isLoadingMore
-
-    /** Navigate to a detail screen and load it under the shared isLoading flag; a null result leaves
-     *  the previous detail unchanged (used by openShow when the podcast has no info). */
-    private fun openDetail(screen: Screen, tag: String, load: suspend (Session) -> DetailData?) {
-        navigateTo(screen)
-        launchWithSessionLoading(tag, isLoading) { sess -> load(sess)?.let { _detail.value = it } }
-    }
-
-    fun openLikedSongs() = openDetail(Screen.PLAYLIST_DETAIL, "openLikedSongs") { sess ->
-        Playlist(sess).getLikedSongs(limit = 50).toDetailData(offset = 0)
-    }
-
-    fun loadMoreDetail() {
-        val current = _detail.value
-        if (_isLoadingMore.value) return
-        if (current.totalCount in 0..current.tracks.size) return
-        val uri = current.uri
-        _isLoadingMore.value = true
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val sess = session ?: return@launch
-                val offset = current.tracks.size
-                if (uri == "spotify:collection:tracks") {
-                    val data = Playlist(sess).getLikedSongs(limit = 50, offset = offset)
-                    val more = data.toDetailData(offset)
-                    _detail.value = current.copy(
-                        tracks = current.tracks + more.tracks,
-                        totalCount = more.totalCount,
-                        loadedOffset = offset + more.tracks.size
-                    )
-                } else if (uri.startsWith("spotify:playlist:")) {
-                    val id = uri.removePrefix("spotify:playlist:")
-                    val info = Playlist(sess).getPlaylist(id, limit = DETAIL_PAGE_SIZE, offset = offset)
-                    val more = info.tracks.map { it.toTrackInfo() }
-                    val newSize = current.tracks.size + more.size
-                    // Server-reported totalTracks is unreliable (PlaylistMapper
-                    // returns 0 when content.totalCount is missing). Use the
-                    // page-shorter-than-limit signal as the authoritative
-                    // "we're at the end" indicator instead.
-                    val newTotalCount = when {
-                        more.size < DETAIL_PAGE_SIZE -> newSize
-                        info.totalTracks > 0 -> info.totalTracks
-                        else -> -1
-                    }
-                    _detail.value = current.copy(
-                        tracks = current.tracks + more,
-                        totalCount = newTotalCount,
-                        loadedOffset = newSize
-                    )
-                } else if (uri.startsWith("spotify:album:")) {
-                    val id = uri.removePrefix("spotify:album:")
-                    val info = Album(sess).getAlbum(id, limit = 50, offset = offset)
-                    val more = info.tracks.map { it.toTrackInfo(info.coverArtUrl) }
-                    _detail.value = current.copy(
-                        tracks = current.tracks + more,
-                        totalCount = info.totalTracks,
-                        loadedOffset = offset + more.size
-                    )
-                } else if (uri.startsWith("spotify:show:")) {
-                    val id = uri.removePrefix("spotify:show:")
-                    val info = Podcast(sess, id).getPodcastInfo(limit = DETAIL_PAGE_SIZE, offset = offset)
-                    val more = info?.episodes?.map { it.toTrackInfo(current.name) } ?: emptyList()
-                    val newSize = current.tracks.size + more.size
-                    // A short page means we've hit the end; otherwise keep the server-reported total.
-                    val newTotalCount = if (more.size < DETAIL_PAGE_SIZE) newSize else (info?.totalEpisodes ?: newSize)
-                    _detail.value = current.copy(
-                        tracks = current.tracks + more,
-                        totalCount = newTotalCount,
-                        loadedOffset = newSize
-                    )
-                }
-            } catch (e: Exception) { LokiLogger.e(TAG, "loadMoreDetail", e) }
-            finally { _isLoadingMore.value = false }
-        }
-    }
-
-
-    fun openPlaylist(playlistId: String) = openDetail(Screen.PLAYLIST_DETAIL, "openPlaylist") { sess ->
-        Playlist(sess).getPlaylist(playlistId, limit = 50).toDetailData(playlistId)
-    }
-
-    fun openAlbum(albumId: String) = openDetail(Screen.ALBUM_DETAIL, "openAlbum") { sess ->
-        Album(sess).getAlbum(albumId, limit = 50).toDetailData(albumId)
-    }
-
-    fun openArtist(artistId: String) = openDetail(Screen.ARTIST_DETAIL, "openArtist") { sess ->
-        Artist(sess).getArtist(artistId).toDetailData(artistId)
-    }
-
-    /**
-     * Open a podcast show. [publisher]/[imageUrl] come from the search/library item that was tapped
-     * (the `queryPodcastEpisodes` payload doesn't carry them); they fall back to the first episode's
-     * cover art. Episodes render as episode-URI [TrackInfo]s and play through the normal [playTrack].
-     */
-    fun openShow(showId: String, publisher: String? = null, imageUrl: String? = null) =
-        openDetail(Screen.SHOW_DETAIL, "openShow") { sess ->
-            Podcast(sess, showId).getPodcastInfo(limit = 50, offset = 0)
-                ?.toDetailData(showId, publisher, imageUrl)
-                .also { if (it == null) LokiLogger.e(TAG, "openShow: no podcast info for $showId") }
-        }
-
-
-    // --- Library actions (save/follow) ---
-
-    val detailSaved = MutableStateFlow(false)
-
-    fun checkDetailSaved(type: String, id: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val sess = session ?: return@launch
-                detailSaved.value = when (type) {
-                    "album" -> Album(sess).isSaved(id)
-                    "artist" -> Artist(sess).isFollowing(id)
-                    else -> false
-                }
-            } catch (_: Exception) { detailSaved.value = false }
-        }
-    }
-
-    fun toggleDetailSaved(type: String, id: String) {
-        launchWithSession("toggleDetailSaved") { sess ->
-            val currentlySaved = detailSaved.value
-            when (type) {
-                "album" -> if (currentlySaved) Album(sess).removeFromLibrary(id) else Album(sess).saveToLibrary(id)
-                "artist" -> if (currentlySaved) Artist(sess).unfollow(id) else Artist(sess).follow(id)
-            }
-            detailSaved.value = !currentlySaved
-        }
-    }
+    // --- Library actions ---
 
     fun removeFromLibrary(item: ch.snepilatch.app.data.LibraryItem) {
         launchWithSession("removeFromLibrary") { sess ->
@@ -3171,12 +2996,6 @@ class SpotifyViewModel : ViewModel() {
         // Slack allowed when bounds-checking a remote seek target against the track duration, so a
         // seek to the very end isn't rejected on rounding/boundary jitter.
         private const val SEEK_BOUNDS_TOLERANCE_MS = 1000L
-
-        /** Page size for playlist/album detail pagination. Matches the limit
-         *  passed to [kotify.api.playlist.Playlist.getPlaylist] in
-         *  [loadMoreDetail]; when a page returns fewer rows than this we've
-         *  reached the end regardless of any server-reported total. */
-        private const val DETAIL_PAGE_SIZE = 50
 
         /** How many times to auto-re-resolve + reload a track (rotating CDN mirrors) after a transient
          *  ExoPlayer/DRM error before skipping to the next track. See [recoverFromPlaybackError]. */

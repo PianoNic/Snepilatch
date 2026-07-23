@@ -55,6 +55,8 @@ import ch.snepilatch.app.ui.components.SpotifyImage
 import ch.snepilatch.app.ui.components.TightAlertDialog
 import ch.snepilatch.app.ui.theme.SpotifyGray
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
+import androidx.lifecycle.viewmodel.compose.viewModel
+import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
@@ -95,6 +97,9 @@ private val MorphCardPadV = 6.dp
 
 @Composable
 fun SpotifyApp(vm: SpotifyViewModel) {
+    // Eagerly create the DetailViewModel from the post-login shell so it registers itself in
+    // DetailRoutes before any deep link or playback-context bridge tries to open a detail.
+    viewModel<DetailViewModel>()
     val screen by vm.currentScreen.collectAsState()
     // Only whether a track exists — collecting the whole PlaybackUiState here would recompose the
     // entire app root twice a second, since the interpolator rewrites positionMs at 2Hz.

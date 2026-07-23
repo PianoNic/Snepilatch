@@ -76,6 +76,7 @@ import ch.snepilatch.app.ui.components.SpotifyImage
 import ch.snepilatch.app.ui.theme.SpotifyBlack
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
 import ch.snepilatch.app.ui.theme.SpotifyWhite
+import ch.snepilatch.app.viewmodel.DetailRoutes
 import ch.snepilatch.app.viewmodel.SearchViewModel
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
 import kotify.api.song.SearchAlbum
@@ -321,10 +322,10 @@ private fun SearchTrack.toUnified(vm: SpotifyViewModel, ctx: Context) = UnifiedR
             vm.likeSong(uri.removePrefix("spotify:track:"))
         },
         OverflowAction(Icons.Rounded.Album, ctx.getString(R.string.visit_album)) {
-            vm.openAlbumForTrack(uri)
+            DetailRoutes.openAlbumForTrack(uri)
         },
         OverflowAction(Icons.Rounded.Person, ctx.getString(R.string.visit_artist)) {
-            vm.openArtistForTrack(uri)
+            DetailRoutes.openArtistForTrack(uri)
         },
         shareAction(ctx, uri)
     )
@@ -336,7 +337,7 @@ private fun SearchArtist.toUnified(vm: SpotifyViewModel, ctx: Context) = Unified
     subtitle = ctx.getString(R.string.search_subtitle_artist),
     imageUrl = avatarUrl,
     circular = true,
-    onClick = { vm.openArtist(idFromUri(uri)) },
+    onClick = { DetailRoutes.openArtist(idFromUri(uri)) },
     menu = listOf(
         OverflowAction(Icons.Rounded.PersonAdd, "Follow") {
             vm.followArtist(idFromUri(uri))
@@ -345,7 +346,7 @@ private fun SearchArtist.toUnified(vm: SpotifyViewModel, ctx: Context) = Unified
     )
 )
 
-private fun SearchAlbum.toUnified(vm: SpotifyViewModel, ctx: Context): UnifiedResult {
+private fun SearchAlbum.toUnified(ctx: Context): UnifiedResult {
     val typeLabel = type.lowercase().replaceFirstChar { it.uppercase() }
     val artistName = artists.firstOrNull()?.name
     return UnifiedResult(
@@ -354,7 +355,7 @@ private fun SearchAlbum.toUnified(vm: SpotifyViewModel, ctx: Context): UnifiedRe
         subtitle = listOfNotNull(typeLabel.takeIf { it.isNotBlank() }, artistName).joinToString(" · "),
         imageUrl = coverArtUrl,
         circular = false,
-        onClick = { vm.openAlbum(idFromUri(uri)) },
+        onClick = { DetailRoutes.openAlbum(idFromUri(uri)) },
         menu = listOf(shareAction(ctx, uri))
     )
 }
@@ -365,7 +366,7 @@ private fun SearchPlaylist.toUnified(vm: SpotifyViewModel, ctx: Context) = Unifi
     subtitle = listOfNotNull(ctx.getString(R.string.search_subtitle_playlist), ownerName).joinToString(" · "),
     imageUrl = coverArtUrl,
     circular = false,
-    onClick = { vm.openPlaylist(idFromUri(uri)) },
+    onClick = { DetailRoutes.openPlaylist(idFromUri(uri)) },
     menu = listOf(
         OverflowAction(Icons.Rounded.Add, "Save to Library") {
             vm.savePlaylist(idFromUri(uri))
@@ -374,14 +375,14 @@ private fun SearchPlaylist.toUnified(vm: SpotifyViewModel, ctx: Context) = Unifi
     )
 )
 
-private fun SearchPodcast.toUnified(vm: SpotifyViewModel, ctx: Context) = UnifiedResult(
+private fun SearchPodcast.toUnified(ctx: Context) = UnifiedResult(
     uri = uri,
     title = name,
     subtitle = listOfNotNull(ctx.getString(R.string.search_subtitle_podcast), publisher).joinToString(" · "),
     imageUrl = coverArtUrl,
     circular = false,
     // Carry publisher + cover art into the show screen — the queryPodcastEpisodes payload lacks them.
-    onClick = { vm.openShow(idFromUri(uri), publisher, coverArtUrl) },
+    onClick = { DetailRoutes.openShow(idFromUri(uri), publisher, coverArtUrl) },
     menu = listOf(shareAction(ctx, uri))
 )
 
@@ -466,13 +467,13 @@ private fun sectionFor(
             .map { it.toUnified(vm, ctx) }
     "ALBUMS" ->
         SearchViewModel.SearchFilter.ALBUMS to results.albums.items.take(SECTION_PREVIEW)
-            .map { it.toUnified(vm, ctx) }
+            .map { it.toUnified(ctx) }
     "PLAYLISTS" ->
         SearchViewModel.SearchFilter.PLAYLISTS to results.playlists.items.take(SECTION_PREVIEW)
             .map { it.toUnified(vm, ctx) }
     "PODCASTS" ->
         SearchViewModel.SearchFilter.PODCASTS to results.podcasts.items.take(SECTION_PREVIEW)
-            .map { it.toUnified(vm, ctx) }
+            .map { it.toUnified(ctx) }
     "USERS" ->
         SearchViewModel.SearchFilter.PROFILES to results.users.items.take(SECTION_PREVIEW)
             .map { it.toUnified(ctx) }
@@ -486,10 +487,10 @@ private fun singleFilterRows(
     filter: SearchViewModel.SearchFilter
 ): List<UnifiedResult> = when (filter) {
     SearchViewModel.SearchFilter.ARTISTS -> results.artists.items.map { it.toUnified(vm, ctx) }
-    SearchViewModel.SearchFilter.ALBUMS -> results.albums.items.map { it.toUnified(vm, ctx) }
+    SearchViewModel.SearchFilter.ALBUMS -> results.albums.items.map { it.toUnified(ctx) }
     SearchViewModel.SearchFilter.SONGS -> results.tracks.items.map { it.toUnified(vm, ctx) }
     SearchViewModel.SearchFilter.PLAYLISTS -> results.playlists.items.map { it.toUnified(vm, ctx) }
-    SearchViewModel.SearchFilter.PODCASTS -> results.podcasts.items.map { it.toUnified(vm, ctx) }
+    SearchViewModel.SearchFilter.PODCASTS -> results.podcasts.items.map { it.toUnified(ctx) }
     SearchViewModel.SearchFilter.PROFILES -> results.users.items.map { it.toUnified(ctx) }
     SearchViewModel.SearchFilter.ALL -> emptyList()
 }
@@ -497,9 +498,9 @@ private fun singleFilterRows(
 private fun SearchTopResult.toUnified(vm: SpotifyViewModel, ctx: Context): UnifiedResult = when (this) {
     is SearchTopResult.Track -> track.toUnified(vm, ctx)
     is SearchTopResult.Artist -> artist.toUnified(vm, ctx)
-    is SearchTopResult.Album -> album.toUnified(vm, ctx)
+    is SearchTopResult.Album -> album.toUnified(ctx)
     is SearchTopResult.Playlist -> playlist.toUnified(vm, ctx)
-    is SearchTopResult.Podcast -> podcast.toUnified(vm, ctx)
+    is SearchTopResult.Podcast -> podcast.toUnified(ctx)
     is SearchTopResult.User -> user.toUnified(ctx)
 }
 

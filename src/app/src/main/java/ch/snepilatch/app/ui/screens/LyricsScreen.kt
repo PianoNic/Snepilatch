@@ -101,7 +101,6 @@ fun LyricsScreen(vm: SpotifyViewModel) {
     }
 
     Box(Modifier.fillMaxSize()) {
-        // Blurred background
         track?.albumArt?.let { artUrl ->
             AsyncImage(
                 model = coil.request.ImageRequest.Builder(LocalContext.current)
@@ -117,7 +116,6 @@ fun LyricsScreen(vm: SpotifyViewModel) {
             val isLandscape = maxWidth > maxHeight
 
             if (isLandscape) {
-                // === LANDSCAPE: album art left, lyrics right ===
                 Row(
                     Modifier
                         .fillMaxSize()
@@ -126,7 +124,6 @@ fun LyricsScreen(vm: SpotifyViewModel) {
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Left: album art + track info
                     Column(
                         Modifier
                             .weight(0.4f)
@@ -134,7 +131,6 @@ fun LyricsScreen(vm: SpotifyViewModel) {
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        // Album art
                         SpotifyImage(
                             url = track?.albumArt,
                             modifier = Modifier
@@ -144,7 +140,6 @@ fun LyricsScreen(vm: SpotifyViewModel) {
                         )
                         Spacer(Modifier.height(10.dp))
 
-                        // Track info
                         Text(
                             track?.name ?: "",
                             color = SpotifyWhite,
@@ -160,7 +155,6 @@ fun LyricsScreen(vm: SpotifyViewModel) {
                         )
                         Spacer(Modifier.height(10.dp))
 
-                        // Mini playback controls
                         val streamLoading by vm.isStreamLoading.collectAsState()
                         val isLiked by vm.currentTrackLiked.collectAsState()
                         val buttonBg = Color.White.copy(alpha = 0.12f)
@@ -233,7 +227,6 @@ fun LyricsScreen(vm: SpotifyViewModel) {
 
                     Spacer(Modifier.width(12.dp))
 
-                    // Right: lyrics
                     Column(
                         Modifier
                             .weight(0.6f)
@@ -267,7 +260,6 @@ fun LyricsScreen(vm: SpotifyViewModel) {
                     }
                 }
             } else {
-                // === PORTRAIT (original) ===
                 Column(
                     Modifier
                         .fillMaxSize()
@@ -677,7 +669,11 @@ private fun InterludeDots(accentColor: Color) {
             )
             Box(
                 Modifier.padding(horizontal = 6.dp).size(10.dp)
-                    .graphicsLayer(scaleX = dotScale, scaleY = dotScale, alpha = dotAlpha)
+                    .graphicsLayer {
+                        scaleX = dotScale
+                        scaleY = dotScale
+                        alpha = dotAlpha
+                    }
                     .background(accentColor, CircleShape)
             )
         }

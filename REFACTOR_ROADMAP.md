@@ -1,11 +1,11 @@
 # Refactor roadmap
 
-A practical, step-by-step plan for the rest of the SpotifyViewModel decomposition. Read [ARCHITECTURE.md](ARCHITECTURE.md) first for the layout and the playback rules. This document is the work plan, not the architecture.
+A practical, step-by-step plan for the rest of the PlaybackViewModel decomposition. Read [ARCHITECTURE.md](ARCHITECTURE.md) first for the layout and the playback rules. This document is the work plan, not the architecture.
 
 ## Current state (April 2026)
 
 ```
-SpotifyViewModel.kt   2153 lines   (started at 2208 — net −2.5%)
+PlaybackViewModel.kt   2153 lines   (started at 2208 — net −2.5%)
 NowPlayingScreen.kt   1117 lines
 MusicPlaybackService  711 lines
 DetailScreen.kt       710 lines
@@ -46,7 +46,7 @@ Extract one feature at a time, each as its own PR, each landing with at least on
 | 10 | `ThemeViewModel` | ~40 | low | Album art palette, theme colors |
 | 11 | `CanvasViewModel` | ~30 | low | Canvas video URL fetch |
 
-After all 11 are done, `SpotifyViewModel` should be ~600 lines containing only the playback orchestration (init, session lifecycle, the WS callback wiring, cold-start, transport commands, state mirroring). At that point it's a candidate for renaming to `PlaybackViewModel`.
+After all 11 are done, `PlaybackViewModel` should be ~600 lines containing only the playback orchestration (init, session lifecycle, the WS callback wiring, cold-start, transport commands, state mirroring). At that point it's a candidate for renaming to `PlaybackViewModel`.
 
 ### Phase 2 — Playback decomposition (after Phase 1)
 
@@ -72,19 +72,19 @@ This is the exact recipe used for `SearchViewModel`. Follow it for every Phase 1
 ### Step 1 — Create the issue and branch
 
 ```sh
-gh issue create --title "Extract <Feature>ViewModel" --label refactor --body "Move <feature> state and logic out of SpotifyViewModel into a dedicated <Feature>ViewModel. Pattern: see SearchViewModel (PR #201)."
+gh issue create --title "Extract <Feature>ViewModel" --label refactor --body "Move <feature> state and logic out of PlaybackViewModel into a dedicated <Feature>ViewModel. Pattern: see SearchViewModel (PR #201)."
 git checkout -b feature/<issue#>_Extract<Feature>ViewModel
 ```
 
 ### Step 2 — Identify what to move
 
-In `SpotifyViewModel.kt`, find:
+In `PlaybackViewModel.kt`, find:
 - Public state flows for the feature (e.g. `val currentTrackLiked = MutableStateFlow(false)`)
 - Private state (`var lastLikeCheckUri: String? = null`)
 - All public methods that read or mutate that state
 - Any helper methods only called from those methods
 
-Use `grep -n` to make sure nothing outside the feature reads the same fields. If it does, you have a coupling — note it for later (you may need to keep an event bus or callback into `SpotifyViewModel`).
+Use `grep -n` to make sure nothing outside the feature reads the same fields. If it does, you have a coupling — note it for later (you may need to keep an event bus or callback into `PlaybackViewModel`).
 
 ### Step 3 — Create the new ViewModel
 
@@ -116,7 +116,7 @@ class <Feature>ViewModel : ViewModel() {
     // ----- private state -----
     private var someJob: Job? = null
 
-    // ----- methods (move from SpotifyViewModel) -----
+    // ----- methods (move from PlaybackViewModel) -----
     fun doSomething(arg: Foo) {
         launchWithSession("doSomething") { sess ->
             // body
@@ -147,7 +147,7 @@ class <Feature>ViewModel : ViewModel() {
 ```kotlin
 @Composable
 fun <Feature>Screen(
-    vm: SpotifyViewModel,
+    vm: PlaybackViewModel,
     featureVm: <Feature>ViewModel = viewModel()
 ) {
     val state by featureVm.someState.collectAsState()
@@ -155,9 +155,9 @@ fun <Feature>Screen(
 }
 ```
 
-The `vm: SpotifyViewModel` parameter stays for things the feature still needs from the main VM (like `playTrack`, `togglePlayPause`, theme colors during the transition).
+The `vm: PlaybackViewModel` parameter stays for things the feature still needs from the main VM (like `playTrack`, `togglePlayPause`, theme colors during the transition).
 
-### Step 5 — Delete from `SpotifyViewModel`
+### Step 5 — Delete from `PlaybackViewModel`
 
 Remove the moved state and methods. Replace each section with a one-line breadcrumb:
 ```kotlin
@@ -249,7 +249,7 @@ Each feature ViewModel has its own `tag` constant: `private val tag = "<Feature>
 
 ### 5. Snackbar / cross-feature events
 
-If a feature ViewModel needs to surface a message (e.g. "Added to playlist"), forward it to `SpotifyViewModel.snackbarMessage`:
+If a feature ViewModel needs to surface a message (e.g. "Added to playlist"), forward it to `PlaybackViewModel.snackbarMessage`:
 
 ```kotlin
 class <Feature>ViewModel(private val onSnackbar: (String) -> Unit = {}) : ViewModel()
@@ -295,7 +295,7 @@ Then `LyricsViewModel`, then `LibraryViewModel`. After three extractions, the he
 
 ## What to avoid
 
-- **Do not touch `SpotifyViewModel.initialize`** during Phase 1 — that function owns the bootstrap order and is the most fragile non-playback code.
+- **Do not touch `PlaybackViewModel.initialize`** during Phase 1 — that function owns the bootstrap order and is the most fragile non-playback code.
 - **Do not touch `wirePlayerConnectCallbacks`** during Phase 1 — that's where the playback ordering invariants live.
 - **Do not introduce a `coordinator` / `mediator` class** — every "coordinator" eventually grows into a mini-monolith. Feature ViewModels should be flat and independent.
 - **Do not modularize** (split into multiple Gradle modules) until Phase 1 + 2 + 3 are done. Modularization on top of the current structure adds friction without untangling anything.

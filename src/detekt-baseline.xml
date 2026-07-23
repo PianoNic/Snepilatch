@@ -5,14 +5,14 @@
     <ID>AnnotationOnSeparateLine:MediaButtonReceiver.kt$MediaButtonReceiver$@Suppress("DEPRECATION") intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT)</ID>
     <ID>BlockCommentInitialStarAlignment:Theme.kt$/* Other default colors to override background = Color(0xFFFFFBFE), surface = Color(0xFFFFFBFE), onPrimary = Color.White, onSecondary = Color.White, onTertiary = Color.White, onBackground = Color(0xFF1C1B1F), onSurface = Color(0xFF1C1B1F), */</ID>
     <ID>BlockCommentInitialStarAlignment:Type.kt$/* Other default text styles to override titleLarge = TextStyle( fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal, fontSize = 22.sp, lineHeight = 28.sp, letterSpacing = 0.sp ), labelSmall = TextStyle( fontFamily = FontFamily.Default, fontWeight = FontWeight.Medium, fontSize = 11.sp, lineHeight = 16.sp, letterSpacing = 0.5.sp ) */</ID>
-    <ID>CyclomaticComplexMethod:AccountScreen.kt$@Composable fun AccountScreen(vm: SpotifyViewModel)</ID>
-    <ID>CyclomaticComplexMethod:DetailScreen.kt$@Composable fun DetailScreen(vm: SpotifyViewModel)</ID>
+    <ID>CyclomaticComplexMethod:AccountScreen.kt$@Composable fun AccountScreen(vm: PlaybackViewModel)</ID>
+    <ID>CyclomaticComplexMethod:DetailScreen.kt$@Composable fun DetailScreen(vm: PlaybackViewModel)</ID>
     <ID>CyclomaticComplexMethod:LibraryScreen.kt$@Composable fun LibraryScreen()</ID>
-    <ID>CyclomaticComplexMethod:LyricsScreen.kt$@Composable fun LyricsScreen(vm: SpotifyViewModel)</ID>
-    <ID>CyclomaticComplexMethod:NowPlayingScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun NowPlayingScreen( vm: SpotifyViewModel, /** When false, the screen paints no background of its own — the morphing card * in SpotifyApp supplies a card-anchored background that grows with it. */ drawBackground: Boolean = true, /** Per-frame vertical drag (px, down = positive) for finger-tracked collapse; * when set, replaces the standalone swipe-down-to-dismiss. */ onMorphDrag: ((Float) -&gt; Unit)? = null, /** Drag release with vertical velocity (px/s) so the morph can settle. */ onMorphDragEnd: ((Float) -&gt; Unit)? = null )</ID>
-    <ID>CyclomaticComplexMethod:SpotifyApp.kt$@Composable fun SpotifyApp(vm: SpotifyViewModel)</ID>
-    <ID>CyclomaticComplexMethod:SpotifyViewModel.kt$SpotifyViewModel$private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent)</ID>
-    <ID>CyclomaticComplexMethod:SpotifyViewModel.kt$SpotifyViewModel$private suspend fun updatePlaybackFromState(state: PlayerStateData)</ID>
+    <ID>CyclomaticComplexMethod:LyricsScreen.kt$@Composable fun LyricsScreen(vm: PlaybackViewModel)</ID>
+    <ID>CyclomaticComplexMethod:NowPlayingScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun NowPlayingScreen( vm: PlaybackViewModel, /** When false, the screen paints no background of its own — the morphing card * in SpotifyApp supplies a card-anchored background that grows with it. */ drawBackground: Boolean = true, /** Per-frame vertical drag (px, down = positive) for finger-tracked collapse; * when set, replaces the standalone swipe-down-to-dismiss. */ onMorphDrag: ((Float) -&gt; Unit)? = null, /** Drag release with vertical velocity (px/s) so the morph can settle. */ onMorphDragEnd: ((Float) -&gt; Unit)? = null )</ID>
+    <ID>CyclomaticComplexMethod:SpotifyApp.kt$@Composable fun SpotifyApp(vm: PlaybackViewModel)</ID>
+    <ID>CyclomaticComplexMethod:PlaybackViewModel.kt$PlaybackViewModel$private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent)</ID>
+    <ID>CyclomaticComplexMethod:PlaybackViewModel.kt$PlaybackViewModel$private suspend fun updatePlaybackFromState(state: PlayerStateData)</ID>
     <ID>Filename:AudioOutputDetector.kt$ch.snepilatch.app.util.AudioOutputDetector.kt</ID>
     <ID>FinalNewline:ExampleUnitTest.kt$ch.snepilatch.app.ExampleUnitTest.kt</ID>
     <ID>FinalNewline:Theme.kt$ch.snepilatch.app.ui.theme.Theme.kt</ID>
@@ -25,24 +25,24 @@
     <ID>Indentation:MusicPlaybackService.kt$MusicPlaybackService$ </ID>
     <ID>Indentation:NowPlayingScreen.kt$ </ID>
     <ID>Indentation:SpotifyApp.kt$ </ID>
-    <ID>LongMethod:AccountScreen.kt$@Composable fun AccountScreen(vm: SpotifyViewModel)</ID>
-    <ID>LongMethod:DetailScreen.kt$@Composable fun DetailScreen(vm: SpotifyViewModel)</ID>
-    <ID>LongMethod:DetailScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun AlbumTrackRow( track: ch.snepilatch.app.data.TrackInfo, vm: SpotifyViewModel, contextUri: String, trackIndex: Int? = null )</ID>
-    <ID>LongMethod:DetailScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun ArtistTrackRow( number: Int, track: ch.snepilatch.app.data.TrackInfo, vm: SpotifyViewModel, contextUri: String, playcount: String? = null )</ID>
-    <ID>LongMethod:DevicesDialog.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun DevicesDialog(vm: SpotifyViewModel)</ID>
+    <ID>LongMethod:AccountScreen.kt$@Composable fun AccountScreen(vm: PlaybackViewModel)</ID>
+    <ID>LongMethod:DetailScreen.kt$@Composable fun DetailScreen(vm: PlaybackViewModel)</ID>
+    <ID>LongMethod:DetailScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun AlbumTrackRow( track: ch.snepilatch.app.data.TrackInfo, vm: PlaybackViewModel, contextUri: String, trackIndex: Int? = null )</ID>
+    <ID>LongMethod:DetailScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun ArtistTrackRow( number: Int, track: ch.snepilatch.app.data.TrackInfo, vm: PlaybackViewModel, contextUri: String, playcount: String? = null )</ID>
+    <ID>LongMethod:DevicesDialog.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun DevicesDialog(vm: PlaybackViewModel)</ID>
     <ID>LongMethod:LibraryScreen.kt$@Composable fun LibraryScreen()</ID>
-    <ID>LongMethod:LyricsScreen.kt$@Composable fun LyricsScreen(vm: SpotifyViewModel)</ID>
+    <ID>LongMethod:LyricsScreen.kt$@Composable fun LyricsScreen(vm: PlaybackViewModel)</ID>
     <ID>LongMethod:MainActivity.kt$MainActivity$override fun onCreate(savedInstanceState: Bundle?)</ID>
-    <ID>LongMethod:NowPlayingScreen.kt$@Composable fun PlayerBackground(vm: SpotifyViewModel, modifier: Modifier = Modifier)</ID>
-    <ID>LongMethod:NowPlayingScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun NowPlayingScreen( vm: SpotifyViewModel, /** When false, the screen paints no background of its own — the morphing card * in SpotifyApp supplies a card-anchored background that grows with it. */ drawBackground: Boolean = true, /** Per-frame vertical drag (px, down = positive) for finger-tracked collapse; * when set, replaces the standalone swipe-down-to-dismiss. */ onMorphDrag: ((Float) -&gt; Unit)? = null, /** Drag release with vertical velocity (px/s) so the morph can settle. */ onMorphDragEnd: ((Float) -&gt; Unit)? = null )</ID>
-    <ID>LongMethod:NowPlayingScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun NowPlayingMenu( showMore: Boolean, onShowMore: (Boolean) -&gt; Unit, onShowPlaylistPicker: () -&gt; Unit, vm: SpotifyViewModel, track: ch.snepilatch.app.data.TrackInfo?, shareContext: android.content.Context, buttonBg: Color )</ID>
-    <ID>LongMethod:SearchScreen.kt$@Composable fun SearchScreen(vm: SpotifyViewModel, searchVm: SearchViewModel = viewModel())</ID>
-    <ID>LongMethod:SharedComponents.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun TrackRow(track: TrackInfo, vm: SpotifyViewModel, contextUri: String? = null, trackIndex: Int? = null)</ID>
-    <ID>LongMethod:SpotifyApp.kt$@Composable fun SpotifyApp(vm: SpotifyViewModel)</ID>
-    <ID>LongMethod:SpotifyViewModel.kt$SpotifyViewModel$fun initialize(cookies: Map&lt;String, String&gt;)</ID>
-    <ID>LongMethod:SpotifyViewModel.kt$SpotifyViewModel$private suspend fun coldStartPlay()</ID>
-    <ID>LongMethod:SpotifyViewModel.kt$SpotifyViewModel$private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent)</ID>
-    <ID>LongMethod:SpotifyViewModel.kt$SpotifyViewModel$private suspend fun updatePlaybackFromState(state: PlayerStateData)</ID>
+    <ID>LongMethod:NowPlayingScreen.kt$@Composable fun PlayerBackground(vm: PlaybackViewModel, modifier: Modifier = Modifier)</ID>
+    <ID>LongMethod:NowPlayingScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun NowPlayingScreen( vm: PlaybackViewModel, /** When false, the screen paints no background of its own — the morphing card * in SpotifyApp supplies a card-anchored background that grows with it. */ drawBackground: Boolean = true, /** Per-frame vertical drag (px, down = positive) for finger-tracked collapse; * when set, replaces the standalone swipe-down-to-dismiss. */ onMorphDrag: ((Float) -&gt; Unit)? = null, /** Drag release with vertical velocity (px/s) so the morph can settle. */ onMorphDragEnd: ((Float) -&gt; Unit)? = null )</ID>
+    <ID>LongMethod:NowPlayingScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun NowPlayingMenu( showMore: Boolean, onShowMore: (Boolean) -&gt; Unit, onShowPlaylistPicker: () -&gt; Unit, vm: PlaybackViewModel, track: ch.snepilatch.app.data.TrackInfo?, shareContext: android.content.Context, buttonBg: Color )</ID>
+    <ID>LongMethod:SearchScreen.kt$@Composable fun SearchScreen(vm: PlaybackViewModel, searchVm: SearchViewModel = viewModel())</ID>
+    <ID>LongMethod:SharedComponents.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun TrackRow(track: TrackInfo, vm: PlaybackViewModel, contextUri: String? = null, trackIndex: Int? = null)</ID>
+    <ID>LongMethod:SpotifyApp.kt$@Composable fun SpotifyApp(vm: PlaybackViewModel)</ID>
+    <ID>LongMethod:PlaybackViewModel.kt$PlaybackViewModel$fun initialize(cookies: Map&lt;String, String&gt;)</ID>
+    <ID>LongMethod:PlaybackViewModel.kt$PlaybackViewModel$private suspend fun coldStartPlay()</ID>
+    <ID>LongMethod:PlaybackViewModel.kt$PlaybackViewModel$private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent)</ID>
+    <ID>LongMethod:PlaybackViewModel.kt$PlaybackViewModel$private suspend fun updatePlaybackFromState(state: PlayerStateData)</ID>
     <ID>LongMethod:UpdateDialog.kt$@Composable fun UpdateDialog( updateInfo: UpdateInfo, onDismiss: () -&gt; Unit )</ID>
     <ID>LongParameterList:MusicPlaybackService.kt$MusicPlaybackService$(url: String, licenseUrl: String, licenseHeaders: Map&lt;String, String&gt;, title: String, artist: String, albumArtUrl: String?, startPlaying: Boolean = true, startPositionMs: Long = 0L)</ID>
     <ID>LoopWithTooManyJumpStatements:LyricsScreen.kt$for</ID>
@@ -52,14 +52,14 @@
     <ID>MaxLineLength:MusicPlaybackService.kt$MusicPlaybackService.&lt;no name provided&gt;$LokiLogger.i(TAG, "Audio session ID changed: $currentAudioSessionId -&gt; $audioSessionId, playWhenReady=${player.playWhenReady}, openSession=$openAudioEffectSession")</ID>
     <ID>MaxLineLength:NowPlayingScreen.kt$eqIntent.putExtra(android.media.audiofx.AudioEffect.EXTRA_CONTENT_TYPE, android.media.audiofx.AudioEffect.CONTENT_TYPE_MUSIC)</ID>
     <ID>MaxLineLength:QueueScreen.kt$LazyColumn</ID>
-    <ID>MaxLineLength:SpotifyViewModel.kt$SpotifyViewModel$?:</ID>
-    <ID>MaxLineLength:SpotifyViewModel.kt$SpotifyViewModel$LokiLogger.i(TAG, "[Timing] WS onTrackChange arrived (${delta}ms after CMD '$lastCommandName') -&gt; ${event.current?.uri} fileId=${event.currentFileId}")</ID>
-    <ID>MaxLineLength:SpotifyViewModel.kt$SpotifyViewModel$LokiLogger.i(TAG, "[Timing] resolveAndPlay DRM loaded in ${System.currentTimeMillis() - resolveStart}ms (${System.currentTimeMillis() - lastCommandTs}ms total from CMD)")</ID>
+    <ID>MaxLineLength:PlaybackViewModel.kt$PlaybackViewModel$?:</ID>
+    <ID>MaxLineLength:PlaybackViewModel.kt$PlaybackViewModel$LokiLogger.i(TAG, "[Timing] WS onTrackChange arrived (${delta}ms after CMD '$lastCommandName') -&gt; ${event.current?.uri} fileId=${event.currentFileId}")</ID>
+    <ID>MaxLineLength:PlaybackViewModel.kt$PlaybackViewModel$LokiLogger.i(TAG, "[Timing] resolveAndPlay DRM loaded in ${System.currentTimeMillis() - resolveStart}ms (${System.currentTimeMillis() - lastCommandTs}ms total from CMD)")</ID>
     <ID>MaximumLineLength:DetailScreen.kt$ </ID>
     <ID>MaximumLineLength:MusicPlaybackService.kt$MusicPlaybackService.&lt;no name provided&gt;$ </ID>
     <ID>MaximumLineLength:NowPlayingScreen.kt$ </ID>
     <ID>MaximumLineLength:QueueScreen.kt$ </ID>
-    <ID>MaximumLineLength:SpotifyViewModel.kt$SpotifyViewModel$ </ID>
+    <ID>MaximumLineLength:PlaybackViewModel.kt$PlaybackViewModel$ </ID>
     <ID>MultiLineIfElse:BottomNav.kt$Modifier</ID>
     <ID>MultiLineIfElse:BottomNav.kt$Modifier.border(2.dp, SpotifyWhite, CircleShape)</ID>
     <ID>MultiLineIfElse:DetailScreen.kt$String.format("%,d", detail.followers)</ID>
@@ -76,38 +76,38 @@
     <ID>MultiLineIfElse:ReleaseNotesScreen.kt$MaterialTheme.colorScheme.primary</ID>
     <ID>MultiLineIfElse:ReleaseNotesScreen.kt$SpotifyGray</ID>
     <ID>MultiLineIfElse:SpotifyImageUrl.kt$raw</ID>
-    <ID>MultiLineIfElse:SpotifyViewModel.kt$SpotifyViewModel$false</ID>
-    <ID>MultiLineIfElse:SpotifyViewModel.kt$SpotifyViewModel$null</ID>
-    <ID>MultiLineIfElse:SpotifyViewModel.kt$SpotifyViewModel$pt.info</ID>
-    <ID>MultiLineIfElse:SpotifyViewModel.kt$SpotifyViewModel$throw e</ID>
-    <ID>NestedBlockDepth:SpotifyViewModel.kt$SpotifyViewModel$private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent)</ID>
+    <ID>MultiLineIfElse:PlaybackViewModel.kt$PlaybackViewModel$false</ID>
+    <ID>MultiLineIfElse:PlaybackViewModel.kt$PlaybackViewModel$null</ID>
+    <ID>MultiLineIfElse:PlaybackViewModel.kt$PlaybackViewModel$pt.info</ID>
+    <ID>MultiLineIfElse:PlaybackViewModel.kt$PlaybackViewModel$throw e</ID>
+    <ID>NestedBlockDepth:PlaybackViewModel.kt$PlaybackViewModel$private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent)</ID>
     <ID>NewLineAtEndOfFile:ExampleUnitTest.kt$ch.snepilatch.app.ExampleUnitTest.kt</ID>
     <ID>NewLineAtEndOfFile:Theme.kt$ch.snepilatch.app.ui.theme.Theme.kt</ID>
     <ID>NewLineAtEndOfFile:Type.kt$ch.snepilatch.app.ui.theme.Type.kt</ID>
-    <ID>NoConsecutiveBlankLines:SpotifyViewModel.kt$SpotifyViewModel$ </ID>
+    <ID>NoConsecutiveBlankLines:PlaybackViewModel.kt$PlaybackViewModel$ </ID>
     <ID>NoMultipleSpaces:MusicPlaybackService.kt$MusicPlaybackService$ </ID>
     <ID>NoMultipleSpaces:ReleaseNotesScreen.kt$ </ID>
-    <ID>NoMultipleSpaces:SpotifyViewModel.kt$SpotifyViewModel$ </ID>
-    <ID>SpacingAroundKeyword:SpotifyViewModel.kt$SpotifyViewModel$catch</ID>
-    <ID>SpacingAroundKeyword:SpotifyViewModel.kt$SpotifyViewModel$finally</ID>
+    <ID>NoMultipleSpaces:PlaybackViewModel.kt$PlaybackViewModel$ </ID>
+    <ID>SpacingAroundKeyword:PlaybackViewModel.kt$PlaybackViewModel$catch</ID>
+    <ID>SpacingAroundKeyword:PlaybackViewModel.kt$PlaybackViewModel$finally</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:SessionHolder.kt$SessionHolder$@Volatile var cdnResolver: SpotifyCdnResolver? = null</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:SessionHolder.kt$SessionHolder$@Volatile var player: PlayerConnect? = null</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:SessionHolder.kt$SessionHolder$@Volatile var spotifyPlayback: SpotifyPlayback? = null</ID>
     <ID>SpacingBetweenDeclarationsWithComments:MusicPlaybackService.kt$MusicPlaybackService$// Which extra buttons to show: "like", "shuffle", "repeat"</ID>
     <ID>SpacingBetweenDeclarationsWithComments:PositionInterpolator.kt$PositionInterpolator.Companion$// Report every 30s (60 * 500ms)</ID>
-    <ID>SpacingBetweenDeclarationsWithComments:SpotifyViewModel.kt$SpotifyViewModel$// Canvas background</ID>
-    <ID>SpacingBetweenDeclarationsWithComments:SpotifyViewModel.kt$SpotifyViewModel$// Content region for CDN resolution</ID>
-    <ID>SpacingBetweenDeclarationsWithComments:SpotifyViewModel.kt$SpotifyViewModel$// Language preference: "system", "en", "de", "ru", "gsw"</ID>
-    <ID>SpacingBetweenDeclarationsWithComments:SpotifyViewModel.kt$SpotifyViewModel$// Lyrics animation direction for line-synced (non word-synced): "vertical" or "horizontal"</ID>
-    <ID>SpacingBetweenDeclarationsWithComments:SpotifyViewModel.kt$SpotifyViewModel$// Next track info (always available from WebSocket state for mini player swipe)</ID>
-    <ID>SpacingBetweenDeclarationsWithComments:SpotifyViewModel.kt$SpotifyViewModel$// Notification button preferences: "like", "shuffle", "repeat"</ID>
-    <ID>ThrowsCount:SpotifyViewModel.kt$SpotifyViewModel$fun togglePlayPause()</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:PlaybackViewModel.kt$PlaybackViewModel$// Canvas background</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:PlaybackViewModel.kt$PlaybackViewModel$// Content region for CDN resolution</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:PlaybackViewModel.kt$PlaybackViewModel$// Language preference: "system", "en", "de", "ru", "gsw"</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:PlaybackViewModel.kt$PlaybackViewModel$// Lyrics animation direction for line-synced (non word-synced): "vertical" or "horizontal"</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:PlaybackViewModel.kt$PlaybackViewModel$// Next track info (always available from WebSocket state for mini player swipe)</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:PlaybackViewModel.kt$PlaybackViewModel$// Notification button preferences: "like", "shuffle", "repeat"</ID>
+    <ID>ThrowsCount:PlaybackViewModel.kt$PlaybackViewModel$fun togglePlayPause()</ID>
     <ID>TooGenericExceptionThrown:ReleaseNotesScreen.kt$throw Exception("HTTP ${response.code}")</ID>
     <ID>UseCheckOrError:SpotifyCdnResolver.kt$SpotifyCdnResolver$throw IllegalStateException("No CDN mirrors for fileId=$fileId")</ID>
-    <ID>UseCheckOrError:SpotifyViewModel.kt$SpotifyViewModel$throw IllegalStateException("CdnResolver not initialized")</ID>
-    <ID>UseCheckOrError:SpotifyViewModel.kt$SpotifyViewModel$throw IllegalStateException("No file ID available")</ID>
-    <ID>VariableNaming:SpotifyViewModel.kt$SpotifyViewModel$// Playback (internal so tests can seed state without going through the // network-dependent initialize/resolve paths) internal val _playback = MutableStateFlow(PlaybackUiState())</ID>
-    <ID>VariableNaming:SpotifyViewModel.kt$SpotifyViewModel$private val TAG = "SpotifyVM"</ID>
+    <ID>UseCheckOrError:PlaybackViewModel.kt$PlaybackViewModel$throw IllegalStateException("CdnResolver not initialized")</ID>
+    <ID>UseCheckOrError:PlaybackViewModel.kt$PlaybackViewModel$throw IllegalStateException("No file ID available")</ID>
+    <ID>VariableNaming:PlaybackViewModel.kt$PlaybackViewModel$// Playback (internal so tests can seed state without going through the // network-dependent initialize/resolve paths) internal val _playback = MutableStateFlow(PlaybackUiState())</ID>
+    <ID>VariableNaming:PlaybackViewModel.kt$PlaybackViewModel$private val TAG = "PlaybackVM"</ID>
     <ID>Wrapping:AccountScreen.kt$(</ID>
     <ID>Wrapping:AccountScreen.kt$;</ID>
     <ID>Wrapping:AccountScreen.kt$Text( if (canvasOn) stringResource(R.string.canvas_on) else stringResource(R.string.canvas_off), color = SpotifyLightGray )</ID>
@@ -139,8 +139,8 @@
     <ID>Wrapping:SharedComponents.kt$(</ID>
     <ID>Wrapping:SharedComponents.kt$;</ID>
     <ID>Wrapping:SpotifyApp.kt$;</ID>
-    <ID>Wrapping:SpotifyViewModel.kt$SpotifyViewModel$(</ID>
-    <ID>Wrapping:SpotifyViewModel.kt$SpotifyViewModel$;</ID>
-    <ID>Wrapping:SpotifyViewModel.kt$SpotifyViewModel$it.key == activeId || it.key == "hobs_$activeId" || "hobs_${it.key}" == activeId</ID>
+    <ID>Wrapping:PlaybackViewModel.kt$PlaybackViewModel$(</ID>
+    <ID>Wrapping:PlaybackViewModel.kt$PlaybackViewModel$;</ID>
+    <ID>Wrapping:PlaybackViewModel.kt$PlaybackViewModel$it.key == activeId || it.key == "hobs_$activeId" || "hobs_${it.key}" == activeId</ID>
   </CurrentIssues>
 </SmellBaseline>

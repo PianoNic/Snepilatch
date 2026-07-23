@@ -18,11 +18,11 @@ import kotlinx.coroutines.launch
  * ViewModel for the "Your Library" screen: the saved list + pagination, plus create/remove.
  *
  * Reads the session (and, for mutations, the username) from [SessionHolder], and loads the first
- * page in [init] — the old eager load lived in `SpotifyViewModel.initialize`, which runs before any
+ * page in [init] — the old eager load lived in `PlaybackViewModel.initialize`, which runs before any
  * composable exists; loading here instead fires as soon as the post-login shell composes this VM,
  * which is well before the library-backed playlist picker can be opened.
  *
- * `followArtist`/`savePlaylist` and the add-to-playlist picker stay on [SpotifyViewModel] — they emit
+ * `followArtist`/`savePlaylist` and the add-to-playlist picker stay on [PlaybackViewModel] — they emit
  * snackbars and are triggered from non-composable search builders, i.e. "add external content to the
  * library" rather than browsing it.
  */

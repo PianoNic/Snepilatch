@@ -50,11 +50,11 @@ import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.theme.SpotifyElevated
 import ch.snepilatch.app.ui.theme.SpotifyGray
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
-import ch.snepilatch.app.viewmodel.SpotifyViewModel
+import ch.snepilatch.app.viewmodel.PlaybackViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DevicesDialog(vm: SpotifyViewModel) {
+fun DevicesDialog(vm: PlaybackViewModel) {
     val devices by vm.devices.collectAsState()
     val playback by vm.playback.collectAsState()
     val theme by vm.themeColors.collectAsState()

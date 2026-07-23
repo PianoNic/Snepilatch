@@ -78,7 +78,7 @@ import ch.snepilatch.app.ui.theme.SpotifyLightGray
 import ch.snepilatch.app.ui.theme.SpotifyWhite
 import ch.snepilatch.app.viewmodel.DetailRoutes
 import ch.snepilatch.app.viewmodel.SearchViewModel
-import ch.snepilatch.app.viewmodel.SpotifyViewModel
+import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import kotify.api.song.SearchAlbum
 import kotify.api.song.SearchArtist
 import kotify.api.song.SearchPlaylist
@@ -111,7 +111,7 @@ private val browseCategories = listOf(
 )
 
 @Composable
-fun SearchScreen(vm: SpotifyViewModel, searchVm: SearchViewModel = viewModel()) {
+fun SearchScreen(vm: PlaybackViewModel, searchVm: SearchViewModel = viewModel()) {
     val query by searchVm.query.collectAsState()
     val submittedQuery by searchVm.submittedQuery.collectAsState()
     val suggestions by searchVm.suggestions.collectAsState()
@@ -304,7 +304,7 @@ private fun shareAction(ctx: Context, uri: String) = OverflowAction(
     ctx.startActivity(android.content.Intent.createChooser(intent, ctx.getString(R.string.share)))
 }
 
-private fun SearchTrack.toUnified(vm: SpotifyViewModel, ctx: Context) = UnifiedResult(
+private fun SearchTrack.toUnified(vm: PlaybackViewModel, ctx: Context) = UnifiedResult(
     uri = uri,
     title = name,
     subtitle = ctx.getString(R.string.search_subtitle_song, artists.joinToString(", ") { it.name }),
@@ -331,7 +331,7 @@ private fun SearchTrack.toUnified(vm: SpotifyViewModel, ctx: Context) = UnifiedR
     )
 )
 
-private fun SearchArtist.toUnified(vm: SpotifyViewModel, ctx: Context) = UnifiedResult(
+private fun SearchArtist.toUnified(vm: PlaybackViewModel, ctx: Context) = UnifiedResult(
     uri = uri,
     title = name,
     subtitle = ctx.getString(R.string.search_subtitle_artist),
@@ -360,7 +360,7 @@ private fun SearchAlbum.toUnified(ctx: Context): UnifiedResult {
     )
 }
 
-private fun SearchPlaylist.toUnified(vm: SpotifyViewModel, ctx: Context) = UnifiedResult(
+private fun SearchPlaylist.toUnified(vm: PlaybackViewModel, ctx: Context) = UnifiedResult(
     uri = uri,
     title = name,
     subtitle = listOfNotNull(ctx.getString(R.string.search_subtitle_playlist), ownerName).joinToString(" · "),
@@ -399,7 +399,7 @@ private fun SearchUser.toUnified(ctx: Context) = UnifiedResult(
 @Composable
 private fun CategorizedResults(
     results: kotify.api.song.SearchResult?,
-    vm: SpotifyViewModel,
+    vm: PlaybackViewModel,
     selectedFilter: SearchViewModel.SearchFilter,
     onFilterChange: (SearchViewModel.SearchFilter) -> Unit
 ) {
@@ -456,7 +456,7 @@ private val DEFAULT_CHIP_ORDER = listOf("TRACKS", "ARTISTS", "ALBUMS", "PLAYLIST
 private fun sectionFor(
     type: String,
     results: kotify.api.song.SearchResult,
-    vm: SpotifyViewModel,
+    vm: PlaybackViewModel,
     ctx: Context
 ): Pair<SearchViewModel.SearchFilter, List<UnifiedResult>>? = when (type) {
     "TRACKS" ->
@@ -482,7 +482,7 @@ private fun sectionFor(
 
 private fun singleFilterRows(
     results: kotify.api.song.SearchResult,
-    vm: SpotifyViewModel,
+    vm: PlaybackViewModel,
     ctx: Context,
     filter: SearchViewModel.SearchFilter
 ): List<UnifiedResult> = when (filter) {
@@ -495,7 +495,7 @@ private fun singleFilterRows(
     SearchViewModel.SearchFilter.ALL -> emptyList()
 }
 
-private fun SearchTopResult.toUnified(vm: SpotifyViewModel, ctx: Context): UnifiedResult = when (this) {
+private fun SearchTopResult.toUnified(vm: PlaybackViewModel, ctx: Context): UnifiedResult = when (this) {
     is SearchTopResult.Track -> track.toUnified(vm, ctx)
     is SearchTopResult.Artist -> artist.toUnified(vm, ctx)
     is SearchTopResult.Album -> album.toUnified(ctx)

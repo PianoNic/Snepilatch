@@ -28,7 +28,7 @@ import ch.snepilatch.app.ui.theme.SpotifyBlack
 import ch.snepilatch.app.util.UpdateInfo
 import ch.snepilatch.app.util.UpdateService
 import ch.snepilatch.app.util.loadCookies
-import ch.snepilatch.app.viewmodel.SpotifyViewModel
+import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -84,7 +84,7 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            val vm: SpotifyViewModel = viewModel()
+            val vm: PlaybackViewModel = viewModel()
             val initialized by vm.isInitialized.collectAsState()
             val error by vm.initError.collectAsState()
             val needsLogin by vm.needsLogin.collectAsState()

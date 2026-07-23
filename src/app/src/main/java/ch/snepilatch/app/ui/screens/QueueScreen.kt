@@ -21,10 +21,10 @@ import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.components.SpotifyImage
 import ch.snepilatch.app.ui.theme.*
-import ch.snepilatch.app.viewmodel.SpotifyViewModel
+import ch.snepilatch.app.viewmodel.PlaybackViewModel
 
 @Composable
-fun QueueScreen(vm: SpotifyViewModel) {
+fun QueueScreen(vm: PlaybackViewModel) {
     val queue by vm.queue.collectAsState()
     val playback by vm.playback.collectAsState()
 

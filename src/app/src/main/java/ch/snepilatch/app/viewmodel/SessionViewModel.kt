@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
  * session, rethrow cancellation, log everything else against [logTag]" boilerplate each of them
  * was duplicating.
  *
- * Not used by [SpotifyViewModel], which owns the session lifecycle and also needs player-scoped
+ * Not used by [PlaybackViewModel], which owns the session lifecycle and also needs player-scoped
  * launches.
  */
 abstract class SessionViewModel(protected val logTag: String) : ViewModel() {

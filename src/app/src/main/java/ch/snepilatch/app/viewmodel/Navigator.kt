@@ -8,8 +8,8 @@ import kotlinx.coroutines.flow.StateFlow
  * Single source of truth for which [Screen] is showing, plus the back stack.
  *
  * Process-scoped (like [ch.snepilatch.app.playback.SessionHolder]) so feature
- * ViewModels can drive navigation without routing through [SpotifyViewModel].
- * [SpotifyViewModel] delegates its nav methods here and calls [reset] on
+ * ViewModels can drive navigation without routing through [PlaybackViewModel].
+ * [PlaybackViewModel] delegates its nav methods here and calls [reset] on
  * construction — a freshly constructed ViewModel means a fresh app entry
  * (Activity finished + recreated, or cold process), which mirrors the old
  * behaviour where `currentScreen` lived on the ViewModel and reset to HOME.

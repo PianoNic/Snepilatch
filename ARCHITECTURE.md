@@ -30,7 +30,7 @@ src/app/src/main/java/ch/snepilatch/app/
 │   ├── SpotifyImageUrl.kt
 │   └── UpdateService.kt
 └── viewmodel/
-    └── SpotifyViewModel.kt  Single ViewModel. See "ViewModel rules" below.
+    └── PlaybackViewModel.kt  Single ViewModel. See "ViewModel rules" below.
 ```
 
 ## Layered responsibility
@@ -38,8 +38,8 @@ src/app/src/main/java/ch/snepilatch/app/
 - **`util/`** is pure. No Compose, no ViewModel, no service. Top-level functions, easy to test.
 - **`data/`** is types + mappers. No business logic. The mappers translate KotifyClient DTOs into the UI models defined here.
 - **`playback/`** owns everything Android about playback: the foreground service, ExoPlayer, the media buttons, the session holder. Code here can use Android APIs but should not reach into the ViewModel.
-- **`ui/`** is Compose only. Screens take a `SpotifyViewModel` and read its state flows. No direct API calls, no service references — go through the ViewModel.
-- **`viewmodel/`** holds the single `SpotifyViewModel`. It owns the UI state, dispatches user actions, and bridges between the UI layer and the playback / data layers.
+- **`ui/`** is Compose only. Screens take a `PlaybackViewModel` and read its state flows. No direct API calls, no service references — go through the ViewModel.
+- **`viewmodel/`** holds the single `PlaybackViewModel`. It owns the UI state, dispatches user actions, and bridges between the UI layer and the playback / data layers.
 
 ## Session ownership
 
@@ -63,7 +63,7 @@ If you're going to refactor playback, **add a unit test first** (see `app/src/te
 
 ## ViewModel rules
 
-`SpotifyViewModel` is large (~2200 lines). It owns:
+`PlaybackViewModel` is large (~2200 lines). It owns:
 - Navigation state (current screen, screen stack)
 - Session state (via `SessionHolder` accessors)
 - Playback state (`_playback`, `isStreaming`, etc.)

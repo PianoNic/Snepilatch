@@ -33,7 +33,7 @@ import ch.snepilatch.app.R
 import ch.snepilatch.app.data.Screen
 import ch.snepilatch.app.ui.theme.SpotifyBlack
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
-import ch.snepilatch.app.viewmodel.SpotifyViewModel
+import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import coil.compose.AsyncImage
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
@@ -41,7 +41,7 @@ import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint
 
 @Composable
-fun BottomNav(screen: Screen, vm: SpotifyViewModel, hazeState: HazeState) {
+fun BottomNav(screen: Screen, vm: PlaybackViewModel, hazeState: HazeState) {
     val account by vm.account.collectAsState()
 
     Column(

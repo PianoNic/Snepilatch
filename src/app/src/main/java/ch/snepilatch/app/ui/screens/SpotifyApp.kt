@@ -58,7 +58,7 @@ import ch.snepilatch.app.ui.theme.SpotifyLightGray
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.LibraryViewModel
-import ch.snepilatch.app.viewmodel.SpotifyViewModel
+import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import androidx.compose.runtime.compositionLocalOf
@@ -97,7 +97,7 @@ private val MorphCardPadV = 6.dp
 // --- App Shell ---
 
 @Composable
-fun SpotifyApp(vm: SpotifyViewModel) {
+fun SpotifyApp(vm: PlaybackViewModel) {
     // Eagerly create the DetailViewModel from the post-login shell so it registers itself in
     // DetailRoutes before any deep link or playback-context bridge tries to open a detail.
     viewModel<DetailViewModel>()
@@ -343,7 +343,7 @@ fun SpotifyApp(vm: SpotifyViewModel) {
 }
 
 @Composable
-private fun MainContent(screen: Screen, vm: SpotifyViewModel, hazeState: HazeState) {
+private fun MainContent(screen: Screen, vm: PlaybackViewModel, hazeState: HazeState) {
     val libraryVm: LibraryViewModel = viewModel()
     Box(
         Modifier
@@ -370,7 +370,7 @@ private fun MainContent(screen: Screen, vm: SpotifyViewModel, hazeState: HazeSta
  */
 @Composable
 private fun PlayerMorph(
-    vm: SpotifyViewModel,
+    vm: PlaybackViewModel,
     expand: Animatable<Float, *>,
     miniBounds: Rect,
     fullSize: IntSize,
@@ -479,7 +479,7 @@ fun LoadingScreen(
             when {
                 isRateLimited -> {
                     // The cooldown total can vary (20s on first retry, 40s on
-                    // second, etc. — see SpotifyViewModel). Track the highest
+                    // second, etc. — see PlaybackViewModel). Track the highest
                     // value we've seen so the progress bar fills correctly
                     // regardless of the starting length.
                     var totalSeconds by remember { mutableIntStateOf(cooldownSecondsRemaining) }

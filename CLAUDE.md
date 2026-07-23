@@ -37,7 +37,7 @@ When fixing a playback bug, add a test that would have caught it.
 
 ## ViewModel coroutine helpers
 
-Two helpers in `SpotifyViewModel` cover most IO launches:
+Two helpers in `PlaybackViewModel` cover most IO launches:
 
 - **`launchWithSession("tag") { sess -> ... }`** — null-checks the session, runs on `Dispatchers.IO`, catches and logs against the tag.
 - **`launchWithPlayer("tag") { pc -> ... }`** — same shape, but for transport commands that need `PlayerConnect`.
@@ -58,20 +58,20 @@ The pre-resolved cache (`nextCdnUrl` + `nextCdnFileId` from `onNextPlaybackId`) 
 
 ## ViewModel split strategy
 
-`SpotifyViewModel` is large (~3k lines). We extract feature-scoped ViewModels incrementally. **Extracted so far: `SearchViewModel`, `LyricsViewModel`, `DetailViewModel`, `LibraryViewModel`, `HomeViewModel`** (Detail/Library built on the shared `Navigator`; Home/Library load their feed in `init`). Each lands with its own tests. That's the clean feature set — what's left on `SpotifyViewModel` is playback, the playback-coupled features (Queue/Account/Devices), and cross-cutting settings/theme.
+`PlaybackViewModel` is large (~3k lines). We extract feature-scoped ViewModels incrementally. **Extracted so far: `SearchViewModel`, `LyricsViewModel`, `DetailViewModel`, `LibraryViewModel`, `HomeViewModel`** (Detail/Library built on the shared `Navigator`; Home/Library load their feed in `init`). Each lands with its own tests. That's the clean feature set — what's left on `PlaybackViewModel` is playback, the playback-coupled features (Queue/Account/Devices), and cross-cutting settings/theme.
 
-**Navigation is a process-scoped `Navigator`** (like `SessionHolder`): it owns `currentScreen` + the back stack + `navigateTo`/`navigateToTab`/`goBack`. `SpotifyViewModel` delegates to it and `reset()`s it on construction. Feature VMs navigate through `Navigator` directly — that's what unblocked the Detail extraction. For a feature VM whose openers must also be reachable from `SpotifyViewModel`'s own code (deep links, playback-context bridges) or from non-composable UI builders, add a tiny process-scoped router object next to the VM (see `DetailRoutes`): the live VM registers itself in `init` and the callers hop through it, so no one holds a cross-VM reference. A screen (normally Home) is always composed before any deep link is processed, so a VM is always registered in time.
+**Navigation is a process-scoped `Navigator`** (like `SessionHolder`): it owns `currentScreen` + the back stack + `navigateTo`/`navigateToTab`/`goBack`. `PlaybackViewModel` delegates to it and `reset()`s it on construction. Feature VMs navigate through `Navigator` directly — that's what unblocked the Detail extraction. For a feature VM whose openers must also be reachable from `PlaybackViewModel`'s own code (deep links, playback-context bridges) or from non-composable UI builders, add a tiny process-scoped router object next to the VM (see `DetailRoutes`): the live VM registers itself in `init` and the callers hop through it, so no one holds a cross-VM reference. A screen (normally Home) is always composed before any deep link is processed, so a VM is always registered in time.
 
 Pattern (proven by `SearchViewModel`/`LyricsViewModel`):
 1. Move the feature's state + methods into a new `<Feature>ViewModel : SessionViewModel("<Tag>")`.
-2. `SessionViewModel` (the base for all five feature VMs) provides `launchWithSession(op) { sess -> }` and `launchWithSessionLoading(op, loadingFlag) { sess -> }` — both null-check `SessionHolder.session`, rethrow cancellation, and log against the tag. Don't re-roll these. `SpotifyViewModel` is NOT a `SessionViewModel` (it owns the session lifecycle and needs player-scoped launches too).
-3. A screen can hold **both** ViewModels at once — obtain the feature VM in the body with `val featureVm: <Feature>ViewModel = viewModel()`. `LyricsScreen` reads playback/transport/theme from `SpotifyViewModel` and lyrics content from `LyricsViewModel` side by side. The feature VM doesn't need to own the whole screen.
-4. Pass the inputs the feature needs down from the screen (e.g. `lyricsVm.fetch(track.uri)`), rather than having the feature VM reach back into `SpotifyViewModel` state.
+2. `SessionViewModel` (the base for all five feature VMs) provides `launchWithSession(op) { sess -> }` and `launchWithSessionLoading(op, loadingFlag) { sess -> }` — both null-check `SessionHolder.session`, rethrow cancellation, and log against the tag. Don't re-roll these. `PlaybackViewModel` is NOT a `SessionViewModel` (it owns the session lifecycle and needs player-scoped launches too).
+3. A screen can hold **both** ViewModels at once — obtain the feature VM in the body with `val featureVm: <Feature>ViewModel = viewModel()`. `LyricsScreen` reads playback/transport/theme from `PlaybackViewModel` and lyrics content from `LyricsViewModel` side by side. The feature VM doesn't need to own the whole screen.
+4. Pass the inputs the feature needs down from the screen (e.g. `lyricsVm.fetch(track.uri)`), rather than having the feature VM reach back into `PlaybackViewModel` state.
 
 **What makes a feature safe to extract now vs. what's blocked:**
-- Clean = the feature reads the session, writes its own state, and navigates through `Navigator`. `Lyrics` needed no navigation at all; `Detail` navigates via `Navigator` and exposes `DetailRoutes` for the `SpotifyViewModel`/non-composable callers.
-- **`Account` and `Devices` are NOT clean extractions — leave them on `SpotifyViewModel`.** They're playback-coupled: `AccountInfo.isPremium` gates audio-source logic inside the VM, and `activeDeviceName` is written from the playback state handler (`updatePlaybackFromState`) while `loadDevices`/`transferPlayback` need `PlayerConnect`. Extracting them would drag playback state across a VM boundary — the same reason we don't extract playback itself.
-- **`LibraryViewModel`** took the clean part: the library list + pagination + `createPlaylist`/`removeFromLibrary`. It loads in `init` (the old eager load lived in `SpotifyViewModel.initialize`, which runs before any composable exists) and reads `username` from `SessionHolder`. The snackbar-emitting `followArtist`/`savePlaylist` and the add-to-playlist picker stayed on `SpotifyViewModel` (they'd have needed the snackbar channel + a router for non-composable callers) — "add external content to the library" is a separable concern from browsing it.
+- Clean = the feature reads the session, writes its own state, and navigates through `Navigator`. `Lyrics` needed no navigation at all; `Detail` navigates via `Navigator` and exposes `DetailRoutes` for the `PlaybackViewModel`/non-composable callers.
+- **`Account` and `Devices` are NOT clean extractions — leave them on `PlaybackViewModel`.** They're playback-coupled: `AccountInfo.isPremium` gates audio-source logic inside the VM, and `activeDeviceName` is written from the playback state handler (`updatePlaybackFromState`) while `loadDevices`/`transferPlayback` need `PlayerConnect`. Extracting them would drag playback state across a VM boundary — the same reason we don't extract playback itself.
+- **`LibraryViewModel`** took the clean part: the library list + pagination + `createPlaylist`/`removeFromLibrary`. It loads in `init` (the old eager load lived in `PlaybackViewModel.initialize`, which runs before any composable exists) and reads `username` from `SessionHolder`. The snackbar-emitting `followArtist`/`savePlaylist` and the add-to-playlist picker stayed on `PlaybackViewModel` (they'd have needed the snackbar channel + a router for non-composable callers) — "add external content to the library" is a separable concern from browsing it.
 
 Don't try to extract playback. The handler-extraction + test rig pattern (see `RemotePlayPauseHandlerTest`) is the safer route for that area.
 
@@ -85,7 +85,7 @@ cd ../KotifyClient
 cp build/libs/KotifyClient-obfuscated.jar ../Snepilatch/src/app/libs/KotifyClient.jar
 ```
 
-**Symptom of a stale jar:** `:app:compileProdDebugKotlin` fails with a wall of unresolved references in `SpotifyViewModel.kt` (`onAd`, `onSeek`, `artistNames`, `passthroughUrl`, `saveToLibrary`, wrong `playTrack` arity). That is the committed jar lagging the app source — rebuild it with the recipe above. It is not a bug in whatever file you were editing.
+**Symptom of a stale jar:** `:app:compileProdDebugKotlin` fails with a wall of unresolved references in `PlaybackViewModel.kt` (`onAd`, `onSeek`, `artistNames`, `passthroughUrl`, `saveToLibrary`, wrong `playTrack` arity). That is the committed jar lagging the app source — rebuild it with the recipe above. It is not a bug in whatever file you were editing.
 
 ## Logging
 

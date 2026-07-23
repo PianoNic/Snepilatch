@@ -51,7 +51,7 @@ import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.util.formatTime
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.viewmodel.LibraryViewModel
-import ch.snepilatch.app.viewmodel.SpotifyViewModel
+import ch.snepilatch.app.viewmodel.PlaybackViewModel
 
 /**
  * The seek bar + elapsed/duration labels (or the jukebox remix timeline), pulled into its own leaf
@@ -61,7 +61,7 @@ import ch.snepilatch.app.viewmodel.SpotifyViewModel
  */
 @Composable
 private fun PlaybackProgress(
-    vm: SpotifyViewModel,
+    vm: PlaybackViewModel,
     animatedPrimary: Color,
     timeColor: Color,
     timeFontSize: TextUnit,
@@ -265,7 +265,7 @@ private fun CanvasVideoBackground(canvasVideoUrl: String, audioPlaying: Boolean)
 }
 
 @Composable
-fun PlayerBackground(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
+fun PlayerBackground(vm: PlaybackViewModel, modifier: Modifier = Modifier) {
     // Narrow projections only — the background never shows position, so it must not recompose at 2Hz.
     val track by vm.currentTrack.collectAsState()
     val isPlaying by vm.isPlayingFlow.collectAsState()
@@ -351,7 +351,7 @@ private fun AlbumBackdrop(gradient: Boolean, top: Color, mid: Color, artUrl: Str
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NowPlayingScreen(
-    vm: SpotifyViewModel,
+    vm: PlaybackViewModel,
     /** When false, the screen paints no background of its own — the morphing card
      *  in SpotifyApp supplies a card-anchored background that grows with it. */
     drawBackground: Boolean = true,
@@ -883,7 +883,7 @@ private fun shareTrack(context: android.content.Context, trackUri: String?, choo
 
 /** Keep the audio-output name current while the player is shown (registers an AudioDeviceCallback). */
 @Composable
-private fun AudioDeviceEffect(vm: SpotifyViewModel) {
+private fun AudioDeviceEffect(vm: PlaybackViewModel) {
     val ctx = LocalContext.current
     DisposableEffect(Unit) {
         val am = ctx.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
@@ -934,7 +934,7 @@ private fun TonalIconToggle(
  *  bodies don't recompose on those flows. */
 @Composable
 private fun PlayerControls(
-    vm: SpotifyViewModel,
+    vm: PlaybackViewModel,
     animatedPrimary: Color,
     buttonBg: Color,
     spinnerActive: Boolean,
@@ -1004,7 +1004,7 @@ private fun PlayerControls(
  *  orientations; compact = landscape. Collects its audio/provider projections internally. */
 @Composable
 private fun PlayerBottomBar(
-    vm: SpotifyViewModel,
+    vm: PlaybackViewModel,
     animatedPrimary: Color,
     buttonBg: Color,
     shareTrackLabel: String,
@@ -1112,7 +1112,7 @@ private fun NowPlayingMenu(
     showMore: Boolean,
     onShowMore: (Boolean) -> Unit,
     onShowPlaylistPicker: () -> Unit,
-    vm: SpotifyViewModel,
+    vm: PlaybackViewModel,
     track: ch.snepilatch.app.data.TrackInfo?,
     shareContext: android.content.Context,
     buttonBg: Color

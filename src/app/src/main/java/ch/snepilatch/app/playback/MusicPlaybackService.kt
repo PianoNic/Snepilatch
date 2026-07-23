@@ -80,6 +80,18 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         var art: Bitmap? = null
     )
 
+    // The five notification transport PendingIntents never vary (fixed action + request code +
+    // FLAG_IMMUTABLE), so build them once instead of reconstructing all five on every notification
+    // refresh (which happens on every play/pause, position, and metadata update).
+    private fun broadcastIntent(action: String, requestCode: Int) = PendingIntent.getBroadcast(
+        this, requestCode, Intent(action), PendingIntent.FLAG_IMMUTABLE
+    )
+    private val prevIntent by lazy { broadcastIntent("ch.snepilatch.app.PREV", 0) }
+    private val playPauseIntent by lazy { broadcastIntent("ch.snepilatch.app.PLAY_PAUSE", 1) }
+    private val nextIntent by lazy { broadcastIntent("ch.snepilatch.app.NEXT", 2) }
+    private val leftIntent by lazy { broadcastIntent("ch.snepilatch.app.LEFT_ACTION", 3) }
+    private val rightIntent by lazy { broadcastIntent("ch.snepilatch.app.RIGHT_ACTION", 4) }
+
     private val metadataQueue = mutableListOf<TrackMetadata>()
     private var currentTitle = ""
     private var currentArtist = ""
@@ -332,7 +344,6 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                         currentTitle = next.title
                         currentArtist = next.artist
                         currentArt = next.art
-                        updateMediaSessionMetadata()
                         updateNotification()
                         LokiLogger.i(TAG, "Auto-transition to: ${next.title} by ${next.artist}")
                     }
@@ -477,7 +488,6 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             }
 
             player.prepare()
-            updateMediaSessionMetadata()
             updateNotification()
         }
 
@@ -487,7 +497,6 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             meta.art = bitmap
             currentArt = bitmap
             mainHandler.post {
-                updateMediaSessionMetadata()
                 updateNotification()
             }
         }
@@ -513,7 +522,6 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             player.setMediaSource(source)
             player.playWhenReady = true
             player.prepare()
-            updateMediaSessionMetadata()
             updateNotification()
         }
     }
@@ -683,7 +691,6 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         currentTitle = title
         currentArtist = artist
         mainHandler.post {
-            updateMediaSessionMetadata()
             updateNotification()
         }
     }
@@ -700,7 +707,6 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         if (expectedUrl == null) {
             currentArt = null
             mainHandler.post {
-                updateMediaSessionMetadata()
                 updateNotification()
             }
             return
@@ -708,7 +714,6 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         // Update text + duration immediately; load art async and apply only if
         // it's still the current idle URL when it returns.
         mainHandler.post {
-            updateMediaSessionMetadata()
             updateNotification()
         }
         serviceScope.launch {
@@ -716,7 +721,6 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             if (idleArtUrl == expectedUrl) {
                 currentArt = bitmap
                 mainHandler.post {
-                    updateMediaSessionMetadata()
                     updateNotification()
                 }
             }
@@ -877,7 +881,6 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 }
             })
             player.prepare()
-            updateMediaSessionMetadata()
             updateNotification()
         }
 
@@ -887,7 +890,6 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             meta.art = bitmap
             currentArt = bitmap
             mainHandler.post {
-                updateMediaSessionMetadata()
                 updateNotification()
             }
         }
@@ -899,7 +901,6 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         serviceScope.launch {
             currentArt = albumArtUrl?.let { loadBitmap(it) }
             mainHandler.post {
-                updateMediaSessionMetadata()
                 updateNotification()
             }
         }
@@ -984,33 +985,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     private fun buildNotification(): Notification {
         val isPlaying = player.isPlaying
 
-        // Actions
-        val prevIntent = PendingIntent.getBroadcast(
-            this, 0,
-            Intent("ch.snepilatch.app.PREV"),
-            PendingIntent.FLAG_IMMUTABLE
-        )
-        val playPauseIntent = PendingIntent.getBroadcast(
-            this, 1,
-            Intent("ch.snepilatch.app.PLAY_PAUSE"),
-            PendingIntent.FLAG_IMMUTABLE
-        )
-        val nextIntent = PendingIntent.getBroadcast(
-            this, 2,
-            Intent("ch.snepilatch.app.NEXT"),
-            PendingIntent.FLAG_IMMUTABLE
-        )
-        val leftIntent = PendingIntent.getBroadcast(
-            this, 3,
-            Intent("ch.snepilatch.app.LEFT_ACTION"),
-            PendingIntent.FLAG_IMMUTABLE
-        )
-        val rightIntent = PendingIntent.getBroadcast(
-            this, 4,
-            Intent("ch.snepilatch.app.RIGHT_ACTION"),
-            PendingIntent.FLAG_IMMUTABLE
-        )
-
+        // Actions — prevIntent/playPauseIntent/nextIntent/leftIntent/rightIntent are cached fields.
         val playPauseIcon = if (isPlaying) R.drawable.ic_pause_rounded else R.drawable.ic_play_arrow_rounded
 
         fun buttonIcon(type: String) = when (type) {

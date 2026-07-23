@@ -132,8 +132,10 @@ class JukeboxController(
             engine?.setPaused(p)
         }
         svc.setJukeboxRemixing(true) // hide the notification seekbar for the whole session (no auto-advance)
-        svc.jukeboxSeekToStart()
+        // Enable analysis BEFORE seeking: the tap's isActive() is re-read on the seek's pipeline flush,
+        // so analyzing must already be true for the flush to add the tap back into the audio chain.
         svc.setJukeboxAnalyzing(true)
+        svc.jukeboxSeekToStart()
         LokiLogger.i(TAG, "capture pass started for $trackId")
 
         val rate = awaitRate(svc) ?: run {

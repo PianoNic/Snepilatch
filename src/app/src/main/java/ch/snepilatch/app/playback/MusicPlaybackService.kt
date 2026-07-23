@@ -601,10 +601,15 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         }
     }
 
-    /** Turn the decoded-PCM waveform capture on/off; resets the buffer when turning on. */
+    /** Turn the decoded-PCM waveform capture on/off; allocates the buffer on, frees the ~63MB on off. */
     fun setJukeboxAnalyzing(enabled: Boolean) {
-        if (enabled) jukeboxTap.resetCapture()
-        jukeboxTap.analyzing = enabled
+        if (enabled) {
+            jukeboxTap.resetCapture()
+            jukeboxTap.analyzing = true
+        } else {
+            jukeboxTap.analyzing = false
+            jukeboxTap.releaseBuffer()
+        }
     }
 
     fun jukeboxSampleRate(): Int = jukeboxTap.sampleRate()

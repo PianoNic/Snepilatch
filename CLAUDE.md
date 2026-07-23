@@ -58,13 +58,17 @@ The pre-resolved cache (`nextCdnUrl` + `nextCdnFileId` from `onNextPlaybackId`) 
 
 ## ViewModel split strategy
 
-`SpotifyViewModel` is large. The plan is to extract feature-scoped ViewModels incrementally: Search → Library → Account → Lyrics → Detail. Each extraction lands with its own tests.
+`SpotifyViewModel` is large (~3.1k lines). We extract feature-scoped ViewModels incrementally. **Extracted so far: `SearchViewModel`, `LyricsViewModel`.** Each lands with its own tests.
 
-Pattern:
-1. Move the feature's state and methods into a new `<Feature>ViewModel` class.
-2. The new ViewModel reads `Session` from `SessionHolder` and uses the same `launchWithSession` shape (or its own equivalent).
-3. The screen calls `viewModel<<Feature>ViewModel>()` instead of pulling the field off `SpotifyViewModel`.
-4. Cross-feature triggers (e.g. "library refresh after createPlaylist") go through a shared event bus or are inlined in the caller.
+Pattern (proven by `SearchViewModel`/`LyricsViewModel`):
+1. Move the feature's state + methods into a new `<Feature>ViewModel : ViewModel()`.
+2. It reads `Session` from `SessionHolder` and rolls its own small `launchWith…` helper (the ones on `SpotifyViewModel` are private; copy the shape).
+3. A screen can hold **both** ViewModels at once — obtain the feature VM in the body with `val featureVm: <Feature>ViewModel = viewModel()`. `LyricsScreen` reads playback/transport/theme from `SpotifyViewModel` and lyrics content from `LyricsViewModel` side by side. The feature VM doesn't need to own the whole screen.
+4. Pass the inputs the feature needs down from the screen (e.g. `lyricsVm.fetch(track.uri)`), rather than having the feature VM reach back into `SpotifyViewModel` state.
+
+**What makes a feature safe to extract now vs. what's blocked:**
+- Clean today = the feature only *reads* the session and *writes its own* state, and does **not** trigger navigation or a cross-feature refresh from inside its own logic. `Lyrics` qualified (it never navigates — `SpotifyViewModel.openLyrics` does that; it has no cross-writes).
+- **Blocked until there's a shared navigation channel:** `Library`, `Detail`, `Account`, `Devices`. Their screens call `openPlaylist`/`openAlbum`/`openArtist`, which go through `navigateTo` + the back stack — both owned by `SpotifyViewModel`. Extracting them today just re-couples the new VM back to `SpotifyViewModel` for navigation, which defeats the point. **Do that navigation channel first** (a process-scoped `Navigator` / shared `SharedFlow<Screen>` that `SpotifyViewModel` observes), then extract these. Same goes for cross-feature triggers like "refresh library after `createPlaylist`" — route them through that channel or inline them in the caller.
 
 Don't try to extract playback. The handler-extraction + test rig pattern (see `RemotePlayPauseHandlerTest`) is the safer route for that area.
 

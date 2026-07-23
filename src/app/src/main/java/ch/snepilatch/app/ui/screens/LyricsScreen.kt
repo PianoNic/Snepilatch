@@ -38,10 +38,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.components.SpotifyImage
 import ch.snepilatch.app.ui.theme.*
+import ch.snepilatch.app.viewmodel.LyricsViewModel
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -50,6 +52,7 @@ import kotify.api.lyrics.SyncedLine
 
 @Composable
 fun LyricsScreen(vm: SpotifyViewModel) {
+    val lyricsVm: LyricsViewModel = viewModel()
     // Narrow projections — the lyrics scaffold must not recompose on the 2Hz position tick; position
     // is consumed only through the smoothPosition state below (mutated off the flow, not read here).
     val track by vm.currentTrack.collectAsState()
@@ -57,13 +60,13 @@ fun LyricsScreen(vm: SpotifyViewModel) {
     val isPaused by vm.isPausedFlow.collectAsState()
     val repeatMode by vm.repeatModeFlow.collectAsState()
     val theme by vm.themeColors.collectAsState()
-    val lyrics by vm.lyrics.collectAsState()
-    val isLoading by vm.isLyricsLoading.collectAsState()
+    val lyrics by lyricsVm.lyrics.collectAsState()
+    val isLoading by lyricsVm.isLoading.collectAsState()
     val animatedPrimary by animateColorAsState(theme.primary, tween(800), label = "lyricsPrimary")
     val lyricsAnimDirection by vm.lyricsAnimDirection.collectAsState()
 
     LaunchedEffect(track?.uri) {
-        if (track != null) vm.fetchLyrics()
+        track?.uri?.let { lyricsVm.fetch(it) }
     }
 
     // Smooth position interpolation:

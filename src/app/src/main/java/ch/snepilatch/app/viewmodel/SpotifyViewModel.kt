@@ -1033,10 +1033,7 @@ class SpotifyViewModel : ViewModel() {
         // Only update theme/liked/canvas for the track we're ACTUALLY displaying
         val displayUri = displayTrack?.uri
         if (!isTrackMismatch) {
-            if (imageUrl != null && imageUrl != lastPaletteUrl) {
-                lastPaletteUrl = imageUrl
-                extractColorsFromArt(imageUrl)
-            }
+            maybeUpdatePalette(imageUrl)
             if (displayUri != null) {
                 checkLikedState(displayUri)
                 fetchCanvasForTrack(displayUri)
@@ -1709,7 +1706,7 @@ class SpotifyViewModel : ViewModel() {
             val art = normalizeSpotifyImageUrl(track.albumArt)
             // Reflect the tapped track in the UI immediately (echo's onState corrects any stale metadata).
             _playback.value = _playback.value.copy(track = track.copy(albumArt = art), positionMs = 0)
-            if (art != null && art != lastPaletteUrl) { lastPaletteUrl = art; extractColorsFromArt(art) }
+            maybeUpdatePalette(art)
             checkLikedState(trackUri)
             fetchCanvasForTrack(trackUri)
             // DRM: stop the old player to close its Widevine session, then load the new track.
@@ -2463,10 +2460,7 @@ class SpotifyViewModel : ViewModel() {
             durationMs = if (current.durationMs > 0) current.durationMs else _playback.value.durationMs
         )
         _playback.value = _playback.value.copy(track = newTrack, positionMs = 0)
-        if (art != null && art != lastPaletteUrl) {
-            lastPaletteUrl = art
-            extractColorsFromArt(art)
-        }
+        maybeUpdatePalette(art)
         checkLikedState(trackUri)
         fetchCanvasForTrack(trackUri)
 
@@ -3172,6 +3166,14 @@ class SpotifyViewModel : ViewModel() {
 
     fun unfollowArtist(artistId: String) {
         launchWithSession("unfollowArtist") { sess -> Artist(sess).unfollow(artistId) }
+    }
+
+    /** Extract a fresh palette only when the art URL actually changed since the last extraction. */
+    private fun maybeUpdatePalette(art: String?) {
+        if (art != null && art != lastPaletteUrl) {
+            lastPaletteUrl = art
+            extractColorsFromArt(art)
+        }
     }
 
     private fun extractColorsFromArt(imageUrl: String) {

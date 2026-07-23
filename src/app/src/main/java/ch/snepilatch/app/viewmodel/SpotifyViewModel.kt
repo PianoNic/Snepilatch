@@ -1512,7 +1512,7 @@ class SpotifyViewModel : ViewModel() {
                     startPlaying = true, headers = emptyMap(), startPositionMs = positionMs
                 )
             }
-            commitRecoveredStream(failedUri, "Podcast (RSS)")
+            commitStream(failedUri, "Podcast (RSS)")
             LokiLogger.i(TAG, "Auto-recovered external episode $failedUri @${positionMs}ms")
             return true
         }
@@ -1536,12 +1536,12 @@ class SpotifyViewModel : ViewModel() {
                 startPlaying = true, startPositionMs = positionMs, pssh = stream.pssh,
             )
         }
-        commitRecoveredStream(failedUri, "Spotify CDN")
+        commitStream(failedUri, "Spotify CDN")
         LokiLogger.i(TAG, "Auto-recovered $failedUri via mirror #$playbackErrorRetries at ${positionMs}ms")
         return true
     }
 
-    private fun commitRecoveredStream(uri: String, provider: String) {
+    private fun commitStream(uri: String, provider: String) {
         currentStreamUri = uri
         isStreaming.value = true
         streamProvider.value = provider
@@ -2649,7 +2649,7 @@ class SpotifyViewModel : ViewModel() {
                     withContext(Dispatchers.Main) {
                         MusicPlaybackService.instance?.playUrl(passthroughUrl, title, artist, art, startPlaying = !coldStart, headers = emptyMap())
                     }
-                    commitEpisodeStream(trackUri, "Podcast")
+                    commitStream(trackUri, "Podcast")
                     LokiLogger.i(TAG, "[Episode] passthrough (direct, no DRM) for $trackUri in ${System.currentTimeMillis() - resolveStart}ms")
                     true
                 }
@@ -2665,7 +2665,7 @@ class SpotifyViewModel : ViewModel() {
                             startPlaying = !coldStart, pssh = stream.pssh,
                         )
                     }
-                    commitEpisodeStream(trackUri, "Spotify CDN")
+                    commitStream(trackUri, "Spotify CDN")
                     LokiLogger.i(TAG, "[Episode] soundfinder hosted DRM loaded in ${System.currentTimeMillis() - resolveStart}ms")
                     true
                 }
@@ -2679,11 +2679,6 @@ class SpotifyViewModel : ViewModel() {
         }
     }
 
-    private fun commitEpisodeStream(trackUri: String, provider: String) {
-        currentStreamUri = trackUri
-        isStreaming.value = true
-        streamProvider.value = provider
-    }
 
     /**
      * Resolve + play a podcast episode. Two shapes, both fed from the same connect-state/track-playback

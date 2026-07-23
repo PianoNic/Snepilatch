@@ -23,8 +23,15 @@ object LokiLogger {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var flushJob: Job? = null
 
+    // Only buffer once init() has wired up the flush loop. Production ships with LOKI_ENDPOINT empty,
+    // so init() is never called, no flush job ever drains the queue — without this gate the buffer
+    // would grow unbounded for the whole app lifetime.
+    @Volatile
+    private var started = false
+
     private const val FLUSH_INTERVAL_MS = 10_000L
     private const val MAX_BATCH_SIZE = 100
+    private const val MAX_BUFFER = 1000
 
     data class LogEntry(
         val timestamp: Long,
@@ -53,6 +60,7 @@ object LokiLogger {
                 flush()
             }
         }
+        started = true
 
         i("LokiLogger", "Session started | version=$appVersion | device=${Build.MODEL} | Android ${Build.VERSION.RELEASE}")
     }
@@ -75,6 +83,10 @@ object LokiLogger {
             "ERROR" -> Log.e(tag, message)
         }
 
+        // Console logging above always runs; only queue for the Loki push when a flush loop exists
+        // to drain it (dev builds with loki.endpoint set). Otherwise the queue would never empty.
+        if (!started) return
+
         buffer.add(
             LogEntry(
                 timestamp = System.currentTimeMillis() * 1_000_000,
@@ -83,6 +95,8 @@ object LokiLogger {
                 message = message
             )
         )
+        // Bound the queue in case the flush loop falls behind (e.g. the endpoint is unreachable).
+        while (buffer.size > MAX_BUFFER) buffer.poll()
 
         if (level == "ERROR") {
             scope.launch { flush() }

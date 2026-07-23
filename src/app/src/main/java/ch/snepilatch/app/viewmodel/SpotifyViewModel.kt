@@ -2231,27 +2231,29 @@ class SpotifyViewModel : ViewModel() {
             val track = _playback.value.track ?: return@lambda
             val trackId = track.uri.removePrefix("spotify:track:")
             if (currentTrackLiked.value) unlikeSong(trackId) else likeSong(trackId)
-            viewModelScope.launch {
-                kotlinx.coroutines.delay(300)
-                svc.isLiked = currentTrackLiked.value
-                svc.updateNotification()
-            }
+            resyncNotificationAfterCommand(svc) { svc.isLiked = currentTrackLiked.value }
         }
         svc.onShuffleToggle = {
             toggleShuffle()
-            viewModelScope.launch {
-                kotlinx.coroutines.delay(300)
-                svc.isShuffling = _playback.value.isShuffling
-                svc.updateNotification()
-            }
+            resyncNotificationAfterCommand(svc) { svc.isShuffling = _playback.value.isShuffling }
         }
         svc.onRepeatToggle = {
             cycleRepeat()
-            viewModelScope.launch {
-                kotlinx.coroutines.delay(300)
-                svc.repeatMode = _playback.value.repeatMode
-                svc.updateNotification()
-            }
+            resyncNotificationAfterCommand(svc) { svc.repeatMode = _playback.value.repeatMode }
+        }
+    }
+
+    /**
+     * After a notification-button command, re-read the true source-of-truth state (which the toggle's
+     * optimistic push or an onState round-trip may not have repainted) and repaint the notification.
+     * Each caller sets ONLY its own field via [apply] — mirroring the others would paint a fresher-than-
+     * today glyph for state that lags (e.g. the jukebox repeat guard writes _playback but not svc).
+     */
+    private fun resyncNotificationAfterCommand(svc: MusicPlaybackService, apply: () -> Unit) {
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(NOTIFICATION_RESYNC_MS)
+            apply()
+            svc.updateNotification()
         }
     }
 
@@ -3182,6 +3184,9 @@ class SpotifyViewModel : ViewModel() {
     companion object {
         /** SharedPreferences file name for all persisted settings. */
         const val PREFS = "kotify_prefs"
+
+        /** Delay before re-reading true state to repaint the notification after a button command. */
+        private const val NOTIFICATION_RESYNC_MS = 300L
 
         /** How long to wait after ExoPlayer's STATE_ENDED before falling back to
          *  a forced player.skipNext(). Spotify's natural onTrackChange reliably

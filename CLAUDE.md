@@ -63,8 +63,8 @@ The pre-resolved cache (`nextCdnUrl` + `nextCdnFileId` from `onNextPlaybackId`) 
 **Navigation is a process-scoped `Navigator`** (like `SessionHolder`): it owns `currentScreen` + the back stack + `navigateTo`/`navigateToTab`/`goBack`. `SpotifyViewModel` delegates to it and `reset()`s it on construction. Feature VMs navigate through `Navigator` directly — that's what unblocked the Detail extraction. For a feature VM whose openers must also be reachable from `SpotifyViewModel`'s own code (deep links, playback-context bridges) or from non-composable UI builders, add a tiny process-scoped router object next to the VM (see `DetailRoutes`): the live VM registers itself in `init` and the callers hop through it, so no one holds a cross-VM reference. A screen (normally Home) is always composed before any deep link is processed, so a VM is always registered in time.
 
 Pattern (proven by `SearchViewModel`/`LyricsViewModel`):
-1. Move the feature's state + methods into a new `<Feature>ViewModel : ViewModel()`.
-2. It reads `Session` from `SessionHolder` and rolls its own small `launchWith…` helper (the ones on `SpotifyViewModel` are private; copy the shape).
+1. Move the feature's state + methods into a new `<Feature>ViewModel : SessionViewModel("<Tag>")`.
+2. `SessionViewModel` (the base for all five feature VMs) provides `launchWithSession(op) { sess -> }` and `launchWithSessionLoading(op, loadingFlag) { sess -> }` — both null-check `SessionHolder.session`, rethrow cancellation, and log against the tag. Don't re-roll these. `SpotifyViewModel` is NOT a `SessionViewModel` (it owns the session lifecycle and needs player-scoped launches too).
 3. A screen can hold **both** ViewModels at once — obtain the feature VM in the body with `val featureVm: <Feature>ViewModel = viewModel()`. `LyricsScreen` reads playback/transport/theme from `SpotifyViewModel` and lyrics content from `LyricsViewModel` side by side. The feature VM doesn't need to own the whole screen.
 4. Pass the inputs the feature needs down from the screen (e.g. `lyricsVm.fetch(track.uri)`), rather than having the feature VM reach back into `SpotifyViewModel` state.
 

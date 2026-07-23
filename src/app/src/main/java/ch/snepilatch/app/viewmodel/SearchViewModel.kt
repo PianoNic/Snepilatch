@@ -1,20 +1,13 @@
 package ch.snepilatch.app.viewmodel
 
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import ch.snepilatch.app.playback.SessionHolder
 import ch.snepilatch.app.util.LokiLogger
 import kotify.api.song.SearchResult
 import kotify.api.song.SearchSuggestion
 import kotify.api.song.Song
-import kotify.session.Session
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
 
 /**
  * ViewModel for the Spotify-style search screen.
@@ -29,9 +22,7 @@ import kotlinx.coroutines.launch
  *    results from [results]. The user got here by tapping a suggestion or
  *    pressing the keyboard's search action.
  */
-class SearchViewModel : ViewModel() {
-
-    private val tag = "SearchVM"
+class SearchViewModel : SessionViewModel("SearchVM") {
 
     val query = MutableStateFlow("")
 
@@ -127,7 +118,7 @@ class SearchViewModel : ViewModel() {
                 if (submittedQuery.value == text) {
                     _results.value = response
                     LokiLogger.i(
-                        tag,
+                        logTag,
                         "Search '$text': tracks=${response.tracks.items.size}, " +
                             "artists=${response.artists.items.size}, " +
                             "albums=${response.albums.items.size}, " +
@@ -141,18 +132,6 @@ class SearchViewModel : ViewModel() {
             }
         }
     }
-
-    private fun launchWithSession(label: String, block: suspend (Session) -> Unit): Job =
-        viewModelScope.launch(Dispatchers.IO) {
-            val sess = SessionHolder.session ?: return@launch
-            try {
-                block(sess)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                LokiLogger.e(tag, label, e)
-            }
-        }
 
     companion object {
         private const val MIN_SUGGEST_LENGTH = 2

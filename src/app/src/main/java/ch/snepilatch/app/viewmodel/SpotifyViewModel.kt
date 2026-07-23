@@ -271,6 +271,11 @@ class SpotifyViewModel : ViewModel() {
     data class PlayingContext(val type: String, val name: String, val uri: String? = null)
     val playingContext = MutableStateFlow<PlayingContext?>(null)
     private var lastContextUri: String? = null
+
+    // (is_active_device, has_active_device) at the last device-indicator update. The two booleans
+    // fully determine which indicator branch runs, so re-running (and its loadDevices() network call)
+    // is only needed when they change — not on every onState push (~5/track).
+    private var lastDeviceIndicatorKey: Pair<Boolean, Boolean>? = null
     private val playlistNameCache = mutableMapOf<String, String>()
 
     // Loading
@@ -1067,14 +1072,19 @@ class SpotifyViewModel : ViewModel() {
             }
         }
 
-        // Update active device indicator from state
-        if (state.is_active_device) {
-            activeDeviceName.value = android.os.Build.MODEL
-        } else if (state.has_active_device) {
-            // Another device is active, try to get its name
-            loadDevices()
-        } else {
-            activeDeviceName.value = null
+        // Update active device indicator from state — only on an actual edge, so the foreign-device
+        // getDevices() network call fires once on the transition into foreign-active, not every push.
+        val deviceIndicatorKey = state.is_active_device to state.has_active_device
+        if (deviceIndicatorKey != lastDeviceIndicatorKey) {
+            lastDeviceIndicatorKey = deviceIndicatorKey
+            if (state.is_active_device) {
+                activeDeviceName.value = android.os.Build.MODEL
+            } else if (state.has_active_device) {
+                // Another device is active, try to get its name
+                loadDevices()
+            } else {
+                activeDeviceName.value = null
+            }
         }
 
         playingContext.value = resolvePlayingContext(state.context_uri, track)

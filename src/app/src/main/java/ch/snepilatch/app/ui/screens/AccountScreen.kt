@@ -144,13 +144,15 @@ fun AccountScreen(vm: SpotifyViewModel) {
         val appLanguage by vm.appLanguage.collectAsState()
         var showLanguagePicker by remember { mutableStateOf(false) }
         val systemDefaultLabel = stringResource(R.string.language_system_default)
-        val languages = listOf(
-            "system" to systemDefaultLabel,
-            "en" to "English",
-            "de" to "Deutsch",
-            "ru" to "Русский",
-            "gsw" to "Schwiizerdütsch"
-        )
+        val languages = remember(systemDefaultLabel) {
+            listOf(
+                "system" to systemDefaultLabel,
+                "en" to "English",
+                "de" to "Deutsch",
+                "ru" to "Русский",
+                "gsw" to "Schwiizerdütsch"
+            )
+        }
         val currentLanguageLabel = languages.find { it.first == appLanguage }?.second ?: systemDefaultLabel
         ListItem(
             headlineContent = { Text(stringResource(R.string.language), color = SpotifyWhite) },
@@ -161,31 +163,16 @@ fun AccountScreen(vm: SpotifyViewModel) {
             modifier = Modifier.clickable { showLanguagePicker = true }
         )
         if (showLanguagePicker) {
-            TightAlertDialog(
-                onDismissRequest = { showLanguagePicker = false },
-                title = { Text(stringResource(R.string.language), color = SpotifyWhite) },
-                text = {
-                    Column {
-                        languages.forEach { (code, label) ->
-                            Row(
-                                Modifier.fillMaxWidth().clickable {
-                                    vm.setAppLanguage(code, audioContext)
-                                    showLanguagePicker = false
-                                }.padding(vertical = 12.dp, horizontal = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(selected = appLanguage == code, onClick = {
-                                    vm.setAppLanguage(code, audioContext)
-                                    showLanguagePicker = false
-                                }, colors = RadioButtonDefaults.colors(selectedColor = animatedPrimary, unselectedColor = SpotifyLightGray))
-                                Spacer(Modifier.width(8.dp))
-                                Text(label, color = SpotifyWhite, fontSize = 15.sp)
-                            }
-                        }
-                    }
+            RadioPickerDialog(
+                title = stringResource(R.string.language),
+                options = languages.map { RadioOption(it.first, it.second) },
+                selected = appLanguage,
+                selectedColor = animatedPrimary,
+                onSelect = {
+                    vm.setAppLanguage(it, audioContext)
+                    showLanguagePicker = false
                 },
-                containerColor = SpotifyGray, confirmButton = {},
-                dismissButton = { TextButton(onClick = { showLanguagePicker = false }) { Text(stringResource(R.string.cancel), color = SpotifyLightGray) } }
+                onDismiss = { showLanguagePicker = false }
             )
         }
 
@@ -202,52 +189,20 @@ fun AccountScreen(vm: SpotifyViewModel) {
             modifier = Modifier.clickable { showLyricsPicker = true }
         )
         if (showLyricsPicker) {
-            TightAlertDialog(
-                onDismissRequest = { showLyricsPicker = false },
-                title = { Text(stringResource(R.string.lyrics_animation), color = SpotifyWhite) },
-                text = {
-                    Column {
-                        Text(stringResource(R.string.lyrics_anim_desc),
-                            color = SpotifyLightGray, fontSize = 13.sp)
-                        Spacer(Modifier.height(12.dp))
-                        listOf(
-                            "vertical" to stringResource(R.string.lyrics_vertical),
-                            "horizontal" to stringResource(R.string.lyrics_horizontal)
-                        ).forEach { (value, label) ->
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        vm.setLyricsAnimDirection(value, audioContext)
-                                        showLyricsPicker = false
-                                    }
-                                    .padding(vertical = 12.dp, horizontal = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(
-                                    selected = lyricsAnim == value,
-                                    onClick = {
-                                        vm.setLyricsAnimDirection(value, audioContext)
-                                        showLyricsPicker = false
-                                    },
-                                    colors = RadioButtonDefaults.colors(
-                                        selectedColor = animatedPrimary,
-                                        unselectedColor = SpotifyLightGray
-                                    )
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text(label, color = SpotifyWhite, fontSize = 15.sp)
-                            }
-                        }
-                    }
+            RadioPickerDialog(
+                title = stringResource(R.string.lyrics_animation),
+                description = stringResource(R.string.lyrics_anim_desc),
+                options = listOf(
+                    RadioOption("vertical", stringResource(R.string.lyrics_vertical)),
+                    RadioOption("horizontal", stringResource(R.string.lyrics_horizontal))
+                ),
+                selected = lyricsAnim,
+                selectedColor = animatedPrimary,
+                onSelect = {
+                    vm.setLyricsAnimDirection(it, audioContext)
+                    showLyricsPicker = false
                 },
-                containerColor = SpotifyGray,
-                confirmButton = {},
-                dismissButton = {
-                    TextButton(onClick = { showLyricsPicker = false }) {
-                        Text(stringResource(R.string.cancel), color = SpotifyLightGray)
-                    }
-                }
+                onDismiss = { showLyricsPicker = false }
             )
         }
 
@@ -353,62 +308,30 @@ fun AccountScreen(vm: SpotifyViewModel) {
             modifier = Modifier.clickable { showRegionPicker = true }
         )
         if (showRegionPicker) {
-            TightAlertDialog(
-                onDismissRequest = { showRegionPicker = false },
-                title = { Text(stringResource(R.string.content_region), color = SpotifyWhite) },
-                text = {
-                    Column {
-                        listOf(
-                            "nearest" to stringResource(R.string.region_nearest),
-                            "US" to stringResource(R.string.region_us),
-                            "GB" to stringResource(R.string.region_gb),
-                            "DE" to stringResource(R.string.region_de),
-                            "CH" to stringResource(R.string.region_ch),
-                            "FR" to stringResource(R.string.region_fr),
-                            "JP" to stringResource(R.string.region_jp),
-                            "KR" to stringResource(R.string.region_kr),
-                            "AU" to stringResource(R.string.region_au),
-                            "BR" to stringResource(R.string.region_br),
-                            "CA" to stringResource(R.string.region_ca),
-                            "SE" to stringResource(R.string.region_se)
-                        ).forEach { (code, label) ->
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        vm.setContentRegion(code, audioContext)
-                                        showRegionPicker = false
-                                    }
-                                    .padding(vertical = 12.dp, horizontal = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(
-                                    selected = currentRegion == code,
-                                    onClick = {
-                                        vm.setContentRegion(code, audioContext)
-                                        showRegionPicker = false
-                                    },
-                                    colors = RadioButtonDefaults.colors(
-                                        selectedColor = animatedPrimary,
-                                        unselectedColor = SpotifyLightGray
-                                    )
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Column {
-                                    Text(label, color = SpotifyWhite, fontSize = 15.sp)
-                                    Text(code, color = SpotifyLightGray, fontSize = 12.sp)
-                                }
-                            }
-                        }
-                    }
+            val regionOptions = listOf(
+                "nearest" to stringResource(R.string.region_nearest),
+                "US" to stringResource(R.string.region_us),
+                "GB" to stringResource(R.string.region_gb),
+                "DE" to stringResource(R.string.region_de),
+                "CH" to stringResource(R.string.region_ch),
+                "FR" to stringResource(R.string.region_fr),
+                "JP" to stringResource(R.string.region_jp),
+                "KR" to stringResource(R.string.region_kr),
+                "AU" to stringResource(R.string.region_au),
+                "BR" to stringResource(R.string.region_br),
+                "CA" to stringResource(R.string.region_ca),
+                "SE" to stringResource(R.string.region_se)
+            )
+            RadioPickerDialog(
+                title = stringResource(R.string.content_region),
+                options = regionOptions.map { RadioOption(it.first, it.second, it.first) },
+                selected = currentRegion,
+                selectedColor = animatedPrimary,
+                onSelect = {
+                    vm.setContentRegion(it, audioContext)
+                    showRegionPicker = false
                 },
-                containerColor = SpotifyGray,
-                confirmButton = {},
-                dismissButton = {
-                    TextButton(onClick = { showRegionPicker = false }) {
-                        Text(stringResource(R.string.cancel), color = SpotifyLightGray)
-                    }
-                }
+                onDismiss = { showRegionPicker = false }
             )
         }
 
@@ -428,16 +351,27 @@ fun AccountScreen(vm: SpotifyViewModel) {
         val notifLikeLabel = stringResource(R.string.notif_like)
         val notifShuffleLabel = stringResource(R.string.notif_shuffle)
         val notifRepeatLabel = stringResource(R.string.notif_repeat)
-        val buttonOptions = listOf(
-            "like" to notifLikeLabel to stringResource(R.string.notif_like_short_desc),
-            "shuffle" to notifShuffleLabel to stringResource(R.string.notif_shuffle_desc),
-            "repeat" to notifRepeatLabel to stringResource(R.string.notif_repeat_desc)
-        )
+        val notifLikeDesc = stringResource(R.string.notif_like_short_desc)
+        val notifShuffleDesc = stringResource(R.string.notif_shuffle_desc)
+        val notifRepeatDesc = stringResource(R.string.notif_repeat_desc)
+        val buttonOptions = remember(
+            notifLikeLabel, notifShuffleLabel, notifRepeatLabel,
+            notifLikeDesc, notifShuffleDesc, notifRepeatDesc
+        ) {
+            listOf(
+                "like" to notifLikeLabel to notifLikeDesc,
+                "shuffle" to notifShuffleLabel to notifShuffleDesc,
+                "repeat" to notifRepeatLabel to notifRepeatDesc
+            )
+        }
         fun buttonLabel(type: String) = when (type) {
             "like" -> notifLikeLabel
             "shuffle" -> notifShuffleLabel
             "repeat" -> notifRepeatLabel
             else -> type
+        }
+        val notifRadioOptions = buttonOptions.map { (pair, desc) ->
+            RadioOption(pair.first, pair.second, desc)
         }
 
         // Left notification button
@@ -452,32 +386,16 @@ fun AccountScreen(vm: SpotifyViewModel) {
             modifier = Modifier.clickable { showLeftPicker = true }
         )
         if (showLeftPicker) {
-            TightAlertDialog(
-                onDismissRequest = { showLeftPicker = false },
-                title = { Text(stringResource(R.string.notification_button_left), color = SpotifyWhite) },
-                text = {
-                    Column {
-                        buttonOptions.forEach { (pair, desc) ->
-                            val (value, label) = pair
-                            Row(
-                                Modifier.fillMaxWidth().clickable {
-                                    vm.setNotificationLeftButton(value, audioContext)
-                                    showLeftPicker = false
-                                }.padding(vertical = 12.dp, horizontal = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(selected = leftButton == value, onClick = {
-                                    vm.setNotificationLeftButton(value, audioContext)
-                                    showLeftPicker = false
-                                }, colors = RadioButtonDefaults.colors(selectedColor = animatedPrimary, unselectedColor = SpotifyLightGray))
-                                Spacer(Modifier.width(8.dp))
-                                Column { Text(label, color = SpotifyWhite, fontSize = 15.sp); Text(desc, color = SpotifyLightGray, fontSize = 12.sp) }
-                            }
-                        }
-                    }
+            RadioPickerDialog(
+                title = stringResource(R.string.notification_button_left),
+                options = notifRadioOptions,
+                selected = leftButton,
+                selectedColor = animatedPrimary,
+                onSelect = {
+                    vm.setNotificationLeftButton(it, audioContext)
+                    showLeftPicker = false
                 },
-                containerColor = SpotifyGray, confirmButton = {},
-                dismissButton = { TextButton(onClick = { showLeftPicker = false }) { Text(stringResource(R.string.cancel), color = SpotifyLightGray) } }
+                onDismiss = { showLeftPicker = false }
             )
         }
 
@@ -493,32 +411,16 @@ fun AccountScreen(vm: SpotifyViewModel) {
             modifier = Modifier.clickable { showRightPicker = true }
         )
         if (showRightPicker) {
-            TightAlertDialog(
-                onDismissRequest = { showRightPicker = false },
-                title = { Text(stringResource(R.string.notification_button_right), color = SpotifyWhite) },
-                text = {
-                    Column {
-                        buttonOptions.forEach { (pair, desc) ->
-                            val (value, label) = pair
-                            Row(
-                                Modifier.fillMaxWidth().clickable {
-                                    vm.setNotificationRightButton(value, audioContext)
-                                    showRightPicker = false
-                                }.padding(vertical = 12.dp, horizontal = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(selected = rightButton == value, onClick = {
-                                    vm.setNotificationRightButton(value, audioContext)
-                                    showRightPicker = false
-                                }, colors = RadioButtonDefaults.colors(selectedColor = animatedPrimary, unselectedColor = SpotifyLightGray))
-                                Spacer(Modifier.width(8.dp))
-                                Column { Text(label, color = SpotifyWhite, fontSize = 15.sp); Text(desc, color = SpotifyLightGray, fontSize = 12.sp) }
-                            }
-                        }
-                    }
+            RadioPickerDialog(
+                title = stringResource(R.string.notification_button_right),
+                options = notifRadioOptions,
+                selected = rightButton,
+                selectedColor = animatedPrimary,
+                onSelect = {
+                    vm.setNotificationRightButton(it, audioContext)
+                    showRightPicker = false
                 },
-                containerColor = SpotifyGray, confirmButton = {},
-                dismissButton = { TextButton(onClick = { showRightPicker = false }) { Text(stringResource(R.string.cancel), color = SpotifyLightGray) } }
+                onDismiss = { showRightPicker = false }
             )
         }
 
@@ -655,5 +557,66 @@ private fun AccountSectionHeader(title: String) {
         fontSize = 16.sp,
         fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp)
+    )
+}
+
+private data class RadioOption(val value: String, val label: String, val supportingText: String? = null)
+
+/** Single radio-select settings dialog shared by the Language, Lyrics, Region and notification pickers. */
+@Composable
+private fun RadioPickerDialog(
+    title: String,
+    description: String? = null,
+    options: List<RadioOption>,
+    selected: String,
+    selectedColor: Color,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    TightAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title, color = SpotifyWhite) },
+        text = {
+            Column {
+                if (description != null) {
+                    Text(description, color = SpotifyLightGray, fontSize = 13.sp)
+                    Spacer(Modifier.height(12.dp))
+                }
+                options.forEach { opt ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(opt.value) }
+                            .padding(vertical = 12.dp, horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = selected == opt.value,
+                            onClick = { onSelect(opt.value) },
+                            colors = RadioButtonDefaults.colors(
+                                selectedColor = selectedColor,
+                                unselectedColor = SpotifyLightGray
+                            )
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        if (opt.supportingText != null) {
+                            Column {
+                                Text(opt.label, color = SpotifyWhite, fontSize = 15.sp)
+                                Text(opt.supportingText, color = SpotifyLightGray, fontSize = 12.sp)
+                            }
+                        } else {
+                            Text(opt.label, color = SpotifyWhite, fontSize = 15.sp)
+                        }
+                    }
+                }
+            }
+        },
+        containerColor = SpotifyGray,
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel), color = SpotifyLightGray)
+            }
+        }
     )
 }

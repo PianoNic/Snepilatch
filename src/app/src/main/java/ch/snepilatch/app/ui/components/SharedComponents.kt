@@ -68,6 +68,7 @@ import ch.snepilatch.app.ui.theme.SpotifyGray
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
 import ch.snepilatch.app.util.formatTime
 import androidx.lifecycle.viewmodel.compose.viewModel
+import ch.snepilatch.app.viewmodel.ThemeController
 import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import coil.compose.AsyncImage
@@ -199,7 +200,7 @@ fun TrackRow(track: TrackInfo, vm: PlaybackViewModel, contextUri: String? = null
     val currentUri by vm.currentTrackUri.collectAsState()
     val playing by vm.isPlayingFlow.collectAsState()
     val isPlaying = currentUri == track.uri && playing
-    val theme by vm.themeColors.collectAsState()
+    val theme by ThemeController.themeColors.collectAsState()
     val accent = theme.primary
 
     Row(

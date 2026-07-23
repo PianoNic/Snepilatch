@@ -35,6 +35,7 @@ import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.util.UpdateInfo
 import ch.snepilatch.app.util.UpdateService
 import ch.snepilatch.app.util.clearCookies
+import ch.snepilatch.app.viewmodel.ThemeController
 import ch.snepilatch.app.viewmodel.AppSettings
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import kotlinx.coroutines.Dispatchers
@@ -44,7 +45,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun AccountScreen(vm: PlaybackViewModel) {
     val account by vm.account.collectAsState()
-    val theme by vm.themeColors.collectAsState()
+    val theme by ThemeController.themeColors.collectAsState()
     val animatedPrimary by animateColorAsState(theme.primary, tween(800), label = "accPrimary")
 
     Column(

@@ -43,6 +43,7 @@ import ch.snepilatch.app.ui.components.TrackRow
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.util.stripHtml
 import androidx.lifecycle.viewmodel.compose.viewModel
+import ch.snepilatch.app.viewmodel.ThemeController
 import ch.snepilatch.app.viewmodel.DetailRoutes
 import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
@@ -53,7 +54,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
     val detail by detailVm.detail.collectAsState()
     val isLoading by detailVm.isLoading.collectAsState()
     val isLoadingMore by detailVm.isLoadingMore.collectAsState()
-    val theme by vm.themeColors.collectAsState()
+    val theme by ThemeController.themeColors.collectAsState()
     val accentColor by androidx.compose.animation.animateColorAsState(theme.primary, androidx.compose.animation.core.tween(800), label = "detailAccent")
     val isArtist = detail.type == "artist"
 
@@ -519,7 +520,7 @@ private fun ArtistTrackRow(
     val detailVm: DetailViewModel = viewModel()
     val playback by vm.playback.collectAsState()
     val isPlaying = playback.track?.uri == track.uri && playback.isPlaying
-    val theme by vm.themeColors.collectAsState()
+    val theme by ThemeController.themeColors.collectAsState()
     val accent = theme.primary
 
     Row(
@@ -659,7 +660,7 @@ private fun AlbumTrackRow(
     val detailVm: DetailViewModel = viewModel()
     val playback by vm.playback.collectAsState()
     val isPlaying = playback.track?.uri == track.uri && playback.isPlaying
-    val theme by vm.themeColors.collectAsState()
+    val theme by ThemeController.themeColors.collectAsState()
     val accent = theme.primary
 
     Row(

@@ -72,6 +72,8 @@ import ch.snepilatch.app.ui.theme.SpotifyBlack
 import ch.snepilatch.app.ui.theme.SpotifyElevated
 import ch.snepilatch.app.ui.theme.SpotifyGray
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
+import androidx.lifecycle.viewmodel.compose.viewModel
+import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
 
 private const val PREFS_NAME = "kotify_prefs"
@@ -294,24 +296,24 @@ fun LibraryScreen(vm: SpotifyViewModel) {
     }
 }
 
-fun libraryItemClick(item: LibraryItem, vm: SpotifyViewModel) {
+fun libraryItemClick(item: LibraryItem, detailVm: DetailViewModel) {
     when (item.type) {
-        "collection" -> vm.openLikedSongs()
+        "collection" -> detailVm.openLikedSongs()
         "playlist" -> {
             val id = item.uri.split(":").lastOrNull() ?: return
-            vm.openPlaylist(id)
+            detailVm.openPlaylist(id)
         }
         "album" -> {
             val id = item.uri.split(":").lastOrNull() ?: return
-            vm.openAlbum(id)
+            detailVm.openAlbum(id)
         }
         "artist" -> {
             val id = item.uri.split(":").lastOrNull() ?: return
-            vm.openArtist(id)
+            detailVm.openArtist(id)
         }
         "show" -> {
             val id = item.uri.split(":").lastOrNull() ?: return
-            vm.openShow(id, item.owner, item.imageUrl)
+            detailVm.openShow(id, item.owner, item.imageUrl)
         }
     }
 }
@@ -319,6 +321,7 @@ fun libraryItemClick(item: LibraryItem, vm: SpotifyViewModel) {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LibraryGridCard(item: LibraryItem, vm: SpotifyViewModel) {
+    val detailVm: DetailViewModel = viewModel()
     val isArtist = item.type == "artist"
     var showRemove by remember { mutableStateOf(false) }
     if (showRemove && item.type != "collection") {
@@ -328,7 +331,7 @@ fun LibraryGridCard(item: LibraryItem, vm: SpotifyViewModel) {
         Modifier
             .fillMaxWidth()
             .combinedClickable(
-                onClick = { libraryItemClick(item, vm) },
+                onClick = { libraryItemClick(item, detailVm) },
                 onLongClick = { if (item.type != "collection") showRemove = true }
             ),
         horizontalAlignment = if (isArtist) Alignment.CenterHorizontally else Alignment.Start
@@ -364,6 +367,7 @@ fun LibraryGridCard(item: LibraryItem, vm: SpotifyViewModel) {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LibraryListItem(item: LibraryItem, vm: SpotifyViewModel) {
+    val detailVm: DetailViewModel = viewModel()
     val isArtist = item.type == "artist"
     var showRemove by remember { mutableStateOf(false) }
     if (showRemove && item.type != "collection") {
@@ -373,7 +377,7 @@ fun LibraryListItem(item: LibraryItem, vm: SpotifyViewModel) {
         Modifier
             .fillMaxWidth()
             .combinedClickable(
-                onClick = { libraryItemClick(item, vm) },
+                onClick = { libraryItemClick(item, detailVm) },
                 onLongClick = { if (item.type != "collection") showRemove = true }
             )
             .padding(horizontal = 16.dp, vertical = 8.dp),

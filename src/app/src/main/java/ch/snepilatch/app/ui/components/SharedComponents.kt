@@ -67,6 +67,8 @@ import ch.snepilatch.app.ui.theme.SpotifyElevated
 import ch.snepilatch.app.ui.theme.SpotifyGray
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
 import ch.snepilatch.app.util.formatTime
+import androidx.lifecycle.viewmodel.compose.viewModel
+import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
 import coil.compose.AsyncImage
 
@@ -188,6 +190,7 @@ fun rememberSmoothPositionMs(positionMs: Long, durationMs: Long, isPlaying: Bool
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrackRow(track: TrackInfo, vm: SpotifyViewModel, contextUri: String? = null, trackIndex: Int? = null) {
+    val detailVm: DetailViewModel = viewModel()
     var showMenu by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
     // Subscribe only to the two projections that affect a row (which track is current +
@@ -280,10 +283,10 @@ fun TrackRow(track: TrackInfo, vm: SpotifyViewModel, contextUri: String? = null,
                     vm.likeSong(track.uri.removePrefix("spotify:track:")); showMenu = false
                 },
                 Triple(Icons.Rounded.Album, visitAlbumLabel) {
-                    showMenu = false; vm.openAlbumForTrack(track.uri)
+                    showMenu = false; detailVm.openAlbumForTrack(track.uri)
                 },
                 Triple(Icons.Rounded.Person, visitArtistLabel) {
-                    showMenu = false; vm.openArtistForTrack(track.uri)
+                    showMenu = false; detailVm.openArtistForTrack(track.uri)
                 },
                 Triple(Icons.Rounded.Share, shareLabel) {
                     showMenu = false

@@ -42,13 +42,17 @@ import ch.snepilatch.app.ui.components.SpotifyImage
 import ch.snepilatch.app.ui.components.TrackRow
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.util.stripHtml
+import androidx.lifecycle.viewmodel.compose.viewModel
+import ch.snepilatch.app.viewmodel.DetailRoutes
+import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
 
 @Composable
 fun DetailScreen(vm: SpotifyViewModel) {
-    val detail by vm.detail.collectAsState()
-    val isLoading by vm.isLoading.collectAsState()
-    val isLoadingMore by vm.isLoadingMore.collectAsState()
+    val detailVm: DetailViewModel = viewModel()
+    val detail by detailVm.detail.collectAsState()
+    val isLoading by detailVm.isLoading.collectAsState()
+    val isLoadingMore by detailVm.isLoadingMore.collectAsState()
     val theme by vm.themeColors.collectAsState()
     val accentColor by androidx.compose.animation.animateColorAsState(theme.primary, androidx.compose.animation.core.tween(800), label = "detailAccent")
     val isArtist = detail.type == "artist"
@@ -144,7 +148,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.clickable {
-                                detail.artistUri?.substringAfterLast(":")?.let { vm.openArtist(it) }
+                                detail.artistUri?.substringAfterLast(":")?.let { detailVm.openArtist(it) }
                             }
                         )
                     }
@@ -206,15 +210,15 @@ fun DetailScreen(vm: SpotifyViewModel) {
             ) {
                 // Save/Follow (albums & artists)
                 if (detail.type == "album" || isArtist) {
-                    val saved by vm.detailSaved.collectAsState()
+                    val saved by detailVm.detailSaved.collectAsState()
                     val detailId = detail.uri
                         .removePrefix("spotify:album:")
                         .removePrefix("spotify:artist:")
-                    LaunchedEffect(detail.uri) { vm.checkDetailSaved(detail.type, detailId) }
+                    LaunchedEffect(detail.uri) { detailVm.checkDetailSaved(detail.type, detailId) }
 
                     if (isArtist) {
                         OutlinedButton(
-                            onClick = { vm.toggleDetailSaved(detail.type, detailId) },
+                            onClick = { detailVm.toggleDetailSaved(detail.type, detailId) },
                             colors = ButtonDefaults.outlinedButtonColors(
                                 contentColor = SpotifyWhite
                             ),
@@ -231,7 +235,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
                     } else {
                         IconToggleButton(
                             checked = saved,
-                            onCheckedChange = { vm.toggleDetailSaved(detail.type, detailId) },
+                            onCheckedChange = { detailVm.toggleDetailSaved(detail.type, detailId) },
                             colors = IconButtonDefaults.iconToggleButtonColors(
                                 contentColor = SpotifyWhite,
                                 checkedContentColor = accentColor,
@@ -314,7 +318,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
         // Tracks
         itemsIndexed(detail.tracks, key = { index, track -> "$index-${track.uri}" }) { index, track ->
             if (hasMore && index >= detail.tracks.size - 5) {
-                LaunchedEffect(detail.tracks.size) { vm.loadMoreDetail() }
+                LaunchedEffect(detail.tracks.size) { detailVm.loadMoreDetail() }
             }
             when {
                 isArtist -> ArtistTrackRow(index + 1, track, vm, detail.uri, detail.topTrackPlaycounts.getOrNull(index))
@@ -355,7 +359,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
                                 .width(130.dp)
                                 .clickable {
                                     val id = rel.uri.substringAfterLast(":")
-                                    vm.openAlbum(id)
+                                    detailVm.openAlbum(id)
                                 }
                         ) {
                             SpotifyImage(
@@ -400,7 +404,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
                                 .width(120.dp)
                                 .clickable {
                                     val id = ra.uri.substringAfterLast(":")
-                                    vm.openArtist(id)
+                                    detailVm.openArtist(id)
                                 },
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
@@ -467,7 +471,7 @@ fun DetailScreen(vm: SpotifyViewModel) {
                                 .width(130.dp)
                                 .clickable {
                                     val id = rel.uri.substringAfterLast(":")
-                                    vm.openAlbum(id)
+                                    detailVm.openAlbum(id)
                                 }
                         ) {
                             SpotifyImage(
@@ -512,6 +516,7 @@ private fun ArtistTrackRow(
     contextUri: String,
     playcount: String? = null
 ) {
+    val detailVm: DetailViewModel = viewModel()
     val playback by vm.playback.collectAsState()
     val isPlaying = playback.track?.uri == track.uri && playback.isPlaying
     val theme by vm.themeColors.collectAsState()
@@ -611,7 +616,7 @@ private fun ArtistTrackRow(
                         vm.likeSong(track.uri.removePrefix("spotify:track:")); showMenu = false
                     },
                     Triple(Icons.Rounded.Album, visitAlbumLabel) {
-                        showMenu = false; vm.openAlbumForTrack(track.uri)
+                        showMenu = false; detailVm.openAlbumForTrack(track.uri)
                     },
                     Triple(Icons.Rounded.Share, shareLabel) {
                         showMenu = false
@@ -651,6 +656,7 @@ private fun AlbumTrackRow(
     contextUri: String,
     trackIndex: Int? = null
 ) {
+    val detailVm: DetailViewModel = viewModel()
     val playback by vm.playback.collectAsState()
     val isPlaying = playback.track?.uri == track.uri && playback.isPlaying
     val theme by vm.themeColors.collectAsState()
@@ -736,7 +742,7 @@ private fun AlbumTrackRow(
                         vm.likeSong(track.uri.removePrefix("spotify:track:")); showMenu = false
                     },
                     Triple(Icons.Rounded.Person, visitArtistLabel) {
-                        showMenu = false; vm.openArtistForTrack(track.uri)
+                        showMenu = false; detailVm.openArtistForTrack(track.uri)
                     },
                     Triple(Icons.Rounded.Share, shareLabel) {
                         showMenu = false
@@ -842,7 +848,7 @@ private fun DetailHeaderMenu(
                 add(Triple(Icons.Rounded.Person, visitArtistLabel) {
                     onDismiss()
                     val artistId = detail.artistUri.substringAfterLast(":")
-                    vm.openArtist(artistId)
+                    DetailRoutes.openArtist(artistId)
                 })
             }
         }

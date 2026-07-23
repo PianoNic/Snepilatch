@@ -46,6 +46,8 @@ import ch.snepilatch.app.ui.components.ShimmerBox
 import ch.snepilatch.app.ui.components.SpotifyImage
 import ch.snepilatch.app.ui.theme.SpotifyCardBg
 import ch.snepilatch.app.ui.theme.SpotifyLightGray
+import androidx.lifecycle.viewmodel.compose.viewModel
+import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
 
 // --- Home Screen ---
@@ -114,6 +116,7 @@ fun HomeScreen(vm: SpotifyViewModel) {
 
 @Composable
 fun QuickPickGrid(items: List<kotify.api.home.HomeSectionItem>, vm: SpotifyViewModel) {
+    val detailVm: DetailViewModel = viewModel()
     Column(
         Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -131,10 +134,10 @@ fun QuickPickGrid(items: List<kotify.api.home.HomeSectionItem>, vm: SpotifyViewM
                             .clickable {
                                 val id = item.uri.split(":").lastOrNull() ?: return@clickable
                                 when (item.type) {
-                                    "playlist" -> vm.openPlaylist(id)
-                                    "album" -> vm.openAlbum(id)
-                                    "artist" -> vm.openArtist(id)
-                                    "show" -> vm.openShow(id, item.owner, item.imageUrl)
+                                    "playlist" -> detailVm.openPlaylist(id)
+                                    "album" -> detailVm.openAlbum(id)
+                                    "artist" -> detailVm.openArtist(id)
+                                    "show" -> detailVm.openShow(id, item.owner, item.imageUrl)
                                     else -> vm.playTrack(item.uri)
                                 }
                             },
@@ -214,6 +217,7 @@ fun HomeShimmer() {
 
 @Composable
 fun HomeSectionCard(item: kotify.api.home.HomeSectionItem, vm: SpotifyViewModel, modifier: Modifier = Modifier) {
+    val detailVm: DetailViewModel = viewModel()
     val isArtist = item.type == "artist"
     Column(
         modifier
@@ -221,10 +225,10 @@ fun HomeSectionCard(item: kotify.api.home.HomeSectionItem, vm: SpotifyViewModel,
             .clickable {
                 val id = item.uri.split(":").lastOrNull() ?: return@clickable
                 when (item.type) {
-                    "playlist" -> vm.openPlaylist(id)
-                    "album" -> vm.openAlbum(id)
-                    "artist" -> vm.openArtist(id)
-                    "show" -> vm.openShow(id, item.owner, item.imageUrl)
+                    "playlist" -> detailVm.openPlaylist(id)
+                    "album" -> detailVm.openAlbum(id)
+                    "artist" -> detailVm.openArtist(id)
+                    "show" -> detailVm.openShow(id, item.owner, item.imageUrl)
                     else -> vm.playTrack(item.uri)
                 }
             },

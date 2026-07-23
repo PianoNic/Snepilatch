@@ -38,19 +38,19 @@ private fun formatReleaseDate(raw: String): String {
     return when (parts.size) {
         3 -> {
             val year = parts[0].toIntOrNull()
-            val month = parts[1].toIntOrNull()
+            val month = parts[1].toIntOrNull()?.takeIf { it in 1..12 }
             val day = parts[2].toIntOrNull()
-            if (year != null && month in 1..12 && day != null) {
-                "${MONTHS[month!! - 1]} $day, $year"
+            if (year != null && month != null && day != null) {
+                "${MONTHS[month - 1]} $day, $year"
             } else {
                 raw
             }
         }
         2 -> {
             val year = parts[0].toIntOrNull()
-            val month = parts[1].toIntOrNull()
-            if (year != null && month in 1..12) {
-                "${MONTHS[month!! - 1]} $year"
+            val month = parts[1].toIntOrNull()?.takeIf { it in 1..12 }
+            if (year != null && month != null) {
+                "${MONTHS[month - 1]} $year"
             } else {
                 raw
             }

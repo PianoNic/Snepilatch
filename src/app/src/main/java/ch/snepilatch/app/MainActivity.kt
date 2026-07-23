@@ -28,6 +28,7 @@ import ch.snepilatch.app.ui.theme.SpotifyBlack
 import ch.snepilatch.app.util.UpdateInfo
 import ch.snepilatch.app.util.UpdateService
 import ch.snepilatch.app.util.loadCookies
+import ch.snepilatch.app.viewmodel.AppSettings
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -94,7 +95,7 @@ class MainActivity : ComponentActivity() {
 
             val context = this@MainActivity
             LaunchedEffect(Unit) {
-                vm.loadPreferences(context)
+                AppSettings.load(context)
                 if (!initialized && error == null && !needsLogin) {
                     val savedCookies = loadCookies(context)
                     if (savedCookies != null) {

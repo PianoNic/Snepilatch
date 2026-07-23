@@ -44,6 +44,7 @@ import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.components.SpotifyImage
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.viewmodel.LyricsViewModel
+import ch.snepilatch.app.viewmodel.AppSettings
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -63,7 +64,7 @@ fun LyricsScreen(vm: PlaybackViewModel) {
     val lyrics by lyricsVm.lyrics.collectAsState()
     val isLoading by lyricsVm.isLoading.collectAsState()
     val animatedPrimary by animateColorAsState(theme.primary, tween(800), label = "lyricsPrimary")
-    val lyricsAnimDirection by vm.lyricsAnimDirection.collectAsState()
+    val lyricsAnimDirection by AppSettings.lyricsAnimDirection.collectAsState()
 
     LaunchedEffect(track?.uri) {
         track?.uri?.let { lyricsVm.fetch(it) }

@@ -32,9 +32,15 @@ import ch.snepilatch.app.viewmodel.SpotifyViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : ComponentActivity() {
     private val pendingDeepLink = MutableStateFlow<Uri?>(null)
+
+    companion object {
+        // Process-scoped so the update check fires once per app start, not per Activity recreation.
+        private val updateChecked = AtomicBoolean(false)
+    }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -98,13 +104,17 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // Check for updates in background
-                withContext(Dispatchers.IO) {
-                    val info = UpdateService.checkForUpdates(context)
-                    if (info != null) {
-                        val dismissed = UpdateService.getDismissedVersion(context)
-                        if (dismissed != info.latestVersion) {
-                            updateInfo = info
+                // Check for updates in background — once per process. This LaunchedEffect(Unit) re-runs
+                // on every Activity recreation (e.g. config changes), which would otherwise refire the
+                // network + TLS update check each time.
+                if (updateChecked.compareAndSet(false, true)) {
+                    withContext(Dispatchers.IO) {
+                        val info = UpdateService.checkForUpdates(context)
+                        if (info != null) {
+                            val dismissed = UpdateService.getDismissedVersion(context)
+                            if (dismissed != info.latestVersion) {
+                                updateInfo = info
+                            }
                         }
                     }
                 }

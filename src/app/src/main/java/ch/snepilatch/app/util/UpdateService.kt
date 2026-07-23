@@ -26,7 +26,7 @@ object UpdateService {
         "https://api.github.com/repos/PianoNic/snepilatch/releases/latest"
     private const val DISMISSED_KEY = "dismissed_update_version"
 
-    private val client = OkHttpClient()
+    internal val client = OkHttpClient()
 
     suspend fun checkForUpdates(context: Context): UpdateInfo? = withContext(Dispatchers.IO) {
         try {
@@ -112,11 +112,19 @@ object UpdateService {
                     val buffer = ByteArray(8192)
                     var bytesRead: Long = 0
                     var read: Int
+                    var lastPct = -1
                     while (input.read(buffer).also { read = it } != -1) {
                         output.write(buffer, 0, read)
                         bytesRead += read
                         if (totalBytes > 0) {
-                            onProgress(bytesRead.toFloat() / totalBytes)
+                            // Emit only when the whole-percent changes, collapsing thousands of
+                            // per-8KB progress writes/recompositions to ~100. The final iteration
+                            // (bytesRead == totalBytes -> pct 100) still fires the terminal 1.0.
+                            val pct = (bytesRead * 100 / totalBytes).toInt()
+                            if (pct != lastPct) {
+                                lastPct = pct
+                                onProgress(bytesRead.toFloat() / totalBytes)
+                            }
                         }
                     }
                 }

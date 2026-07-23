@@ -6,10 +6,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.ErrorOutline
-import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,10 +18,9 @@ import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.components.TightAlertDialog
 import ch.snepilatch.app.ui.theme.*
+import ch.snepilatch.app.util.UpdateService
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
 
@@ -35,84 +30,6 @@ data class ReleaseNote(
     val body: String,
     val date: String
 )
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun ReleaseNotesScreen(onBack: () -> Unit) {
-    val scope = rememberCoroutineScope()
-    val context = LocalContext.current
-    var releases by remember { mutableStateOf<List<ReleaseNote>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-    var error by remember { mutableStateOf<String?>(null) }
-    val genericError = stringResource(R.string.release_load_generic_error)
-
-    fun load() {
-        isLoading = true
-        error = null
-        scope.launch {
-            try {
-                val notes = withContext(Dispatchers.IO) { fetchReleaseNotes(context) }
-                releases = notes
-            } catch (e: Exception) {
-                error = e.message ?: genericError
-            }
-            isLoading = false
-        }
-    }
-
-    LaunchedEffect(Unit) { load() }
-
-    Scaffold(
-        containerColor = SpotifyBlack,
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.release_notes), color = SpotifyWhite) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, null, tint = SpotifyWhite)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = SpotifyBlack)
-            )
-        }
-    ) { padding ->
-        when {
-            isLoading -> {
-                Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                    LoadingIndicator(color = SpotifyLightGray)
-                }
-            }
-            error != null -> {
-                Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Rounded.ErrorOutline, null, tint = SpotifyLightGray, modifier = Modifier.size(64.dp))
-                        Spacer(Modifier.height(16.dp))
-                        Text(stringResource(R.string.release_load_failed), color = SpotifyWhite, fontSize = 18.sp)
-                        Spacer(Modifier.height(8.dp))
-                        Text(error!!, color = SpotifyLightGray, fontSize = 13.sp)
-                        Spacer(Modifier.height(24.dp))
-                        Button(onClick = { load() }) {
-                            Icon(Icons.Rounded.Refresh, null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(stringResource(R.string.retry))
-                        }
-                    }
-                }
-            }
-            else -> {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize().padding(padding),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    itemsIndexed(releases) { index, note ->
-                        ReleaseNoteCard(note, isLatest = index == 0)
-                    }
-                }
-            }
-        }
-    }
-}
 
 @Composable
 private fun ReleaseNoteCard(note: ReleaseNote, isLatest: Boolean) {
@@ -228,7 +145,6 @@ private fun String.cleanMarkdown(): String {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReleaseNotesDialog(onDismiss: () -> Unit) {
-    val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var releases by remember { mutableStateOf<List<ReleaseNote>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -271,7 +187,7 @@ fun ReleaseNotesDialog(onDismiss: () -> Unit) {
 }
 
 private suspend fun fetchReleaseNotes(context: android.content.Context): List<ReleaseNote> {
-    val client = OkHttpClient()
+    val client = UpdateService.client
     val request = Request.Builder()
         .url("https://api.github.com/repos/PianoNic/Snepilatch/releases")
         .header("Accept", "application/vnd.github+json")

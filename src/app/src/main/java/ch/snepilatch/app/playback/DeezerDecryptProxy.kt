@@ -175,13 +175,21 @@ class DeezerDecryptProxy {
 
     /** Decrypt the upstream stream block-by-block, skipping [skip] leading bytes. */
     private fun decryptInto(out: OutputStream, upstream: InputStream, key: ByteArray, startBlock: Int, skip: Long) {
+        // One Cipher per stream instead of one per decrypted block. decryptInto runs on a single
+        // per-request proxy thread (Cipher is not thread-safe, but it never leaves this call), and
+        // doFinal resets a CBC cipher to its post-init state — i.e. back to the fixed IV — so every
+        // block still decrypts against the same IV the block-positional (no-chaining) scheme needs.
+        // This collapses ~5000 Blowfish key expansions per track down to one.
+        val cipher = Cipher.getInstance("Blowfish/CBC/NoPadding").apply {
+            init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "Blowfish"), IvParameterSpec(IV))
+        }
         var blockIndex = startBlock
         var toSkip = skip
         val buf = ByteArray(BLOCK)
         while (true) {
             val n = readBlock(upstream, buf)
             if (n <= 0) break
-            val decoded = if (blockIndex % 3 == 0 && n == BLOCK) decryptBlock(key, buf) else buf.copyOf(n)
+            val decoded = if (blockIndex % 3 == 0 && n == BLOCK) cipher.doFinal(buf) else buf.copyOf(n)
             val off = if (toSkip > 0) minOf(toSkip, decoded.size.toLong()).toInt() else 0
             toSkip -= off
             if (off < decoded.size) out.write(decoded, off, decoded.size - off)
@@ -208,12 +216,6 @@ class DeezerDecryptProxy {
             read += n
         }
         return read
-    }
-
-    private fun decryptBlock(key: ByteArray, block: ByteArray): ByteArray {
-        val cipher = Cipher.getInstance("Blowfish/CBC/NoPadding")
-        cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "Blowfish"), IvParameterSpec(IV))
-        return cipher.doFinal(block)
     }
 
     private fun writeStatus(out: OutputStream, code: Int, msg: String) {

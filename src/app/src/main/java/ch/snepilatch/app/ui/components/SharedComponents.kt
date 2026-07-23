@@ -4,10 +4,6 @@ package ch.snepilatch.app.ui.components
 
 import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.theme.SpotifyWhite
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -55,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -93,25 +90,27 @@ fun SheetNavBarFix() {
 
 // --- Shimmer effect ---
 
+/**
+ * A shimmer placeholder driven by a shared [phase] transition (see HomeShimmer). Reading phase.value
+ * inside onDrawBehind registers a DRAW-phase snapshot read, so animation frames invalidate only the
+ * draw, not composition — the box never recomposes as the sweep animates.
+ */
 @Composable
-fun shimmerBrush(): Brush {
-    val transition = rememberInfiniteTransition(label = "shimmer")
-    val translateAnim by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1000f,
-        animationSpec = infiniteRepeatable(tween(1200, easing = LinearEasing)),
-        label = "shimmer"
+fun ShimmerBox(phase: State<Float>, modifier: Modifier) {
+    Box(
+        modifier.drawWithCache {
+            onDrawBehind {
+                val x = phase.value
+                drawRect(
+                    Brush.linearGradient(
+                        colors = listOf(SpotifyGray, SpotifyElevated, SpotifyGray),
+                        start = Offset(x - 500f, 0f),
+                        end = Offset(x, 0f)
+                    )
+                )
+            }
+        }
     )
-    return Brush.linearGradient(
-        colors = listOf(SpotifyGray, SpotifyElevated, SpotifyGray),
-        start = Offset(translateAnim - 500f, 0f),
-        end = Offset(translateAnim, 0f)
-    )
-}
-
-@Composable
-fun ShimmerBox(modifier: Modifier) {
-    Box(modifier.background(shimmerBrush()))
 }
 
 // --- Image with placeholder ---

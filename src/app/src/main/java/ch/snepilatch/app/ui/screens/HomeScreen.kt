@@ -3,6 +3,11 @@ package ch.snepilatch.app.ui.screens
 import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.theme.SpotifyWhite
 import androidx.compose.foundation.clickable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -162,17 +167,27 @@ fun QuickPickGrid(items: List<kotify.api.home.HomeSectionItem>, vm: SpotifyViewM
 
 @Composable
 fun HomeShimmer() {
+    // One shared transition drives every placeholder; ShimmerBox reads phase in the draw phase, so the
+    // sweep animates without recomposing any box. Keep `phase` as State<Float> (no `by`, never read
+    // .value here) so this composable is not invalidated each frame.
+    val phase = rememberInfiniteTransition(label = "shimmer").animateFloat(
+        initialValue = 0f,
+        targetValue = 1000f,
+        animationSpec = infiniteRepeatable(tween(1200, easing = LinearEasing)),
+        label = "shimmer"
+    )
     Column(
         Modifier
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        ShimmerBox(Modifier.width(180.dp).height(28.dp).clip(RoundedCornerShape(4.dp)))
+        ShimmerBox(phase, Modifier.width(180.dp).height(28.dp).clip(RoundedCornerShape(4.dp)))
         Spacer(Modifier.height(16.dp))
         repeat(3) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 repeat(2) {
                     ShimmerBox(
+                        phase,
                         Modifier
                             .weight(1f)
                             .height(56.dp)
@@ -183,14 +198,14 @@ fun HomeShimmer() {
             Spacer(Modifier.height(8.dp))
         }
         Spacer(Modifier.height(24.dp))
-        ShimmerBox(Modifier.width(150.dp).height(22.dp).clip(RoundedCornerShape(4.dp)))
+        ShimmerBox(phase, Modifier.width(150.dp).height(22.dp).clip(RoundedCornerShape(4.dp)))
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             repeat(3) {
                 Column {
-                    ShimmerBox(Modifier.size(140.dp).clip(RoundedCornerShape(8.dp)))
+                    ShimmerBox(phase, Modifier.size(140.dp).clip(RoundedCornerShape(8.dp)))
                     Spacer(Modifier.height(8.dp))
-                    ShimmerBox(Modifier.width(100.dp).height(14.dp).clip(RoundedCornerShape(4.dp)))
+                    ShimmerBox(phase, Modifier.width(100.dp).height(14.dp).clip(RoundedCornerShape(4.dp)))
                 }
             }
         }

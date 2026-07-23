@@ -41,6 +41,7 @@ import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
@@ -58,6 +59,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         private const val ALERT_NOTIFICATION_ID = 2
         var instance: MusicPlaybackService? = null
             private set
+
+        // True once onCreate has published `instance` (and false after teardown). Lets the Activity
+        // await genuine service readiness instead of guessing with a fixed delay before wiring controls.
+        val serviceReady: MutableStateFlow<Boolean> = MutableStateFlow(false)
     }
 
     private var mediaSession: MediaSessionCompat? = null
@@ -410,6 +415,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         sessionToken = mediaSession!!.sessionToken
 
         instance = this
+        serviceReady.value = true
 
         // Start foreground immediately with a placeholder notification
         startForeground(NOTIFICATION_ID, buildNotification())
@@ -1188,6 +1194,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         // other reasons (e.g. low memory) we want the session to stay live
         // so the next launch can resume.
         instance = null
+        serviceReady.value = false
         super.onDestroy()
     }
 }

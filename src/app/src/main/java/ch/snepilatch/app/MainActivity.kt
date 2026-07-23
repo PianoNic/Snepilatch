@@ -31,6 +31,7 @@ import ch.snepilatch.app.util.loadCookies
 import ch.snepilatch.app.viewmodel.SpotifyViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -121,23 +122,19 @@ class MainActivity : ComponentActivity() {
             }
 
             // Wire service controls once initialized and service is ready
+            // Wait for the service to actually be up (instance published) rather than guessing with a
+            // fixed delay, then wire controls and — for a headphone cold-launch started by the
+            // MediaButtonReceiver with an autoplay extra — start playback. Kept as ONE effect so wiring
+            // is guaranteed to finish before autoplay reaches the cold-start onReady handoff.
             LaunchedEffect(initialized) {
                 if (initialized) {
-                    kotlinx.coroutines.delay(500)
+                    MusicPlaybackService.serviceReady.first { it }
                     vm.wireServiceControls()
-                }
-            }
-
-            // Headphone cold-launch: if MainActivity was started by the
-            // MediaButtonReceiver with an autoplay extra, fire togglePlayPause
-            // as soon as init finishes so the user hears music without having
-            // to tap the play button.
-            LaunchedEffect(initialized) {
-                if (initialized && intent.getBooleanExtra(MediaButtonReceiver.EXTRA_AUTO_PLAY, false)) {
-                    intent.removeExtra(MediaButtonReceiver.EXTRA_AUTO_PLAY)
-                    kotlinx.coroutines.delay(600) // let wireServiceControls finish
-                    if (!vm.playback.value.isPlaying) {
-                        vm.togglePlayPause()
+                    if (intent.getBooleanExtra(MediaButtonReceiver.EXTRA_AUTO_PLAY, false)) {
+                        intent.removeExtra(MediaButtonReceiver.EXTRA_AUTO_PLAY)
+                        if (!vm.playback.value.isPlaying) {
+                            vm.togglePlayPause()
+                        }
                     }
                 }
             }

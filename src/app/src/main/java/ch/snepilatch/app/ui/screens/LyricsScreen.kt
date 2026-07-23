@@ -344,10 +344,14 @@ private fun SyncedLyricsView(
     val isUnsynced = syncType == "UNSYNCED"
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
-    val posMs by smoothPosition
 
-    val activeIndex = if (isUnsynced) -1 else remember(posMs / 100) {
-        lines.indexOfLast { posMs >= it.startTimeMs }.coerceAtLeast(0)
+    // derivedStateOf so this view recomposes only when the active LINE changes, not every frame:
+    // smoothPosition updates per display frame, but the derived index changes only a few times a
+    // minute. Reading smoothPosition at body level would instead recompose the whole view every frame.
+    val activeIndex by remember(lines, isUnsynced) {
+        derivedStateOf {
+            if (isUnsynced) -1 else lines.indexOfLast { smoothPosition.value >= it.startTimeMs }.coerceAtLeast(0)
+        }
     }
 
     var userScrolling by remember { mutableStateOf(false) }

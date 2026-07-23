@@ -2436,6 +2436,15 @@ class SpotifyViewModel : ViewModel() {
         suppressRemotePause = suppress
     }
 
+    /** Poll every 100ms up to [maxAttempts] times, returning as soon as [ready] is true (or attempts run
+     *  out). Used to wait briefly for a state-machine file id / external url that races onTrackChange. */
+    private suspend fun pollFor(maxAttempts: Int, ready: () -> Boolean) {
+        for (i in 1..maxAttempts) {
+            delay(100)
+            if (ready()) return
+        }
+    }
+
     /**
      * Acquire the Spotify-CDN [SpotifyStream] for [trackUri]: reuse the pre-resolved next-track CDN URL
      * when its file id matches, else wait for the state-machine file id (up to ~1.5s), self-resolve if
@@ -2467,11 +2476,8 @@ class SpotifyViewModel : ViewModel() {
                 // endpoint below only offers premium MP4_256 on many accounts, which a free CDM
                 // can't license. Cheap: only runs when the cluster hasn't supplied a file id yet.
                 LokiLogger.d(TAG, "SpotifyCDN: Waiting for state-machine file ID...")
-                for (i in 1..15) {
-                    delay(100)
-                    fileId = latestFileId
-                    if (fileId != null) break
-                }
+                pollFor(15) { latestFileId != null }
+                fileId = latestFileId
             }
             // Still null: self-resolve. Use the media endpoint only when the file id is
             // licensable for this account (see safeMediaFileId), else metadata/4/track.
@@ -2722,12 +2728,9 @@ class SpotifyViewModel : ViewModel() {
             var externalUrl = externalUrlByUri[trackUri]
             if (fileId == null && externalUrl == null) {
                 // Either callback can land just after onTrackChange — give them a moment.
-                for (i in 1..8) {
-                    delay(100)
-                    fileId = latestFileId
-                    externalUrl = externalUrlByUri[trackUri]
-                    if (fileId != null || externalUrl != null) break
-                }
+                pollFor(8) { latestFileId != null || externalUrlByUri[trackUri] != null }
+                fileId = latestFileId
+                externalUrl = externalUrlByUri[trackUri]
             }
 
             // External/RSS: direct https url, no DRM. Stream it as-is.

@@ -46,7 +46,7 @@ class JukeboxController(
         const val FALLBACK_HANDOFF_MS = 45_000L // used only when the track duration is unknown
         const val REANALYZE_GROWTH_S = 30 // re-analyse + enrich jumps every +30s of newly captured audio
         const val VIZ_BUCKETS = 56 // number of pillars in the remix map
-        const val VIZ_TICK_MS = 120L // how often the remix map refreshes
+        const val VIZ_TICK_MS = 200L // how often the remix map refreshes (JukeboxTimeline eases between ticks)
         const val PREVIEW_START_S = 10 // run the first similarity search ~10s in (populates the remix map)
 
         // Refresh cadence for the preview similarities until the centre handoff. Was 5s, but each refresh
@@ -318,17 +318,41 @@ class JukeboxController(
         vizJob?.cancel()
         vizJob = scope.launch(Dispatchers.Default) {
             val total = maxOf(1, totalFrames)
+            var lastPosFrames = -1
+            var lastBuffered = -1
+            var lastRemixing: Boolean? = null
+            var lastBuckets: FloatArray? = null
             while (currentCoroutineContext().isActive && _enabled.value) {
+                // Frozen while paused: the playhead doesn't move and buckets don't change, so skip the
+                // recompute + emit entirely and just idle until resume.
+                if (paused) {
+                    delay(VIZ_TICK_MS)
+                    continue
+                }
                 val eng = engine
                 val posMs = if (eng != null) eng.positionMs() else withContext(Dispatchers.Main) { svc.getCurrentPosition() }
                 val posFrames = (posMs * rate / 1000).toInt()
                 val buffered = svc.jukeboxCapturedFrames().coerceIn(0, total)
-                _viz.value = JukeboxViz(
-                    buckets = normalizeBuckets(eng?.jumpBuckets(VIZ_BUCKETS, total) ?: previewBuckets),
-                    bufferedFraction = buffered.toFloat() / total,
-                    playheadFraction = (posFrames.toFloat() / total).coerceIn(0f, 1f),
-                    remixing = eng != null
-                )
+                val remixing = eng != null
+                val buckets = normalizeBuckets(eng?.jumpBuckets(VIZ_BUCKETS, total) ?: previewBuckets)
+                // Emit (and trigger downstream recomposition) only when something observable changed.
+                val changed = lastBuckets == null ||
+                    posFrames != lastPosFrames ||
+                    buffered != lastBuffered ||
+                    remixing != lastRemixing ||
+                    !buckets.contentEquals(lastBuckets)
+                if (changed) {
+                    _viz.value = JukeboxViz(
+                        buckets = buckets,
+                        bufferedFraction = buffered.toFloat() / total,
+                        playheadFraction = (posFrames.toFloat() / total).coerceIn(0f, 1f),
+                        remixing = remixing
+                    )
+                    lastPosFrames = posFrames
+                    lastBuffered = buffered
+                    lastRemixing = remixing
+                    lastBuckets = buckets
+                }
                 delay(VIZ_TICK_MS)
             }
             _viz.value = null

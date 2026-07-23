@@ -278,7 +278,6 @@ fun PlayerBackground(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
     val audioPlaying = isPlaying && !isPaused
 
     Box(modifier) {
-        // Canvas video background (looping, muted)
         val url = canvasVideoUrl
         if (canvasOn && url != null) {
             CanvasVideoBackground(url, audioPlaying)
@@ -425,7 +424,6 @@ fun NowPlayingScreen(
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Left side: Album art
                     Column(
                         Modifier
                             .weight(0.45f)
@@ -444,14 +442,12 @@ fun NowPlayingScreen(
 
                     Spacer(Modifier.width(16.dp))
 
-                    // Right side: Info + controls
                     Column(
                         Modifier
                             .weight(0.55f)
                             .fillMaxHeight(),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // Top bar
                         Row(
                             Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -506,7 +502,6 @@ fun NowPlayingScreen(
 
                         Spacer(Modifier.weight(0.3f))
 
-                        // Track info + like
                         Row(
                             Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -576,7 +571,6 @@ fun NowPlayingScreen(
 
                         Spacer(Modifier.weight(0.2f))
 
-                        // Controls
                         Row(
                             Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceEvenly,
@@ -665,7 +659,6 @@ fun NowPlayingScreen(
                         val streaming by vm.isStreaming.collectAsState()
                         val audioOutput by vm.audioOutputName.collectAsState()
                         val audioType by vm.audioOutputType.collectAsState()
-                        // Live audio output tracking
                         val audioCtx = LocalContext.current
                         DisposableEffect(Unit) {
                             val am = audioCtx.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
@@ -796,7 +789,6 @@ fun NowPlayingScreen(
                 ) {
                     Spacer(Modifier.statusBarsPadding().height(8.dp))
 
-                    // Top bar: down arrow, "Now playing", three-dot menu
                     Row(
                             Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -880,7 +872,6 @@ fun NowPlayingScreen(
 
                     Spacer(Modifier.height(32.dp))
 
-                    // Track info + like button
                     Row(
                         Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -963,13 +954,11 @@ fun NowPlayingScreen(
 
                     Spacer(Modifier.weight(0.15f))
 
-                    // Controls — with dark circular backgrounds
                     Row(
                         Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Shuffle
                         FilledTonalIconToggleButton(
                             checked = isShuffling,
                             onCheckedChange = { vm.toggleShuffle() },
@@ -983,7 +972,6 @@ fun NowPlayingScreen(
                         ) {
                             Icon(Icons.Rounded.Shuffle, stringResource(R.string.shuffle), modifier = Modifier.size(22.dp))
                         }
-                        // Previous
                         FilledTonalIconButton(
                             onClick = { vm.skipPrevious() },
                             colors = IconButtonDefaults.filledTonalIconButtonColors(
@@ -994,7 +982,6 @@ fun NowPlayingScreen(
                         ) {
                             Icon(Icons.Rounded.SkipPrevious, stringResource(R.string.previous), modifier = Modifier.size(32.dp))
                         }
-                        // Play/Pause — large prominent button
                         FilledIconButton(
                             onClick = { if (!spinnerActive) vm.togglePlayPause() },
                             colors = IconButtonDefaults.filledIconButtonColors(
@@ -1015,7 +1002,6 @@ fun NowPlayingScreen(
                                 )
                             }
                         }
-                        // Next
                         val nextReady by vm.isNextReady.collectAsState()
                         val isCurrentlyStreaming by vm.isStreaming.collectAsState()
                         val nextLoading = !nextReady && isCurrentlyStreaming
@@ -1033,7 +1019,6 @@ fun NowPlayingScreen(
                                 Icon(Icons.Rounded.SkipNext, stringResource(R.string.next), modifier = Modifier.size(32.dp))
                             }
                         }
-                        // Repeat
                         FilledTonalIconToggleButton(
                             checked = repeatMode != "off",
                             onCheckedChange = { vm.cycleRepeat() },
@@ -1300,7 +1285,6 @@ private fun NowPlayingMenu(
             }
         ) {
             SheetNavBarFix()
-            // Track header
             track?.let { t ->
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),

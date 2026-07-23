@@ -27,8 +27,10 @@ class PositionInterpolator(
     private var tickCount = 0
 
     fun start() {
-        job?.cancel()
-        tickCount = 0
+        // Idempotent: redundant per-state-push starts must not cancel/relaunch the loop (which would
+        // also reset the 30s Connect-report counter). A genuine restart goes through stop() first,
+        // which nulls the job.
+        if (job?.isActive == true) return
         job = scope.launch {
             while (true) {
                 delay(TICK_MS)
@@ -55,6 +57,7 @@ class PositionInterpolator(
     fun stop() {
         job?.cancel()
         job = null
+        tickCount = 0
     }
 
     companion object {

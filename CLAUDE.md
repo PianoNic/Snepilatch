@@ -58,7 +58,7 @@ The pre-resolved cache (`nextCdnUrl` + `nextCdnFileId` from `onNextPlaybackId`) 
 
 ## ViewModel split strategy
 
-`SpotifyViewModel` is large (~3k lines). We extract feature-scoped ViewModels incrementally. **Extracted so far: `SearchViewModel`, `LyricsViewModel`, `DetailViewModel`** (the last built on the shared `Navigator`). Each lands with its own tests.
+`SpotifyViewModel` is large (~3k lines). We extract feature-scoped ViewModels incrementally. **Extracted so far: `SearchViewModel`, `LyricsViewModel`, `DetailViewModel`, `LibraryViewModel`** (the last two built on the shared `Navigator`). Each lands with its own tests.
 
 **Navigation is a process-scoped `Navigator`** (like `SessionHolder`): it owns `currentScreen` + the back stack + `navigateTo`/`navigateToTab`/`goBack`. `SpotifyViewModel` delegates to it and `reset()`s it on construction. Feature VMs navigate through `Navigator` directly — that's what unblocked the Detail extraction. For a feature VM whose openers must also be reachable from `SpotifyViewModel`'s own code (deep links, playback-context bridges) or from non-composable UI builders, add a tiny process-scoped router object next to the VM (see `DetailRoutes`): the live VM registers itself in `init` and the callers hop through it, so no one holds a cross-VM reference. A screen (normally Home) is always composed before any deep link is processed, so a VM is always registered in time.
 
@@ -70,7 +70,8 @@ Pattern (proven by `SearchViewModel`/`LyricsViewModel`):
 
 **What makes a feature safe to extract now vs. what's blocked:**
 - Clean = the feature reads the session, writes its own state, and navigates through `Navigator`. `Lyrics` needed no navigation at all; `Detail` navigates via `Navigator` and exposes `DetailRoutes` for the `SpotifyViewModel`/non-composable callers.
-- **Still on `SpotifyViewModel`:** `Library`, `Account`, `Devices`. These are now unblocked (Navigator exists) — follow the `DetailViewModel` PR as the template. Watch for cross-feature triggers (e.g. "refresh library after `createPlaylist`"): route them through a small router object like `DetailRoutes`, or inline them in the caller. `removeFromLibrary` stayed on `SpotifyViewModel` with the other library-mutation actions.
+- **`Account` and `Devices` are NOT clean extractions — leave them on `SpotifyViewModel`.** They're playback-coupled: `AccountInfo.isPremium` gates audio-source logic inside the VM, and `activeDeviceName` is written from the playback state handler (`updatePlaybackFromState`) while `loadDevices`/`transferPlayback` need `PlayerConnect`. Extracting them would drag playback state across a VM boundary — the same reason we don't extract playback itself.
+- **`LibraryViewModel`** took the clean part: the library list + pagination + `createPlaylist`/`removeFromLibrary`. It loads in `init` (the old eager load lived in `SpotifyViewModel.initialize`, which runs before any composable exists) and reads `username` from `SessionHolder`. The snackbar-emitting `followArtist`/`savePlaylist` and the add-to-playlist picker stayed on `SpotifyViewModel` (they'd have needed the snackbar channel + a router for non-composable callers) — "add external content to the library" is a separable concern from browsing it.
 
 Don't try to extract playback. The handler-extraction + test rig pattern (see `RemotePlayPauseHandlerTest`) is the safer route for that area.
 

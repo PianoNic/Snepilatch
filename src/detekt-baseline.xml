@@ -7,7 +7,7 @@
     <ID>BlockCommentInitialStarAlignment:Type.kt$/* Other default text styles to override titleLarge = TextStyle( fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal, fontSize = 22.sp, lineHeight = 28.sp, letterSpacing = 0.sp ), labelSmall = TextStyle( fontFamily = FontFamily.Default, fontWeight = FontWeight.Medium, fontSize = 11.sp, lineHeight = 16.sp, letterSpacing = 0.5.sp ) */</ID>
     <ID>CyclomaticComplexMethod:AccountScreen.kt$@Composable fun AccountScreen(vm: SpotifyViewModel)</ID>
     <ID>CyclomaticComplexMethod:DetailScreen.kt$@Composable fun DetailScreen(vm: SpotifyViewModel)</ID>
-    <ID>CyclomaticComplexMethod:LibraryScreen.kt$@Composable fun LibraryScreen(vm: SpotifyViewModel)</ID>
+    <ID>CyclomaticComplexMethod:LibraryScreen.kt$@Composable fun LibraryScreen()</ID>
     <ID>CyclomaticComplexMethod:LyricsScreen.kt$@Composable fun LyricsScreen(vm: SpotifyViewModel)</ID>
     <ID>CyclomaticComplexMethod:NowPlayingScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun NowPlayingScreen( vm: SpotifyViewModel, /** When false, the screen paints no background of its own — the morphing card * in SpotifyApp supplies a card-anchored background that grows with it. */ drawBackground: Boolean = true, /** Per-frame vertical drag (px, down = positive) for finger-tracked collapse; * when set, replaces the standalone swipe-down-to-dismiss. */ onMorphDrag: ((Float) -&gt; Unit)? = null, /** Drag release with vertical velocity (px/s) so the morph can settle. */ onMorphDragEnd: ((Float) -&gt; Unit)? = null )</ID>
     <ID>CyclomaticComplexMethod:SpotifyApp.kt$@Composable fun SpotifyApp(vm: SpotifyViewModel)</ID>
@@ -30,7 +30,7 @@
     <ID>LongMethod:DetailScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun AlbumTrackRow( track: ch.snepilatch.app.data.TrackInfo, vm: SpotifyViewModel, contextUri: String, trackIndex: Int? = null )</ID>
     <ID>LongMethod:DetailScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun ArtistTrackRow( number: Int, track: ch.snepilatch.app.data.TrackInfo, vm: SpotifyViewModel, contextUri: String, playcount: String? = null )</ID>
     <ID>LongMethod:DevicesDialog.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun DevicesDialog(vm: SpotifyViewModel)</ID>
-    <ID>LongMethod:LibraryScreen.kt$@Composable fun LibraryScreen(vm: SpotifyViewModel)</ID>
+    <ID>LongMethod:LibraryScreen.kt$@Composable fun LibraryScreen()</ID>
     <ID>LongMethod:LyricsScreen.kt$@Composable fun LyricsScreen(vm: SpotifyViewModel)</ID>
     <ID>LongMethod:MainActivity.kt$MainActivity$override fun onCreate(savedInstanceState: Bundle?)</ID>
     <ID>LongMethod:NowPlayingScreen.kt$@Composable fun PlayerBackground(vm: SpotifyViewModel, modifier: Modifier = Modifier)</ID>

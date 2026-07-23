@@ -26,6 +26,10 @@ object SessionHolder {
     @Volatile var spotifyPlayback: SpotifyPlayback? = null
     @Volatile var cdnResolver: SpotifyCdnResolver? = null
 
+    /** The signed-in user's Spotify username. Set during initialize once the profile loads; read by
+     *  library mutations (create/delete/save playlist) that need it. */
+    @Volatile var username: String = ""
+
     /** True if the holder has a ready-to-use session + player + resolver. */
     val isReady: Boolean
         get() = session != null && player != null && cdnResolver != null
@@ -49,5 +53,6 @@ object SessionHolder {
         player = null
         spotifyPlayback = null
         cdnResolver = null
+        username = ""
     }
 }

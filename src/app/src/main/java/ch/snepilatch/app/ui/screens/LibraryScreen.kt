@@ -258,8 +258,11 @@ fun LibraryScreen(vm: SpotifyViewModel) {
             ) {
                 itemsIndexed(sortedLibrary, key = { _, item -> item.uri }) { index, item ->
                     LibraryGridCard(item, vm)
-                    if (libraryHasMore && index >= library.size - 10) {
-                        LaunchedEffect(library.size) { vm.loadMoreLibrary() }
+                    // Key the near-end trigger on the VISIBLE (filtered/searched) list, not the raw
+                    // library — otherwise a filter that shrinks the list below library.size - 10 never
+                    // reaches the threshold and pagination silently stops.
+                    if (libraryHasMore && index >= sortedLibrary.size - 10) {
+                        LaunchedEffect(sortedLibrary.size) { vm.loadMoreLibrary() }
                     }
                 }
             }
@@ -270,8 +273,10 @@ fun LibraryScreen(vm: SpotifyViewModel) {
             ) {
                 itemsIndexed(sortedLibrary, key = { _, item -> item.uri }) { index, item ->
                     LibraryListItem(item, vm)
-                    if (libraryHasMore && index >= library.size - 10) {
-                        LaunchedEffect(library.size) { vm.loadMoreLibrary() }
+                    // See the grid branch: trigger on the visible list size, not the raw library, so
+                    // pagination still fires when a filter/search shrinks the list.
+                    if (libraryHasMore && index >= sortedLibrary.size - 10) {
+                        LaunchedEffect(sortedLibrary.size) { vm.loadMoreLibrary() }
                     }
                 }
             }

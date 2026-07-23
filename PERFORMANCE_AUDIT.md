@@ -104,7 +104,17 @@ What landed, and where it deviates from the card text:
 - **P0-6** Added single-field `distinctUntilChanged` projections to the VM (`currentTrack`, `isPausedFlow`, `isAdFlow`, `durationFlow`, `isShufflingFlow`, `repeatModeFlow`, `positionFlow`). MiniPlayerContent, NowPlayingScreen, PlayerBackground and LyricsScreen no longer collect the whole `PlaybackUiState`. `positionFlow` (the only 2Hz projection) is collected **only** in the `MiniProgressBar` / `PlaybackProgress` leaves; LyricsScreen re-anchors by collecting it *inside* a coroutine instead of keying a `LaunchedEffect` on a composition read, so position ticks no longer recompose its scaffold.
 - **Extra (not on a card, same root cause):** `SpotifyApp.kt` — the app **root** collected the whole `PlaybackUiState` just to test `track != null`, recomposing the entire app at 2Hz. Now reads the `currentTrackUri` projection. This is the "narrow the SpotifyApp root" item the critic note referenced.
 
-**Still unverified — needs a device.** Every acceptance bullet that says "a GPU/frame profiler shows…" or "recomposition counts…" has *not* been measured. Compile/test/detekt only. Next agent (or a human) should profile paused-vs-playing on-device and confirm: zero frame callbacks while paused on the player, canvas decoder at 0 when paused, and MiniPlayerContent not recomposing on position ticks.
+**On-device verification — DONE for P0-1 (2026-07-20).** Samsung Galaxy S25 Ultra (SM-S938B, SDK 36, 120Hz panel), measured with `adb shell dumpsys gfxinfo ch.snepilatch.app` over 8-second windows in fluid-background mode, as a true A/B of the pre-P0 commit (`647b0ef`) vs the P0 commit (`5487c4e`):
+
+| Scenario | Pre-P0 | P0 fix |
+|---|---|---|
+| Fluid bg, **paused**, 8s | **~975 frames (~122 fps)** — warp never froze | **0 frames** — fully idle |
+| Fluid bg, playing, 8s | ~121 fps | ~121 fps (display-capped by the smooth progress bar; warp rebuild throttled to ~30fps, which frame-count can't isolate) |
+| Accent bg, paused, 8s | — | 0 frames |
+
+P0-1's "freeze when paused" claim is proven: the pre-P0 build rebuilt the full 3-effect RenderEffect chain ~122×/s while paused and doing nothing — the phone-heat root cause — and the fix drops that to zero.
+
+**Still unmeasured:** P0-5 canvas pause-on-pause (needs a track that actually has a Canvas clip), and the per-composable recomposition-count claims for P0-2 / P0-6 (gfxinfo counts frames, not recompositions — these need Layout Inspector / composition tracing to confirm the leaf-confinement).
 
 **Environment note:** `app/libs/KotifyClient.jar` was stale (Jun 14) against the current source and the build was already broken before any of this work. Rebuilt from the sibling `KotifyClient` repo via `./gradlew obfuscate`.
 

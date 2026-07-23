@@ -1778,7 +1778,11 @@ class SpotifyViewModel : ViewModel() {
                     p.skipToTrack(track.uri, uid, ctxUri)
                 } else {
                     LokiLogger.w(TAG, "No UID for queue track, falling back to local advance")
-                    repeat(index + 1) { p.localNext(); delay(300) }
+                    val steps = minOf(index + 1, MAX_LOCAL_WALK)
+                    if (index + 1 > MAX_LOCAL_WALK) {
+                        LokiLogger.w(TAG, "Capped no-uid queue walk to $MAX_LOCAL_WALK of ${index + 1} steps; tap the row again to advance further")
+                    }
+                    repeat(steps) { p.localNext(); delay(300) }
                 }
             } catch (e: Exception) { LokiLogger.e(TAG, "skipToQueueIndex", e) }
         }
@@ -3237,5 +3241,9 @@ class SpotifyViewModel : ViewModel() {
          *  restart the track instead of going to the previous one. Matches the
          *  behavior most music players use. */
         private const val PREV_RESTART_THRESHOLD_MS = 3000L
+
+        /** Cap on best-effort localNext() steps when a queue row has no uid (skipToTrack impossible).
+         *  Deep no-uid jumps become approximate; we log when capped so the user can tap again. */
+        private const val MAX_LOCAL_WALK = 5
     }
 }

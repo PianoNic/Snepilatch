@@ -262,6 +262,12 @@ class PlaybackViewModel : ViewModel() {
     // fully determine which indicator branch runs, so re-running (and its loadDevices() network call)
     // is only needed when they change — not on every onState push (~5/track).
     private var lastDeviceIndicatorKey: Pair<Boolean, Boolean>? = null
+
+    // True while some OTHER Connect device holds playback. Written from the state handler on every
+    // push, read by the transport commands: the local* state reports below describe THIS device, so
+    // they're meaningless when the active device is someone else's — those cases need a real command.
+    @Volatile private var foreignDeviceActive = false
+
     private val playlistNameCache = mutableMapOf<String, String>()
 
     // Loading (detail loading moved to DetailViewModel.isLoading)
@@ -998,7 +1004,8 @@ class PlaybackViewModel : ViewModel() {
 
         // Detect playback transfer away — stop local ExoPlayer
         LokiLogger.d(TAG, "Transfer check: streaming=${isStreaming.value} hasActive=${state.has_active_device} isOurs=${state.is_active_device}")
-        if (isStreaming.value && state.has_active_device && !state.is_active_device) {
+        foreignDeviceActive = state.has_active_device && !state.is_active_device
+        if (isStreaming.value && foreignDeviceActive) {
             LokiLogger.i(TAG, "Playback transferred to another device — stopping local stream")
             isStreaming.value = false
             streamProvider.value = null
@@ -1127,6 +1134,19 @@ class PlaybackViewModel : ViewModel() {
             try {
                 val p = player ?: return@launch
                 val t0 = System.currentTimeMillis()
+                if (foreignDeviceActive) {
+                    // Another device holds playback: act as a remote control for it. The local* state
+                    // reports below describe THIS device, so they'd be ignored, and the cold-start path
+                    // would claim the device and pull the audio over here. Moving playback to the phone
+                    // stays an explicit action via the devices dialog (transferPlayback).
+                    if (action == "resume") p.resume() else p.pause()
+                    // Optimistic flip so the button responds now; the cluster push confirms it.
+                    val resuming = action == "resume"
+                    _playback.value = _playback.value.copy(isPlaying = resuming, isPaused = !resuming)
+                    if (resuming) startPositionTicker() else stopPositionTicker()
+                    LokiLogger.i(TAG, "[Timing] CMD $action (remote device) done in ${System.currentTimeMillis() - t0}ms")
+                    return@launch
+                }
                 if (action == "resume") {
                     if (isStreaming.value) {
                         // Hot path: ExoPlayer is already loaded — flip the UI to playing
@@ -2197,6 +2217,22 @@ class PlaybackViewModel : ViewModel() {
      */
     internal fun setSuppressRemotePauseForTest(suppress: Boolean) {
         suppressRemotePause = suppress
+    }
+
+    /**
+     * Test seam: simulate another Connect device holding playback, so [togglePlayPause] must issue a
+     * remote command instead of a local state report / cold start.
+     */
+    internal fun setForeignDeviceActiveForTest(active: Boolean) {
+        foreignDeviceActive = active
+    }
+
+    /**
+     * Test seam: await the in-flight transport command. [togglePlayPause] and friends launch on
+     * [Dispatchers.IO], so assertions would otherwise race the coroutine.
+     */
+    internal suspend fun awaitCommandForTest() {
+        commandJob?.join()
     }
 
     /** Poll every 100ms up to [maxAttempts] times, returning as soon as [ready] is true (or attempts run

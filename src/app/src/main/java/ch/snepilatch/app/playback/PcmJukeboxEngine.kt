@@ -13,7 +13,7 @@ import kotlin.random.Random
  * (captured live from the audio pipeline — no separate download) through our own [AudioTrack], and at
  * waveform-matched points jumps to a similar section with an equal-power **crossfade**. Because we own
  * every sample, the splice has no decoder flush and no click — genuinely seamless, unlike an ExoPlayer
- * seek. The match points come from [WaveformAnalyzer]; no Spotify beats involved.
+ * seek. The match points come from [WaveformAnalyzer]; no Spfy beats involved.
  *
  * The captured audio + its jump candidates live in a swappable [Snapshot]: playback starts as soon as
  * the opening is captured, then [update] swaps in bigger snapshots as the rest of the track loads, so

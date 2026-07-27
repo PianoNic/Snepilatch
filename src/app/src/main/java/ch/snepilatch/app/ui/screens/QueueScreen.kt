@@ -19,7 +19,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
-import ch.snepilatch.app.ui.components.SpotifyImage
+import ch.snepilatch.app.ui.components.SpfyImage
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 
@@ -34,16 +34,16 @@ fun QueueScreen(vm: PlaybackViewModel) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = { vm.goBack() }) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back), tint = SpotifyWhite)
+                Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back), tint = SpfyWhite)
             }
-            Text(stringResource(R.string.queue), color = SpotifyWhite, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.queue), color = SpfyWhite, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         }
 
         // Now playing
         playback.track?.let { track ->
             Text(
                 stringResource(R.string.now_playing),
-                color = SpotifyLightGray,
+                color = SpfyLightGray,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -51,14 +51,14 @@ fun QueueScreen(vm: PlaybackViewModel) {
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .background(SpotifyGray.copy(alpha = 0.5f))
+                    .background(SpfyGray.copy(alpha = 0.5f))
                     .padding(horizontal = 16.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                SpotifyImage(track.albumArt, Modifier.size(48.dp).clip(RoundedCornerShape(4.dp)))
+                SpfyImage(track.albumArt, Modifier.size(48.dp).clip(RoundedCornerShape(4.dp)))
                 Column(Modifier.padding(start = 12.dp).weight(1f)) {
-                    Text(track.name, color = SpotifyWhite, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(track.artist, color = SpotifyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(track.name, color = SpfyWhite, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(track.artist, color = SpfyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
@@ -67,7 +67,7 @@ fun QueueScreen(vm: PlaybackViewModel) {
         if (queue.isNotEmpty()) {
             Text(
                 stringResource(R.string.queue_next_up),
-                color = SpotifyLightGray,
+                color = SpfyLightGray,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -83,10 +83,10 @@ fun QueueScreen(vm: PlaybackViewModel) {
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    SpotifyImage(track.albumArt, Modifier.size(48.dp).clip(RoundedCornerShape(4.dp)))
+                    SpfyImage(track.albumArt, Modifier.size(48.dp).clip(RoundedCornerShape(4.dp)))
                     Column(Modifier.padding(start = 12.dp).weight(1f)) {
-                        Text(track.name, color = SpotifyWhite, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(track.artist, color = SpotifyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(track.name, color = SpfyWhite, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(track.artist, color = SpfyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
@@ -94,7 +94,7 @@ fun QueueScreen(vm: PlaybackViewModel) {
 
         if (queue.isEmpty() && playback.track == null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(stringResource(R.string.queue_empty), color = SpotifyLightGray, fontSize = 16.sp)
+                Text(stringResource(R.string.queue_empty), color = SpfyLightGray, fontSize = 16.sp)
             }
         }
     }

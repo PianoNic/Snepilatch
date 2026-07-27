@@ -67,7 +67,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
                 Modifier
                     .size(120.dp)
                     .clip(CircleShape)
-                    .background(SpotifyGray),
+                    .background(SpfyGray),
                 contentAlignment = Alignment.Center
             ) {
                 if (account.profileImageUrl != null) {
@@ -78,7 +78,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
                         contentScale = ContentScale.Crop
                     )
                 } else {
-                    Icon(Icons.Rounded.Person, null, tint = SpotifyLightGray, modifier = Modifier.size(64.dp))
+                    Icon(Icons.Rounded.Person, null, tint = SpfyLightGray, modifier = Modifier.size(64.dp))
                 }
             }
 
@@ -86,7 +86,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
 
             Text(
                 account.displayName.ifEmpty { account.username.ifEmpty { stringResource(R.string.loading_dots) } },
-                color = SpotifyWhite,
+                color = SpfyWhite,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -94,7 +94,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
             Spacer(Modifier.height(6.dp))
             Text(
                 stringResource(R.string.followers_playlists, account.followers, account.playlistCount),
-                color = SpotifyLightGray,
+                color = SpfyLightGray,
                 fontSize = 13.sp
             )
 
@@ -158,10 +158,10 @@ fun AccountScreen(vm: PlaybackViewModel) {
         }
         val currentLanguageLabel = languages.find { it.first == appLanguage }?.second ?: systemDefaultLabel
         ListItem(
-            headlineContent = { Text(stringResource(R.string.language), color = SpotifyWhite) },
-            supportingContent = { Text(currentLanguageLabel, color = SpotifyLightGray) },
-            leadingContent = { Icon(Icons.Rounded.Language, null, tint = SpotifyLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpotifyLightGray) },
+            headlineContent = { Text(stringResource(R.string.language), color = SpfyWhite) },
+            supportingContent = { Text(currentLanguageLabel, color = SpfyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.Language, null, tint = SpfyLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { showLanguagePicker = true }
         )
@@ -184,10 +184,10 @@ fun AccountScreen(vm: PlaybackViewModel) {
         var showLyricsPicker by remember { mutableStateOf(false) }
         val lyricsLabel = if (lyricsAnim == "horizontal") stringResource(R.string.lyrics_horizontal) else stringResource(R.string.lyrics_vertical)
         ListItem(
-            headlineContent = { Text(stringResource(R.string.lyrics_animation), color = SpotifyWhite) },
-            supportingContent = { Text(lyricsLabel, color = SpotifyLightGray) },
-            leadingContent = { Icon(Icons.Rounded.MusicNote, null, tint = SpotifyLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpotifyLightGray) },
+            headlineContent = { Text(stringResource(R.string.lyrics_animation), color = SpfyWhite) },
+            supportingContent = { Text(lyricsLabel, color = SpfyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.MusicNote, null, tint = SpfyLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { showLyricsPicker = true }
         )
@@ -218,15 +218,15 @@ fun AccountScreen(vm: PlaybackViewModel) {
         val losslessSubtitle = if (isLossless) {
             stringResource(R.string.lossless_on_flac)
         } else {
-            stringResource(R.string.lossless_off_spotify)
+            stringResource(R.string.lossless_off_spfy)
         }
 
         // Lossless toggle — when on, the resolver picks the best source
         // (Qobuz, then Deezer) autonomously; no provider choice.
         ListItem(
-            headlineContent = { Text(stringResource(R.string.lossless_audio), color = SpotifyWhite) },
-            supportingContent = { Text(losslessSubtitle, color = SpotifyLightGray) },
-            leadingContent = { Icon(Icons.Rounded.MusicNote, null, tint = SpotifyLightGray) },
+            headlineContent = { Text(stringResource(R.string.lossless_audio), color = SpfyWhite) },
+            supportingContent = { Text(losslessSubtitle, color = SpfyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.MusicNote, null, tint = SpfyLightGray) },
             trailingContent = {
                 Switch(
                     checked = isLossless,
@@ -236,8 +236,8 @@ fun AccountScreen(vm: PlaybackViewModel) {
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = animatedPrimary,
                         checkedTrackColor = animatedPrimary.copy(alpha = 0.5f),
-                        uncheckedThumbColor = SpotifyLightGray,
-                        uncheckedTrackColor = SpotifyLightGray.copy(alpha = 0.3f)
+                        uncheckedThumbColor = SpfyLightGray,
+                        uncheckedTrackColor = SpfyLightGray.copy(alpha = 0.3f)
                     )
                 )
             },
@@ -252,18 +252,18 @@ fun AccountScreen(vm: PlaybackViewModel) {
         val inAppEqOn by AppSettings.eqEnabled.collectAsState()
 
         ListItem(
-            headlineContent = { Text(stringResource(R.string.equalizer), color = SpotifyWhite) },
+            headlineContent = { Text(stringResource(R.string.equalizer), color = SpfyWhite) },
             supportingContent = {
-                Text(stringResource(if (inAppEqOn) R.string.state_on else R.string.state_off), color = SpotifyLightGray)
+                Text(stringResource(if (inAppEqOn) R.string.state_on else R.string.state_off), color = SpfyLightGray)
             },
-            leadingContent = { Icon(Icons.Rounded.GraphicEq, null, tint = SpotifyLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpotifyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.GraphicEq, null, tint = SpfyLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { vm.navigateTo(ch.snepilatch.app.data.Screen.EQUALIZER) }
         )
 
         ListItem(
-            headlineContent = { Text(stringResource(R.string.eq_headroom), color = SpotifyWhite) },
+            headlineContent = { Text(stringResource(R.string.eq_headroom), color = SpfyWhite) },
             supportingContent = {
                 Text(
                     when {
@@ -271,10 +271,10 @@ fun AccountScreen(vm: PlaybackViewModel) {
                         headroomOn -> stringResource(R.string.eq_headroom_on, headroomDb.toInt())
                         else -> stringResource(R.string.eq_headroom_off)
                     },
-                    color = SpotifyLightGray
+                    color = SpfyLightGray
                 )
             },
-            leadingContent = { Icon(Icons.AutoMirrored.Rounded.VolumeUp, null, tint = SpotifyLightGray) },
+            leadingContent = { Icon(Icons.AutoMirrored.Rounded.VolumeUp, null, tint = SpfyLightGray) },
             trailingContent = {
                 Switch(
                     checked = headroomOn && !inAppEqOn,
@@ -283,8 +283,8 @@ fun AccountScreen(vm: PlaybackViewModel) {
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = animatedPrimary,
                         checkedTrackColor = animatedPrimary.copy(alpha = 0.5f),
-                        uncheckedThumbColor = SpotifyLightGray,
-                        uncheckedTrackColor = SpotifyLightGray.copy(alpha = 0.3f)
+                        uncheckedThumbColor = SpfyLightGray,
+                        uncheckedTrackColor = SpfyLightGray.copy(alpha = 0.3f)
                     )
                 )
             },
@@ -304,12 +304,12 @@ fun AccountScreen(vm: PlaybackViewModel) {
         // Canvas background
         val canvasOn by AppSettings.canvasEnabled.collectAsState()
         ListItem(
-            headlineContent = { Text(stringResource(R.string.canvas_background), color = SpotifyWhite) },
+            headlineContent = { Text(stringResource(R.string.canvas_background), color = SpfyWhite) },
             supportingContent = { Text(
                 if (canvasOn) stringResource(R.string.canvas_on) else stringResource(R.string.canvas_off),
-                color = SpotifyLightGray
+                color = SpfyLightGray
             ) },
-            leadingContent = { Icon(Icons.Rounded.PlayCircle, null, tint = SpotifyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.PlayCircle, null, tint = SpfyLightGray) },
             trailingContent = {
                 Switch(
                     checked = canvasOn,
@@ -317,8 +317,8 @@ fun AccountScreen(vm: PlaybackViewModel) {
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = animatedPrimary,
                         checkedTrackColor = animatedPrimary.copy(alpha = 0.5f),
-                        uncheckedThumbColor = SpotifyLightGray,
-                        uncheckedTrackColor = SpotifyLightGray.copy(alpha = 0.3f)
+                        uncheckedThumbColor = SpfyLightGray,
+                        uncheckedTrackColor = SpfyLightGray.copy(alpha = 0.3f)
                     )
                 )
             },
@@ -328,14 +328,14 @@ fun AccountScreen(vm: PlaybackViewModel) {
         // Player background style: album-colour gradient vs. the fluid Kawarp album-art warp.
         val gradientBg by AppSettings.playerGradientBg.collectAsState()
         ListItem(
-            headlineContent = { Text(stringResource(R.string.gradient_background), color = SpotifyWhite) },
+            headlineContent = { Text(stringResource(R.string.gradient_background), color = SpfyWhite) },
             supportingContent = {
                 Text(
                     stringResource(if (gradientBg) R.string.gradient_bg_on else R.string.gradient_bg_off),
-                    color = SpotifyLightGray
+                    color = SpfyLightGray
                 )
             },
-            leadingContent = { Icon(Icons.Rounded.Gradient, null, tint = SpotifyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.Gradient, null, tint = SpfyLightGray) },
             trailingContent = {
                 Switch(
                     checked = gradientBg,
@@ -343,8 +343,8 @@ fun AccountScreen(vm: PlaybackViewModel) {
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = animatedPrimary,
                         checkedTrackColor = animatedPrimary.copy(alpha = 0.5f),
-                        uncheckedThumbColor = SpotifyLightGray,
-                        uncheckedTrackColor = SpotifyLightGray.copy(alpha = 0.3f)
+                        uncheckedThumbColor = SpfyLightGray,
+                        uncheckedTrackColor = SpfyLightGray.copy(alpha = 0.3f)
                     )
                 )
             },
@@ -360,10 +360,10 @@ fun AccountScreen(vm: PlaybackViewModel) {
             currentRegion
         }
         ListItem(
-            headlineContent = { Text(stringResource(R.string.content_region), color = SpotifyWhite) },
-            supportingContent = { Text(regionLabel, color = SpotifyLightGray) },
-            leadingContent = { Icon(Icons.Rounded.Language, null, tint = SpotifyLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpotifyLightGray) },
+            headlineContent = { Text(stringResource(R.string.content_region), color = SpfyWhite) },
+            supportingContent = { Text(regionLabel, color = SpfyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.Language, null, tint = SpfyLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { showRegionPicker = true }
         )
@@ -397,9 +397,9 @@ fun AccountScreen(vm: PlaybackViewModel) {
 
         // Connect to device (Playback)
         ListItem(
-            headlineContent = { Text(stringResource(R.string.connect_to_device), color = SpotifyWhite) },
-            leadingContent = { Icon(Icons.Rounded.Devices, null, tint = SpotifyLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpotifyLightGray) },
+            headlineContent = { Text(stringResource(R.string.connect_to_device), color = SpfyWhite) },
+            leadingContent = { Icon(Icons.Rounded.Devices, null, tint = SpfyLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { vm.loadDevices(); vm.showDevices.value = true }
         )
@@ -438,10 +438,10 @@ fun AccountScreen(vm: PlaybackViewModel) {
         val leftButton by AppSettings.notificationLeftButton.collectAsState()
         var showLeftPicker by remember { mutableStateOf(false) }
         ListItem(
-            headlineContent = { Text(stringResource(R.string.notification_left_button), color = SpotifyWhite) },
-            supportingContent = { Text(buttonLabel(leftButton), color = SpotifyLightGray) },
-            leadingContent = { Icon(Icons.Rounded.Notifications, null, tint = SpotifyLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpotifyLightGray) },
+            headlineContent = { Text(stringResource(R.string.notification_left_button), color = SpfyWhite) },
+            supportingContent = { Text(buttonLabel(leftButton), color = SpfyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.Notifications, null, tint = SpfyLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { showLeftPicker = true }
         )
@@ -463,10 +463,10 @@ fun AccountScreen(vm: PlaybackViewModel) {
         val rightButton by AppSettings.notificationRightButton.collectAsState()
         var showRightPicker by remember { mutableStateOf(false) }
         ListItem(
-            headlineContent = { Text(stringResource(R.string.notification_right_button), color = SpotifyWhite) },
-            supportingContent = { Text(buttonLabel(rightButton), color = SpotifyLightGray) },
-            leadingContent = { Icon(Icons.Rounded.Notifications, null, tint = SpotifyLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpotifyLightGray) },
+            headlineContent = { Text(stringResource(R.string.notification_right_button), color = SpfyWhite) },
+            supportingContent = { Text(buttonLabel(rightButton), color = SpfyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.Notifications, null, tint = SpfyLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { showRightPicker = true }
         )
@@ -488,9 +488,9 @@ fun AccountScreen(vm: PlaybackViewModel) {
         AccountSectionHeader(stringResource(R.string.about))
 
         ListItem(
-            headlineContent = { Text(stringResource(R.string.app_version), color = SpotifyWhite) },
-            supportingContent = { Text(BuildConfig.VERSION_NAME, color = SpotifyLightGray) },
-            leadingContent = { Icon(Icons.Rounded.Info, null, tint = SpotifyLightGray) },
+            headlineContent = { Text(stringResource(R.string.app_version), color = SpfyWhite) },
+            supportingContent = { Text(BuildConfig.VERSION_NAME, color = SpfyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.Info, null, tint = SpfyLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
         )
 
@@ -502,14 +502,14 @@ fun AccountScreen(vm: PlaybackViewModel) {
         var upToDate by remember { mutableStateOf(false) }
 
         ListItem(
-            headlineContent = { Text(stringResource(R.string.check_for_updates), color = SpotifyWhite) },
+            headlineContent = { Text(stringResource(R.string.check_for_updates), color = SpfyWhite) },
             supportingContent = { Text(
                 when {
                     isChecking -> stringResource(R.string.checking)
                     upToDate -> stringResource(R.string.up_to_date)
                     else -> stringResource(R.string.tap_to_check)
                 },
-                color = if (upToDate) animatedPrimary else SpotifyLightGray
+                color = if (upToDate) animatedPrimary else SpfyLightGray
             ) },
             leadingContent = {
                 if (isChecking) {
@@ -518,10 +518,10 @@ fun AccountScreen(vm: PlaybackViewModel) {
                         color = animatedPrimary
                     )
                 } else {
-                    Icon(Icons.Rounded.SystemUpdate, null, tint = SpotifyLightGray)
+                    Icon(Icons.Rounded.SystemUpdate, null, tint = SpfyLightGray)
                 }
             },
-            trailingContent = { if (!isChecking) Icon(Icons.Rounded.ChevronRight, null, tint = SpotifyLightGray) },
+            trailingContent = { if (!isChecking) Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable(enabled = !isChecking) {
                 isChecking = true
@@ -551,10 +551,10 @@ fun AccountScreen(vm: PlaybackViewModel) {
         var showReleaseNotes by remember { mutableStateOf(false) }
 
         ListItem(
-            headlineContent = { Text(stringResource(R.string.release_notes), color = SpotifyWhite) },
-            supportingContent = { Text(stringResource(R.string.view_changelog), color = SpotifyLightGray) },
-            leadingContent = { Icon(Icons.Rounded.Description, null, tint = SpotifyLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpotifyLightGray) },
+            headlineContent = { Text(stringResource(R.string.release_notes), color = SpfyWhite) },
+            supportingContent = { Text(stringResource(R.string.view_changelog), color = SpfyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.Description, null, tint = SpfyLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { showReleaseNotes = true }
         )
@@ -567,7 +567,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
         AccountSectionHeader(stringResource(R.string.special_thanks))
 
         ListItem(
-            headlineContent = { Text("Cinnabar 🧼", color = SpotifyWhite) },
+            headlineContent = { Text("Cinnabar 🧼", color = SpfyWhite) },
             leadingContent = {
                 AsyncImage(
                     model = "https://cdn.discordapp.com/avatars/823656705350565898/0167b0e2080d52dfa1f0a964a17828bb.webp?size=1024",
@@ -580,7 +580,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
         )
 
         ListItem(
-            headlineContent = { Text("MyDrift", color = SpotifyWhite) },
+            headlineContent = { Text("MyDrift", color = SpfyWhite) },
             leadingContent = {
                 AsyncImage(
                     model = "https://cdn.discordapp.com/avatars/679006161554505729/2a9c7c72d662df626e9e740cf427c15e.webp?size=1024",
@@ -598,7 +598,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
         ListItem(
             headlineContent = { Text(stringResource(R.string.log_out), color = Color(0xFFE57373)) },
             leadingContent = { Icon(Icons.AutoMirrored.Rounded.ExitToApp, null, tint = Color(0xFFE57373)) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpotifyLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable {
                 clearCookies(context)
@@ -610,10 +610,10 @@ fun AccountScreen(vm: PlaybackViewModel) {
 
 @Composable
 private fun AccountSectionHeader(title: String) {
-    HorizontalDivider(color = SpotifyGray, modifier = Modifier.padding(horizontal = 16.dp))
+    HorizontalDivider(color = SpfyGray, modifier = Modifier.padding(horizontal = 16.dp))
     Text(
         title,
-        color = SpotifyWhite,
+        color = SpfyWhite,
         fontSize = 16.sp,
         fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp)
@@ -635,11 +635,11 @@ private fun RadioPickerDialog(
 ) {
     TightAlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title, color = SpotifyWhite) },
+        title = { Text(title, color = SpfyWhite) },
         text = {
             Column {
                 if (description != null) {
-                    Text(description, color = SpotifyLightGray, fontSize = 13.sp)
+                    Text(description, color = SpfyLightGray, fontSize = 13.sp)
                     Spacer(Modifier.height(12.dp))
                 }
                 options.forEach { opt ->
@@ -655,27 +655,27 @@ private fun RadioPickerDialog(
                             onClick = { onSelect(opt.value) },
                             colors = RadioButtonDefaults.colors(
                                 selectedColor = selectedColor,
-                                unselectedColor = SpotifyLightGray
+                                unselectedColor = SpfyLightGray
                             )
                         )
                         Spacer(Modifier.width(8.dp))
                         if (opt.supportingText != null) {
                             Column {
-                                Text(opt.label, color = SpotifyWhite, fontSize = 15.sp)
-                                Text(opt.supportingText, color = SpotifyLightGray, fontSize = 12.sp)
+                                Text(opt.label, color = SpfyWhite, fontSize = 15.sp)
+                                Text(opt.supportingText, color = SpfyLightGray, fontSize = 12.sp)
                             }
                         } else {
-                            Text(opt.label, color = SpotifyWhite, fontSize = 15.sp)
+                            Text(opt.label, color = SpfyWhite, fontSize = 15.sp)
                         }
                     }
                 }
             }
         },
-        containerColor = SpotifyGray,
+        containerColor = SpfyGray,
         confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel), color = SpotifyLightGray)
+                Text(stringResource(R.string.cancel), color = SpfyLightGray)
             }
         }
     )

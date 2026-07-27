@@ -21,7 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
-import ch.snepilatch.app.ui.theme.SpotifyElevated
+import ch.snepilatch.app.ui.theme.SpfyElevated
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,7 +31,7 @@ fun TightAlertDialog(
     text: (@Composable () -> Unit)? = null,
     confirmButton: @Composable () -> Unit,
     dismissButton: (@Composable () -> Unit)? = null,
-    containerColor: Color = SpotifyElevated,
+    containerColor: Color = SpfyElevated,
     shape: Shape = AlertDialogDefaults.shape,
 ) {
     val maxBodyHeight = LocalConfiguration.current.screenHeightDp.dp * 0.6f

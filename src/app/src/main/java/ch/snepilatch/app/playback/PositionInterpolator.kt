@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 /**
  * Ticks the UI playback position forward every 500ms, reading the authoritative
  * position from ExoPlayer when streaming locally, and periodically reports the
- * position back to Spotify Connect so other clients stay in sync.
+ * position back to Spfy Connect so other clients stay in sync.
  *
  * Extracted from PlaybackViewModel as a pure refactor — behavior is unchanged.
  */
@@ -67,7 +67,7 @@ class PositionInterpolator(
         // glides at the panel's native refresh rate while this only keeps it honest.
         private const val TICK_MS = 500L
 
-        // Report to Spotify Connect every 30s (60 * 500ms).
+        // Report to Spfy Connect every 30s (60 * 500ms).
         private const val REPORT_EVERY_N_TICKS = 60
     }
 }

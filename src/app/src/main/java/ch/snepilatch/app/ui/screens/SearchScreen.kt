@@ -72,10 +72,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.components.OverflowAction
 import ch.snepilatch.app.ui.components.OverflowMenu
-import ch.snepilatch.app.ui.components.SpotifyImage
-import ch.snepilatch.app.ui.theme.SpotifyBlack
-import ch.snepilatch.app.ui.theme.SpotifyLightGray
-import ch.snepilatch.app.ui.theme.SpotifyWhite
+import ch.snepilatch.app.ui.components.SpfyImage
+import ch.snepilatch.app.ui.theme.SpfyBlack
+import ch.snepilatch.app.ui.theme.SpfyLightGray
+import ch.snepilatch.app.ui.theme.SpfyWhite
 import ch.snepilatch.app.viewmodel.DetailRoutes
 import ch.snepilatch.app.viewmodel.SearchViewModel
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
@@ -125,7 +125,7 @@ fun SearchScreen(vm: PlaybackViewModel, searchVm: SearchViewModel = viewModel())
     Column(Modifier.fillMaxSize().padding(top = 12.dp)) {
         Text(
             stringResource(R.string.search_title),
-            color = SpotifyWhite,
+            color = SpfyWhite,
             fontSize = 26.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -139,21 +139,21 @@ fun SearchScreen(vm: PlaybackViewModel, searchVm: SearchViewModel = viewModel())
                 .padding(horizontal = 16.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .focusRequester(focusRequester),
-            placeholder = { Text(stringResource(R.string.search_field_placeholder), color = SpotifyLightGray.copy(alpha = 0.7f)) },
-            leadingIcon = { Icon(Icons.Rounded.Search, null, tint = SpotifyBlack) },
+            placeholder = { Text(stringResource(R.string.search_field_placeholder), color = SpfyLightGray.copy(alpha = 0.7f)) },
+            leadingIcon = { Icon(Icons.Rounded.Search, null, tint = SpfyBlack) },
             trailingIcon = {
                 if (query.isNotEmpty()) {
                     IconButton(onClick = { searchVm.updateQuery("") }) {
-                        Icon(Icons.Rounded.Close, stringResource(R.string.search_clear), tint = SpotifyBlack)
+                        Icon(Icons.Rounded.Close, stringResource(R.string.search_clear), tint = SpfyBlack)
                     }
                 }
             },
             colors = TextFieldDefaults.colors(
-                focusedTextColor = SpotifyBlack,
-                unfocusedTextColor = SpotifyBlack,
-                cursorColor = SpotifyBlack,
-                focusedContainerColor = SpotifyWhite,
-                unfocusedContainerColor = SpotifyWhite,
+                focusedTextColor = SpfyBlack,
+                unfocusedTextColor = SpfyBlack,
+                cursorColor = SpfyBlack,
+                focusedContainerColor = SpfyWhite,
+                unfocusedContainerColor = SpfyWhite,
                 focusedIndicatorColor = Color.Transparent,
                 unfocusedIndicatorColor = Color.Transparent
             ),
@@ -185,7 +185,7 @@ fun SearchScreen(vm: PlaybackViewModel, searchVm: SearchViewModel = viewModel())
                 AnimatedVisibility(visible = isSearching, enter = fadeIn(), exit = fadeOut()) {
                     Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                         LoadingIndicator(
-                            color = SpotifyWhite,
+                            color = SpfyWhite,
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -207,7 +207,7 @@ private fun BrowseCategoriesGrid(onCategoryTap: (String) -> Unit) {
     Column {
         Text(
             stringResource(R.string.search_browse_all),
-            color = SpotifyWhite,
+            color = SpfyWhite,
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -234,7 +234,7 @@ private fun BrowseCategoriesGrid(onCategoryTap: (String) -> Unit) {
                         .padding(14.dp),
                     contentAlignment = Alignment.BottomStart
                 ) {
-                    Text(cat.name, color = SpotifyWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text(cat.name, color = SpfyWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -261,15 +261,15 @@ private fun SuggestionsList(
                 Icon(
                     Icons.Rounded.Search,
                     null,
-                    tint = SpotifyLightGray,
+                    tint = SpfyLightGray,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(Modifier.width(16.dp))
-                Text(sug.text, color = SpotifyWhite, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                Text(sug.text, color = SpfyWhite, fontSize = 15.sp, modifier = Modifier.weight(1f))
                 Icon(
                     Icons.Rounded.North,
                     null,
-                    tint = SpotifyLightGray.copy(alpha = 0.6f),
+                    tint = SpfyLightGray.copy(alpha = 0.6f),
                     modifier = Modifier.size(16.dp)
                 )
             }
@@ -292,7 +292,7 @@ private data class UnifiedResult(
     val menu: List<OverflowAction> = emptyList()
 )
 
-/** Share action for any Spotify entity: turns spotify:track:ID into an open.spotify.com link. */
+/** Share action for any Spfy entity: turns spotify:track:ID into an open.spotify.com link. */
 private fun shareAction(ctx: Context, uri: String) = OverflowAction(
     Icons.Rounded.Share, ctx.getString(R.string.share)
 ) {
@@ -424,7 +424,7 @@ private fun CategorizedResults(
         ) {
             if (selectedFilter == SearchViewModel.SearchFilter.ALL) {
                 // Relevance layout (web-player style): the Top Result hero, then each
-                // section in Spotify's per-query chipOrder, capped with a "Show all".
+                // section in Spfy's per-query chipOrder, capped with a "Show all".
                 results.topResult?.let { top ->
                     val unified = top.toUnified(vm, ctx)
                     item(key = "top") { TopResultCard(unified) }
@@ -509,19 +509,19 @@ private fun TopResultCard(r: UnifiedResult) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(
             stringResource(R.string.search_top_result),
-            color = SpotifyWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold,
+            color = SpfyWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 8.dp)
         )
         Row(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
-                .background(SpotifyLightGray.copy(alpha = 0.10f))
+                .background(SpfyLightGray.copy(alpha = 0.10f))
                 .clickable { r.onClick() }
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            SpotifyImage(
+            SpfyImage(
                 url = r.imageUrl,
                 modifier = Modifier.size(80.dp),
                 shape = if (r.circular) CircleShape else RoundedCornerShape(6.dp)
@@ -529,12 +529,12 @@ private fun TopResultCard(r: UnifiedResult) {
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    r.title, color = SpotifyWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold,
+                    r.title, color = SpfyWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold,
                     maxLines = 2, overflow = TextOverflow.Ellipsis
                 )
                 if (r.subtitle.isNotBlank()) {
                     Text(
-                        r.subtitle, color = SpotifyLightGray, fontSize = 13.sp,
+                        r.subtitle, color = SpfyLightGray, fontSize = 13.sp,
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(top = 2.dp)
                     )
@@ -551,10 +551,10 @@ private fun SectionHeader(title: String, onShowAll: () -> Unit) {
         Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(title, color = SpotifyWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        Text(title, color = SpfyWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
         Text(
             stringResource(R.string.search_show_all),
-            color = SpotifyLightGray, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+            color = SpfyLightGray, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
             modifier = Modifier.clickable { onShowAll() }
         )
     }
@@ -584,8 +584,8 @@ private fun FilterChipRow(
 
 @Composable
 private fun FilterChip(label: String, isSelected: Boolean, onClick: () -> Unit) {
-    val bg = if (isSelected) Color(0xFF1DB954) else SpotifyLightGray.copy(alpha = 0.18f)
-    val fg = if (isSelected) SpotifyBlack else SpotifyWhite
+    val bg = if (isSelected) Color(0xFF1DB954) else SpfyLightGray.copy(alpha = 0.18f)
+    val fg = if (isSelected) SpfyBlack else SpfyWhite
     Box(
         Modifier
             .clip(RoundedCornerShape(50))
@@ -623,7 +623,7 @@ private fun ResultRow(
             .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        SpotifyImage(
+        SpfyImage(
             url = imageUrl,
             modifier = Modifier.size(56.dp),
             shape = if (circular) CircleShape else RoundedCornerShape(6.dp)
@@ -632,7 +632,7 @@ private fun ResultRow(
         Column(Modifier.weight(1f)) {
             Text(
                 title,
-                color = SpotifyWhite,
+                color = SpfyWhite,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
@@ -641,7 +641,7 @@ private fun ResultRow(
             if (subtitle.isNotBlank()) {
                 Text(
                     subtitle,
-                    color = SpotifyLightGray,
+                    color = SpfyLightGray,
                     fontSize = 13.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis

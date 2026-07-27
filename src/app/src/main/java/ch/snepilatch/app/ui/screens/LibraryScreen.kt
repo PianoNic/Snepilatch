@@ -1,6 +1,6 @@
 package ch.snepilatch.app.ui.screens
 
-import ch.snepilatch.app.ui.theme.SpotifyWhite
+import ch.snepilatch.app.ui.theme.SpfyWhite
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -66,12 +66,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
 import ch.snepilatch.app.data.LibraryItem
-import ch.snepilatch.app.ui.components.SpotifyImage
+import ch.snepilatch.app.ui.components.SpfyImage
 import ch.snepilatch.app.ui.components.TightAlertDialog
-import ch.snepilatch.app.ui.theme.SpotifyBlack
-import ch.snepilatch.app.ui.theme.SpotifyElevated
-import ch.snepilatch.app.ui.theme.SpotifyGray
-import ch.snepilatch.app.ui.theme.SpotifyLightGray
+import ch.snepilatch.app.ui.theme.SpfyBlack
+import ch.snepilatch.app.ui.theme.SpfyElevated
+import ch.snepilatch.app.ui.theme.SpfyGray
+import ch.snepilatch.app.ui.theme.SpfyLightGray
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.LibraryViewModel
@@ -126,13 +126,13 @@ fun LibraryScreen() {
                 .padding(horizontal = 12.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(stringResource(R.string.library_title), color = SpotifyWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold,
+            Text(stringResource(R.string.library_title), color = SpfyWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f))
             IconButton(onClick = { searchActive = !searchActive; if (!searchActive) searchQuery = "" }) {
-                Icon(Icons.Rounded.Search, stringResource(R.string.search), tint = SpotifyWhite, modifier = Modifier.size(24.dp))
+                Icon(Icons.Rounded.Search, stringResource(R.string.search), tint = SpfyWhite, modifier = Modifier.size(24.dp))
             }
             IconButton(onClick = { showCreateDialog = true }) {
-                Icon(Icons.Rounded.Add, stringResource(R.string.library_create), tint = SpotifyWhite, modifier = Modifier.size(26.dp))
+                Icon(Icons.Rounded.Add, stringResource(R.string.library_create), tint = SpfyWhite, modifier = Modifier.size(26.dp))
             }
         }
 
@@ -148,23 +148,23 @@ fun LibraryScreen() {
                 placeholder = {
                     Text(
                         stringResource(R.string.library_search_placeholder),
-                        color = SpotifyLightGray.copy(alpha = 0.7f)
+                        color = SpfyLightGray.copy(alpha = 0.7f)
                     )
                 },
-                leadingIcon = { Icon(Icons.Rounded.Search, null, tint = SpotifyLightGray) },
+                leadingIcon = { Icon(Icons.Rounded.Search, null, tint = SpfyLightGray) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Rounded.Close, stringResource(R.string.clear), tint = SpotifyLightGray)
+                            Icon(Icons.Rounded.Close, stringResource(R.string.clear), tint = SpfyLightGray)
                         }
                     }
                 },
                 colors = TextFieldDefaults.colors(
-                    focusedTextColor = SpotifyWhite,
-                    unfocusedTextColor = SpotifyWhite,
-                    cursorColor = SpotifyWhite,
-                    focusedContainerColor = SpotifyGray,
-                    unfocusedContainerColor = SpotifyGray,
+                    focusedTextColor = SpfyWhite,
+                    unfocusedTextColor = SpfyWhite,
+                    cursorColor = SpfyWhite,
+                    focusedContainerColor = SpfyGray,
+                    unfocusedContainerColor = SpfyGray,
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent
                 ),
@@ -191,10 +191,10 @@ fun LibraryScreen() {
                     },
                     label = { Text(filters[i].second, fontSize = 13.sp) },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = SpotifyWhite,
-                        selectedLabelColor = SpotifyBlack,
-                        containerColor = SpotifyGray,
-                        labelColor = SpotifyWhite
+                        selectedContainerColor = SpfyWhite,
+                        selectedLabelColor = SpfyBlack,
+                        containerColor = SpfyGray,
+                        labelColor = SpfyWhite
                     ),
                     border = null
                 )
@@ -214,19 +214,19 @@ fun LibraryScreen() {
                     Modifier.clickable { showSortMenu = true }.padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Rounded.SwapVert, stringResource(R.string.library_sort), tint = SpotifyLightGray, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Rounded.SwapVert, stringResource(R.string.library_sort), tint = SpfyLightGray, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
                     val sortLabel = when (sortMode) {
                         "alpha" -> stringResource(R.string.library_sort_alpha)
                         "type" -> stringResource(R.string.library_sort_by_type)
                         else -> stringResource(R.string.library_sort_recent)
                     }
-                    Text(sortLabel, color = SpotifyLightGray, fontSize = 13.sp)
+                    Text(sortLabel, color = SpfyLightGray, fontSize = 13.sp)
                 }
                 DropdownMenu(
                     expanded = showSortMenu,
                     onDismissRequest = { showSortMenu = false },
-                    containerColor = SpotifyGray
+                    containerColor = SpfyGray
                 ) {
                     listOf(
                         "recent" to stringResource(R.string.library_sort_recent),
@@ -234,7 +234,7 @@ fun LibraryScreen() {
                         "type" to stringResource(R.string.library_sort_by_type)
                     ).forEach { (value, label) ->
                         DropdownMenuItem(
-                            text = { Text(label, color = if (sortMode == value) SpotifyWhite else SpotifyLightGray) },
+                            text = { Text(label, color = if (sortMode == value) SpfyWhite else SpfyLightGray) },
                             onClick = { sortMode = value; prefs.edit().putString("library_sort", value).apply(); showSortMenu = false }
                         )
                     }
@@ -247,7 +247,7 @@ fun LibraryScreen() {
                 Icon(
                     if (gridView) Icons.AutoMirrored.Rounded.List else Icons.Rounded.GridView,
                     stringResource(R.string.library_toggle_view),
-                    tint = SpotifyLightGray,
+                    tint = SpfyLightGray,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -338,13 +338,13 @@ fun LibraryGridCard(item: LibraryItem) {
         horizontalAlignment = if (isArtist) Alignment.CenterHorizontally else Alignment.Start
     ) {
         if (item.type == "collection") {
-            SpotifyImage(
+            SpfyImage(
                 url = LIKED_SONGS_IMAGE,
                 modifier = Modifier.fillMaxWidth().aspectRatio(1f),
                 shape = RoundedCornerShape(8.dp)
             )
         } else {
-            SpotifyImage(
+            SpfyImage(
                 url = item.imageUrl,
                 modifier = Modifier.fillMaxWidth().aspectRatio(1f),
                 shape = if (isArtist) CircleShape else RoundedCornerShape(8.dp),
@@ -356,11 +356,11 @@ fun LibraryGridCard(item: LibraryItem) {
             )
         }
         Spacer(Modifier.height(8.dp))
-        Text(item.name, color = SpotifyWhite, fontSize = 14.sp, fontWeight = FontWeight.Medium,
+        Text(item.name, color = SpfyWhite, fontSize = 14.sp, fontWeight = FontWeight.Medium,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(
             "${item.type.replaceFirstChar { it.uppercase() }}${if (item.owner != null) " \u00B7 ${item.owner}" else ""}",
-            color = SpotifyLightGray, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+            color = SpfyLightGray, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
         )
     }
 }
@@ -385,16 +385,16 @@ fun LibraryListItem(item: LibraryItem) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (item.type == "collection") {
-            // Liked Songs with gradient background like Spotify
+            // Liked Songs with gradient background like Spfy
             Box(
                 Modifier.size(56.dp).clip(RoundedCornerShape(4.dp))
                     .background(Brush.linearGradient(listOf(Color(0xFF450AF5), Color(0xFFC4EAFD)))),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Filled.FavoriteBorder, null, tint = SpotifyWhite, modifier = Modifier.size(28.dp))
+                Icon(Icons.Filled.FavoriteBorder, null, tint = SpfyWhite, modifier = Modifier.size(28.dp))
             }
         } else {
-            SpotifyImage(
+            SpfyImage(
                 url = item.imageUrl,
                 modifier = Modifier.size(56.dp),
                 shape = if (isArtist) CircleShape else RoundedCornerShape(4.dp),
@@ -407,11 +407,11 @@ fun LibraryListItem(item: LibraryItem) {
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(item.name, color = SpotifyWhite, fontSize = 16.sp, fontWeight = FontWeight.Medium,
+            Text(item.name, color = SpfyWhite, fontSize = 16.sp, fontWeight = FontWeight.Medium,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
                 "${item.type.replaceFirstChar { it.uppercase() }}${if (item.owner != null) " \u00B7 ${item.owner}" else ""}",
-                color = SpotifyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+                color = SpfyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -422,20 +422,20 @@ fun CreatePlaylistDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
     var name by remember { mutableStateOf("") }
     TightAlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = SpotifyElevated,
-        title = { Text(stringResource(R.string.library_create_playlist), color = SpotifyWhite, fontWeight = FontWeight.Bold) },
+        containerColor = SpfyElevated,
+        title = { Text(stringResource(R.string.library_create_playlist), color = SpfyWhite, fontWeight = FontWeight.Bold) },
         text = {
             TextField(
                 value = name,
                 onValueChange = { name = it },
-                placeholder = { Text(stringResource(R.string.library_playlist_name_hint), color = SpotifyLightGray) },
+                placeholder = { Text(stringResource(R.string.library_playlist_name_hint), color = SpfyLightGray) },
                 colors = TextFieldDefaults.colors(
-                    focusedTextColor = SpotifyWhite,
-                    unfocusedTextColor = SpotifyWhite,
-                    cursorColor = SpotifyWhite,
-                    focusedContainerColor = SpotifyGray,
-                    unfocusedContainerColor = SpotifyGray,
-                    focusedIndicatorColor = SpotifyWhite,
+                    focusedTextColor = SpfyWhite,
+                    unfocusedTextColor = SpfyWhite,
+                    cursorColor = SpfyWhite,
+                    focusedContainerColor = SpfyGray,
+                    unfocusedContainerColor = SpfyGray,
+                    focusedIndicatorColor = SpfyWhite,
                     unfocusedIndicatorColor = Color.Transparent
                 ),
                 singleLine = true,
@@ -444,11 +444,11 @@ fun CreatePlaylistDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
         },
         confirmButton = {
             TextButton(onClick = { if (name.isNotBlank()) onCreate(name) }) {
-                Text(stringResource(R.string.library_create_button), color = SpotifyWhite, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.library_create_button), color = SpfyWhite, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel), color = SpotifyLightGray) }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel), color = SpfyLightGray) }
         }
     )
 }
@@ -458,9 +458,9 @@ private fun LibraryRemoveDialog(item: LibraryItem, onDismiss: () -> Unit) {
     val libraryVm: LibraryViewModel = viewModel()
     TightAlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.library_remove_title), color = SpotifyWhite) },
-        text = { Text(stringResource(R.string.library_remove_message, item.name), color = SpotifyLightGray) },
-        containerColor = SpotifyGray,
+        title = { Text(stringResource(R.string.library_remove_title), color = SpfyWhite) },
+        text = { Text(stringResource(R.string.library_remove_message, item.name), color = SpfyLightGray) },
+        containerColor = SpfyGray,
         confirmButton = {
             TextButton(onClick = {
                 libraryVm.removeFromLibrary(item)
@@ -471,7 +471,7 @@ private fun LibraryRemoveDialog(item: LibraryItem, onDismiss: () -> Unit) {
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel), color = SpotifyLightGray)
+                Text(stringResource(R.string.cancel), color = SpfyLightGray)
             }
         }
     )

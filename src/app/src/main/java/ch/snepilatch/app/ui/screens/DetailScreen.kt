@@ -38,7 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
-import ch.snepilatch.app.ui.components.SpotifyImage
+import ch.snepilatch.app.ui.components.SpfyImage
 import ch.snepilatch.app.ui.components.TrackRow
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.util.stripHtml
@@ -60,7 +60,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
 
     if (isLoading) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            LoadingIndicator(color = SpotifyLightGray)
+            LoadingIndicator(color = SpfyLightGray)
         }
         return
     }
@@ -71,7 +71,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
         // Hero image
         item {
             Box(Modifier.fillMaxWidth().height(if (isArtist) 350.dp else 300.dp)) {
-                SpotifyImage(
+                SpfyImage(
                     url = detail.imageUrl,
                     modifier = Modifier.fillMaxSize(),
                     shape = RoundedCornerShape(0.dp)
@@ -80,7 +80,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                     Modifier
                         .fillMaxSize()
                         .background(Brush.verticalGradient(
-                            listOf(Color.Transparent, SpotifyBlack),
+                            listOf(Color.Transparent, SpfyBlack),
                             startY = if (isArtist) 400f else 150f
                         ))
                 )
@@ -94,12 +94,12 @@ fun DetailScreen(vm: PlaybackViewModel) {
                         .clickable { vm.goBack() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back), tint = SpotifyWhite, modifier = Modifier.size(20.dp))
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back), tint = SpfyWhite, modifier = Modifier.size(20.dp))
                 }
                 Column(Modifier.align(Alignment.BottomStart).padding(16.dp)) {
                     Text(
                         detail.name,
-                        color = SpotifyWhite,
+                        color = SpfyWhite,
                         fontSize = if (isArtist) 36.sp else 26.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -113,7 +113,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                     val desc = remember(detail.description) { detail.description?.let { stripHtml(it) } }
                     if (desc != null) {
-                        Text(desc, color = SpotifyLightGray, fontSize = 13.sp, maxLines = 2)
+                        Text(desc, color = SpfyLightGray, fontSize = 13.sp, maxLines = 2)
                         Spacer(Modifier.height(4.dp))
                     }
                     // Owner · songs · duration all on one line
@@ -131,7 +131,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                         meta.add(stringResource(R.string.detail_minutes, totalMin.toInt()))
                     }
                     if (meta.isNotEmpty()) {
-                        Text(meta.joinToString(" · "), color = SpotifyLightGray, fontSize = 13.sp)
+                        Text(meta.joinToString(" · "), color = SpfyLightGray, fontSize = 13.sp)
                     }
                 }
             }
@@ -145,7 +145,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                     if (detail.artistName != null) {
                         Text(
                             detail.artistName!!,
-                            color = SpotifyWhite,
+                            color = SpfyWhite,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.clickable {
@@ -157,7 +157,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                     val summary = remember(detail.description) { detail.description?.let { stripHtml(it) } }
                     val meta = listOfNotNull(detail.albumType, detail.releaseDate, summary).joinToString(" · ")
                     if (meta.isNotBlank()) {
-                        Text(meta, color = SpotifyLightGray, fontSize = 13.sp)
+                        Text(meta, color = SpfyLightGray, fontSize = 13.sp)
                     }
                 }
             }
@@ -168,10 +168,10 @@ fun DetailScreen(vm: PlaybackViewModel) {
             item {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                     if (detail.publisher != null) {
-                        Text(detail.publisher!!, color = SpotifyWhite, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        Text(detail.publisher!!, color = SpfyWhite, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     }
                     if (detail.description != null) {
-                        Text(detail.description!!, color = SpotifyLightGray, fontSize = 13.sp)
+                        Text(detail.description!!, color = SpfyLightGray, fontSize = 13.sp)
                     }
                 }
             }
@@ -187,7 +187,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                 }
                 Text(
                     stringResource(R.string.detail_monthly_listeners, formatted),
-                    color = SpotifyLightGray,
+                    color = SpfyLightGray,
                     fontSize = 13.sp,
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 0.dp)
                 )
@@ -221,9 +221,9 @@ fun DetailScreen(vm: PlaybackViewModel) {
                         OutlinedButton(
                             onClick = { detailVm.toggleDetailSaved(detail.type, detailId) },
                             colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = SpotifyWhite
+                                contentColor = SpfyWhite
                             ),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, SpotifyLightGray),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, SpfyLightGray),
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
                             modifier = Modifier.height(32.dp)
                         ) {
@@ -238,7 +238,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                             checked = saved,
                             onCheckedChange = { detailVm.toggleDetailSaved(detail.type, detailId) },
                             colors = IconButtonDefaults.iconToggleButtonColors(
-                                contentColor = SpotifyWhite,
+                                contentColor = SpfyWhite,
                                 checkedContentColor = accentColor,
                             ),
                         ) {
@@ -255,7 +255,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                 // KotifyClient supports for the current detail type.
                 var showHeaderMenu by remember { mutableStateOf(false) }
                 IconButton(onClick = { showHeaderMenu = true }) {
-                    Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SpotifyLightGray, modifier = Modifier.size(24.dp))
+                    Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SpfyLightGray, modifier = Modifier.size(24.dp))
                 }
                 if (showHeaderMenu) {
                     DetailHeaderMenu(
@@ -271,7 +271,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                 IconButton(onClick = { vm.toggleShuffle() }) {
                     Icon(
                         Icons.Rounded.Shuffle, stringResource(R.string.shuffle),
-                        tint = if (shuffling) accentColor else SpotifyWhite,
+                        tint = if (shuffling) accentColor else SpfyWhite,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -308,7 +308,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
             item {
                 Text(
                     stringResource(R.string.popular),
-                    color = SpotifyWhite,
+                    color = SpfyWhite,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
@@ -331,7 +331,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
         if (isLoadingMore) {
             item {
                 Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                    LoadingIndicator(color = SpotifyLightGray, modifier = Modifier.size(24.dp))
+                    LoadingIndicator(color = SpfyLightGray, modifier = Modifier.size(24.dp))
                 }
             }
         }
@@ -342,7 +342,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                 Spacer(Modifier.height(16.dp))
                 Text(
                     stringResource(R.string.popular_releases),
-                    color = SpotifyWhite,
+                    color = SpfyWhite,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -363,17 +363,17 @@ fun DetailScreen(vm: PlaybackViewModel) {
                                     detailVm.openAlbum(id)
                                 }
                         ) {
-                            SpotifyImage(
+                            SpfyImage(
                                 url = rel.imageUrl,
                                 modifier = Modifier.size(130.dp),
                                 shape = RoundedCornerShape(8.dp)
                             )
                             Spacer(Modifier.height(6.dp))
-                            Text(rel.name, color = SpotifyWhite, fontSize = 13.sp, fontWeight = FontWeight.Medium,
+                            Text(rel.name, color = SpfyWhite, fontSize = 13.sp, fontWeight = FontWeight.Medium,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(
                                 listOfNotNull(rel.year, rel.albumType).joinToString(" · "),
-                                color = SpotifyLightGray, fontSize = 11.sp, maxLines = 1
+                                color = SpfyLightGray, fontSize = 11.sp, maxLines = 1
                             )
                         }
                     }
@@ -387,7 +387,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                 Spacer(Modifier.height(16.dp))
                 Text(
                     stringResource(R.string.fans_also_like),
-                    color = SpotifyWhite,
+                    color = SpfyWhite,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -409,13 +409,13 @@ fun DetailScreen(vm: PlaybackViewModel) {
                                 },
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            SpotifyImage(
+                            SpfyImage(
                                 url = ra.imageUrl,
                                 modifier = Modifier.size(120.dp),
                                 shape = CircleShape
                             )
                             Spacer(Modifier.height(8.dp))
-                            Text(ra.name, color = SpotifyWhite, fontSize = 13.sp,
+                            Text(ra.name, color = SpfyWhite, fontSize = 13.sp,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                 modifier = Modifier.fillMaxWidth())
@@ -432,14 +432,14 @@ fun DetailScreen(vm: PlaybackViewModel) {
                 Spacer(Modifier.height(16.dp))
                 Text(
                     stringResource(R.string.about),
-                    color = SpotifyWhite,
+                    color = SpfyWhite,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
                 Text(
                     bio,
-                    color = SpotifyLightGray,
+                    color = SpfyLightGray,
                     fontSize = 14.sp,
                     maxLines = 4,
                     overflow = TextOverflow.Ellipsis,
@@ -454,7 +454,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                 Spacer(Modifier.height(16.dp))
                 Text(
                     stringResource(R.string.more_by, detail.artistName ?: stringResource(R.string.unknown)),
-                    color = SpotifyWhite,
+                    color = SpfyWhite,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -475,17 +475,17 @@ fun DetailScreen(vm: PlaybackViewModel) {
                                     detailVm.openAlbum(id)
                                 }
                         ) {
-                            SpotifyImage(
+                            SpfyImage(
                                 url = rel.imageUrl,
                                 modifier = Modifier.size(130.dp),
                                 shape = RoundedCornerShape(8.dp)
                             )
                             Spacer(Modifier.height(6.dp))
-                            Text(rel.name, color = SpotifyWhite, fontSize = 13.sp, fontWeight = FontWeight.Medium,
+                            Text(rel.name, color = SpfyWhite, fontSize = 13.sp, fontWeight = FontWeight.Medium,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(
                                 listOfNotNull(rel.year, rel.albumType).joinToString(" · "),
-                                color = SpotifyLightGray, fontSize = 11.sp, maxLines = 1
+                                color = SpfyLightGray, fontSize = 11.sp, maxLines = 1
                             )
                         }
                     }
@@ -499,7 +499,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                 Spacer(Modifier.height(24.dp))
                 Text(
                     detail.copyright!!,
-                    color = SpotifyLightGray.copy(alpha = 0.6f),
+                    color = SpfyLightGray.copy(alpha = 0.6f),
                     fontSize = 11.sp,
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
@@ -532,11 +532,11 @@ private fun ArtistTrackRow(
     ) {
         Text(
             "$number",
-            color = if (isPlaying) accent else SpotifyLightGray,
+            color = if (isPlaying) accent else SpfyLightGray,
             fontSize = 15.sp,
             modifier = Modifier.width(28.dp)
         )
-        SpotifyImage(
+        SpfyImage(
             url = track.albumArt,
             modifier = Modifier.size(44.dp),
             shape = RoundedCornerShape(4.dp)
@@ -546,7 +546,7 @@ private fun ArtistTrackRow(
         Column(Modifier.weight(1f)) {
             Text(
                 track.name,
-                color = if (isPlaying) accent else SpotifyWhite,
+                color = if (isPlaying) accent else SpfyWhite,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
@@ -557,13 +557,13 @@ private fun ArtistTrackRow(
                     val num = playcount.toLong()
                     String.format("%,d", num)
                 } catch (_: Exception) { playcount }
-                Text(formatted, color = SpotifyLightGray, fontSize = 12.sp)
+                Text(formatted, color = SpfyLightGray, fontSize = 12.sp)
             }
         }
         // 3-dot menu
         var showMenu by remember { mutableStateOf(false) }
         IconButton(onClick = { showMenu = true }, modifier = Modifier.size(36.dp)) {
-            Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SpotifyLightGray, modifier = Modifier.size(20.dp))
+            Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SpfyLightGray, modifier = Modifier.size(20.dp))
         }
         if (showMenu) {
             val sheetState = rememberBottomSheetState(
@@ -573,14 +573,14 @@ private fun ArtistTrackRow(
             ModalBottomSheet(
                 onDismissRequest = { showMenu = false },
                 sheetState = sheetState,
-                containerColor = SpotifyElevated,
+                containerColor = SpfyElevated,
                 dragHandle = {
                     Box(
                         Modifier
                             .padding(vertical = 12.dp)
                             .width(40.dp)
                             .height(4.dp)
-                            .background(SpotifyLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
+                            .background(SpfyLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
                     )
                 }
             ) {
@@ -590,15 +590,15 @@ private fun ArtistTrackRow(
                     Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    SpotifyImage(url = track.albumArt, modifier = Modifier.size(48.dp), shape = RoundedCornerShape(8.dp))
+                    SpfyImage(url = track.albumArt, modifier = Modifier.size(48.dp), shape = RoundedCornerShape(8.dp))
                     Spacer(Modifier.width(12.dp))
                     Column {
-                        Text(track.name, color = SpotifyWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(track.artist, color = SpotifyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(track.name, color = SpfyWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(track.artist, color = SpfyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 Spacer(Modifier.height(8.dp))
-                HorizontalDivider(color = SpotifyLightGray.copy(alpha = 0.15f))
+                HorizontalDivider(color = SpfyLightGray.copy(alpha = 0.15f))
 
                 val menuContext = androidx.compose.ui.platform.LocalContext.current
                 val shareLabel = stringResource(R.string.share)
@@ -638,9 +638,9 @@ private fun ArtistTrackRow(
                             .padding(horizontal = 20.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(icon, null, tint = SpotifyWhite, modifier = Modifier.size(24.dp))
+                        Icon(icon, null, tint = SpfyWhite, modifier = Modifier.size(24.dp))
                         Spacer(Modifier.width(16.dp))
-                        Text(label, color = SpotifyWhite, fontSize = 15.sp)
+                        Text(label, color = SpfyWhite, fontSize = 15.sp)
                     }
                 }
                 Spacer(Modifier.navigationBarsPadding().height(12.dp))
@@ -673,7 +673,7 @@ private fun AlbumTrackRow(
         Column(Modifier.weight(1f)) {
             Text(
                 track.name,
-                color = if (isPlaying) accent else SpotifyWhite,
+                color = if (isPlaying) accent else SpfyWhite,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
@@ -682,7 +682,7 @@ private fun AlbumTrackRow(
             if (track.artist.isNotBlank()) {
                 Text(
                     track.artist,
-                    color = SpotifyLightGray,
+                    color = SpfyLightGray,
                     fontSize = 13.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -691,7 +691,7 @@ private fun AlbumTrackRow(
         }
         var showMenu by remember { mutableStateOf(false) }
         IconButton(onClick = { showMenu = true }, modifier = Modifier.size(36.dp)) {
-            Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SpotifyLightGray, modifier = Modifier.size(20.dp))
+            Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SpfyLightGray, modifier = Modifier.size(20.dp))
         }
         if (showMenu) {
             val sheetState = rememberBottomSheetState(
@@ -701,14 +701,14 @@ private fun AlbumTrackRow(
             ModalBottomSheet(
                 onDismissRequest = { showMenu = false },
                 sheetState = sheetState,
-                containerColor = SpotifyElevated,
+                containerColor = SpfyElevated,
                 dragHandle = {
                     Box(
                         Modifier
                             .padding(vertical = 12.dp)
                             .width(40.dp)
                             .height(4.dp)
-                            .background(SpotifyLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
+                            .background(SpfyLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
                     )
                 }
             ) {
@@ -717,15 +717,15 @@ private fun AlbumTrackRow(
                     Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    SpotifyImage(url = track.albumArt, modifier = Modifier.size(48.dp), shape = RoundedCornerShape(8.dp))
+                    SpfyImage(url = track.albumArt, modifier = Modifier.size(48.dp), shape = RoundedCornerShape(8.dp))
                     Spacer(Modifier.width(12.dp))
                     Column {
-                        Text(track.name, color = SpotifyWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(track.artist, color = SpotifyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(track.name, color = SpfyWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(track.artist, color = SpfyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 Spacer(Modifier.height(8.dp))
-                HorizontalDivider(color = SpotifyLightGray.copy(alpha = 0.15f))
+                HorizontalDivider(color = SpfyLightGray.copy(alpha = 0.15f))
                 val menuContext = androidx.compose.ui.platform.LocalContext.current
                 val shareLabel = stringResource(R.string.share)
                 val addQueueLabel = stringResource(R.string.add_to_queue)
@@ -763,9 +763,9 @@ private fun AlbumTrackRow(
                             .padding(horizontal = 20.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(icon, null, tint = SpotifyWhite, modifier = Modifier.size(24.dp))
+                        Icon(icon, null, tint = SpfyWhite, modifier = Modifier.size(24.dp))
                         Spacer(Modifier.width(16.dp))
-                        Text(label, color = SpotifyWhite, fontSize = 15.sp)
+                        Text(label, color = SpfyWhite, fontSize = 15.sp)
                     }
                 }
                 Spacer(Modifier.navigationBarsPadding().height(12.dp))
@@ -778,7 +778,7 @@ private fun AlbumTrackRow(
  * Bottom-sheet menu opened from the 3-dot button on the detail header
  * (album, playlist, artist, Liked Songs). Each row is a single action that
  * KotifyClient actually supports — no Premium-gated entries, no UI-only
- * "show Spotify Code" filler. Action set adapts to the detail type.
+ * "show Spfy Code" filler. Action set adapts to the detail type.
  *
  * Skips "Remove from Library" because the like/save toggle already lives
  * elsewhere in the header.
@@ -802,27 +802,27 @@ private fun DetailHeaderMenu(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = SpotifyElevated,
+        containerColor = SpfyElevated,
     ) {
         ch.snepilatch.app.ui.components.SheetNavBarFix()
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            ch.snepilatch.app.ui.components.SpotifyImage(
+            ch.snepilatch.app.ui.components.SpfyImage(
                 url = detail.imageUrl,
                 modifier = Modifier.size(48.dp),
                 shape = RoundedCornerShape(8.dp)
             )
             Spacer(Modifier.width(12.dp))
             Column {
-                Text(detail.name, color = SpotifyWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(detail.name, color = SpfyWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 val subtitle = detail.artistName ?: detail.ownerName ?: type.replaceFirstChar { it.uppercase() }
-                Text(subtitle, color = SpotifyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(subtitle, color = SpfyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
         Spacer(Modifier.height(8.dp))
-        HorizontalDivider(color = SpotifyLightGray.copy(alpha = 0.15f))
+        HorizontalDivider(color = SpfyLightGray.copy(alpha = 0.15f))
         val items = buildList<Triple<androidx.compose.ui.graphics.vector.ImageVector, String, () -> Unit>> {
             if (!isCollection) {
                 val id = detail.uri.substringAfterLast(":")
@@ -861,9 +861,9 @@ private fun DetailHeaderMenu(
                     .padding(horizontal = 20.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(icon, null, tint = SpotifyWhite, modifier = Modifier.size(24.dp))
+                Icon(icon, null, tint = SpfyWhite, modifier = Modifier.size(24.dp))
                 Spacer(Modifier.width(16.dp))
-                Text(label, color = SpotifyWhite, fontSize = 15.sp)
+                Text(label, color = SpfyWhite, fontSize = 15.sp)
             }
         }
         Spacer(Modifier.navigationBarsPadding().height(12.dp))

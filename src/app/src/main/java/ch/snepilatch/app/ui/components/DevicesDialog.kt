@@ -2,7 +2,7 @@
 
 package ch.snepilatch.app.ui.components
 
-import ch.snepilatch.app.ui.theme.SpotifyWhite
+import ch.snepilatch.app.ui.theme.SpfyWhite
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -47,9 +47,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
-import ch.snepilatch.app.ui.theme.SpotifyElevated
-import ch.snepilatch.app.ui.theme.SpotifyGray
-import ch.snepilatch.app.ui.theme.SpotifyLightGray
+import ch.snepilatch.app.ui.theme.SpfyElevated
+import ch.snepilatch.app.ui.theme.SpfyGray
+import ch.snepilatch.app.ui.theme.SpfyLightGray
 import ch.snepilatch.app.viewmodel.ThemeController
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 
@@ -74,14 +74,14 @@ fun DevicesDialog(vm: PlaybackViewModel) {
     ModalBottomSheet(
         onDismissRequest = { vm.showDevices.value = false },
         sheetState = sheetState,
-        containerColor = SpotifyElevated,
+        containerColor = SpfyElevated,
         dragHandle = {
             Box(
                 Modifier
                     .padding(vertical = 12.dp)
                     .width(40.dp)
                     .height(4.dp)
-                    .background(SpotifyLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
+                    .background(SpfyLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
             )
         }
     ) {
@@ -94,7 +94,7 @@ fun DevicesDialog(vm: PlaybackViewModel) {
             // Title
             Text(
                 stringResource(R.string.connect),
-                color = SpotifyWhite,
+                color = SpfyWhite,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
@@ -106,9 +106,9 @@ fun DevicesDialog(vm: PlaybackViewModel) {
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    LoadingIndicator(color = SpotifyWhite, modifier = Modifier.size(24.dp))
+                    LoadingIndicator(color = SpfyWhite, modifier = Modifier.size(24.dp))
                     Spacer(Modifier.width(12.dp))
-                    Text(stringResource(R.string.searching_devices), color = SpotifyLightGray, fontSize = 14.sp)
+                    Text(stringResource(R.string.searching_devices), color = SpfyLightGray, fontSize = 14.sp)
                 }
             }
 
@@ -155,7 +155,7 @@ fun DevicesDialog(vm: PlaybackViewModel) {
                             .padding(horizontal = 20.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.AutoMirrored.Rounded.VolumeDown, null, tint = SpotifyLightGray, modifier = Modifier.size(20.dp))
+                        Icon(Icons.AutoMirrored.Rounded.VolumeDown, null, tint = SpfyLightGray, modifier = Modifier.size(20.dp))
                         var volumeValue by remember { mutableFloatStateOf(playback.volume.toFloat()) }
                         var dragging by remember { mutableStateOf(false) }
                         // Track external volume changes when the user isn't dragging (equal writes to
@@ -168,17 +168,17 @@ fun DevicesDialog(vm: PlaybackViewModel) {
                                 volumeValue = it
                             },
                             onValueChangeFinished = {
-                                vm.setSpotifyVolume(volumeValue.toDouble())
+                                vm.setSpfyVolume(volumeValue.toDouble())
                                 dragging = false
                             },
                             modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
                             colors = SliderDefaults.colors(
                                 thumbColor = accentColor,
                                 activeTrackColor = accentColor,
-                                inactiveTrackColor = SpotifyGray
+                                inactiveTrackColor = SpfyGray
                             )
                         )
-                        Icon(Icons.AutoMirrored.Rounded.VolumeUp, null, tint = SpotifyLightGray, modifier = Modifier.size(20.dp))
+                        Icon(Icons.AutoMirrored.Rounded.VolumeUp, null, tint = SpfyLightGray, modifier = Modifier.size(20.dp))
                     }
                 }
 
@@ -204,13 +204,13 @@ fun DevicesDialog(vm: PlaybackViewModel) {
                             else -> Icons.Rounded.Computer
                         },
                         null,
-                        tint = SpotifyLightGray,
+                        tint = SpfyLightGray,
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(Modifier.width(16.dp))
                     Text(
                         if (isOurDevice) stringResource(R.string.this_smartphone) else device.name,
-                        color = SpotifyWhite,
+                        color = SpfyWhite,
                         fontSize = 16.sp,
                         modifier = Modifier.weight(1f)
                     )

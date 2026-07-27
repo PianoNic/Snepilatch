@@ -4,31 +4,31 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-class SpotifyImageUrlTest {
+class SpfyImageUrlTest {
 
-    @Test fun rewritesSpotifyImageUriToCdnUrl() {
+    @Test fun rewritesSpfyImageUriToCdnUrl() {
         assertEquals(
             "https://i.scdn.co/image/ab67616d0000b273abc",
-            normalizeSpotifyImageUrl("spotify:image:ab67616d0000b273abc")
+            normalizeSpfyImageUrl("spotify:image:ab67616d0000b273abc")
         )
     }
 
     @Test fun passesThroughHttpsUrl() {
         val url = "https://i.scdn.co/image/already-an-url"
-        assertEquals(url, normalizeSpotifyImageUrl(url))
+        assertEquals(url, normalizeSpfyImageUrl(url))
     }
 
     @Test fun passesThroughHttpUrl() {
         val url = "http://example.com/cover.jpg"
-        assertEquals(url, normalizeSpotifyImageUrl(url))
+        assertEquals(url, normalizeSpfyImageUrl(url))
     }
 
     @Test fun passesNullThrough() {
-        assertNull(normalizeSpotifyImageUrl(null))
+        assertNull(normalizeSpfyImageUrl(null))
     }
 
     @Test fun passesBlankThrough() {
-        assertEquals("", normalizeSpotifyImageUrl(""))
-        assertEquals("   ", normalizeSpotifyImageUrl("   "))
+        assertEquals("", normalizeSpfyImageUrl(""))
+        assertEquals("   ", normalizeSpfyImageUrl("   "))
     }
 }

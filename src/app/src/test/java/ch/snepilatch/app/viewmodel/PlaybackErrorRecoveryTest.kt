@@ -1,8 +1,8 @@
 package ch.snepilatch.app.viewmodel
 
 import ch.snepilatch.app.playback.SessionHolder
-import ch.snepilatch.app.playback.engine.SpotifyCdnResolver
-import ch.snepilatch.app.playback.engine.SpotifyStream
+import ch.snepilatch.app.playback.engine.SpfyCdnResolver
+import ch.snepilatch.app.playback.engine.SpfyStream
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -17,7 +17,7 @@ import org.junit.Test
 /**
  * A transient ExoPlayer/DRM error (e.g. `ERROR_CODE_DRM_LICENSE_ACQUISITION_FAILED` — a throttled
  * Widevine license) must NOT leave playback silent until the user taps play. The recovery re-resolves
- * the SAME track and reloads it at its last position; it only hands back to Spotify once the retry
+ * the SAME track and reloads it at its last position; it only hands back to Spfy once the retry
  * budget is spent. Regression guard for the "music stopped once and didn't continue" bug.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -37,9 +37,9 @@ class PlaybackErrorRecoveryTest {
 
     @Test
     fun transientError_reResolvesAndReloadsSameTrack_notSilent() = runBlocking {
-        val resolver = mockk<SpotifyCdnResolver>(relaxed = true)
+        val resolver = mockk<SpfyCdnResolver>(relaxed = true)
         coEvery { resolver.resolveMediaEntries("spotify:track:test") } returns listOf("fileXYZ" to "10")
-        coEvery { resolver.resolveForFileId(eq("fileXYZ"), any()) } returns SpotifyStream(
+        coEvery { resolver.resolveForFileId(eq("fileXYZ"), any()) } returns SpfyStream(
             cdnUrl = "https://cdn.example/audio",
             licenseUrl = "https://license.example",
             licenseHeaders = emptyMap(),
@@ -66,9 +66,9 @@ class PlaybackErrorRecoveryTest {
         // Regression for the livelock: a track that fails at the same spot every time reaches READY on
         // each recovery reload (which used to reset the retry budget), so it stayed pinned to mirror #1
         // forever — never escalating or skipping. It must now walk mirror #1 -> #2 -> #3, then skip.
-        val resolver = mockk<SpotifyCdnResolver>(relaxed = true)
+        val resolver = mockk<SpfyCdnResolver>(relaxed = true)
         coEvery { resolver.resolveMediaEntries("spotify:track:test") } returns listOf("fileXYZ" to "10")
-        coEvery { resolver.resolveForFileId(eq("fileXYZ"), any()) } returns SpotifyStream(
+        coEvery { resolver.resolveForFileId(eq("fileXYZ"), any()) } returns SpfyStream(
             cdnUrl = "https://cdn.example/audio",
             licenseUrl = "https://license.example",
             licenseHeaders = emptyMap(),
@@ -98,7 +98,7 @@ class PlaybackErrorRecoveryTest {
     @Test
     fun repeatedFailures_skipToNextTrackInsteadOfSilence() = runBlocking {
         // Resolve never yields a usable file id, so every mirror/attempt fails.
-        val resolver = mockk<SpotifyCdnResolver>(relaxed = true)
+        val resolver = mockk<SpfyCdnResolver>(relaxed = true)
         coEvery { resolver.resolveMediaEntries(any()) } returns emptyList()
         coEvery { resolver.fetchFileIdFromMetadata(any()) } returns null
         SessionHolder.cdnResolver = resolver

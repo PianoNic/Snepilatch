@@ -1,6 +1,6 @@
 package ch.snepilatch.app.ui.components
 
-import ch.snepilatch.app.ui.theme.SpotifyWhite
+import ch.snepilatch.app.ui.theme.SpfyWhite
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,8 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
 import ch.snepilatch.app.data.Screen
-import ch.snepilatch.app.ui.theme.SpotifyBlack
-import ch.snepilatch.app.ui.theme.SpotifyLightGray
+import ch.snepilatch.app.ui.theme.SpfyBlack
+import ch.snepilatch.app.ui.theme.SpfyLightGray
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import coil.compose.AsyncImage
 import dev.chrisbanes.haze.HazeState
@@ -50,15 +50,15 @@ fun BottomNav(screen: Screen, vm: PlaybackViewModel, hazeState: HazeState) {
             .hazeEffect(
                 state = hazeState,
                 style = HazeStyle(
-                    backgroundColor = SpotifyBlack,
+                    backgroundColor = SpfyBlack,
                     blurRadius = 24.dp,
-                    tints = listOf(HazeTint(SpotifyBlack.copy(alpha = 0.7f)))
+                    tints = listOf(HazeTint(SpfyBlack.copy(alpha = 0.7f)))
                 )
             )
     ) {
         NavigationBar(
             containerColor = Color.Transparent,
-            contentColor = SpotifyWhite,
+            contentColor = SpfyWhite,
             tonalElevation = 0.dp,
         ) {
             data class NavItem(val s: Screen, val icon: ImageVector, val label: String)
@@ -81,7 +81,7 @@ fun BottomNav(screen: Screen, vm: PlaybackViewModel, hazeState: HazeState) {
                                     .size(24.dp)
                                     .clip(CircleShape)
                                     .then(
-                                        if (selected) Modifier.border(2.dp, SpotifyWhite, CircleShape)
+                                        if (selected) Modifier.border(2.dp, SpfyWhite, CircleShape)
                                         else Modifier
                                     ),
                                 contentAlignment = Alignment.Center
@@ -99,10 +99,10 @@ fun BottomNav(screen: Screen, vm: PlaybackViewModel, hazeState: HazeState) {
                     },
                     label = { Text(nav.label, fontSize = 11.sp) },
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = SpotifyWhite,
-                        selectedTextColor = SpotifyWhite,
-                        unselectedIconColor = SpotifyLightGray,
-                        unselectedTextColor = SpotifyLightGray,
+                        selectedIconColor = SpfyWhite,
+                        selectedTextColor = SpfyWhite,
+                        unselectedIconColor = SpfyLightGray,
+                        unselectedTextColor = SpfyLightGray,
                         indicatorColor = Color.Transparent
                     )
                 )

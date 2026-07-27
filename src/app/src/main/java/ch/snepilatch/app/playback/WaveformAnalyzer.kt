@@ -6,7 +6,7 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * Waveform-native self-similarity analysis — the replacement for Spotify's beat/segment analysis.
+ * Waveform-native self-similarity analysis — the replacement for Spfy's beat/segment analysis.
  * Given the decoded mono PCM of a track (captured live from the audio pipeline, no separate download),
  * it splits the audio into short frames, computes a chroma (12 pitch-class) + coarse timbre feature per
  * frame via FFT, and finds pairs of frames that sound alike ("parallels") — the points the jukebox can

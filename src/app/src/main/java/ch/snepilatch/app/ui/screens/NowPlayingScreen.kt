@@ -43,7 +43,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import ch.snepilatch.app.ui.components.SheetNavBarFix
-import ch.snepilatch.app.ui.components.SpotifyImage
+import ch.snepilatch.app.ui.components.SpfyImage
 import ch.snepilatch.app.ui.components.TightAlertDialog
 import ch.snepilatch.app.ui.components.JukeboxTimeline
 import ch.snepilatch.app.ui.components.rememberSmoothPositionMs
@@ -116,7 +116,7 @@ private fun PlaybackProgress(
             colors = SliderDefaults.colors(
                 thumbColor = animatedPrimary,
                 activeTrackColor = animatedPrimary,
-                inactiveTrackColor = SpotifyWhite.copy(alpha = 0.15f)
+                inactiveTrackColor = SpfyWhite.copy(alpha = 0.15f)
             ),
             modifier = Modifier.fillMaxWidth()
         )
@@ -130,7 +130,7 @@ private fun PlaybackProgress(
 /**
  * The now-playing background: Canvas video when enabled, otherwise the album's
  * accent colour with the blurred album art over it, topped by a dark scrim.
- * Extracted so the expanding-player morph (SpotifyApp) can render the same *live*
+ * Extracted so the expanding-player morph (SpfyApp) can render the same *live*
  * background — video included — inside the growing card, anchored to it, instead
  * of a still. The video transform is recomputed on view resize so it stays
  * fit-cropped while the card grows.
@@ -307,7 +307,7 @@ fun PlayerBackground(vm: PlaybackViewModel, modifier: Modifier = Modifier) {
         )
         // Bottom-weighted scrim — canvas only. The looping video is bright and busy, so the
         // title/artist/context/progress/transport in the lower half need a gradient behind them to
-        // stay legible (echo/Spotify do the same). The fluid/gradient/blur backdrops already darken
+        // stay legible (echo/Spfy do the same). The fluid/gradient/blur backdrops already darken
         // themselves, so the extra band there just looked heavy — skip it. Fade starts high up the
         // frame and ramps to dark at the bottom so there's no hard edge.
         if (hasCanvas) {
@@ -329,7 +329,7 @@ fun PlayerBackground(vm: PlaybackViewModel, modifier: Modifier = Modifier) {
     }
 }
 
-/** The non-canvas player backdrop: an album-colour gradient (Spotify/YTM/Metrolist style) when
+/** The non-canvas player backdrop: an album-colour gradient (Spfy/YTM/Metrolist style) when
  *  [gradient] is on, otherwise a fluid, flowing warp of the album art (spicy-lyrics style) over the
  *  accent colour — falling back to a static blur on pre-Android-13 devices. */
 @Composable
@@ -355,7 +355,7 @@ private fun AlbumBackdrop(gradient: Boolean, top: Color, mid: Color, artUrl: Str
 fun NowPlayingScreen(
     vm: PlaybackViewModel,
     /** When false, the screen paints no background of its own — the morphing card
-     *  in SpotifyApp supplies a card-anchored background that grows with it. */
+     *  in SpfyApp supplies a card-anchored background that grows with it. */
     drawBackground: Boolean = true,
     /** Per-frame vertical drag (px, down = positive) for finger-tracked collapse;
      *  when set, replaces the standalone swipe-down-to-dismiss. */
@@ -401,8 +401,8 @@ fun NowPlayingScreen(
     val canvasOn by AppSettings.canvasEnabled.collectAsState()
     val hasCanvas = canvasOn && canvasVideoUrl != null
     // Brighter text in canvas mode for readability over video
-    val secondaryText = if (hasCanvas) SpotifyWhite.copy(alpha = 0.85f) else SpotifyLightGray
-    val tertiaryText = if (hasCanvas) SpotifyWhite.copy(alpha = 0.65f) else SpotifyLightGray.copy(alpha = 0.7f)
+    val secondaryText = if (hasCanvas) SpfyWhite.copy(alpha = 0.85f) else SpfyLightGray
+    val tertiaryText = if (hasCanvas) SpfyWhite.copy(alpha = 0.65f) else SpfyLightGray.copy(alpha = 0.7f)
 
     Box(Modifier.fillMaxSize()) {
         // Background (Canvas video, or album colour + blurred art + scrim). Skipped
@@ -465,7 +465,7 @@ fun NowPlayingScreen(
                                 modifier = Modifier.size(38.dp),
                                 colors = IconButtonDefaults.filledTonalIconButtonColors(
                                     containerColor = buttonBg,
-                                    contentColor = SpotifyWhite,
+                                    contentColor = SpfyWhite,
                                 ),
                             ) {
                                 Icon(Icons.Rounded.KeyboardArrowDown, stringResource(R.string.close), modifier = Modifier.size(24.dp))
@@ -480,7 +480,7 @@ fun NowPlayingScreen(
                             ) {
                                 Text(
                                     ctx?.let { stringResource(R.string.now_playing_playing_from, it.type) } ?: stringResource(R.string.now_playing),
-                                    color = SpotifyLightGray,
+                                    color = SpfyLightGray,
                                     fontSize = 10.sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -488,7 +488,7 @@ fun NowPlayingScreen(
                                 ctx?.let {
                                     Text(
                                         it.name,
-                                        color = SpotifyWhite,
+                                        color = SpfyWhite,
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         maxLines = 1,
@@ -517,7 +517,7 @@ fun NowPlayingScreen(
                             Column(Modifier.weight(1f).padding(end = 8.dp)) {
                                 Text(
                                     displayTitle,
-                                    color = SpotifyWhite,
+                                    color = SpfyWhite,
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1,
@@ -526,7 +526,7 @@ fun NowPlayingScreen(
                                 Spacer(Modifier.height(2.dp))
                                 Text(
                                     displayArtist,
-                                    color = SpotifyLightGray,
+                                    color = SpfyLightGray,
                                     fontSize = 13.sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -535,7 +535,7 @@ fun NowPlayingScreen(
                                     Spacer(Modifier.height(2.dp))
                                     Text(
                                         it,
-                                        color = SpotifyLightGray.copy(alpha = 0.7f),
+                                        color = SpfyLightGray.copy(alpha = 0.7f),
                                         fontSize = 11.sp,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -552,7 +552,7 @@ fun NowPlayingScreen(
                                 modifier = Modifier.size(40.dp),
                                 colors = IconButtonDefaults.filledIconToggleButtonColors(
                                     containerColor = buttonBg,
-                                    contentColor = SpotifyWhite.copy(alpha = 0.7f),
+                                    contentColor = SpfyWhite.copy(alpha = 0.7f),
                                     checkedContainerColor = buttonBg,
                                     checkedContentColor = animatedPrimary,
                                 ),
@@ -572,7 +572,7 @@ fun NowPlayingScreen(
                         PlaybackProgress(
                             vm = vm,
                             animatedPrimary = animatedPrimary,
-                            timeColor = SpotifyLightGray,
+                            timeColor = SpfyLightGray,
                             timeFontSize = 11.sp,
                         )
 
@@ -632,7 +632,7 @@ fun NowPlayingScreen(
                                 modifier = Modifier.size(44.dp),
                                 colors = IconButtonDefaults.filledTonalIconButtonColors(
                                     containerColor = buttonBg,
-                                    contentColor = SpotifyWhite,
+                                    contentColor = SpfyWhite,
                                 ),
                             ) {
                                 Icon(Icons.Rounded.KeyboardArrowDown, stringResource(R.string.close), modifier = Modifier.size(28.dp))
@@ -657,7 +657,7 @@ fun NowPlayingScreen(
                                 ctx?.let {
                                     Text(
                                         it.name,
-                                        color = SpotifyWhite,
+                                        color = SpfyWhite,
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         maxLines = 1,
@@ -672,7 +672,7 @@ fun NowPlayingScreen(
                                 modifier = Modifier.size(44.dp),
                                 colors = IconButtonDefaults.filledTonalIconButtonColors(
                                     containerColor = buttonBg,
-                                    contentColor = SpotifyWhite,
+                                    contentColor = SpfyWhite,
                                 ),
                             ) {
                                 Icon(Icons.Rounded.Tune, stringResource(R.string.equalizer), modifier = Modifier.size(22.dp))
@@ -705,7 +705,7 @@ fun NowPlayingScreen(
                         Column(Modifier.weight(1f).padding(end = 12.dp)) {
                             MarqueeText(
                                 text = displayTitle,
-                                color = SpotifyWhite,
+                                color = SpfyWhite,
                                 fontSize = 22.sp,
                                 isPlaying = isPlaying,
                                 fontWeight = FontWeight.Bold
@@ -743,7 +743,7 @@ fun NowPlayingScreen(
                                 modifier = Modifier.size(48.dp),
                                 colors = IconButtonDefaults.filledIconToggleButtonColors(
                                     containerColor = buttonBg,
-                                    contentColor = SpotifyWhite.copy(alpha = 0.7f),
+                                    contentColor = SpfyWhite.copy(alpha = 0.7f),
                                     checkedContainerColor = buttonBg,
                                     checkedContentColor = animatedPrimary,
                                 ),
@@ -797,8 +797,8 @@ fun NowPlayingScreen(
         val playlists = libraryItems.filter { it.type == "playlist" }
         TightAlertDialog(
             onDismissRequest = { showPlaylistPicker = false },
-            title = { Text(stringResource(R.string.add_to_playlist), color = SpotifyWhite) },
-            containerColor = SpotifyGray,
+            title = { Text(stringResource(R.string.add_to_playlist), color = SpfyWhite) },
+            containerColor = SpfyGray,
             text = {
                 // TightAlertDialog wraps `text` in a height-bounded verticalScroll Box, which
                 // gives its child infinite max height — a LazyColumn there throws "infinity
@@ -818,16 +818,16 @@ fun NowPlayingScreen(
                                 .padding(vertical = 10.dp, horizontal = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            SpotifyImage(
+                            SpfyImage(
                                 url = playlist.imageUrl,
                                 modifier = Modifier.size(44.dp),
                                 shape = RoundedCornerShape(4.dp)
                             )
                             Spacer(Modifier.width(12.dp))
                             Column {
-                                Text(playlist.name, color = SpotifyWhite, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(playlist.name, color = SpfyWhite, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 playlist.owner?.let {
-                                    Text(it, color = SpotifyLightGray, fontSize = 12.sp, maxLines = 1)
+                                    Text(it, color = SpfyLightGray, fontSize = 12.sp, maxLines = 1)
                                 }
                             }
                         }
@@ -837,7 +837,7 @@ fun NowPlayingScreen(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showPlaylistPicker = false }) {
-                    Text(stringResource(R.string.cancel), color = SpotifyLightGray)
+                    Text(stringResource(R.string.cancel), color = SpfyLightGray)
                 }
             }
         )
@@ -854,13 +854,13 @@ private fun InfoPill(icon: androidx.compose.ui.graphics.vector.ImageVector, text
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
-        Icon(icon, null, tint = SpotifyWhite, modifier = Modifier.size(9.dp))
-        Text(text, color = SpotifyWhite, fontSize = 9.sp, maxLines = 1)
+        Icon(icon, null, tint = SpfyWhite, modifier = Modifier.size(9.dp))
+        Text(text, color = SpfyWhite, fontSize = 9.sp, maxLines = 1)
     }
 }
 
 /**
- * The audio-source pill. Always visible: when a stream is active it names the source (Spotify CDN,
+ * The audio-source pill. Always visible: when a stream is active it names the source (Spfy CDN,
  * Qobuz, …); when nothing is streaming locally ([provider] == null — idle, or playing on a remote
  * Connect device) it shows a dimmed "No CDN" idle state instead of vanishing.
  */
@@ -897,7 +897,7 @@ private fun TonalIconBtn(onClick: () -> Unit, size: Dp, buttonBg: Color, content
     FilledTonalIconButton(
         onClick = onClick,
         modifier = Modifier.size(size),
-        colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = buttonBg, contentColor = SpotifyWhite),
+        colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = buttonBg, contentColor = SpfyWhite),
     ) { content() }
 }
 
@@ -916,7 +916,7 @@ private fun TonalIconToggle(
         modifier = Modifier.size(size),
         colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
             containerColor = buttonBg,
-            contentColor = SpotifyWhite,
+            contentColor = SpfyWhite,
             checkedContainerColor = buttonBg,
             checkedContentColor = accent,
         ),
@@ -964,12 +964,12 @@ private fun PlayerControls(
             onClick = { if (!spinnerActive) vm.togglePlayPause() },
             colors = IconButtonDefaults.filledIconButtonColors(
                 containerColor = if (spinnerActive) animatedPrimary.copy(alpha = 0.5f) else animatedPrimary,
-                contentColor = SpotifyWhite,
+                contentColor = SpfyWhite,
             ),
             modifier = Modifier.size(playBtn),
         ) {
             if (spinnerActive) {
-                LoadingIndicator(color = SpotifyWhite, modifier = Modifier.size(playSpinnerSize))
+                LoadingIndicator(color = SpfyWhite, modifier = Modifier.size(playSpinnerSize))
             } else {
                 Icon(
                     if (isPaused || !isPlaying) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
@@ -979,7 +979,7 @@ private fun PlayerControls(
         }
         TonalIconBtn({ vm.skipNext() }, skipBtn, buttonBg) {
             if (nextLoading) {
-                LoadingIndicator(color = SpotifyWhite, modifier = Modifier.size(nextSpinnerSize))
+                LoadingIndicator(color = SpfyWhite, modifier = Modifier.size(nextSpinnerSize))
             } else {
                 Icon(Icons.Rounded.SkipNext, stringResource(R.string.next), modifier = Modifier.size(skipIcon))
             }
@@ -1017,7 +1017,7 @@ private fun PlayerBottomBar(
         "usb" -> Icons.Rounded.Usb
         else -> Icons.Rounded.Speaker
     }
-    // Playing on another Spotify Connect device: show it with a computer icon + name instead of the
+    // Playing on another Spfy Connect device: show it with a computer icon + name instead of the
     // (then-irrelevant) local Bluetooth/wired output.
     val remoteDevice = if (!streaming) activeDevice?.takeIf { it != android.os.Build.MODEL } else null
     val outIcon = if (remoteDevice != null) Icons.Rounded.Computer else audioIcon
@@ -1040,9 +1040,9 @@ private fun PlayerBottomBar(
                 modifier = Modifier.size(actionBtn),
                 colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
                     containerColor = buttonBg,
-                    contentColor = SpotifyWhite,
+                    contentColor = SpfyWhite,
                     checkedContainerColor = animatedPrimary,
-                    checkedContentColor = SpotifyWhite,
+                    checkedContentColor = SpfyWhite,
                 ),
             ) {
                 Icon(outIcon, stringResource(R.string.audio_output), modifier = Modifier.size(actionIcon))
@@ -1095,8 +1095,8 @@ private fun SourcePill(provider: String?) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
-        Icon(icon, null, tint = SpotifyWhite.copy(alpha = fgAlpha), modifier = Modifier.size(9.dp))
-        Text(label, color = SpotifyWhite.copy(alpha = fgAlpha), fontSize = 9.sp, maxLines = 1)
+        Icon(icon, null, tint = SpfyWhite.copy(alpha = fgAlpha), modifier = Modifier.size(9.dp))
+        Text(label, color = SpfyWhite.copy(alpha = fgAlpha), fontSize = 9.sp, maxLines = 1)
     }
 }
 
@@ -1116,7 +1116,7 @@ private fun NowPlayingMenu(
         modifier = Modifier.size(44.dp),
         colors = IconButtonDefaults.filledTonalIconButtonColors(
             containerColor = buttonBg,
-            contentColor = SpotifyWhite,
+            contentColor = SpfyWhite,
         ),
     ) {
         Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), modifier = Modifier.size(22.dp))
@@ -1130,14 +1130,14 @@ private fun NowPlayingMenu(
         ModalBottomSheet(
             onDismissRequest = { onShowMore(false) },
             sheetState = sheetState,
-            containerColor = SpotifyElevated,
+            containerColor = SpfyElevated,
             dragHandle = {
                 Box(
                     Modifier
                         .padding(vertical = 12.dp)
                         .width(40.dp)
                         .height(4.dp)
-                        .background(SpotifyLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
+                        .background(SpfyLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
                 )
             }
         ) {
@@ -1147,19 +1147,19 @@ private fun NowPlayingMenu(
                     Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    SpotifyImage(
+                    SpfyImage(
                         url = t.albumArt,
                         modifier = Modifier.size(48.dp),
                         shape = RoundedCornerShape(8.dp)
                     )
                     Spacer(Modifier.width(12.dp))
                     Column {
-                        Text(t.name, color = SpotifyWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(t.artist, color = SpotifyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(t.name, color = SpfyWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(t.artist, color = SpfyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 Spacer(Modifier.height(8.dp))
-                HorizontalDivider(color = SpotifyLightGray.copy(alpha = 0.15f))
+                HorizontalDivider(color = SpfyLightGray.copy(alpha = 0.15f))
             }
 
             val shareTrackLabel = stringResource(R.string.share_track_chooser)
@@ -1203,17 +1203,17 @@ private fun NowPlayingMenu(
                         .padding(horizontal = 20.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(icon, null, tint = SpotifyWhite, modifier = Modifier.size(24.dp))
+                    Icon(icon, null, tint = SpfyWhite, modifier = Modifier.size(24.dp))
                     Spacer(Modifier.width(16.dp))
-                    Text(label, color = SpotifyWhite, fontSize = 15.sp)
+                    Text(label, color = SpfyWhite, fontSize = 15.sp)
                 }
             }
 
             // Eternal Jukebox toggle — endless, ever-varying playback of the current track. Tinted
-            // Spotify-green while active. Only does something while streaming a track locally.
+            // Spfy-green while active. Only does something while streaming a track locally.
             val jukeboxOn by vm.jukeboxEnabled.collectAsState()
             val jukeboxLabel = stringResource(R.string.eternal_jukebox)
-            val jukeboxTint = if (jukeboxOn) Color(0xFF1ED760) else SpotifyWhite
+            val jukeboxTint = if (jukeboxOn) Color(0xFF1ED760) else SpfyWhite
             Row(
                 Modifier
                     .fillMaxWidth()

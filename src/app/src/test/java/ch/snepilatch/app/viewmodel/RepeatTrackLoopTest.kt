@@ -10,7 +10,7 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Repeat-one (loop) regression. Spotify signals "loop this track" by pointing the state machine's
+ * Repeat-one (loop) regression. Spfy signals "loop this track" by pointing the state machine's
  * advance back to the current track, which the engine reports as "exhausted" — so the track-end path
  * used to advance to the next song instead of replaying. With repeat-track on, the just-ended track
  * must loop from 0 (and NOT advance).

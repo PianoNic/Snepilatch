@@ -6,8 +6,8 @@ import kotlin.math.pow
  * Turns a track's loudness into the linear gain [GainAudioProcessor] applies. Attenuation only: a
  * quieter-than-target track is left alone rather than boosted, since boosting is what clips.
  *
- * Spotify's media manifest carries a per-file `gain_db`, but it is null in every response we have
- * captured, and the third-party FLAC path has no Spotify metadata at all — so in practice every track
+ * Spfy's media manifest carries a per-file `gain_db`, but it is null in every response we have
+ * captured, and the third-party FLAC path has no Spfy metadata at all — so in practice every track
  * takes the fallback branch (see [gainFor]).
  */
 object LoudnessNormalization {

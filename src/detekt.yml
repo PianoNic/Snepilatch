@@ -10,18 +10,18 @@ build:
 
 complexity:
   LongMethod:
-    threshold: 80          # SpotifyViewModel has long methods we know about; baseline tracks them
+    threshold: 80          # SpfyViewModel has long methods we know about; baseline tracks them
   LongParameterList:
     functionThreshold: 8
     constructorThreshold: 10
   TooManyFunctions:
-    thresholdInClasses: 80 # SpotifyViewModel is large; baselined
+    thresholdInClasses: 80 # SpfyViewModel is large; baselined
     thresholdInFiles: 80
     thresholdInObjects: 30
   CyclomaticComplexMethod:
     threshold: 25
   LargeClass:
-    threshold: 2500        # SpotifyViewModel
+    threshold: 2500        # SpfyViewModel
   NestedBlockDepth:
     threshold: 6
 

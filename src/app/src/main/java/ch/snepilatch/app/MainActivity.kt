@@ -22,9 +22,9 @@ import ch.snepilatch.app.playback.MusicPlaybackService
 import ch.snepilatch.app.playback.SessionHolder
 import ch.snepilatch.app.ui.components.UpdateDialog
 import ch.snepilatch.app.ui.screens.LoadingScreen
-import ch.snepilatch.app.ui.screens.SpotifyApp
-import ch.snepilatch.app.ui.screens.SpotifyLoginScreen
-import ch.snepilatch.app.ui.theme.SpotifyBlack
+import ch.snepilatch.app.ui.screens.SpfyApp
+import ch.snepilatch.app.ui.screens.SpfyLoginScreen
+import ch.snepilatch.app.ui.theme.SpfyBlack
 import ch.snepilatch.app.util.UpdateInfo
 import ch.snepilatch.app.util.UpdateService
 import ch.snepilatch.app.util.loadCookies
@@ -153,7 +153,7 @@ class MainActivity : ComponentActivity() {
             Surface(
                 modifier = Modifier
                     .fillMaxSize(),
-                color = SpotifyBlack
+                color = SpfyBlack
             ) {
                 // Update dialog
                 if (updateInfo != null) {
@@ -164,7 +164,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 when {
-                    needsLogin -> SpotifyLoginScreen(vm)
+                    needsLogin -> SpfyLoginScreen(vm)
                     !initialized -> {
                         val cooldown by vm.rateLimitCooldown.collectAsState()
                         val seconds by vm.cooldownSeconds.collectAsState()
@@ -184,7 +184,7 @@ class MainActivity : ComponentActivity() {
                             }
                         )
                     }
-                    else -> SpotifyApp(vm)
+                    else -> SpfyApp(vm)
                 }
             }
         }

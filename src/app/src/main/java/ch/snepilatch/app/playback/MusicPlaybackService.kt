@@ -20,8 +20,10 @@ import android.support.v4.media.session.PlaybackStateCompat
 import android.os.Bundle
 import androidx.annotation.OptIn
 import androidx.core.app.NotificationCompat
+import ch.snepilatch.app.BuildConfig
 import ch.snepilatch.app.R
 import ch.snepilatch.app.util.LokiLogger
+import ch.snepilatch.app.viewmodel.AppSettings
 import androidx.media.MediaBrowserServiceCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -77,6 +79,15 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     // Taps the decoded PCM in the audio pipeline — the foundation of the waveform-based seamless
     // jukebox. Pass-through; only observes when analyzing is toggled on.
     private val jukeboxTap = JukeboxAudioTap()
+
+    // EQ headroom: attenuates the decoded PCM so an external EQ (Wavelet & co.) has room to boost into.
+    // Strictly after the tap — the tap must keep seeing the unmodified signal its beat matching needs.
+    private val gainProcessor = GainAudioProcessor()
+
+    // In-app 10-band EQ on the audio session. Unlike the headroom above it computes its own input
+    // gain from the curve, so the two are never both needed — the UI disables one when the other is on.
+    private val equalizer = EqualizerController()
+    val equalizerSupported: Boolean get() = equalizer.supported
 
     private data class TrackMetadata(
         val title: String,
@@ -233,7 +244,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 enableFloatOutput: Boolean,
                 enableAudioTrackPlaybackParams: Boolean
             ): AudioSink = DefaultAudioSink.Builder(context)
-                .setAudioProcessors(arrayOf(jukeboxTap))
+                .setAudioProcessors(arrayOf(jukeboxTap, gainProcessor))
                 .build()
         }
 
@@ -276,6 +287,8 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
                 // Follow Auxio convention: open/close audio effect session on play/pause
                 currentAudioSessionId = player.audioSessionId
+                // Re-insert the in-app EQ now that a track is actually running (see syncEqualizer).
+                if (playWhenReady) syncEqualizer()
                 if (playWhenReady) {
                     if (!openAudioEffectSession) {
                         LokiLogger.i(TAG, "Opening audio effect session (audioSessionId=$currentAudioSessionId)")
@@ -341,6 +354,8 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 LokiLogger.i(TAG, "Audio session ID changed: $currentAudioSessionId -> $audioSessionId, playWhenReady=${player.playWhenReady}, openSession=$openAudioEffectSession")
                 val oldId = currentAudioSessionId
                 currentAudioSessionId = audioSessionId
+                // Rebuild the in-app EQ on the new session and drop the old effect with it.
+                syncEqualizer()
                 if (audioSessionId != 0 && player.playWhenReady) {
                     if (openAudioEffectSession && oldId != audioSessionId) {
                         // Session changed mid-play, close old and open new
@@ -428,6 +443,75 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
     var onReady: (() -> Unit)? = null
 
+    /**
+     * Apply the EQ-headroom attenuation, before the media item is prepared so the level is right from
+     * the first frame. [trackLoudnessDb] is the track's measured loudness if we ever have one — nothing
+     * supplies it today (Spotify's manifest `gain_db` is always null and the FLAC path has no Spotify
+     * metadata), so every track takes the flat user-set attenuation.
+     */
+    fun applyHeadroomGain(trackLoudnessDb: Double? = null) {
+        val gain = if (AppSettings.eqHeadroomEnabled.value) {
+            LoudnessNormalization.gainFor(trackLoudnessDb, AppSettings.eqHeadroomDb.value.toDouble())
+        } else {
+            1f
+        }
+        val branch = if (trackLoudnessDb != null) "loudness=${trackLoudnessDb}dB" else "flat"
+        LokiLogger.i(TAG, "Headroom gain=$gain ($branch, enabled=${AppSettings.eqHeadroomEnabled.value})")
+        gainProcessor.setGain(gain)
+    }
+
+    /**
+     * Bring the in-app EQ in line with the settings: attached to the current session when enabled,
+     * released when not. Called on every audio-session change (a stale effect on a dead session is a
+     * real leak), whenever the user flips the toggle, and again when playback starts.
+     *
+     * The last one matters: an effect created while the session has no running AudioTrack isn't
+     * necessarily inserted into AudioFlinger's chain — on this Samsung device it stayed silent until
+     * something re-committed the chain (a volume-key press would do it). Re-creating it once audio is
+     * actually running puts it in the live chain instead.
+     */
+    /**
+     * Debug-only switch that makes the EQ attach as a non-controlling client, to exercise the
+     * "another app owns the effect" path on demand:
+     * `adb shell touch /sdcard/Android/data/<pkg>/files/eq_low_priority`
+     */
+    private val lowPriorityDebug: Boolean
+        get() = BuildConfig.DEBUG && java.io.File(getExternalFilesDir(null), "eq_low_priority").exists()
+
+    fun syncEqualizer() {
+        equalizer.debugLowPriority = lowPriorityDebug
+        if (AppSettings.eqEnabled.value) {
+            // Evict external effect apps first — see broadcastAudioEffectAction for why sharing fails.
+            if (openAudioEffectSession) {
+                broadcastAudioEffectAction(AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION)
+                openAudioEffectSession = false
+            }
+            equalizer.attach(currentAudioSessionId, AppSettings.eqBands.value)
+            // The effect refused to be created on a live session (some Samsung firmware does this).
+            // Turn the feature off rather than leave the user with neither our EQ nor their external
+            // one: this flips the toggle, releases, and re-advertises the session on the way back in.
+            if (equalizer.supported && currentAudioSessionId != 0 && !equalizer.attached) {
+                LokiLogger.e(TAG, "EQ unavailable on this device — falling back to external effects")
+                AppSettings.setEqEnabled(false, this)
+            }
+        } else {
+            equalizer.release()
+            // Hand the session back to Wavelet & co.
+            if (player.playWhenReady && !openAudioEffectSession) {
+                broadcastAudioEffectAction(AudioEffect.ACTION_OPEN_AUDIO_EFFECT_CONTROL_SESSION)
+                openAudioEffectSession = true
+            }
+        }
+    }
+
+    /** Push a changed curve to the live effect (no-op when the EQ is off). */
+    fun setEqCurve(bands: FloatArray) {
+        if (!equalizer.applyCurve(bands)) {
+            LokiLogger.e(TAG, "EQ curve could not be applied — disabling in-app EQ")
+            AppSettings.setEqEnabled(false, this)
+        }
+    }
+
     fun playUrl(
         url: String,
         title: String,
@@ -439,6 +523,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     ) {
         LokiLogger.i(TAG, "Loading: $title by $artist -> ${url.take(80)} (play=$startPlaying, headers=${headers.keys}, pos=${startPositionMs}ms)")
         isAdSkipping = false  // a real track is loading — end the ad-skip buffering state
+        applyHeadroomGain()
         val meta = TrackMetadata(title, artist, albumArtUrl)
         metadataQueue.clear()
         metadataQueue.add(meta)
@@ -844,6 +929,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                    pssh: String? = null) {
         LokiLogger.i(TAG, "Loading DRM: $title by $artist -> ${url.take(80)} (play=$startPlaying, pos=${startPositionMs}ms, pssh=${pssh != null})")
         isAdSkipping = false  // a real track is loading — end the ad-skip buffering state
+        applyHeadroomGain()
         val meta = TrackMetadata(title, artist, albumArtUrl)
         metadataQueue.clear()
         metadataQueue.add(meta)
@@ -1025,10 +1111,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         val nm = getSystemService(NotificationManager::class.java)
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Music Playback",
+            getString(R.string.notif_channel_playback),
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "Shows current playing track"
+            description = getString(R.string.notif_channel_playback_desc)
             setShowBadge(false)
         }
         nm.createNotificationChannel(channel)
@@ -1036,10 +1122,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         // High-importance channel so error alerts surface as a heads-up pop-up.
         val alertChannel = NotificationChannel(
             ALERT_CHANNEL_ID,
-            "Alerts",
+            getString(R.string.notif_channel_alerts),
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "Connection and sign-in problems that need your attention"
+            description = getString(R.string.notif_channel_alerts_desc)
         }
         nm.createNotificationChannel(alertChannel)
     }
@@ -1050,7 +1136,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
      * session so the now-playing bar / lockscreen / Android Auto reflect it too. Called from the
      * ViewModel when [kotify.session.Session.onAuthLost] fires. Cleared by [clearError] on recovery.
      */
-    fun showError(title: String, message: String) {
+    fun showError(@androidx.annotation.StringRes titleRes: Int, @androidx.annotation.StringRes messageRes: Int) {
+        val title = getString(titleRes)
+        val message = getString(messageRes)
         mainHandler.post {
             val openApp = packageManager.getLaunchIntentForPackage(packageName)?.apply {
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -1123,6 +1211,14 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
     private fun broadcastAudioEffectAction(action: String) {
         if (currentAudioSessionId == 0) return
+        // While the in-app EQ owns the session, don't invite external effect apps into it. Measured on
+        // a Galaxy (Android 16): once Samsung's SoundAlive attaches after this broadcast, every
+        // DynamicsProcessing write on the same session fails with "invalid parameter operation" — and
+        // two EQs in one chain would double-process anyway. CLOSE always goes out, so they detach.
+        if (action == AudioEffect.ACTION_OPEN_AUDIO_EFFECT_CONTROL_SESSION && AppSettings.eqEnabled.value) {
+            LokiLogger.i(TAG, "Not advertising session $currentAudioSessionId — in-app EQ owns it")
+            return
+        }
         val pkg = packageName ?: "ch.snepilatch.app"
         LokiLogger.i(TAG, "Broadcasting $action: pkg=$pkg, sessionId=$currentAudioSessionId")
         sendBroadcast(
@@ -1179,6 +1275,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         stopJukebox()
         unregisterNetworkCallback()
         releaseControlPlaneLocks()
+        equalizer.release()
         if (openAudioEffectSession) {
             broadcastAudioEffectAction(AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION)
             openAudioEffectSession = false

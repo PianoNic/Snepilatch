@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -138,9 +139,13 @@ fun SpotifyApp(vm: PlaybackViewModel) {
         if (screen != Screen.NOW_PLAYING && screen != Screen.LYRICS) contentScreen = screen
     }
 
+    val snackbarContext = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(Unit) {
         vm.snackbarMessage.collect { message ->
-            snackbarHostState.showSnackbar(message, duration = SnackbarDuration.Short)
+            snackbarHostState.showSnackbar(
+                snackbarContext.getString(message.id, *message.args.toTypedArray()),
+                duration = SnackbarDuration.Short
+            )
         }
     }
 
@@ -358,6 +363,7 @@ private fun MainContent(screen: Screen, vm: PlaybackViewModel, hazeState: HazeSt
             Screen.LIBRARY -> { LaunchedEffect(Unit) { libraryVm.loadLibrary() }; LibraryScreen() }
             Screen.ACCOUNT -> AccountScreen(vm)
             Screen.QUEUE -> QueueScreen(vm)
+            Screen.EQUALIZER -> EqualizerScreen(vm)
             Screen.PLAYLIST_DETAIL, Screen.ALBUM_DETAIL, Screen.ARTIST_DETAIL, Screen.SHOW_DETAIL -> DetailScreen(vm)
             Screen.NOW_PLAYING, Screen.LYRICS, Screen.LOGIN -> {}
         }
@@ -469,7 +475,7 @@ private fun PlayerMorph(
 
 @Composable
 fun LoadingScreen(
-    error: String?,
+    error: ch.snepilatch.app.data.UiMessage?,
     isRateLimited: Boolean = false,
     cooldownSecondsRemaining: Int = 0,
     onLogin: () -> Unit = {},
@@ -514,7 +520,7 @@ fun LoadingScreen(
                     Spacer(Modifier.height(16.dp))
                     Text(stringResource(R.string.connection_failed), color = SpotifyWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(8.dp))
-                    Text(error, color = SpotifyLightGray, fontSize = 13.sp)
+                    Text(error.resolve(LocalContext.current), color = SpotifyLightGray, fontSize = 13.sp)
                     Spacer(Modifier.height(24.dp))
                     Button(
                         onClick = onRetry,

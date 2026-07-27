@@ -239,6 +239,12 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         // Custom renderers factory so our PCM tap sits in the audio processor chain and can read the
         // decoded waveform (for the seamless-jukebox engine). It passes audio through untouched.
         val renderersFactory = object : DefaultRenderersFactory(this) {
+            // enableFloatOutput is deliberately ignored. It only does anything when the decoder
+            // already emits 32-bit float, so it is a no-op for the 16-bit AAC Spotify path and would
+            // apply only to high-bit-depth FLAC — where it would break two things: JukeboxAudioTap
+            // captures into a ShortArray, and GainAudioProcessor bypasses itself on any encoding
+            // other than PCM_16BIT, so the EQ headroom would silently stop working. Teach both
+            // ENCODING_PCM_FLOAT first if this is ever wanted.
             override fun buildAudioSink(
                 context: android.content.Context,
                 enableFloatOutput: Boolean,

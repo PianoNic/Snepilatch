@@ -104,8 +104,8 @@
     <string name="playback_ended">Воспроизведение завершено</string>
 
     <!-- Backfill -->
-    <string name="tidal_desc">Tidal — FLAC до 1411 кбит/с</string>
-    <string name="qobuz_desc">Qobuz — FLAC до 9216 кбит/с</string>
+    <string name="tidal_desc">Tidal · FLAC до 1411 кбит/с</string>
+    <string name="qobuz_desc">Qobuz · FLAC до 9216 кбит/с</string>
 
     <!-- Common (added) -->
     <string name="close">Закрыть</string>
@@ -250,4 +250,45 @@
     <string name="account_section_playback">Воспроизведение</string>
     <string name="account_section_appearance">Внешний вид</string>
     <string name="account_section_notifications">Уведомления</string>
+
+    <!-- Equalizer -->
+    <string name="state_on">Вкл</string>
+    <string name="state_off">Выкл</string>
+    <string name="eq_in_app">Встроенный эквалайзер</string>
+    <string name="eq_in_app_desc">Заменяет внешние эквалайзеры вроде Wavelet</string>
+    <string name="eq_requires_p">Требуется Android 9 или новее.</string>
+    <string name="eq_preamp">Предусиление %1$s дБ</string>
+    <string name="eq_preamp_auto">Автоматически</string>
+    <string name="eq_flat">Сброс</string>
+    <string name="eq_headroom">Запас для эквалайзера</string>
+    <string name="eq_headroom_handled">Управляется встроенным эквалайзером</string>
+    <string name="eq_headroom_on">Громкость снижена на %1$d дБ. Установите по самому большому подъёму эквалайзера</string>
+    <string name="eq_headroom_off">Выкл. Включите, если используете внешний эквалайзер вроде Wavelet</string>
+    <string name="gradient_background">Градиентный фон</string>
+    <string name="gradient_bg_on">Градиент из цветов обложки</string>
+    <string name="gradient_bg_off">Плавающая обложка</string>
+    <string name="lossless_on_flac">FLAC</string>
+    <string name="region_nearest">Ближайший (авто)</string>
+    <string name="eternal_jukebox">Eternal Jukebox</string>
+
+    <!-- Snackbars -->
+    <string name="following_artist">Вы подписались на исполнителя</string>
+    <string name="saved_to_library">Добавлено в медиатеку</string>
+    <string name="save_to_library">Добавить в медиатеку</string>
+    <string name="added_to_playlist">Добавлено в плейлист</string>
+    <string name="added_tracks_to_playlist">Добавлено в плейлист треков: %1$d</string>
+    <string name="added_to_queue_msg">Добавлено в очередь</string>
+    <string name="added_tracks_to_queue">Добавлено в очередь треков: %1$d</string>
+
+    <!-- Notification channels -->
+    <string name="notif_channel_playback">Воспроизведение музыки</string>
+    <string name="notif_channel_playback_desc">Показывает текущий трек</string>
+    <string name="notif_channel_alerts">Предупреждения</string>
+    <string name="notif_channel_alerts_desc">Проблемы с подключением и входом, требующие внимания</string>
+
+    <!-- Connection errors -->
+    <string name="auth_lost">Сессия Spotify потеряна. Войдите снова, чтобы продолжить</string>
+    <string name="connect_failed">Не удалось подключиться после 5 попыток. Повторите попытку позже.</string>
+    <string name="notif_connection_lost_title">Snepilatch: соединение потеряно</string>
+    <string name="notif_connection_lost_text">Нажмите, чтобы переподключиться к Spotify</string>
 </resources>

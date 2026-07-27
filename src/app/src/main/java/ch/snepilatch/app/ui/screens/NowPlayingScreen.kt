@@ -665,18 +665,10 @@ fun NowPlayingScreen(
                                     )
                                 }
                             }
-                            // EQ button — opens system equalizer
+                            // EQ button: our screen when the in-app EQ owns the session, the system
+                            // effect panel otherwise (see PlaybackViewModel.openEqualizer).
                             FilledTonalIconButton(
-                                onClick = {
-                                    try {
-                                        val eqIntent = android.content.Intent(android.media.audiofx.AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL)
-                                        eqIntent.putExtra(android.media.audiofx.AudioEffect.EXTRA_PACKAGE_NAME, shareContext.packageName)
-                                        eqIntent.putExtra(android.media.audiofx.AudioEffect.EXTRA_CONTENT_TYPE, android.media.audiofx.AudioEffect.CONTENT_TYPE_MUSIC)
-                                        shareContext.startActivity(eqIntent)
-                                    } catch (_: Exception) {
-                                        // No EQ app installed
-                                    }
-                                },
+                                onClick = { vm.openEqualizer(shareContext) },
                                 modifier = Modifier.size(44.dp),
                                 colors = IconButtonDefaults.filledTonalIconButtonColors(
                                     containerColor = buttonBg,

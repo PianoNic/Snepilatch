@@ -104,8 +104,8 @@
     <string name="playback_ended">Wiedergabe beendet</string>
 
     <!-- Backfill -->
-    <string name="tidal_desc">Tidal — FLAC bis 1411 kbps</string>
-    <string name="qobuz_desc">Qobuz — FLAC bis 9216 kbps</string>
+    <string name="tidal_desc">Tidal · FLAC bis 1411 kbps</string>
+    <string name="qobuz_desc">Qobuz · FLAC bis 9216 kbps</string>
 
     <!-- Common (added) -->
     <string name="close">Schließen</string>
@@ -251,4 +251,44 @@
     <string name="account_section_playback">Wiedergabe</string>
     <string name="account_section_appearance">Erscheinungsbild</string>
     <string name="account_section_notifications">Benachrichtigungen</string>
+
+    <!-- Equalizer -->
+    <string name="state_on">Ein</string>
+    <string name="state_off">Aus</string>
+    <string name="eq_in_app">App-Equalizer</string>
+    <string name="eq_in_app_desc">Übernimmt von externen Equalizern wie Wavelet</string>
+    <string name="eq_requires_p">Benötigt Android 9 oder neuer.</string>
+    <string name="eq_preamp">Vorverstärkung %1$s dB</string>
+    <string name="eq_preamp_auto">Automatisch</string>
+    <string name="eq_flat">Neutral</string>
+    <string name="eq_headroom">EQ-Headroom</string>
+    <string name="eq_headroom_handled">Übernimmt der App-Equalizer</string>
+    <string name="eq_headroom_on">Wiedergabe um %1$d dB gesenkt. Auf deine grösste EQ-Anhebung einstellen</string>
+    <string name="eq_headroom_off">Aus. Einschalten, wenn du einen externen Equalizer wie Wavelet nutzt</string>
+    <string name="gradient_background">Farbverlauf-Hintergrund</string>
+    <string name="gradient_bg_on">Albumfarben-Verlauf</string>
+    <string name="gradient_bg_off">Fliessendes Albumcover</string>
+    <string name="lossless_on_flac">FLAC</string>
+    <string name="region_nearest">Nächstgelegen (automatisch)</string>
+
+    <!-- Snackbars -->
+    <string name="following_artist">Künstler gefolgt</string>
+    <string name="saved_to_library">Zur Bibliothek hinzugefügt</string>
+    <string name="save_to_library">Zur Bibliothek hinzufügen</string>
+    <string name="added_to_playlist">Zur Playlist hinzugefügt</string>
+    <string name="added_tracks_to_playlist">%1$d Titel zur Playlist hinzugefügt</string>
+    <string name="added_to_queue_msg">Zur Warteschlange hinzugefügt</string>
+    <string name="added_tracks_to_queue">%1$d Titel zur Warteschlange hinzugefügt</string>
+
+    <!-- Notification channels -->
+    <string name="notif_channel_playback">Musikwiedergabe</string>
+    <string name="notif_channel_playback_desc">Zeigt den aktuell laufenden Titel</string>
+    <string name="notif_channel_alerts">Warnungen</string>
+    <string name="notif_channel_alerts_desc">Verbindungs- und Anmeldeprobleme, die deine Aufmerksamkeit brauchen</string>
+
+    <!-- Connection errors -->
+    <string name="auth_lost">Spotify-Sitzung verloren. Melde dich erneut an, um fortzufahren</string>
+    <string name="connect_failed">Verbindung nach 5 Versuchen fehlgeschlagen. Bitte später erneut versuchen.</string>
+    <string name="notif_connection_lost_title">Snepilatch: Verbindung verloren</string>
+    <string name="notif_connection_lost_text">Tippen, um Spotify neu zu verbinden</string>
 </resources>

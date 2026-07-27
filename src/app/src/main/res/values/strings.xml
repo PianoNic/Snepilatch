@@ -60,8 +60,8 @@
     <string name="lossless_on_flac">FLAC</string>
     <string name="lossless_off">Standard quality</string>
     <string name="lossless_provider">Lossless Provider</string>
-    <string name="tidal_desc">Tidal — FLAC up to 1411kbps</string>
-    <string name="qobuz_desc">Qobuz — FLAC up to 9216kbps</string>
+    <string name="tidal_desc">Tidal · FLAC up to 1411kbps</string>
+    <string name="qobuz_desc">Qobuz · FLAC up to 9216kbps</string>
     <string name="canvas_background">Canvas Background</string>
     <string name="canvas_on">Looping video behind album art</string>
     <string name="canvas_off">Off</string>
@@ -253,4 +253,42 @@
     <string name="account_section_playback">Playback</string>
     <string name="account_section_appearance">Appearance</string>
     <string name="account_section_notifications">Notifications</string>
+
+    <!-- Equalizer -->
+    <string name="state_on">On</string>
+    <string name="state_off">Off</string>
+    <string name="eq_in_app">In-app equalizer</string>
+    <string name="eq_in_app_desc">Takes over from external EQs like Wavelet</string>
+    <string name="eq_requires_p">Requires Android 9 or newer.</string>
+    <string name="eq_preamp">Preamp %1$s dB</string>
+    <string name="eq_preamp_auto">Automatic</string>
+    <string name="eq_flat">Flat</string>
+    <string name="eq_headroom">EQ headroom</string>
+    <string name="eq_headroom_handled">Handled by the in-app equalizer</string>
+    <string name="eq_headroom_on">Playback lowered %1$d dB. Set this to match your largest EQ boost</string>
+    <string name="eq_headroom_off">Off. Enable if you use an external equalizer like Wavelet</string>
+    <string name="gradient_background">Gradient background</string>
+    <string name="gradient_bg_on">Album colour gradient</string>
+    <string name="gradient_bg_off">Flowing album art</string>
+
+    <!-- Snackbars -->
+    <string name="following_artist">Following artist</string>
+    <string name="saved_to_library">Saved to Library</string>
+    <string name="save_to_library">Save to Library</string>
+    <string name="added_to_playlist">Added to playlist</string>
+    <string name="added_tracks_to_playlist">Added %1$d tracks to playlist</string>
+    <string name="added_to_queue_msg">Added to queue</string>
+    <string name="added_tracks_to_queue">Added %1$d tracks to queue</string>
+
+    <!-- Notification channels -->
+    <string name="notif_channel_playback">Music Playback</string>
+    <string name="notif_channel_playback_desc">Shows current playing track</string>
+    <string name="notif_channel_alerts">Alerts</string>
+    <string name="notif_channel_alerts_desc">Connection and sign-in problems that need your attention</string>
+
+    <!-- Connection errors -->
+    <string name="auth_lost">Lost Spotify session. Sign in again to continue</string>
+    <string name="connect_failed">Connection failed after 5 attempts. Please try again later.</string>
+    <string name="notif_connection_lost_title">Snepilatch: connection lost</string>
+    <string name="notif_connection_lost_text">Tap to reconnect to Spotify</string>
 </resources>

@@ -368,7 +368,7 @@ private fun SearchPlaylist.toUnified(vm: PlaybackViewModel, ctx: Context) = Unif
     circular = false,
     onClick = { DetailRoutes.openPlaylist(idFromUri(uri)) },
     menu = listOf(
-        OverflowAction(Icons.Rounded.Add, "Save to Library") {
+        OverflowAction(Icons.Rounded.Add, ctx.getString(R.string.save_to_library)) {
             vm.savePlaylist(idFromUri(uri))
         },
         shareAction(ctx, uri)

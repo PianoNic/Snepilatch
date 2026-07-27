@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import ch.snepilatch.app.R
+import ch.snepilatch.app.data.UiMessage
 import ch.snepilatch.app.util.LokiLogger
 import ch.snepilatch.app.util.detectActiveAudioOutput
 import ch.snepilatch.app.util.normalizeSpotifyImageUrl
@@ -68,7 +70,7 @@ class PlaybackViewModel : ViewModel() {
         set(value) { SessionHolder.player = value }
     private var username: String = ""
     val isInitialized = MutableStateFlow(false)
-    val initError = MutableStateFlow<String?>(null)
+    val initError = MutableStateFlow<UiMessage?>(null)
     val rateLimitCooldown = MutableStateFlow(false)
     val cooldownSeconds = MutableStateFlow(0)
     private var initRetryCount = 0
@@ -273,9 +275,11 @@ class PlaybackViewModel : ViewModel() {
     // Loading (detail loading moved to DetailViewModel.isLoading)
     val isStreamLoading = MutableStateFlow(false)
 
-    // Snackbar messages
-    private val _snackbarMessage = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 1)
-    val snackbarMessage: kotlinx.coroutines.flow.SharedFlow<String> = _snackbarMessage
+    // Snackbar messages. Carries a string resource, not a resolved String: the ViewModel has no
+    // Context, and resolving in the UI is what makes the message follow the picked app language.
+    private val _snackbarMessage =
+        kotlinx.coroutines.flow.MutableSharedFlow<UiMessage>(extraBufferCapacity = 1)
+    val snackbarMessage: kotlinx.coroutines.flow.SharedFlow<UiMessage> = _snackbarMessage
 
     // Like state
     val currentTrackLiked = MutableStateFlow(false)
@@ -325,11 +329,11 @@ class PlaybackViewModel : ViewModel() {
     /** Terminal "you must sign in again" state — the notification + now-playing error + loading gate. */
     private fun surfaceAuthLost() {
         authRecovering = false
-        initError.value = "Lost Spotify session — sign in again to continue"
+        initError.value = UiMessage(R.string.auth_lost)
         isInitialized.value = false
         MusicPlaybackService.instance?.showError(
-            "Snepilatch — connection lost",
-            "Tap to reconnect to Spotify"
+            R.string.notif_connection_lost_title,
+            R.string.notif_connection_lost_text
         )
     }
 
@@ -441,14 +445,14 @@ class PlaybackViewModel : ViewModel() {
                     initRetryCount++
                     if (initRetryCount > 5) {
                         LokiLogger.e(TAG, "Rate limited — 5 retries exhausted, giving up")
-                        initError.value = "Connection failed after 5 attempts. Please try again later."
+                        initError.value = UiMessage(R.string.connect_failed)
                         rateLimitCooldown.value = false
                         authRecovering = false
                         return@launch
                     }
                     val cooldownSecs = 20 * initRetryCount // 20s, 40s, 60s...
                     LokiLogger.w(TAG, "Rate limited, attempt $initRetryCount/5, cooling down ${cooldownSecs}s...")
-                    initError.value = "Rate limited — attempt $initRetryCount/5"
+                    initError.value = UiMessage(R.string.rate_limited, listOf(initRetryCount))
                     rateLimitCooldown.value = true
                     for (i in cooldownSecs downTo 1) {
                         cooldownSeconds.value = i
@@ -470,7 +474,7 @@ class PlaybackViewModel : ViewModel() {
                         needsLogin.value = true
                     }
                 } else {
-                    initError.value = msg
+                    initError.value = UiMessage(raw = msg)
                 }
             }
         }
@@ -1705,7 +1709,11 @@ class PlaybackViewModel : ViewModel() {
             kotify.api.playlist.Playlist(sess).addToPlaylist(playlistId, trackUris)
             LokiLogger.i(TAG, "Added ${trackUris.size} tracks to playlist $playlistId")
             _snackbarMessage.tryEmit(
-                if (trackUris.size == 1) "Added to playlist" else "Added ${trackUris.size} tracks to playlist"
+                if (trackUris.size == 1) {
+                    UiMessage(R.string.added_to_playlist)
+                } else {
+                    UiMessage(R.string.added_tracks_to_playlist, listOf(trackUris.size))
+                }
             )
         }
     }
@@ -1762,10 +1770,36 @@ class PlaybackViewModel : ViewModel() {
             try {
                 player?.addToQueue(trackUris)
                 _snackbarMessage.tryEmit(
-                    if (trackUris.size == 1) "Added to queue" else "Added ${trackUris.size} tracks to queue"
+                    if (trackUris.size == 1) {
+                        UiMessage(R.string.added_to_queue_msg)
+                    } else {
+                        UiMessage(R.string.added_tracks_to_queue, listOf(trackUris.size))
+                    }
                 )
             }
             catch (e: Exception) { LokiLogger.e(TAG, "addAllToQueue", e) }
+        }
+    }
+
+    /** In-app EQ on: our screen owns the curve. Off: hand the user to their external EQ app. */
+    fun openEqualizer(context: android.content.Context) {
+        if (AppSettings.eqEnabled.value) {
+            navigateTo(Screen.EQUALIZER)
+            return
+        }
+        try {
+            context.startActivity(
+                android.content.Intent(android.media.audiofx.AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL)
+                    .putExtra(android.media.audiofx.AudioEffect.EXTRA_PACKAGE_NAME, context.packageName)
+                    .putExtra(
+                        android.media.audiofx.AudioEffect.EXTRA_CONTENT_TYPE,
+                        android.media.audiofx.AudioEffect.CONTENT_TYPE_MUSIC
+                    )
+            )
+        } catch (e: Exception) {
+            // No system EQ panel on this device; our own screen is the only thing we can offer.
+            LokiLogger.w(TAG, "No external EQ panel: ${e.message}")
+            navigateTo(Screen.EQUALIZER)
         }
     }
 
@@ -1881,7 +1915,7 @@ class PlaybackViewModel : ViewModel() {
             Song(sess).likeSong(trackId)
             currentTrackLiked.value = true
             pushLikeToNotification(true)
-            _snackbarMessage.tryEmit("Added to Liked Songs")
+            _snackbarMessage.tryEmit(UiMessage(R.string.added_to_liked))
         }
     }
 
@@ -1890,7 +1924,7 @@ class PlaybackViewModel : ViewModel() {
             Song(sess).unlikeSong(trackId)
             currentTrackLiked.value = false
             pushLikeToNotification(false)
-            _snackbarMessage.tryEmit("Removed from Liked Songs")
+            _snackbarMessage.tryEmit(UiMessage(R.string.removed_from_liked))
         }
     }
 
@@ -2744,7 +2778,7 @@ class PlaybackViewModel : ViewModel() {
     fun followArtist(artistId: String) {
         launchWithSession("followArtist") { sess ->
             Artist(sess).follow(artistId)
-            _snackbarMessage.tryEmit("Following artist")
+            _snackbarMessage.tryEmit(UiMessage(R.string.following_artist))
         }
     }
 
@@ -2753,7 +2787,7 @@ class PlaybackViewModel : ViewModel() {
             // Playlists live in the rootlist, not the generic library (which rejects PLAYLIST uris),
             // so saveToLibrary needs the current username.
             kotify.api.playlist.Playlist(sess).saveToLibrary(playlistId, username)
-            _snackbarMessage.tryEmit("Saved to Library")
+            _snackbarMessage.tryEmit(UiMessage(R.string.saved_to_library))
         }
     }
 

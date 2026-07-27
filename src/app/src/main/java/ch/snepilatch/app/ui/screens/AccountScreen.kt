@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ExitToApp
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -243,6 +244,63 @@ fun AccountScreen(vm: PlaybackViewModel) {
             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
         )
 
+        // EQ headroom — a flat attenuation for people running an EXTERNAL equalizer. Off by default:
+        // with no EQ attached it is pure level loss, and the in-app EQ makes its own headroom.
+        val headroomOn by AppSettings.eqHeadroomEnabled.collectAsState()
+        val headroomDb by AppSettings.eqHeadroomDb.collectAsState()
+        // The in-app EQ owns its own gain staging, so stacking this on top would double-attenuate.
+        val inAppEqOn by AppSettings.eqEnabled.collectAsState()
+
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.equalizer), color = SpotifyWhite) },
+            supportingContent = {
+                Text(stringResource(if (inAppEqOn) R.string.state_on else R.string.state_off), color = SpotifyLightGray)
+            },
+            leadingContent = { Icon(Icons.Rounded.GraphicEq, null, tint = SpotifyLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpotifyLightGray) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable { vm.navigateTo(ch.snepilatch.app.data.Screen.EQUALIZER) }
+        )
+
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.eq_headroom), color = SpotifyWhite) },
+            supportingContent = {
+                Text(
+                    when {
+                        inAppEqOn -> stringResource(R.string.eq_headroom_handled)
+                        headroomOn -> stringResource(R.string.eq_headroom_on, headroomDb.toInt())
+                        else -> stringResource(R.string.eq_headroom_off)
+                    },
+                    color = SpotifyLightGray
+                )
+            },
+            leadingContent = { Icon(Icons.AutoMirrored.Rounded.VolumeUp, null, tint = SpotifyLightGray) },
+            trailingContent = {
+                Switch(
+                    checked = headroomOn && !inAppEqOn,
+                    enabled = !inAppEqOn,
+                    onCheckedChange = { AppSettings.setEqHeadroomEnabled(it, audioContext) },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = animatedPrimary,
+                        checkedTrackColor = animatedPrimary.copy(alpha = 0.5f),
+                        uncheckedThumbColor = SpotifyLightGray,
+                        uncheckedTrackColor = SpotifyLightGray.copy(alpha = 0.3f)
+                    )
+                )
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+        )
+        if (headroomOn && !inAppEqOn) {
+            Slider(
+                value = headroomDb,
+                onValueChange = { AppSettings.setEqHeadroomDb(it.toInt().toFloat(), audioContext) },
+                valueRange = -18f..0f,
+                steps = 17,
+                colors = SliderDefaults.colors(thumbColor = animatedPrimary, activeTrackColor = animatedPrimary),
+                modifier = Modifier.padding(horizontal = 24.dp)
+            )
+        }
+
         // Canvas background
         val canvasOn by AppSettings.canvasEnabled.collectAsState()
         ListItem(
@@ -270,10 +328,10 @@ fun AccountScreen(vm: PlaybackViewModel) {
         // Player background style: album-colour gradient vs. the fluid Kawarp album-art warp.
         val gradientBg by AppSettings.playerGradientBg.collectAsState()
         ListItem(
-            headlineContent = { Text("Gradient background", color = SpotifyWhite) },
+            headlineContent = { Text(stringResource(R.string.gradient_background), color = SpotifyWhite) },
             supportingContent = {
                 Text(
-                    if (gradientBg) "Album colour gradient" else "Flowing album art",
+                    stringResource(if (gradientBg) R.string.gradient_bg_on else R.string.gradient_bg_off),
                     color = SpotifyLightGray
                 )
             },

@@ -44,6 +44,16 @@ object AppSettings {
     // Canvas background toggle (the URL itself is playback state on PlaybackViewModel).
     val canvasEnabled = MutableStateFlow(false)
 
+    // EQ headroom: a flat attenuation before the audio session, so an EXTERNAL equalizer (Wavelet &
+    // co.) has room to boost into instead of clipping. Off by default — with no EQ attached it is pure
+    // level loss. The in-app EQ doesn't need it; that one computes its own input gain from the curve.
+    val eqHeadroomEnabled = MutableStateFlow(false)
+    val eqHeadroomDb = MutableStateFlow(-6f)
+
+    // In-app 10-band EQ: on/off plus the per-band gains in dB (see EqualizerHeadroom.FREQUENCIES).
+    val eqEnabled = MutableStateFlow(false)
+    val eqBands = MutableStateFlow(FloatArray(ch.snepilatch.app.playback.EqualizerHeadroom.BANDS))
+
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     fun load(context: Context) {
@@ -67,6 +77,10 @@ object AppSettings {
             context.resources.updateConfiguration(config, context.resources.displayMetrics)
         }
         canvasEnabled.value = prefs.getBoolean("canvas_enabled", true)
+        eqHeadroomEnabled.value = prefs.getBoolean("eq_headroom_enabled", false)
+        eqHeadroomDb.value = prefs.getFloat("eq_headroom_db", -6f)
+        eqEnabled.value = prefs.getBoolean("eq_enabled", false)
+        eqBands.value = parseBands(prefs.getString("eq_bands", null))
         playerGradientBg.value = prefs.getBoolean("player_gradient_bg", true)
         contentRegion.value = prefs.getString("content_region", "nearest") ?: "nearest"
         notificationLeftButton.value = prefs.getString("notification_left_button", "repeat") ?: "repeat"
@@ -167,6 +181,41 @@ object AppSettings {
         playerGradientBg.value = enabled
         prefs(context)
             .edit().putBoolean("player_gradient_bg", enabled).apply()
+    }
+
+    /**
+     * Persist the headroom toggle / attenuation and push the new gain to the service. It lands on the
+     * next configure (track change or seek), so the level doesn't jump mid-track.
+     */
+    fun setEqHeadroomEnabled(enabled: Boolean, context: Context) {
+        eqHeadroomEnabled.value = enabled
+        prefs(context).edit().putBoolean("eq_headroom_enabled", enabled).apply()
+        MusicPlaybackService.instance?.applyHeadroomGain()
+    }
+
+    /** Band gains persist as a comma-joined string; anything unparseable falls back to a flat curve. */
+    private fun parseBands(raw: String?): FloatArray {
+        val bands = ch.snepilatch.app.playback.EqualizerHeadroom.BANDS
+        val parsed = raw?.split(",")?.mapNotNull { it.trim().toFloatOrNull() } ?: emptyList()
+        return if (parsed.size == bands) parsed.toFloatArray() else FloatArray(bands)
+    }
+
+    fun setEqEnabled(enabled: Boolean, context: Context) {
+        eqEnabled.value = enabled
+        prefs(context).edit().putBoolean("eq_enabled", enabled).apply()
+        MusicPlaybackService.instance?.syncEqualizer()
+    }
+
+    fun setEqBands(bands: FloatArray, context: Context) {
+        eqBands.value = bands
+        prefs(context).edit().putString("eq_bands", bands.joinToString(",")).apply()
+        MusicPlaybackService.instance?.setEqCurve(bands)
+    }
+
+    fun setEqHeadroomDb(db: Float, context: Context) {
+        eqHeadroomDb.value = db
+        prefs(context).edit().putFloat("eq_headroom_db", db).apply()
+        MusicPlaybackService.instance?.applyHeadroomGain()
     }
 
     /** Persist the canvas toggle. PlaybackViewModel.setCanvasEnabled wraps this to also clear the URL. */

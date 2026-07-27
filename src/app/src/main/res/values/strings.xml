@@ -102,8 +102,6 @@
     <string name="searching_devices">Searching for devices…</string>
 
     <!-- Notification -->
-    <string name="added_to_liked">Added to Liked Songs</string>
-    <string name="removed_from_liked">Removed from Liked Songs</string>
 
     <!-- Playback -->
     <string name="playback_ended">Playback ended</string>
@@ -272,13 +270,7 @@
     <string name="gradient_bg_off">Flowing album art</string>
 
     <!-- Snackbars -->
-    <string name="following_artist">Following artist</string>
-    <string name="saved_to_library">Saved to Library</string>
     <string name="save_to_library">Save to Library</string>
-    <string name="added_to_playlist">Added to playlist</string>
-    <string name="added_tracks_to_playlist">Added %1$d tracks to playlist</string>
-    <string name="added_to_queue_msg">Added to queue</string>
-    <string name="added_tracks_to_queue">Added %1$d tracks to queue</string>
 
     <!-- Notification channels -->
     <string name="notif_channel_playback">Music Playback</string>
@@ -291,4 +283,11 @@
     <string name="connect_failed">Connection failed after 5 attempts. Please try again later.</string>
     <string name="notif_connection_lost_title">Snepilatch: connection lost</string>
     <string name="notif_connection_lost_text">Tap to reconnect to Spotify</string>
+
+    <!-- Action errors -->
+    <string name="error_like">Could not update Liked Songs</string>
+    <string name="error_follow">Could not follow artist</string>
+    <string name="error_save_library">Could not save to library</string>
+    <string name="error_add_playlist">Could not add to playlist</string>
+    <string name="error_add_queue">Could not add to queue</string>
 </resources>

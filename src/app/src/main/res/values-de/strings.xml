@@ -97,8 +97,6 @@
     <string name="searching_devices">Suche nach Geräten…</string>
 
     <!-- Notification -->
-    <string name="added_to_liked">Zu Lieblingssongs hinzugefügt</string>
-    <string name="removed_from_liked">Aus Lieblingssongs entfernt</string>
 
     <!-- Playback -->
     <string name="playback_ended">Wiedergabe beendet</string>
@@ -272,13 +270,7 @@
     <string name="region_nearest">Nächstgelegen (automatisch)</string>
 
     <!-- Snackbars -->
-    <string name="following_artist">Künstler gefolgt</string>
-    <string name="saved_to_library">Zur Bibliothek hinzugefügt</string>
     <string name="save_to_library">Zur Bibliothek hinzufügen</string>
-    <string name="added_to_playlist">Zur Playlist hinzugefügt</string>
-    <string name="added_tracks_to_playlist">%1$d Titel zur Playlist hinzugefügt</string>
-    <string name="added_to_queue_msg">Zur Warteschlange hinzugefügt</string>
-    <string name="added_tracks_to_queue">%1$d Titel zur Warteschlange hinzugefügt</string>
 
     <!-- Notification channels -->
     <string name="notif_channel_playback">Musikwiedergabe</string>
@@ -291,4 +283,11 @@
     <string name="connect_failed">Verbindung nach 5 Versuchen fehlgeschlagen. Bitte später erneut versuchen.</string>
     <string name="notif_connection_lost_title">Snepilatch: Verbindung verloren</string>
     <string name="notif_connection_lost_text">Tippen, um Spotify neu zu verbinden</string>
+
+    <!-- Action errors -->
+    <string name="error_like">Lieblingssongs konnten nicht aktualisiert werden</string>
+    <string name="error_follow">Künstler konnte nicht gefolgt werden</string>
+    <string name="error_save_library">Konnte nicht zur Bibliothek hinzugefügt werden</string>
+    <string name="error_add_playlist">Konnte nicht zur Playlist hinzugefügt werden</string>
+    <string name="error_add_queue">Konnte nicht zur Warteschlange hinzugefügt werden</string>
 </resources>

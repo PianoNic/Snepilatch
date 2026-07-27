@@ -97,8 +97,6 @@
     <string name="searching_devices">Am Grät sueche…</string>
 
     <!-- Notification -->
-    <string name="added_to_liked">Zu de Lieblingssongs dezue</string>
-    <string name="removed_from_liked">Vo de Lieblingssongs weg</string>
 
     <!-- Playback -->
     <string name="playback_ended">Wiedergab fertig</string>
@@ -272,13 +270,7 @@
     <string name="eternal_jukebox">Eternal Jukebox</string>
 
     <!-- Snackbars -->
-    <string name="following_artist">Em Künstler folgsch jetz</string>
-    <string name="saved_to_library">Zur Bibliothek dezue</string>
     <string name="save_to_library">Zur Bibliothek dezuetue</string>
-    <string name="added_to_playlist">Zur Playlist dezue</string>
-    <string name="added_tracks_to_playlist">%1$d Lieder zur Playlist dezue</string>
-    <string name="added_to_queue_msg">Zur Warteschlange dezue</string>
-    <string name="added_tracks_to_queue">%1$d Lieder zur Warteschlange dezue</string>
 
     <!-- Notification channels -->
     <string name="notif_channel_playback">Musigwiedergab</string>
@@ -291,4 +283,11 @@
     <string name="connect_failed">Verbindig na 5 Versüech fehlgschlage. Bitte spöter nomal probiere.</string>
     <string name="notif_connection_lost_title">Snepilatch: Verbindig verlore</string>
     <string name="notif_connection_lost_text">Tippe, zum Spotify neu verbinde</string>
+
+    <!-- Action errors -->
+    <string name="error_like">Lieblingssongs händ nöd chöne aktualisiert werde</string>
+    <string name="error_follow">Em Künstler häsch nöd chöne folge</string>
+    <string name="error_save_library">Häts nöd i d Bibliothek gschafft</string>
+    <string name="error_add_playlist">Häts nöd i d Playlist gschafft</string>
+    <string name="error_add_queue">Häts nöd i d Warteschlange gschafft</string>
 </resources>

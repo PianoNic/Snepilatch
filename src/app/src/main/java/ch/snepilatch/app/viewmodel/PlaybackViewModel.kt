@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.annotation.StringRes
 import ch.snepilatch.app.R
 import ch.snepilatch.app.data.UiMessage
 import ch.snepilatch.app.util.LokiLogger
@@ -275,11 +276,13 @@ class PlaybackViewModel : ViewModel() {
     // Loading (detail loading moved to DetailViewModel.isLoading)
     val isStreamLoading = MutableStateFlow(false)
 
-    // Snackbar messages. Carries a string resource, not a resolved String: the ViewModel has no
-    // Context, and resolving in the UI is what makes the message follow the picked app language.
-    private val _snackbarMessage =
+    // Failures the user should know about, shown as a system toast. Successful actions stay silent:
+    // the like button filling in or the track appearing in the queue is its own confirmation.
+    // Carries a string resource, not a resolved String — the ViewModel has no Context, and resolving
+    // in the UI is what makes the message follow the picked app language.
+    private val _errorMessage =
         kotlinx.coroutines.flow.MutableSharedFlow<UiMessage>(extraBufferCapacity = 1)
-    val snackbarMessage: kotlinx.coroutines.flow.SharedFlow<UiMessage> = _snackbarMessage
+    val errorMessage: kotlinx.coroutines.flow.SharedFlow<UiMessage> = _errorMessage
 
     // Like state
     val currentTrackLiked = MutableStateFlow(false)
@@ -753,7 +756,11 @@ class PlaybackViewModel : ViewModel() {
      * `viewModelScope.launch(Dispatchers.IO) { try { val s = session ?: return@launch ... } catch ... }`
      * that appeared throughout the ViewModel.
      */
-    private fun launchWithSession(tag: String, block: suspend (Session) -> Unit): Job =
+    private fun launchWithSession(
+        tag: String,
+        @StringRes errorMessage: Int? = null,
+        block: suspend (Session) -> Unit
+    ): Job =
         viewModelScope.launch(Dispatchers.IO) {
             val sess = session ?: return@launch
             try {
@@ -762,6 +769,7 @@ class PlaybackViewModel : ViewModel() {
                 throw e
             } catch (e: Exception) {
                 LokiLogger.e(TAG, tag, e)
+                errorMessage?.let { _errorMessage.tryEmit(UiMessage(it)) }
             }
         }
 
@@ -1705,16 +1713,9 @@ class PlaybackViewModel : ViewModel() {
      */
     fun addTracksToPlaylist(playlistId: String, trackUris: List<String>) {
         if (trackUris.isEmpty()) return
-        launchWithSession("addTracksToPlaylist") { sess ->
+        launchWithSession("addTracksToPlaylist", R.string.error_add_playlist) { sess ->
             kotify.api.playlist.Playlist(sess).addToPlaylist(playlistId, trackUris)
             LokiLogger.i(TAG, "Added ${trackUris.size} tracks to playlist $playlistId")
-            _snackbarMessage.tryEmit(
-                if (trackUris.size == 1) {
-                    UiMessage(R.string.added_to_playlist)
-                } else {
-                    UiMessage(R.string.added_tracks_to_playlist, listOf(trackUris.size))
-                }
-            )
         }
     }
 
@@ -1769,15 +1770,11 @@ class PlaybackViewModel : ViewModel() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 player?.addToQueue(trackUris)
-                _snackbarMessage.tryEmit(
-                    if (trackUris.size == 1) {
-                        UiMessage(R.string.added_to_queue_msg)
-                    } else {
-                        UiMessage(R.string.added_tracks_to_queue, listOf(trackUris.size))
-                    }
-                )
             }
-            catch (e: Exception) { LokiLogger.e(TAG, "addAllToQueue", e) }
+            catch (e: Exception) {
+                LokiLogger.e(TAG, "addAllToQueue", e)
+                _errorMessage.tryEmit(UiMessage(R.string.error_add_queue))
+            }
         }
     }
 
@@ -1911,20 +1908,18 @@ class PlaybackViewModel : ViewModel() {
     }
 
     fun likeSong(trackId: String) {
-        launchWithSession("likeSong") { sess ->
+        launchWithSession("likeSong", R.string.error_like) { sess ->
             Song(sess).likeSong(trackId)
             currentTrackLiked.value = true
             pushLikeToNotification(true)
-            _snackbarMessage.tryEmit(UiMessage(R.string.added_to_liked))
         }
     }
 
     fun unlikeSong(trackId: String) {
-        launchWithSession("unlikeSong") { sess ->
+        launchWithSession("unlikeSong", R.string.error_like) { sess ->
             Song(sess).unlikeSong(trackId)
             currentTrackLiked.value = false
             pushLikeToNotification(false)
-            _snackbarMessage.tryEmit(UiMessage(R.string.removed_from_liked))
         }
     }
 
@@ -2776,18 +2771,16 @@ class PlaybackViewModel : ViewModel() {
     // --- Playlist Management ---
 
     fun followArtist(artistId: String) {
-        launchWithSession("followArtist") { sess ->
+        launchWithSession("followArtist", R.string.error_follow) { sess ->
             Artist(sess).follow(artistId)
-            _snackbarMessage.tryEmit(UiMessage(R.string.following_artist))
         }
     }
 
     fun savePlaylist(playlistId: String) {
-        launchWithSession("savePlaylist") { sess ->
+        launchWithSession("savePlaylist", R.string.error_save_library) { sess ->
             // Playlists live in the rootlist, not the generic library (which rejects PLAYLIST uris),
             // so saveToLibrary needs the current username.
             kotify.api.playlist.Playlist(sess).saveToLibrary(playlistId, username)
-            _snackbarMessage.tryEmit(UiMessage(R.string.saved_to_library))
         }
     }
 

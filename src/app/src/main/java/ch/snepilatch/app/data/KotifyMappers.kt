@@ -18,7 +18,7 @@ import kotify.api.playlist.Library as KLibrary
 import kotify.api.playlist.LibraryItem as KLibraryItem
 
 /**
- * Spotify returns release dates in several shapes:
+ * Spfy returns release dates in several shapes:
  *   - "2026"
  *   - "2026-02-20"
  *   - "2026-02-20T00:00:00Z"
@@ -130,7 +130,7 @@ fun QueueTrack.toTrackInfo() = TrackInfo(
     uri = uri,
     name = name ?: "Unknown",
     artist = artistName ?: "Unknown",
-    albumArt = ch.snepilatch.app.util.normalizeSpotifyImageUrl(imageUrl),
+    albumArt = ch.snepilatch.app.util.normalizeSpfyImageUrl(imageUrl),
     durationMs = durationMs,
     uid = uid,
 )

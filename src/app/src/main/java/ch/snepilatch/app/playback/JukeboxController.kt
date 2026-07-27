@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Waveform-native, seamless Eternal Jukebox — no Spotify beats.
+ * Waveform-native, seamless Eternal Jukebox — no Spfy beats.
  *
  * On enable it restarts the track and lets it play through once, capturing the decoded PCM live from
  * the audio pipeline (no separate download). When the whole track is captured it analyses the raw
@@ -222,7 +222,7 @@ class JukeboxController(
         engine = eng
         eng.start()
         eng.setPaused(paused)
-        svc.setJukeboxPositionSource { eng.positionMs() } // scrubber + Spotify now jump with the audio
+        svc.setJukeboxPositionSource { eng.positionMs() } // scrubber + Spfy now jump with the audio
         // Let the engine's AudioTrack fill and start sounding (same samples, same position) BEFORE muting
         // ExoPlayer, so the two overlap for a beat instead of leaving a gap — no dropout at the takeover.
         delay(HANDOFF_OVERLAP_MS)

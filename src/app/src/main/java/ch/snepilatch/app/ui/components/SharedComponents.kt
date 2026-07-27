@@ -3,7 +3,7 @@
 package ch.snepilatch.app.ui.components
 
 import ch.snepilatch.app.R
-import ch.snepilatch.app.ui.theme.SpotifyWhite
+import ch.snepilatch.app.ui.theme.SpfyWhite
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -63,9 +63,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.data.TrackInfo
-import ch.snepilatch.app.ui.theme.SpotifyElevated
-import ch.snepilatch.app.ui.theme.SpotifyGray
-import ch.snepilatch.app.ui.theme.SpotifyLightGray
+import ch.snepilatch.app.ui.theme.SpfyElevated
+import ch.snepilatch.app.ui.theme.SpfyGray
+import ch.snepilatch.app.ui.theme.SpfyLightGray
 import ch.snepilatch.app.util.formatTime
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.viewmodel.ThemeController
@@ -106,7 +106,7 @@ fun ShimmerBox(phase: State<Float>, modifier: Modifier) {
                 val x = phase.value
                 drawRect(
                     Brush.linearGradient(
-                        colors = listOf(SpotifyGray, SpotifyElevated, SpotifyGray),
+                        colors = listOf(SpfyGray, SpfyElevated, SpfyGray),
                         start = Offset(x - 500f, 0f),
                         end = Offset(x, 0f)
                     )
@@ -119,7 +119,7 @@ fun ShimmerBox(phase: State<Float>, modifier: Modifier) {
 // --- Image with placeholder ---
 
 @Composable
-fun SpotifyImage(
+fun SpfyImage(
     url: String?,
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
@@ -134,10 +134,10 @@ fun SpotifyImage(
     Box(
         modifier
             .clip(shape)
-            .background(SpotifyGray),
+            .background(SpfyGray),
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, null, tint = SpotifyLightGray.copy(alpha = 0.5f), modifier = Modifier.size(32.dp))
+        Icon(icon, null, tint = SpfyLightGray.copy(alpha = 0.5f), modifier = Modifier.size(32.dp))
         if (!url.isNullOrEmpty()) {
             AsyncImage(
                 model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
@@ -210,24 +210,24 @@ fun TrackRow(track: TrackInfo, vm: PlaybackViewModel, contextUri: String? = null
             .padding(horizontal = 16.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        SpotifyImage(
+        SpfyImage(
             url = track.albumArt,
             modifier = Modifier.size(48.dp),
             shape = RoundedCornerShape(4.dp)
         )
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(track.name, color = if (isPlaying) accent else SpotifyWhite, fontSize = 15.sp, fontWeight = FontWeight.Medium,
+            Text(track.name, color = if (isPlaying) accent else SpfyWhite, fontSize = 15.sp, fontWeight = FontWeight.Medium,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(track.artist, color = SpotifyLightGray, fontSize = 13.sp,
+            Text(track.artist, color = SpfyLightGray, fontSize = 13.sp,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (track.durationMs > 0) {
-            Text(formatTime(track.durationMs), color = SpotifyLightGray, fontSize = 12.sp)
+            Text(formatTime(track.durationMs), color = SpfyLightGray, fontSize = 12.sp)
             Spacer(Modifier.width(4.dp))
         }
         IconButton(onClick = { showMenu = true }, modifier = Modifier.size(36.dp)) {
-            Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SpotifyLightGray, modifier = Modifier.size(20.dp))
+            Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SpfyLightGray, modifier = Modifier.size(20.dp))
         }
     }
 
@@ -240,14 +240,14 @@ fun TrackRow(track: TrackInfo, vm: PlaybackViewModel, contextUri: String? = null
         ModalBottomSheet(
             onDismissRequest = { showMenu = false },
             sheetState = sheetState,
-            containerColor = SpotifyElevated,
+            containerColor = SpfyElevated,
             dragHandle = {
                 Box(
                     Modifier
                         .padding(vertical = 12.dp)
                         .width(40.dp)
                         .height(4.dp)
-                        .background(SpotifyLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
+                        .background(SpfyLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
                 )
             }
         ) {
@@ -257,15 +257,15 @@ fun TrackRow(track: TrackInfo, vm: PlaybackViewModel, contextUri: String? = null
                 Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                SpotifyImage(url = track.albumArt, modifier = Modifier.size(48.dp), shape = RoundedCornerShape(8.dp))
+                SpfyImage(url = track.albumArt, modifier = Modifier.size(48.dp), shape = RoundedCornerShape(8.dp))
                 Spacer(Modifier.width(12.dp))
                 Column {
-                    Text(track.name, color = SpotifyWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(track.artist, color = SpotifyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(track.name, color = SpfyWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(track.artist, color = SpfyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
             Spacer(Modifier.height(8.dp))
-            HorizontalDivider(color = SpotifyLightGray.copy(alpha = 0.15f))
+            HorizontalDivider(color = SpfyLightGray.copy(alpha = 0.15f))
 
             val shareLabel = stringResource(R.string.share)
             val addToQueueLabel = stringResource(R.string.add_to_queue)
@@ -308,9 +308,9 @@ fun TrackRow(track: TrackInfo, vm: PlaybackViewModel, contextUri: String? = null
                         .padding(horizontal = 20.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(icon, null, tint = SpotifyWhite, modifier = Modifier.size(24.dp))
+                    Icon(icon, null, tint = SpfyWhite, modifier = Modifier.size(24.dp))
                     Spacer(Modifier.width(16.dp))
-                    Text(label, color = SpotifyWhite, fontSize = 15.sp)
+                    Text(label, color = SpfyWhite, fontSize = 15.sp)
                 }
             }
             Spacer(Modifier.navigationBarsPadding().height(12.dp))
@@ -342,7 +342,7 @@ fun OverflowMenu(
     if (actions.isEmpty()) return
     var showMenu by remember { mutableStateOf(false) }
     IconButton(onClick = { showMenu = true }, modifier = modifier.size(36.dp)) {
-        Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SpotifyLightGray, modifier = Modifier.size(20.dp))
+        Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SpfyLightGray, modifier = Modifier.size(20.dp))
     }
     if (showMenu) {
         val sheetState = rememberBottomSheetState(
@@ -352,14 +352,14 @@ fun OverflowMenu(
         ModalBottomSheet(
             onDismissRequest = { showMenu = false },
             sheetState = sheetState,
-            containerColor = SpotifyElevated,
+            containerColor = SpfyElevated,
             dragHandle = {
                 Box(
                     Modifier
                         .padding(vertical = 12.dp)
                         .width(40.dp)
                         .height(4.dp)
-                        .background(SpotifyLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
+                        .background(SpfyLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
                 )
             }
         ) {
@@ -368,21 +368,21 @@ fun OverflowMenu(
                 Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                SpotifyImage(
+                SpfyImage(
                     url = imageUrl,
                     modifier = Modifier.size(48.dp),
                     shape = if (circular) androidx.compose.foundation.shape.CircleShape else RoundedCornerShape(8.dp)
                 )
                 Spacer(Modifier.width(12.dp))
                 Column {
-                    Text(title, color = SpotifyWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(title, color = SpfyWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (subtitle.isNotBlank()) {
-                        Text(subtitle, color = SpotifyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(subtitle, color = SpfyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
             Spacer(Modifier.height(8.dp))
-            HorizontalDivider(color = SpotifyLightGray.copy(alpha = 0.15f))
+            HorizontalDivider(color = SpfyLightGray.copy(alpha = 0.15f))
             actions.forEach { action ->
                 Row(
                     Modifier
@@ -391,9 +391,9 @@ fun OverflowMenu(
                         .padding(horizontal = 20.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(action.icon, null, tint = SpotifyWhite, modifier = Modifier.size(24.dp))
+                    Icon(action.icon, null, tint = SpfyWhite, modifier = Modifier.size(24.dp))
                     Spacer(Modifier.width(16.dp))
-                    Text(action.label, color = SpotifyWhite, fontSize = 15.sp)
+                    Text(action.label, color = SpfyWhite, fontSize = 15.sp)
                 }
             }
             Spacer(Modifier.navigationBarsPadding().height(12.dp))
@@ -406,9 +406,9 @@ fun OverflowMenu(
 @Composable
 fun ProfileInfoItem(label: String, value: String, icon: ImageVector) {
     ListItem(
-        headlineContent = { Text(label, color = SpotifyWhite) },
-        supportingContent = { Text(value, color = SpotifyLightGray) },
-        leadingContent = { Icon(icon, null, tint = SpotifyLightGray) },
+        headlineContent = { Text(label, color = SpfyWhite) },
+        supportingContent = { Text(value, color = SpfyLightGray) },
+        leadingContent = { Icon(icon, null, tint = SpfyLightGray) },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     )
 }
@@ -446,10 +446,10 @@ fun SlidingCoverImage(
     // cover slides in from the frame's own right edge, not from off-screen.
     Box(modifier.clip(shape)) {
         previousUrl?.let { prev ->
-            SpotifyImage(url = prev, modifier = Modifier.matchParentSize(), shape = shape)
+            SpfyImage(url = prev, modifier = Modifier.matchParentSize(), shape = shape)
         }
         val sliding = previousUrl != null
-        SpotifyImage(
+        SpfyImage(
             url = currentUrl,
             modifier = Modifier
                 .matchParentSize()

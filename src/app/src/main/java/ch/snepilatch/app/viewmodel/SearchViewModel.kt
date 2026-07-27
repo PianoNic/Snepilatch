@@ -10,13 +10,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * ViewModel for the Spotify-style search screen.
+ * ViewModel for the Spfy-style search screen.
  *
  * State machine:
  *  - **Idle** (`query.isEmpty()`): show the browse-categories grid
  *  - **Suggesting** (`query.isNotEmpty()` and `submittedQuery.isEmpty()`):
  *    show the autocomplete dropdown driven by [suggestions]. New keystrokes
- *    debounce SUGGEST_DEBOUNCE_MS before hitting Spotify so a fast typist
+ *    debounce SUGGEST_DEBOUNCE_MS before hitting Spfy so a fast typist
  *    doesn't fire one request per character.
  *  - **Submitted** (`submittedQuery.isNotEmpty()`): show the categorized
  *    results from [results]. The user got here by tapping a suggestion or
@@ -58,7 +58,7 @@ class SearchViewModel : SessionViewModel("SearchVM") {
             _results.value = null
             return
         }
-        // Length-1 queries are too noisy and Spotify's suggestions for
+        // Length-1 queries are too noisy and Spfy's suggestions for
         // single letters are mostly garbage; wait for at least 2 chars.
         if (text.length < MIN_SUGGEST_LENGTH) return
         scheduleSuggest(text)

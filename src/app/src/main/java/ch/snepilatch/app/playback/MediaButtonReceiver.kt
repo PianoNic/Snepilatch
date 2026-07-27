@@ -16,7 +16,7 @@ import ch.snepilatch.app.util.loadCookies
  * (or PLAY_PAUSE / HEADSETHOOK), we launch MainActivity with an autoplay flag.
  * The activity drives the normal ViewModel initialization path, then triggers
  * the same cold-start play protocol a user tap would. That flashes the UI
- * briefly on headphone press — the same thing the official Spotify app does.
+ * briefly on headphone press — the same thing the official Spfy app does.
  *
  * We only do this when the user has saved cookies, i.e. they're logged in.
  * Otherwise there's nothing to resume and launching the activity would just

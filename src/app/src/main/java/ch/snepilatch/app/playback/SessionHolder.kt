@@ -1,8 +1,8 @@
 package ch.snepilatch.app.playback
 
-import ch.snepilatch.app.playback.engine.SpotifyCdnResolver
+import ch.snepilatch.app.playback.engine.SpfyCdnResolver
 import kotify.api.playerconnect.PlayerConnect
-import kotify.cdn.SpotifyPlayback
+import kotify.cdn.SpfyPlayback
 import kotify.session.Session
 
 /**
@@ -23,10 +23,10 @@ import kotify.session.Session
 object SessionHolder {
     @Volatile var session: Session? = null
     @Volatile var player: PlayerConnect? = null
-    @Volatile var spotifyPlayback: SpotifyPlayback? = null
-    @Volatile var cdnResolver: SpotifyCdnResolver? = null
+    @Volatile var spfyPlayback: SpfyPlayback? = null
+    @Volatile var cdnResolver: SpfyCdnResolver? = null
 
-    /** The signed-in user's Spotify username. Set during initialize once the profile loads; read by
+    /** The signed-in user's Spfy username. Set during initialize once the profile loads; read by
      *  library mutations (create/delete/save playlist) that need it. */
     @Volatile var username: String = ""
 
@@ -38,12 +38,12 @@ object SessionHolder {
     fun set(
         session: Session,
         player: PlayerConnect,
-        spotifyPlayback: SpotifyPlayback,
-        cdnResolver: SpotifyCdnResolver
+        spfyPlayback: SpfyPlayback,
+        cdnResolver: SpfyCdnResolver
     ) {
         this.session = session
         this.player = player
-        this.spotifyPlayback = spotifyPlayback
+        this.spfyPlayback = spfyPlayback
         this.cdnResolver = cdnResolver
     }
 
@@ -51,7 +51,7 @@ object SessionHolder {
     fun clear() {
         session = null
         player = null
-        spotifyPlayback = null
+        spfyPlayback = null
         cdnResolver = null
         username = ""
     }

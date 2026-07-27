@@ -11,7 +11,7 @@ import androidx.media3.exoplayer.drm.DrmSessionEventListener
 import androidx.media3.exoplayer.drm.DrmSessionManager
 
 /**
- * Many Spotify audio files are cenc-encrypted but carry **no Widevine `pssh`** box (their in-file
+ * Many Spfy audio files are cenc-encrypted but carry **no Widevine `pssh`** box (their in-file
  * pssh is for a different DRM system). ExoPlayer then throws `MissingSchemeDataException` and the
  * track plays silent. The web player handles this by fetching the Widevine PSSH from the seektable
  * and feeding it to EME. We do the same: this wrapper rewrites every [Format]'s [DrmInitData] to the

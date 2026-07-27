@@ -22,7 +22,7 @@ object AppSettings {
 
     @Volatile private var appContext: Context? = null
 
-    // Audio source preference: null = Spotify (default), "lossless" = third-party FLAC chain.
+    // Audio source preference: null = Spfy (default), "lossless" = third-party FLAC chain.
     val preferredAudioSource = MutableStateFlow<String?>(null)
 
     // Lyrics animation direction for line-synced (non word-synced): "vertical" or "horizontal"
@@ -38,7 +38,7 @@ object AppSettings {
     // Content region for CDN resolution
     val contentRegion = MutableStateFlow("nearest")
 
-    // Player background style: true = album-colour gradient (Spotify/YTM style), false = blurred art.
+    // Player background style: true = album-colour gradient (Spfy/YTM style), false = blurred art.
     val playerGradientBg = MutableStateFlow(true)
 
     // Canvas background toggle (the URL itself is playback state on PlaybackViewModel).
@@ -60,7 +60,7 @@ object AppSettings {
         appContext = context.applicationContext
         val prefs = prefs(context)
         val savedSource = prefs.getString("audio_source", null)
-        // Migrate: old "spotify" value → null (Spotify CDN is now the default)
+        // Migrate: old "spotify" value → null (Spfy CDN is now the default)
         preferredAudioSource.value = if (savedSource == "spotify") null else savedSource
         if (savedSource == "spotify") {
             prefs.edit().remove("audio_source").apply()

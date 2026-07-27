@@ -8,14 +8,14 @@ import ch.snepilatch.app.R
 import ch.snepilatch.app.data.UiMessage
 import ch.snepilatch.app.util.LokiLogger
 import ch.snepilatch.app.util.detectActiveAudioOutput
-import ch.snepilatch.app.util.normalizeSpotifyImageUrl
+import ch.snepilatch.app.util.normalizeSpfyImageUrl
 import ch.snepilatch.app.playback.JukeboxController
 import ch.snepilatch.app.playback.JukeboxViz
 import ch.snepilatch.app.playback.MusicPlaybackService
 import ch.snepilatch.app.playback.PositionInterpolator
 import ch.snepilatch.app.playback.SessionHolder
-import ch.snepilatch.app.playback.engine.SpotifyCdnResolver
-import ch.snepilatch.app.playback.engine.SpotifyStream
+import ch.snepilatch.app.playback.engine.SpfyCdnResolver
+import ch.snepilatch.app.playback.engine.SpfyStream
 import ch.snepilatch.app.data.*
 import kotify.api.artist.Artist
 import kotify.api.playerconnect.PlayerConnect
@@ -27,7 +27,7 @@ import kotify.api.song.Song
 import kotify.api.user.User
 import kotify.api.canvas.Canvas
 import kotify.cdn.CdnPlayback
-import kotify.cdn.SpotifyPlayback
+import kotify.cdn.SpfyPlayback
 import kotify.cdn.StreamResult
 import kotify.session.Session
 import kotify.session.SessionConfig
@@ -77,15 +77,15 @@ class PlaybackViewModel : ViewModel() {
 
     // Streaming
     private val cdn = CdnPlayback()
-    private var spotifyPlayback: SpotifyPlayback?
-        get() = SessionHolder.spotifyPlayback
-        set(value) { SessionHolder.spotifyPlayback = value }
-    private var cdnResolver: SpotifyCdnResolver?
+    private var spfyPlayback: SpfyPlayback?
+        get() = SessionHolder.spfyPlayback
+        set(value) { SessionHolder.spfyPlayback = value }
+    private var cdnResolver: SpfyCdnResolver?
         get() = SessionHolder.cdnResolver
         set(value) { SessionHolder.cdnResolver = value }
     private var latestFileId: String? = null  // from TrackPlaybackHandler via onPlaybackId
 
-    // Direct https audio URLs for external/RSS podcast episodes (no Spotify file id, no DRM), keyed by
+    // Direct https audio URLs for external/RSS podcast episodes (no Spfy file id, no DRM), keyed by
     // episode uri and pushed via onExternalUrl. Small bounded cache; hosted content never appears here.
     private val externalUrlByUri = java.util.Collections.synchronizedMap(
         object : LinkedHashMap<String, String>(16, 0.75f, false) {
@@ -116,9 +116,9 @@ class PlaybackViewModel : ViewModel() {
     // Set when the user explicitly taps a track to play (playTrack). Lets the
     // next onTrackChange resolve+play locally even from an idle/not-streaming
     // start — otherwise the guard meant for passive init pushes swallows it and
-    // the first song after launch plays on Spotify's side with no local audio.
+    // the first song after launch plays on Spfy's side with no local audio.
     private var pendingUserPlay = false
-    private var nextCdnUrl: String? = null      // Pre-resolved Spotify CDN URL (DRM)
+    private var nextCdnUrl: String? = null      // Pre-resolved Spfy CDN URL (DRM)
     private var nextCdnFileId: String? = null   // File ID for the pre-resolved CDN track
     private var lastCommandTs: Long = 0L  // timing: when last user command was sent
     private var lastCommandName: String = ""
@@ -131,10 +131,10 @@ class PlaybackViewModel : ViewModel() {
 
     // Cold-start sync: when the user taps play with nothing loaded in ExoPlayer,
     // we call transferPlaybackHere(restorePaused=true) — claim the device on
-    // Spotify Connect WITHOUT emitting audio anywhere — and wait for Spotify's
+    // Spfy Connect WITHOUT emitting audio anywhere — and wait for Spfy's
     // state machine to push the current track's file_id via the onPlaybackId
     // callback. We then resolve a CDN URL for that file, load ExoPlayer paused,
-    // and the shared onReady callback seeks + starts ExoPlayer + Spotify in
+    // and the shared onReady callback seeks + starts ExoPlayer + Spfy in
     // lock-step. This is the same protocol the open.spotify.com web player uses.
     private var coldStartPending = false
     private var coldStartFileId: kotlinx.coroutines.CompletableDeferred<String>? = null
@@ -306,7 +306,7 @@ class PlaybackViewModel : ViewModel() {
 
     /**
      * Handle a genuinely-lost session: try to silently re-authenticate from the stored cookies, and
-     * only prompt for a fresh sign-in if there are none. Spotify sometimes hands back a transient
+     * only prompt for a fresh sign-in if there are none. Spfy sometimes hands back a transient
      * anonymous token for a still-valid cookie, so a re-init usually recovers without the user ever
      * seeing the "connection lost" prompt. [initialize] carries its own bounded rate-limit retry, so
      * a truly dead cookie still lands on the sign-in gate after those attempts are exhausted.
@@ -353,9 +353,9 @@ class PlaybackViewModel : ViewModel() {
                 ))
                 sess.load()
 
-                // KotifyClient now fires this ONLY when the login is genuinely dead (Spotify handed
+                // KotifyClient now fires this ONLY when the login is genuinely dead (Spfy handed
                 // back an anonymous token — an expired/revoked sp_dc). Transient dealer/network trouble
-                // retries forever inside KotifyClient and never lands here. But Spotify occasionally
+                // retries forever inside KotifyClient and never lands here. But Spfy occasionally
                 // returns a transient anonymous token even for a live cookie, so instead of dead-ending
                 // the user we first try to silently re-authenticate from the stored cookies; only when
                 // that's impossible (no saved cookies) do we surface the sign-in prompt.
@@ -364,9 +364,9 @@ class PlaybackViewModel : ViewModel() {
                     recoverAuthOrPromptLogin()
                 }
                 session = sess
-                val sp = SpotifyPlayback(sess)
-                spotifyPlayback = sp
-                cdnResolver = SpotifyCdnResolver(sess, sp)
+                val sp = SpfyPlayback(sess)
+                spfyPlayback = sp
+                cdnResolver = SpfyCdnResolver(sess, sp)
                 LokiLogger.i(TAG, "Session loaded")
 
                 // Home and library load themselves from HomeViewModel.init / LibraryViewModel.init.
@@ -413,7 +413,7 @@ class PlaybackViewModel : ViewModel() {
                 // Fresh device ID every launch — avoids stale server-side registrations
                 pc.ready()
                 // Assigning through the property setter publishes the player to
-                // SessionHolder — session/spotifyPlayback/cdnResolver are already
+                // SessionHolder — session/spfyPlayback/cdnResolver are already
                 // live there from the initialization block above.
                 player = pc
                 LokiLogger.i(TAG, "Player ready, device: ${pc.ourDeviceId()}")
@@ -430,9 +430,9 @@ class PlaybackViewModel : ViewModel() {
                 val state = pc.getState()
                 if (state != null) {
                     updatePlaybackFromState(state)
-                    // Only resolve and play if our device is active and Spotify is actually playing.
+                    // Only resolve and play if our device is active and Spfy is actually playing.
                     // Idle preload is intentionally NOT done — pressing play sends resume to
-                    // Spotify, which pushes the file_id via the WS state machine, and
+                    // Spfy, which pushes the file_id via the WS state machine, and
                     // resolveAndPlay then loads ExoPlayer with the right CDN URL.
                     if (state.is_active_device && state.isActuallyPlaying) {
                         resolveCurrentTrack(state)
@@ -505,7 +505,7 @@ class PlaybackViewModel : ViewModel() {
     /**
      * Attach the ViewModel's reactions to a freshly created PlayerConnect.
      *
-     * These callbacks are what keeps the UI in sync with whatever Spotify is
+     * These callbacks are what keeps the UI in sync with whatever Spfy is
      * doing on the account — track changes, pauses from other devices,
      * WebSocket reconnects, and file-id pushes that feed the cold-start
      * protocol.
@@ -523,7 +523,7 @@ class PlaybackViewModel : ViewModel() {
         }
 
         pc.onExternalUrl { url, uri, name ->
-            // External/RSS episode: no Spotify file id, no Widevine — just a direct https audio url.
+            // External/RSS episode: no Spfy file id, no Widevine — just a direct https audio url.
             // Cache it by episode uri so resolveAndPlayEpisode can stream it straight when the echo lands
             // (onExternalUrl and onTrackChange race, exactly like onPlaybackId does).
             LokiLogger.i(TAG, "External/RSS episode audio for ${uri ?: name}: ${url.take(80)}")
@@ -539,14 +539,14 @@ class PlaybackViewModel : ViewModel() {
                     val resolver = cdnResolver ?: return@launch
                     // Double-check after coroutine dispatch
                     if (fileId == nextCdnFileId && nextCdnUrl != null) return@launch
-                    LokiLogger.d(TAG, "Pre-resolving next Spotify CDN: $name ($fileId)")
+                    LokiLogger.d(TAG, "Pre-resolving next Spfy CDN: $name ($fileId)")
                     val stream = resolver.resolveForFileId(fileId)
                     // Cache only — DRM items can't be pre-queued because each
                     // needs its own Widevine license session.
                     nextCdnUrl = stream.cdnUrl
                     nextCdnFileId = fileId
                     isNextReady.value = true
-                    LokiLogger.i(TAG, "Next Spotify CDN pre-resolved: $name")
+                    LokiLogger.i(TAG, "Next Spfy CDN pre-resolved: $name")
                 } catch (e: Exception) {
                     LokiLogger.d(TAG, "Pre-resolve next CDN failed: ${e.message}")
                 }
@@ -641,13 +641,13 @@ class PlaybackViewModel : ViewModel() {
     }
 
     /**
-     * Handle a remote "play" event from Spotify Connect (lockscreen, browser,
+     * Handle a remote "play" event from Spfy Connect (lockscreen, browser,
      * other device). Public for unit tests so they can fire the event without
      * needing a real PlayerConnect.
      */
     internal fun handleRemotePlay(positionMs: Long) {
         if (!isStreaming.value) {
-            LokiLogger.i(TAG, "Spotify: play at ${positionMs}ms")
+            LokiLogger.i(TAG, "Spfy: play at ${positionMs}ms")
             MusicPlaybackService.instance?.syncPlay(positionMs)
         } else if (_playback.value.isPaused) {
             LokiLogger.i(TAG, "Remote play while streaming: resuming ExoPlayer")
@@ -658,15 +658,15 @@ class PlaybackViewModel : ViewModel() {
     }
 
     /**
-     * Handle a remote "pause" event from Spotify Connect. Public for unit tests.
+     * Handle a remote "pause" event from Spfy Connect. Public for unit tests.
      */
     internal fun handleRemotePause(positionMs: Long) {
         if (suppressRemotePause) {
-            LokiLogger.d(TAG, "Spotify: pause suppressed (reconnecting)")
+            LokiLogger.d(TAG, "Spfy: pause suppressed (reconnecting)")
             return
         }
         if (!isStreaming.value) {
-            LokiLogger.i(TAG, "Spotify: pause at ${positionMs}ms")
+            LokiLogger.i(TAG, "Spfy: pause at ${positionMs}ms")
             MusicPlaybackService.instance?.syncPause()
         } else {
             LokiLogger.i(TAG, "Remote pause while streaming: pausing ExoPlayer")
@@ -721,7 +721,7 @@ class PlaybackViewModel : ViewModel() {
 
     /**
      * Repeat-one (loop): when the just-ended track is set to loop, replay it from 0 instead of
-     * advancing. Spotify signals loop by pointing the state machine's `advance` back to the same track
+     * advancing. Spfy signals loop by pointing the state machine's `advance` back to the same track
      * (next == current), which the engine reports as "exhausted" — so the loop has to be driven here,
      * on ExoPlayer, where it's instant and gapless (the web player loops the same way: advance → same
      * state). Returns true if it handled the loop (caller should not advance). Public for the test rig.
@@ -732,7 +732,7 @@ class PlaybackViewModel : ViewModel() {
         MusicPlaybackService.instance?.syncPlay(0)
         _playback.value = _playback.value.copy(isPlaying = true, isPaused = false, positionMs = 0)
         startPositionTicker()
-        // Re-arm KotifyClient's clock and report position 0 so Spotify keeps counting the loop.
+        // Re-arm KotifyClient's clock and report position 0 so Spfy keeps counting the loop.
         launchWithPlayer("repeatLoop") { it.localSeek(0) }
         return true
     }
@@ -824,10 +824,10 @@ class PlaybackViewModel : ViewModel() {
     private val resolvingArtistUris = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
     /**
-     * All credited artists joined for display, e.g. "Post Malone, Swae Lee". Spotify's cluster
+     * All credited artists joined for display, e.g. "Post Malone, Swae Lee". Spfy's cluster
      * metadata lists extra artists under indexed keys which KotifyClient collects into [artistNames];
      * falls back to the single [artistName] (also the show name for episodes). When a track was played
-     * from an artist context, Spotify omits the name entirely and only ships [artistUri]; resolve that
+     * from an artist context, Spfy omits the name entirely and only ships [artistUri]; resolve that
      * to a name (cached, async) rather than showing "Unknown".
      */
     private fun PlayerTrack.displayArtist(): String {
@@ -879,7 +879,7 @@ class PlaybackViewModel : ViewModel() {
 
     private suspend fun updatePlaybackFromState(state: PlayerStateData) {
         val track = state.track
-        val imageUrl = normalizeSpotifyImageUrl(
+        val imageUrl = normalizeSpfyImageUrl(
             track?.imageLargeUrl ?: track?.imageUrl ?: track?.imageSmallUrl
         )
         val trackInfo = if (track != null) {
@@ -894,12 +894,12 @@ class PlaybackViewModel : ViewModel() {
         } else null
 
         // When streaming locally, ExoPlayer is usually the source of truth for
-        // play/pause. BUT during a remote pause transition Spotify's state push
+        // play/pause. BUT during a remote pause transition Spfy's state push
         // can arrive BEFORE our posted `player.pause()` has actually paused
         // ExoPlayer on the main thread — so reading ExoPlayer here would still
         // see "playing" and we'd overwrite the paused state the onPause handler
         // just set. Guard against the race by treating EITHER ExoPlayer-paused
-        // OR Spotify-reports-paused as "paused", never flipping back.
+        // OR Spfy-reports-paused as "paused", never flipping back.
         val exoPlaying = if (isStreaming.value) {
             withContext(Dispatchers.Main) {
                 MusicPlaybackService.instance?.isPlaying() == true
@@ -909,8 +909,8 @@ class PlaybackViewModel : ViewModel() {
         val actuallyPlaying = if (isStreaming.value) (exoPlaying && !state.is_paused) else state.isActuallyPlaying
         val actuallyPaused = if (isStreaming.value) (!exoPlaying || state.is_paused) else state.is_paused
 
-        // When streaming, the audio source of truth is ExoPlayer, not Spotify's state.
-        // If Spotify's state says track B but we're still playing track A, keep showing track A.
+        // When streaming, the audio source of truth is ExoPlayer, not Spfy's state.
+        // If Spfy's state says track B but we're still playing track A, keep showing track A.
         val stateTrackUri = track?.uri
         val isTrackMismatch = isStreaming.value && currentStreamUri != null && stateTrackUri != currentStreamUri
 
@@ -926,7 +926,7 @@ class PlaybackViewModel : ViewModel() {
             } ?: state.position_as_of_timestamp
             else -> {
                 // Not streaming: interpolate the snapshot position only if a device is
-                // actually playing right now. Spotify keeps is_playing=true even when no
+                // actually playing right now. Spfy keeps is_playing=true even when no
                 // device is active (idle state), so on init the snapshot can be hours
                 // stale — interpolating against that would clamp the position to the end
                 // of the track. isActuallyPlaying already accounts for has_active_device
@@ -1074,7 +1074,7 @@ class PlaybackViewModel : ViewModel() {
             contextUri.contains(":album:") -> PlayingContext("Album", track?.albumName ?: "Album", contextUri)
             contextUri.contains(":artist:") -> PlayingContext("Artist", track?.artistName ?: "Artist", contextUri)
             // A single track played with no collection context (search result, shared link, home
-            // shortcut) comes back with context_uri == the track's own uri. Spotify labels this
+            // shortcut) comes back with context_uri == the track's own uri. Spfy labels this
             // "Playing from Search"; without this branch the header fell back to the bare "Now playing"
             // placeholder. uri = null so the header isn't clickable (there's no context to open).
             contextUri.startsWith("spotify:track:") ->
@@ -1087,7 +1087,7 @@ class PlaybackViewModel : ViewModel() {
     private fun stopPositionTicker() = positionInterpolator.stop()
 
     /**
-     * While the jukebox owns playback, force the Spotify Connect session to repeat the current track so
+     * While the jukebox owns playback, force the Spfy Connect session to repeat the current track so
      * the cloud never auto-advances the queue when the track's duration elapses (which would tear the
      * engine down and jump to the next song). Restores the prior repeat mode when the jukebox turns off.
      */
@@ -1154,18 +1154,18 @@ class PlaybackViewModel : ViewModel() {
                 if (action == "resume") {
                     if (isStreaming.value) {
                         // Hot path: ExoPlayer is already loaded — flip the UI to playing
-                        // and start audio locally + sync Spotify Connect.
+                        // and start audio locally + sync Spfy Connect.
                         _playback.value = _playback.value.copy(isPlaying = true, isPaused = false)
                         startPositionTicker()
                         withContext(Dispatchers.Main) { MusicPlaybackService.instance?.syncPlay(_playback.value.positionMs) }
                         // Local state report — never fails the way a command can, so no transfer/retry needed.
                         p.localResume(_playback.value.positionMs)
                     } else {
-                        // Cold start: nothing loaded in ExoPlayer yet. Mirror the Spotify
+                        // Cold start: nothing loaded in ExoPlayer yet. Mirror the Spfy
                         // web player's protocol — fetch track metadata directly (no WS,
-                        // no Spotify state changes), claim the device with
+                        // no Spfy state changes), claim the device with
                         // restore_paused=true, load ExoPlayer paused, and only then
-                        // start Spotify+ExoPlayer in sync via the onReady callback.
+                        // start Spfy+ExoPlayer in sync via the onReady callback.
                         coldStartPlay()
                     }
                 } else {
@@ -1184,7 +1184,7 @@ class PlaybackViewModel : ViewModel() {
     }
 
     /**
-     * Cold-start playback that mirrors the Spotify web player's protocol.
+     * Cold-start playback that mirrors the Spfy web player's protocol.
      *
      * The web player's HAR shows the file_id is NOT in the metadata API for most
      * accounts — it comes from the state machine after the transfer call. So the
@@ -1192,14 +1192,14 @@ class PlaybackViewModel : ViewModel() {
      *
      *   1. transferPlaybackHere(restorePaused = true)
      *      → POST /connect-state/v1/connect/transfer with `restore_paused: "pause"`
-     *      Spotify Connect claims this device as active WITHOUT emitting audio,
+     *      Spfy Connect claims this device as active WITHOUT emitting audio,
      *      and the dealer pushes a cluster_update with the next track + file_id
      *      via the WS state machine.
      *   2. The existing onTrackChange listener fires resolveAndPlay; it reads
      *      coldStartPending and calls playDrmUrl(startPlaying = false). ExoPlayer
      *      buffers the track and prepares its Widevine session, but stays paused.
      *   3. wireServiceControls.onReady sees coldStartPending, seeks ExoPlayer to
-     *      the saved position, syncPlay()s locally, and tells Spotify to resume.
+     *      the saved position, syncPlay()s locally, and tells Spfy to resume.
      *      Local audio and remote state start together — no ghost playback on
      *      any other device.
      *
@@ -1221,7 +1221,7 @@ class PlaybackViewModel : ViewModel() {
         val savedPositionAtEntry = _playback.value.positionMs
 
         coldStartPending = true
-        // transferPlaybackHere(restore_paused=true) makes Spotify push a *paused* cluster state.
+        // transferPlaybackHere(restore_paused=true) makes Spfy push a *paused* cluster state.
         // That echo would hit handleRemotePause and syncPause() ExoPlayer mid-start — the stream we
         // are about to play — leaving audio silent even though onReady flips the UI to "playing", so
         // the user has to tap play a second time. The paused state is our own protocol artifact, not a
@@ -1248,7 +1248,7 @@ class PlaybackViewModel : ViewModel() {
             return
         }
 
-        // Wait for Spotify's state machine to push the file id via onPlaybackId.
+        // Wait for Spfy's state machine to push the file id via onPlaybackId.
         // Capped at 5s — typically arrives in <1s on a fast connection. If we
         // already have a cached latestFileId from an earlier session it'll arrive
         // even sooner because the cluster snapshot includes it.
@@ -1281,7 +1281,7 @@ class PlaybackViewModel : ViewModel() {
             val resolver = cdnResolver ?: throw IllegalStateException("CdnResolver not initialized")
 
             // Lossless mode: resolve via the third-party chain (Qobuz → Deezer →
-            // Deezer) and play locally instead of Spotify's Widevine CDN, so
+            // Deezer) and play locally instead of Spfy's Widevine CDN, so
             // resume-from-idle stays consistent with the rest of the lossless flow.
             if (AppSettings.preferredAudioSource.value != null) {
                 val trackId = trackUri.removePrefix("spotify:track:")
@@ -1316,7 +1316,7 @@ class PlaybackViewModel : ViewModel() {
                     LokiLogger.i(TAG, "[ColdStart] lossless (${info.provider}) loading at ${savedPositionAtEntry}ms")
                     return
                 }
-                LokiLogger.w(TAG, "[ColdStart] lossless resolve failed, falling back to Spotify CDN")
+                LokiLogger.w(TAG, "[ColdStart] lossless resolve failed, falling back to Spfy CDN")
             }
 
             val stream = resolver.resolveForFileId(fileId)
@@ -1326,7 +1326,7 @@ class PlaybackViewModel : ViewModel() {
             // no post-prepare seek dance. setMediaItem(item, startPositionMs)
             // guarantees STATE_READY fires AT that position, and playWhenReady=true
             // makes audio start immediately. The onReady callback then calls
-            // p.resume() to tell Spotify Connect we're now playing.
+            // p.resume() to tell Spfy Connect we're now playing.
             playUrlAt = System.currentTimeMillis()
             withContext(Dispatchers.Main) {
                 MusicPlaybackService.instance?.playDrmUrl(
@@ -1357,7 +1357,7 @@ class PlaybackViewModel : ViewModel() {
         isStreamLoading.value = false
     }
 
-    /** Hand control back to Spotify Connect (resume) — a state report that can't meaningfully fail. */
+    /** Hand control back to Spfy Connect (resume) — a state report that can't meaningfully fail. */
     private suspend fun fallbackResume() {
         try { player?.resume() } catch (_: Exception) {}
     }
@@ -1381,12 +1381,12 @@ class PlaybackViewModel : ViewModel() {
      * `ERROR_CODE_DRM_LICENSE_ACQUISITION_FAILED` — a throttled Widevine license). Rather than going
      * silent until the user taps play, re-resolve the SAME track and reload it at [positionMs], up to
      * [MAX_PLAYBACK_ERROR_RETRIES] times. A fresh resolve also rebuilds the license headers with a
-     * current access token, which is what clears a transient throttle. Spotify-CDN / podcast path only;
-     * the lossless (third-party) path keeps the old hand-back-to-Spotify behaviour. The retry budget
+     * current access token, which is what clears a transient throttle. Spfy-CDN / podcast path only;
+     * the lossless (third-party) path keeps the old hand-back-to-Spfy behaviour. The retry budget
      * resets on the next successful [MusicPlaybackService.onReady], so an unplayable track can't loop.
      */
     internal suspend fun recoverFromPlaybackError(failedUri: String?, positionMs: Long) {
-        // Nothing to reload locally, or lossless mode: hand back to Spotify (previous behaviour).
+        // Nothing to reload locally, or lossless mode: hand back to Spfy (previous behaviour).
         if (failedUri == null || AppSettings.preferredAudioSource.value != null) {
             fallbackResume()
             return
@@ -1396,7 +1396,7 @@ class PlaybackViewModel : ViewModel() {
         if (playbackErrorRetries >= MAX_PLAYBACK_ERROR_RETRIES) {
             // Every mirror we tried still failed — the track is genuinely unplayable right now. Don't
             // sit in silence on it; skip forward to the next track (local advance, uncapped). Falls
-            // back to a plain Spotify resume only if there's no live player to advance.
+            // back to a plain Spfy resume only if there's no live player to advance.
             playbackErrorRetries = 0
             recoveringUri = null
             val pc = player
@@ -1428,7 +1428,7 @@ class PlaybackViewModel : ViewModel() {
             false
         }
         // The re-resolve couldn't produce audio (missing resolver/file id, or it threw) — retry within
-        // budget; when the budget is spent the guard above hands back to Spotify.
+        // budget; when the budget is spent the guard above hands back to Spfy.
         if (!recovered) recoverFromPlaybackError(failedUri, positionMs)
     }
 
@@ -1441,7 +1441,7 @@ class PlaybackViewModel : ViewModel() {
         val track = _playback.value.track
         val title = track?.name?.ifBlank { "Unknown" } ?: "Unknown"
         val artist = track?.artist?.ifBlank { "Unknown" } ?: "Unknown"
-        val art = normalizeSpotifyImageUrl(track?.albumArt)
+        val art = normalizeSpfyImageUrl(track?.albumArt)
 
         // External/RSS episode: replay the direct url (no DRM) from where it stopped.
         externalUrlByUri[failedUri]?.let { externalUrl ->
@@ -1537,7 +1537,7 @@ class PlaybackViewModel : ViewModel() {
         viewModelScope.launch(Dispatchers.Main) {
             MusicPlaybackService.instance?.syncSeek(positionMs)
         }
-        // Report the seek to Spotify locally (state report, not a seek command)
+        // Report the seek to Spfy locally (state report, not a seek command)
         launchWithPlayer("seek") { it.localSeek(positionMs) }
     }
 
@@ -1586,9 +1586,9 @@ class PlaybackViewModel : ViewModel() {
         _playback.value = _playback.value.copy(volume = volume)
     }
 
-    fun setSpotifyVolume(volumePercent: Double) {
+    fun setSpfyVolume(volumePercent: Double) {
         _playback.value = _playback.value.copy(volume = volumePercent)
-        launchWithPlayer("setSpotifyVolume") { it.setVolume(volumePercent) }
+        launchWithPlayer("setSpfyVolume") { it.setVolume(volumePercent) }
     }
 
     /** URI-only entry point (search results, home shortcuts) — no uid/metadata, the WS echo enriches it. */
@@ -1613,7 +1613,7 @@ class PlaybackViewModel : ViewModel() {
         coroutineScope {
             // Instant tap-to-play (always on): self-resolve the tapped track's audio and start
             // ExoPlayer NOW, in parallel with the Connect play command, instead of waiting for the WS
-            // echo. Only for the Spotify-CDN source + a track URI, and not during a cold-start handoff.
+            // echo. Only for the Spfy-CDN source + a track URI, and not during a cold-start handoff.
             // On success it sets currentStreamUri so the echo's resolveAndPlay short-circuits; on
             // failure it does nothing and the echo path plays as usual. Runs as a child of this scope
             // so a rapid re-tap (which cancels userPlayJob) cancels it too.
@@ -1638,7 +1638,7 @@ class PlaybackViewModel : ViewModel() {
     }
 
     /**
-     * Gate for optimistic tap-to-play (always on): we're on the Spotify-CDN source (the only one that
+     * Gate for optimistic tap-to-play (always on): we're on the Spfy-CDN source (the only one that
      * resolves by file id), it's a track URI, and no cold-start handoff is in flight. Extracted so the
      * call site keeps a simple condition.
      */
@@ -1648,7 +1648,7 @@ class PlaybackViewModel : ViewModel() {
 
     /**
      * EXPERIMENTAL (Mode 2): resolve the tapped track's audio via track-playback/v1/media and start
-     * ExoPlayer immediately, without waiting for the WS command echo. Mirrors the Spotify-CDN branch of
+     * ExoPlayer immediately, without waiting for the WS command echo. Mirrors the Spfy-CDN branch of
      * [resolveAndPlay]. Best-effort: any failure logs and returns, leaving the echo path to play the
      * track the normal way. On success it commits currentStreamUri so the echo's resolveAndPlay
      * short-circuits instead of double-loading.
@@ -1667,7 +1667,7 @@ class PlaybackViewModel : ViewModel() {
             if (currentStreamUri == trackUri) return
             val title = track.name.ifBlank { "Unknown" }
             val artist = track.artist.ifBlank { "Unknown" }
-            val art = normalizeSpotifyImageUrl(track.albumArt)
+            val art = normalizeSpfyImageUrl(track.albumArt)
             // Reflect the tapped track in the UI immediately (echo's onState corrects any stale metadata).
             _playback.value = _playback.value.copy(track = track.copy(albumArt = art), positionMs = 0)
             ThemeController.updateFromArt(art)
@@ -1825,7 +1825,7 @@ class PlaybackViewModel : ViewModel() {
                 val needsFetch: Boolean
             )
             val parsed = state.next_tracks.map { qt ->
-                val art = normalizeSpotifyImageUrl(qt.imageUrl)
+                val art = normalizeSpfyImageUrl(qt.imageUrl)
                 val needsFetch = qt.name.isNullOrEmpty() || qt.artistName.isNullOrEmpty() || art == null
                 val info = TrackInfo(
                     uri = qt.uri,
@@ -2133,15 +2133,15 @@ class PlaybackViewModel : ViewModel() {
             }
             if (maybeLoopRepeatTrack()) return@onEnded
             // Snapshot the URI that JUST ended. If a new track gets loaded
-            // (currentStreamUri changes) before our timer fires, Spotify
+            // (currentStreamUri changes) before our timer fires, Spfy
             // already auto-advanced naturally — do NOT force-skip, that would
             // skip a song ahead and the audio/UI desync.
             //
-            // Spotify's natural onTrackChange typically lands 0.9-1.5s after
+            // Spfy's natural onTrackChange typically lands 0.9-1.5s after
             // ExoPlayer's STATE_ENDED. A 1s window was racing it by 50-150ms
             // and causing a double-skip when the natural advance arrived just
             // after the forced skipNext. AUTO_ADVANCE_GRACE_MS gives generous
-            // headroom; the silent fallback only fires when Spotify Connect
+            // headroom; the silent fallback only fires when Spfy Connect
             // genuinely fails to advance.
             val endedUri = currentStreamUri
             viewModelScope.launch(Dispatchers.IO) {
@@ -2177,11 +2177,11 @@ class PlaybackViewModel : ViewModel() {
                 // Cold-start sync: ExoPlayer was loaded with startPositionMs and
                 // playWhenReady=true, so by the time onReady fires audio is already
                 // producing at the right position. We just need to:
-                //   1. Tell Spotify Connect to resume (so other clients show us playing)
+                //   1. Tell Spfy Connect to resume (so other clients show us playing)
                 //   2. Update the UI playing state and start the position ticker
                 //   3. Hide the loading spinner
                 val pos = MusicPlaybackService.instance?.getCurrentPosition() ?: _playback.value.positionMs
-                LokiLogger.i(TAG, "[ColdStart] ExoPlayer producing at ${pos}ms — resuming Spotify Connect")
+                LokiLogger.i(TAG, "[ColdStart] ExoPlayer producing at ${pos}ms — resuming Spfy Connect")
                 coldStartPending = false
                 // Cold start done: audio is producing and we're about to resume Connect, so real
                 // remote pauses (e.g. from another device) must apply again.
@@ -2200,7 +2200,7 @@ class PlaybackViewModel : ViewModel() {
                 startPositionTicker()
                 viewModelScope.launch(Dispatchers.IO) {
                     try {
-                        // For Spotify CDN: resume Spotify so other clients show us as playing
+                        // For Spfy CDN: resume Spfy so other clients show us as playing
                         if (AppSettings.preferredAudioSource.value == null) {
                             player?.resume()
                         }
@@ -2279,15 +2279,15 @@ class PlaybackViewModel : ViewModel() {
     }
 
     /**
-     * Acquire the Spotify-CDN [SpotifyStream] for [trackUri]: reuse the pre-resolved next-track CDN URL
+     * Acquire the Spfy-CDN [SpfyStream] for [trackUri]: reuse the pre-resolved next-track CDN URL
      * when its file id matches, else wait for the state-machine file id (up to ~1.5s), self-resolve if
      * still absent, and resolve mirrors. Throws if the resolver is uninitialised or no file id is
      * available — the caller's try/catch falls through to the third-party CDN on any throw.
      */
-    private suspend fun resolveSpotifyCdnStream(
+    private suspend fun resolveSpfyCdnStream(
         event: kotify.api.playerstatus.TrackChangeEvent,
         trackUri: String
-    ): SpotifyStream {
+    ): SpfyStream {
         val resolver = cdnResolver ?: throw IllegalStateException("CdnResolver not initialized")
 
         // Check if we already pre-resolved this CDN URL
@@ -2296,7 +2296,7 @@ class PlaybackViewModel : ViewModel() {
         val currentFileId = event.currentFileId ?: latestFileId
         val cachedCdnUrl = if (currentFileId != null && nextCdnFileId == currentFileId) nextCdnUrl else null
         return if (cachedCdnUrl != null) {
-            LokiLogger.i(TAG, "SpotifyCDN: Using pre-resolved CDN URL (fileId=$currentFileId)")
+            LokiLogger.i(TAG, "SpfyCDN: Using pre-resolved CDN URL (fileId=$currentFileId)")
             nextCdnUrl = null
             nextCdnFileId = null
             resolver.buildStreamForCachedUrl(cachedCdnUrl, currentFileId)
@@ -2308,26 +2308,26 @@ class PlaybackViewModel : ViewModel() {
                 // (MP4_128 on free). Give it real time before self-resolving, because the media
                 // endpoint below only offers premium MP4_256 on many accounts, which a free CDM
                 // can't license. Cheap: only runs when the cluster hasn't supplied a file id yet.
-                LokiLogger.d(TAG, "SpotifyCDN: Waiting for state-machine file ID...")
+                LokiLogger.d(TAG, "SpfyCDN: Waiting for state-machine file ID...")
                 pollFor(15) { latestFileId != null }
                 fileId = latestFileId
             }
             // Still null: self-resolve. Use the media endpoint only when the file id is
             // licensable for this account (see safeMediaFileId), else metadata/4/track.
             if (fileId == null) {
-                LokiLogger.i(TAG, "SpotifyCDN: No file ID from state machine, self-resolving...")
+                LokiLogger.i(TAG, "SpfyCDN: No file ID from state machine, self-resolving...")
                 fileId = safeMediaFileId(trackUri) ?: resolver.fetchFileIdFromMetadata(trackUri)
                 if (fileId != null) {
-                    LokiLogger.i(TAG, "SpotifyCDN: Got file ID from self-resolve: $fileId")
+                    LokiLogger.i(TAG, "SpfyCDN: Got file ID from self-resolve: $fileId")
                     latestFileId = fileId
                 }
             }
             if (fileId == null) {
                 throw IllegalStateException("No file ID available")
             }
-            LokiLogger.i(TAG, "SpotifyCDN: Resolving fileId=$fileId")
+            LokiLogger.i(TAG, "SpfyCDN: Resolving fileId=$fileId")
             val resolved = resolver.resolveForFileId(fileId)
-            LokiLogger.i(TAG, "SpotifyCDN: Resolved ${resolved.mirrorCount} mirrors")
+            LokiLogger.i(TAG, "SpfyCDN: Resolved ${resolved.mirrorCount} mirrors")
             resolved
         }
     }
@@ -2363,12 +2363,12 @@ class PlaybackViewModel : ViewModel() {
 
         // Don't stop the old song — let it keep playing until the new one is ready.
         // ExoPlayer's setMediaItem() in playUrl/playDrmUrl will seamlessly replace it.
-        // Pause Spotify so it doesn't advance while we resolve the stream
-        // Skip for Spotify CDN — we want Spotify to keep showing us as "playing"
+        // Pause Spfy so it doesn't advance while we resolve the stream
+        // Skip for Spfy CDN — we want Spfy to keep showing us as "playing"
         if (AppSettings.preferredAudioSource.value != null) {
             try { player?.pause() } catch (_: Exception) {}
         }
-        val art = normalizeSpotifyImageUrl(current.imageLargeUrl ?: current.imageUrl)
+        val art = normalizeSpfyImageUrl(current.imageLargeUrl ?: current.imageUrl)
 
         // Update UI with new track info immediately — audio will follow in ~100ms
         val newTrack = TrackInfo(
@@ -2381,9 +2381,9 @@ class PlaybackViewModel : ViewModel() {
         checkLikedState(trackUri)
         fetchCanvasForTrack(trackUri)
 
-        // Podcast episodes always resolve through Spotify — they are not on the third-party music CDNs
+        // Podcast episodes always resolve through Spfy — they are not on the third-party music CDNs
         // (Qobuz/Deezer/YouTube), so we must never fall back to that chain for them. Hosted episodes
-        // carry a Spotify file id (Widevine, same as a track); external/RSS episodes carry a direct
+        // carry a Spfy file id (Widevine, same as a track); external/RSS episodes carry a direct
         // https url surfaced via onExternalUrl. resolveAndPlayEpisode handles both and returns.
         if (trackUri.startsWith("spotify:episode:")) {
             resolveAndPlayEpisode(trackUri, event, title, artist, art, resolveStart)
@@ -2395,7 +2395,7 @@ class PlaybackViewModel : ViewModel() {
         val preResolvedProvider = nextStreamProvider
         if (nextTrackInfo?.uri == trackUri && preResolvedUrl != null) {
             LokiLogger.i(TAG, "Using pre-resolved stream for $trackUri")
-            // Don't resume Spotify yet — onReady callback will sync after ExoPlayer buffers
+            // Don't resume Spfy yet — onReady callback will sync after ExoPlayer buffers
             playUrlAt = System.currentTimeMillis()
             MusicPlaybackService.instance?.playUrl(preResolvedUrl, title, artist, art, headers = nextStreamHeaders)
             currentStreamUri = trackUri
@@ -2412,10 +2412,10 @@ class PlaybackViewModel : ViewModel() {
 
         LokiLogger.i(TAG, "Resolving stream for $trackUri (source=${AppSettings.preferredAudioSource.value})")
 
-        // Spotify CDN path: resolve CDN URL directly from Spotify's infrastructure
+        // Spfy CDN path: resolve CDN URL directly from Spfy's infrastructure
         if (AppSettings.preferredAudioSource.value == null) {
             try {
-                val stream = resolveSpotifyCdnStream(event, trackUri)
+                val stream = resolveSpfyCdnStream(event, trackUri)
                 // DRM: must stop old player to close the Widevine session cleanly.
                 // Unlike non-DRM, we can't seamlessly replace — each track needs its own license.
                 withContext(Dispatchers.Main) {
@@ -2438,7 +2438,7 @@ class PlaybackViewModel : ViewModel() {
                 preResolveNextTrack()
                 return
             } catch (e: Exception) {
-                LokiLogger.w(TAG, "Spotify CDN failed: ${e.message}, falling back to third-party CDN")
+                LokiLogger.w(TAG, "Spfy CDN failed: ${e.message}, falling back to third-party CDN")
             }
         }
 
@@ -2446,7 +2446,7 @@ class PlaybackViewModel : ViewModel() {
             val result = cdn.resolveFromTrack(event, region = AppSettings.effectiveRegion(), preferredSource = AppSettings.preferredAudioSource.value)
             when (result) {
                 is StreamResult.Success -> {
-                    // Don't resume Spotify yet — onReady callback will sync after ExoPlayer buffers
+                    // Don't resume Spfy yet — onReady callback will sync after ExoPlayer buffers
                     playUrlAt = System.currentTimeMillis()
                     val info = result.info
                     val key = info.decryptionKey
@@ -2535,7 +2535,7 @@ class PlaybackViewModel : ViewModel() {
     /**
      * Resolve + play a podcast episode. Two shapes, both fed from the same connect-state/track-playback
      * state machine (never third-party):
-     *  - **Hosted** (Spotify-hosted): carries a Spotify file id (via onPlaybackId / cluster state) →
+     *  - **Hosted** (Spfy-hosted): carries a Spfy file id (via onPlaybackId / cluster state) →
      *    Widevine CDN, identical to a track.
      *  - **External/RSS**: no file id; a direct https audio url surfaced via onExternalUrl → streamed
      *    as-is, no DRM.
@@ -2583,7 +2583,7 @@ class PlaybackViewModel : ViewModel() {
                 return
             }
 
-            // Hosted: Spotify file id → Widevine, exactly like a track.
+            // Hosted: Spfy file id → Widevine, exactly like a track.
             if (fileId != null) {
                 val resolver = cdnResolver ?: throw IllegalStateException("CdnResolver not initialized")
                 latestFileId = fileId
@@ -2647,7 +2647,7 @@ class PlaybackViewModel : ViewModel() {
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val art = normalizeSpotifyImageUrl(track.imageLargeUrl ?: track.imageUrl)
+                val art = normalizeSpfyImageUrl(track.imageLargeUrl ?: track.imageUrl)
 
                 val result = cdn.resolveStreamUrl(
                     trackId, region = AppSettings.effectiveRegion(),
@@ -2684,7 +2684,7 @@ class PlaybackViewModel : ViewModel() {
     }
 
     private suspend fun preResolveNextTrack() {
-        // Skip pre-resolution for Spotify CDN — file IDs only come at play time from the state machine
+        // Skip pre-resolution for Spfy CDN — file IDs only come at play time from the state machine
         if (AppSettings.preferredAudioSource.value == null) {
             isNextReady.value = true
             return
@@ -2703,7 +2703,7 @@ class PlaybackViewModel : ViewModel() {
 
             val title = nextTrack.name ?: "Unknown"
             val artist = nextTrack.artistName ?: "Unknown"
-            val art = normalizeSpotifyImageUrl(nextTrack.imageUrl)
+            val art = normalizeSpfyImageUrl(nextTrack.imageUrl)
             val searchQuery = listOfNotNull(artist.takeIf { it != "Unknown" }, title.takeIf { it != "Unknown" })
                 .joinToString(" ").takeIf { it.isNotBlank() }
 
@@ -2749,7 +2749,7 @@ class PlaybackViewModel : ViewModel() {
     fun loadDevices() {
         launchWithPlayer("loadDevices") { pc ->
             val devicesInfo = pc.getDevices() ?: return@launchWithPlayer
-            // Filter out hobs_ duplicates — they're internal Spotify IDs for the same device
+            // Filter out hobs_ duplicates — they're internal Spfy IDs for the same device
             _devices.value = devicesInfo.devices.filter { !it.key.startsWith("hobs_") }.values.toList()
             val activeId = devicesInfo.activeDeviceId
             LokiLogger.i(TAG, "Devices: ${devicesInfo.devices.keys}, activeId=$activeId")
@@ -2813,7 +2813,7 @@ class PlaybackViewModel : ViewModel() {
         private const val NOTIFICATION_RESYNC_MS = 300L
 
         /** How long to wait after ExoPlayer's STATE_ENDED before falling back to
-         *  a forced player.skipNext(). Spotify's natural onTrackChange reliably
+         *  a forced player.skipNext(). Spfy's natural onTrackChange reliably
          *  lands within ~1.5s; 5s gives generous headroom so we don't double-skip
          *  when the natural advance arrives just past a tighter timeout. */
         private const val AUTO_ADVANCE_GRACE_MS = 5000L

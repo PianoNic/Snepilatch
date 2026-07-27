@@ -122,7 +122,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     private var currentAudioSessionId: Int = 0
     private var openAudioEffectSession = false
 
-    // Callbacks for forwarding controls to Spotify
+    // Callbacks for forwarding controls to Spfy
     var onPlay: (() -> Unit)? = null
     var onPause: (() -> Unit)? = null
     var onSkipNext: (() -> Unit)? = null
@@ -149,12 +149,12 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     var notificationRightButton: String = "like"
 
     /** True while playback is paused because another app holds transient audio focus.
-     *  Used to auto-resume Spotify when focus returns. */
+     *  Used to auto-resume Spfy when focus returns. */
     private var wasSuppressedByFocus = false
 
     // Control-plane keep-awake. ExoPlayer's WAKE_MODE_NETWORK only holds a wake/Wi-Fi lock while the
     // PLAYER needs the network (i.e. buffering); once a track is buffered it lets the radio sleep. But
-    // we are a Spotify Connect device — the dealer WebSocket and the end-of-track advance run OUTSIDE
+    // we are a Spfy Connect device — the dealer WebSocket and the end-of-track advance run OUTSIDE
     // ExoPlayer and must stay responsive with the screen off, or the server-driven advance stalls
     // until the phone is unlocked (Wi-Fi power-save was delaying the control messages). So we hold our
     // OWN partial wake lock + a high-perf Wi-Fi lock for the whole time we're actively playing,
@@ -240,7 +240,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         // decoded waveform (for the seamless-jukebox engine). It passes audio through untouched.
         val renderersFactory = object : DefaultRenderersFactory(this) {
             // enableFloatOutput is deliberately ignored. It only does anything when the decoder
-            // already emits 32-bit float, so it is a no-op for the 16-bit AAC Spotify path and would
+            // already emits 32-bit float, so it is a no-op for the 16-bit AAC Spfy path and would
             // apply only to high-bit-depth FLAC — where it would break two things: JukeboxAudioTap
             // captures into a ShortArray, and GainAudioProcessor bypasses itself on any encoding
             // other than PCM_16BIT, so the EQ headroom would silently stop working. Teach both
@@ -308,29 +308,29 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 }
 
                 // Full (permanent) audio focus loss — e.g. phone call answered.
-                // ExoPlayer flips playWhenReady to false. Mirror to Spotify side.
+                // ExoPlayer flips playWhenReady to false. Mirror to Spfy side.
                 if (!playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS) {
-                    LokiLogger.i(TAG, "Pausing Spotify side due to audio focus loss")
+                    LokiLogger.i(TAG, "Pausing Spfy side due to audio focus loss")
                     onPause?.invoke()
                 }
             }
 
             override fun onPlaybackSuppressionReasonChanged(playbackSuppressionReason: Int) {
                 // Transient focus loss (e.g. Instagram video starts) — ExoPlayer keeps
-                // playWhenReady = true but suppresses playback. Spotify's cloud position
-                // keeps advancing though, so we must mirror the pause to the Spotify side
+                // playWhenReady = true but suppresses playback. Spfy's cloud position
+                // keeps advancing though, so we must mirror the pause to the Spfy side
                 // — otherwise the muted track ends and the next one auto-plays over the
                 // focus-stealing app. Resume both sides when focus returns.
                 when (playbackSuppressionReason) {
                     Player.PLAYBACK_SUPPRESSION_REASON_TRANSIENT_AUDIO_FOCUS_LOSS -> {
-                        LokiLogger.i(TAG, "Pausing Spotify side due to transient focus loss")
+                        LokiLogger.i(TAG, "Pausing Spfy side due to transient focus loss")
                         wasSuppressedByFocus = true
                         onPause?.invoke()
                     }
                     Player.PLAYBACK_SUPPRESSION_REASON_NONE -> {
                         if (wasSuppressedByFocus) {
                             wasSuppressedByFocus = false
-                            LokiLogger.i(TAG, "Resuming Spotify side — transient focus restored")
+                            LokiLogger.i(TAG, "Resuming Spfy side — transient focus restored")
                             onPlay?.invoke()
                         }
                     }
@@ -386,12 +386,12 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             setSessionActivity(pendingIntent)
             setCallback(object : MediaSessionCompat.Callback() {
                 override fun onPlay() {
-                    // Only tell Spotify — ExoPlayer will sync via onPlay callback
+                    // Only tell Spfy — ExoPlayer will sync via onPlay callback
                     onPlay?.invoke()
                 }
 
                 override fun onPause() {
-                    // Only tell Spotify — ExoPlayer will sync via onPause callback
+                    // Only tell Spfy — ExoPlayer will sync via onPause callback
                     onPause?.invoke()
                 }
 
@@ -404,7 +404,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 }
 
                 override fun onSeekTo(pos: Long) {
-                    // Tell Spotify, and also seek ExoPlayer immediately for responsiveness
+                    // Tell Spfy, and also seek ExoPlayer immediately for responsiveness
                     player.seekTo(pos)
                     onSeek?.invoke(pos)
                     updateNotification()
@@ -452,7 +452,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     /**
      * Apply the EQ-headroom attenuation, before the media item is prepared so the level is right from
      * the first frame. [trackLoudnessDb] is the track's measured loudness if we ever have one — nothing
-     * supplies it today (Spotify's manifest `gain_db` is always null and the FLAC path has no Spotify
+     * supplies it today (Spfy's manifest `gain_db` is always null and the FLAC path has no Spfy
      * metadata), so every track takes the flat user-set attenuation.
      */
     fun applyHeadroomGain(trackLoudnessDb: Double? = null) {
@@ -539,7 +539,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         // Start audio IMMEDIATELY — don't wait for art
         mainHandler.post {
             player.playWhenReady = false
-            // Default sources (squid direct URL, Spotify CDN) play from a plain
+            // Default sources (squid direct URL, Spfy CDN) play from a plain
             // MediaItem. Sources that gate their stream behind a request header
             // (the anandserver Qobuz mirror) need those headers on the HTTP data
             // source, so they go through a dedicated header-injecting MediaSource.
@@ -625,7 +625,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
     // While the Eternal Jukebox engine owns the speaker, the true "where are we" is its playhead
     // (which jumps around), not ExoPlayer's linear muted clock. When set, it overrides the reported
-    // position so the UI scrubber and the Spotify Connect reports jump with the audio.
+    // position so the UI scrubber and the Spfy Connect reports jump with the audio.
     @Volatile private var jukeboxPositionSource: (() -> Long)? = null
     fun setJukeboxPositionSource(src: (() -> Long)?) { jukeboxPositionSource = src }
 
@@ -770,7 +770,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     /**
      * Push idle metadata to the notification + MediaSession without loading
      * anything into ExoPlayer. Used right after init to surface whatever
-     * track Spotify Connect's cluster reports as "current", so the system
+     * track Spfy Connect's cluster reports as "current", so the system
      * media notification shows the correct song before the user has pressed
      * play. Pressing play / next / pause from the notification then runs the
      * normal cold-start protocol.
@@ -907,8 +907,8 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     }
 
     /**
-     * Progressive media source that injects a Widevine PSSH (base64 from Spotify's seektable) into
-     * the DRM session. Needed because many Spotify files are cenc-encrypted but embed no Widevine
+     * Progressive media source that injects a Widevine PSSH (base64 from Spfy's seektable) into
+     * the DRM session. Needed because many Spfy files are cenc-encrypted but embed no Widevine
      * pssh box, so ExoPlayer's default in-file DRM throws MissingSchemeDataException and plays silent.
      */
     @OptIn(UnstableApi::class)
@@ -1184,7 +1184,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     }
 
     private suspend fun loadBitmap(url: String): Bitmap? {
-        // Spotify's cluster API returns art as `spotify:image:<id>` URIs.
+        // Spfy's cluster API returns art as `spotify:image:<id>` URIs.
         // Rewrite to the i.scdn.co CDN URL before requesting.
         val resolved = if (url.startsWith("spotify:image:")) {
             "https://i.scdn.co/image/" + url.removePrefix("spotify:image:")

@@ -1,8 +1,8 @@
 package ch.snepilatch.app.ui.screens
 
 import ch.snepilatch.app.R
-import ch.snepilatch.app.ui.theme.SpotifyBlack
-import ch.snepilatch.app.ui.theme.SpotifyWhite
+import ch.snepilatch.app.ui.theme.SpfyBlack
+import ch.snepilatch.app.ui.theme.SpfyWhite
 import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -34,11 +34,11 @@ import ch.snepilatch.app.util.saveCookies
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 
 @Composable
-fun SpotifyLoginScreen(vm: PlaybackViewModel) {
+fun SpfyLoginScreen(vm: PlaybackViewModel) {
     Column(
         Modifier
             .fillMaxSize()
-            .background(SpotifyBlack)
+            .background(SpfyBlack)
             .statusBarsPadding()
     ) {
         Row(
@@ -48,10 +48,10 @@ fun SpotifyLoginScreen(vm: PlaybackViewModel) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = { vm.needsLogin.value = false }) {
-                Icon(Icons.Rounded.Close, stringResource(R.string.close), tint = SpotifyWhite)
+                Icon(Icons.Rounded.Close, stringResource(R.string.close), tint = SpfyWhite)
             }
             Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.login_title), color = SpotifyWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.login_title), color = SpfyWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         }
 
         AndroidView(

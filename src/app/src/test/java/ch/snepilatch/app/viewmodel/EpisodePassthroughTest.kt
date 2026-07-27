@@ -1,8 +1,8 @@
 package ch.snepilatch.app.viewmodel
 
 import ch.snepilatch.app.playback.SessionHolder
-import ch.snepilatch.app.playback.engine.SpotifyCdnResolver
-import ch.snepilatch.app.playback.engine.SpotifyStream
+import ch.snepilatch.app.playback.engine.SpfyCdnResolver
+import ch.snepilatch.app.playback.engine.SpfyStream
 import io.mockk.coEvery
 import io.mockk.mockk
 import io.mockk.verify
@@ -32,7 +32,7 @@ class EpisodePassthroughTest {
 
     @Test
     fun passthroughEpisode_streamsDirectUrl_notDrm() = runBlocking {
-        val resolver = mockk<SpotifyCdnResolver>(relaxed = true)
+        val resolver = mockk<SpfyCdnResolver>(relaxed = true)
         coEvery { resolver.resolveEpisode("EP1") } returns EpisodeResolveInfo(
             fileId = "hostedFileId",
             format = "MP4_128",
@@ -53,7 +53,7 @@ class EpisodePassthroughTest {
 
     @Test
     fun hostedEpisode_goesThroughDrm() = runBlocking {
-        val resolver = mockk<SpotifyCdnResolver>(relaxed = true)
+        val resolver = mockk<SpfyCdnResolver>(relaxed = true)
         coEvery { resolver.resolveEpisode("EP2") } returns EpisodeResolveInfo(
             fileId = "wideFileId",
             format = "MP4_128",
@@ -61,7 +61,7 @@ class EpisodePassthroughTest {
             passthrough = "NONE",
             passthroughUrl = null,
         )
-        coEvery { resolver.resolveForFileId(eq("wideFileId"), any()) } returns SpotifyStream(
+        coEvery { resolver.resolveForFileId(eq("wideFileId"), any()) } returns SpfyStream(
             cdnUrl = "https://cdn/enc", licenseUrl = "https://lic", licenseHeaders = emptyMap(),
             mirrorCount = 1, pssh = "PSSHBYTES",
         )

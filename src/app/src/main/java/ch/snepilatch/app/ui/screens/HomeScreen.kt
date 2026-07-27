@@ -1,7 +1,7 @@
 package ch.snepilatch.app.ui.screens
 
 import ch.snepilatch.app.R
-import ch.snepilatch.app.ui.theme.SpotifyWhite
+import ch.snepilatch.app.ui.theme.SpfyWhite
 import androidx.compose.foundation.clickable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
@@ -43,9 +43,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.ui.components.ShimmerBox
-import ch.snepilatch.app.ui.components.SpotifyImage
-import ch.snepilatch.app.ui.theme.SpotifyCardBg
-import ch.snepilatch.app.ui.theme.SpotifyLightGray
+import ch.snepilatch.app.ui.components.SpfyImage
+import ch.snepilatch.app.ui.theme.SpfyCardBg
+import ch.snepilatch.app.ui.theme.SpfyLightGray
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.HomeViewModel
@@ -71,7 +71,7 @@ fun HomeScreen(vm: PlaybackViewModel) {
         item {
             Text(
                 homeData?.greeting ?: stringResource(R.string.greeting_fallback),
-                color = SpotifyWhite,
+                color = SpfyWhite,
                 fontSize = 26.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -91,7 +91,7 @@ fun HomeScreen(vm: PlaybackViewModel) {
                 item {
                     Text(
                         section.title,
-                        color = SpotifyWhite,
+                        color = SpfyWhite,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 10.dp)
@@ -144,17 +144,17 @@ fun QuickPickGrid(items: List<kotify.api.home.HomeSectionItem>, vm: PlaybackView
                                 }
                             },
                         shape = RoundedCornerShape(6.dp),
-                        colors = CardDefaults.cardColors(containerColor = SpotifyCardBg)
+                        colors = CardDefaults.cardColors(containerColor = SpfyCardBg)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            SpotifyImage(
+                            SpfyImage(
                                 url = item.imageUrl,
                                 modifier = Modifier.size(48.dp),
                                 shape = RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp)
                             )
                             Text(
                                 item.name,
-                                color = SpotifyWhite,
+                                color = SpfyWhite,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 2,
@@ -236,7 +236,7 @@ fun HomeSectionCard(item: kotify.api.home.HomeSectionItem, vm: PlaybackViewModel
             },
         horizontalAlignment = if (isArtist) Alignment.CenterHorizontally else Alignment.Start
     ) {
-        SpotifyImage(
+        SpfyImage(
             url = item.imageUrl,
             modifier = Modifier.size(140.dp),
             shape = if (isArtist) CircleShape else RoundedCornerShape(8.dp),
@@ -245,7 +245,7 @@ fun HomeSectionCard(item: kotify.api.home.HomeSectionItem, vm: PlaybackViewModel
         Spacer(Modifier.height(8.dp))
         Text(
             item.name,
-            color = SpotifyWhite,
+            color = SpfyWhite,
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 2,
@@ -257,7 +257,7 @@ fun HomeSectionCard(item: kotify.api.home.HomeSectionItem, vm: PlaybackViewModel
         if (subtitle != null) {
             Text(
                 subtitle,
-                color = SpotifyLightGray,
+                color = SpfyLightGray,
                 fontSize = 11.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

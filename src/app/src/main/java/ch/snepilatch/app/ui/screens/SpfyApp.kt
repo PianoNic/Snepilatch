@@ -1,6 +1,6 @@
 package ch.snepilatch.app.ui.screens
 
-import ch.snepilatch.app.ui.theme.SpotifyWhite
+import ch.snepilatch.app.ui.theme.SpfyWhite
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -52,10 +52,10 @@ import ch.snepilatch.app.ui.components.DevicesDialog
 import ch.snepilatch.app.ui.components.MiniPlayer
 import ch.snepilatch.app.ui.components.MiniPlayerContent
 import ch.snepilatch.app.ui.components.miniCardBaseColor
-import ch.snepilatch.app.ui.components.SpotifyImage
+import ch.snepilatch.app.ui.components.SpfyImage
 import ch.snepilatch.app.ui.components.TightAlertDialog
-import ch.snepilatch.app.ui.theme.SpotifyGray
-import ch.snepilatch.app.ui.theme.SpotifyLightGray
+import ch.snepilatch.app.ui.theme.SpfyGray
+import ch.snepilatch.app.ui.theme.SpfyLightGray
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.viewmodel.ThemeController
 import ch.snepilatch.app.viewmodel.DetailViewModel
@@ -99,7 +99,7 @@ private val MorphCardPadV = 6.dp
 // --- App Shell ---
 
 @Composable
-fun SpotifyApp(vm: PlaybackViewModel) {
+fun SpfyApp(vm: PlaybackViewModel) {
     // Eagerly create the DetailViewModel from the post-login shell so it registers itself in
     // DetailRoutes before any deep link or playback-context bridge tries to open a detail.
     viewModel<DetailViewModel>()
@@ -245,8 +245,8 @@ fun SpotifyApp(vm: PlaybackViewModel) {
         ) { data ->
             Snackbar(
                 snackbarData = data,
-                containerColor = SpotifyGray,
-                contentColor = SpotifyWhite,
+                containerColor = SpfyGray,
+                contentColor = SpfyWhite,
                 shape = RoundedCornerShape(8.dp)
             )
         }
@@ -301,7 +301,7 @@ fun SpotifyApp(vm: PlaybackViewModel) {
             val playlists = library.filter { it.type == "playlist" }
             TightAlertDialog(
                 onDismissRequest = { vm.showPlaylistPicker.value = false },
-                title = { Text(stringResource(R.string.add_to_playlist), color = SpotifyWhite) },
+                title = { Text(stringResource(R.string.add_to_playlist), color = SpfyWhite) },
                 text = {
                     // TightAlertDialog already wraps `text` in a height-bounded verticalScroll
                     // Box, which hands its child infinite max height — a LazyColumn there throws
@@ -321,25 +321,25 @@ fun SpotifyApp(vm: PlaybackViewModel) {
                                     .padding(vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                SpotifyImage(
+                                SpfyImage(
                                     url = playlist.imageUrl,
                                     modifier = Modifier.size(44.dp),
                                     shape = RoundedCornerShape(4.dp)
                                 )
                                 Spacer(Modifier.width(12.dp))
                                 Column {
-                                    Text(playlist.name, color = SpotifyWhite, fontSize = 14.sp, maxLines = 1)
-                                    playlist.owner?.let { Text(it, color = SpotifyLightGray, fontSize = 12.sp, maxLines = 1) }
+                                    Text(playlist.name, color = SpfyWhite, fontSize = 14.sp, maxLines = 1)
+                                    playlist.owner?.let { Text(it, color = SpfyLightGray, fontSize = 12.sp, maxLines = 1) }
                                 }
                             }
                         }
                     }
                 },
-                containerColor = SpotifyGray,
+                containerColor = SpfyGray,
                 confirmButton = {},
                 dismissButton = {
                     TextButton(onClick = { vm.showPlaylistPicker.value = false }) {
-                        Text(stringResource(R.string.cancel), color = SpotifyLightGray)
+                        Text(stringResource(R.string.cancel), color = SpfyLightGray)
                     }
                 }
             )
@@ -495,11 +495,11 @@ fun LoadingScreen(
                     val progress = ((safeTotal - cooldownSecondsRemaining).toFloat() / safeTotal)
                         .coerceIn(0f, 1f)
 
-                    Icon(Icons.Rounded.CloudOff, null, tint = SpotifyLightGray, modifier = Modifier.size(48.dp))
+                    Icon(Icons.Rounded.CloudOff, null, tint = SpfyLightGray, modifier = Modifier.size(48.dp))
                     Spacer(Modifier.height(16.dp))
-                    Text(stringResource(R.string.rate_limited), color = SpotifyWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.rate_limited), color = SpfyWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(8.dp))
-                    Text(stringResource(R.string.retrying_in, cooldownSecondsRemaining), color = SpotifyLightGray, fontSize = 14.sp)
+                    Text(stringResource(R.string.retrying_in, cooldownSecondsRemaining), color = SpfyLightGray, fontSize = 14.sp)
                     Spacer(Modifier.height(24.dp))
                     LinearProgressIndicator(
                         progress = { progress },
@@ -507,37 +507,37 @@ fun LoadingScreen(
                             .width(200.dp)
                             .height(4.dp)
                             .clip(RoundedCornerShape(2.dp)),
-                        color = SpotifyWhite,
-                        trackColor = SpotifyLightGray.copy(alpha = 0.2f)
+                        color = SpfyWhite,
+                        trackColor = SpfyLightGray.copy(alpha = 0.2f)
                     )
                     Spacer(Modifier.height(24.dp))
                     TextButton(onClick = onLogin) {
-                        Text(stringResource(R.string.login_different_account), color = SpotifyLightGray, fontSize = 13.sp)
+                        Text(stringResource(R.string.login_different_account), color = SpfyLightGray, fontSize = 13.sp)
                     }
                 }
                 error != null -> {
-                    Icon(Icons.Rounded.CloudOff, null, tint = SpotifyLightGray, modifier = Modifier.size(48.dp))
+                    Icon(Icons.Rounded.CloudOff, null, tint = SpfyLightGray, modifier = Modifier.size(48.dp))
                     Spacer(Modifier.height(16.dp))
-                    Text(stringResource(R.string.connection_failed), color = SpotifyWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.connection_failed), color = SpfyWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(8.dp))
-                    Text(error.resolve(LocalContext.current), color = SpotifyLightGray, fontSize = 13.sp)
+                    Text(error.resolve(LocalContext.current), color = SpfyLightGray, fontSize = 13.sp)
                     Spacer(Modifier.height(24.dp))
                     Button(
                         onClick = onRetry,
-                        colors = ButtonDefaults.buttonColors(containerColor = SpotifyWhite),
+                        colors = ButtonDefaults.buttonColors(containerColor = SpfyWhite),
                         shape = RoundedCornerShape(24.dp)
                     ) {
                         Text(stringResource(R.string.retry), fontWeight = FontWeight.Bold, color = Color.Black)
                     }
                     Spacer(Modifier.height(8.dp))
                     TextButton(onClick = onLogin) {
-                        Text(stringResource(R.string.login_different_account), color = SpotifyLightGray, fontSize = 13.sp)
+                        Text(stringResource(R.string.login_different_account), color = SpfyLightGray, fontSize = 13.sp)
                     }
                 }
                 else -> {
-                    CircularWavyProgressIndicator(color = SpotifyWhite)
+                    CircularWavyProgressIndicator(color = SpfyWhite)
                     Spacer(Modifier.height(20.dp))
-                    Text(stringResource(R.string.connecting_to_spotify), color = SpotifyLightGray, fontSize = 15.sp)
+                    Text(stringResource(R.string.connecting_to_spfy), color = SpfyLightGray, fontSize = 15.sp)
                 }
             }
         }

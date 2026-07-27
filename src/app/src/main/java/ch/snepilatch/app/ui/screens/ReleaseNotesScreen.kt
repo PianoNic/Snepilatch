@@ -34,7 +34,7 @@ data class ReleaseNote(
 @Composable
 private fun ReleaseNoteCard(note: ReleaseNote, isLatest: Boolean) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = SpotifyElevated),
+        colors = CardDefaults.cardColors(containerColor = SpfyElevated),
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(Modifier.padding(16.dp)) {
@@ -43,7 +43,7 @@ private fun ReleaseNoteCard(note: ReleaseNote, isLatest: Boolean) {
                 Card(
                     colors = CardDefaults.cardColors(
                         containerColor = if (isLatest) MaterialTheme.colorScheme.primary
-                        else SpotifyGray
+                        else SpfyGray
                     ),
                     shape = RoundedCornerShape(12.dp)
                 ) {
@@ -52,7 +52,7 @@ private fun ReleaseNoteCard(note: ReleaseNote, isLatest: Boolean) {
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (isLatest) MaterialTheme.colorScheme.onPrimary else SpotifyLightGray
+                        color = if (isLatest) MaterialTheme.colorScheme.onPrimary else SpfyLightGray
                     )
                 }
                 if (isLatest) {
@@ -73,7 +73,7 @@ private fun ReleaseNoteCard(note: ReleaseNote, isLatest: Boolean) {
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                Text(note.date, color = SpotifyLightGray, fontSize = 12.sp)
+                Text(note.date, color = SpfyLightGray, fontSize = 12.sp)
             }
 
             Spacer(Modifier.height(12.dp))
@@ -81,7 +81,7 @@ private fun ReleaseNoteCard(note: ReleaseNote, isLatest: Boolean) {
             // Title
             Text(
                 note.title,
-                color = SpotifyWhite,
+                color = SpfyWhite,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -106,28 +106,28 @@ private fun MarkdownText(markdown: String) {
                 trimmed.isEmpty() -> Spacer(Modifier.height(4.dp))
                 trimmed.startsWith("### ") -> Text(
                     trimmed.removePrefix("### "),
-                    color = SpotifyWhite, fontSize = 14.sp, fontWeight = FontWeight.SemiBold
+                    color = SpfyWhite, fontSize = 14.sp, fontWeight = FontWeight.SemiBold
                 )
                 trimmed.startsWith("## ") -> Text(
                     trimmed.removePrefix("## "),
-                    color = SpotifyWhite, fontSize = 15.sp, fontWeight = FontWeight.Bold
+                    color = SpfyWhite, fontSize = 15.sp, fontWeight = FontWeight.Bold
                 )
                 trimmed.startsWith("# ") -> Text(
                     trimmed.removePrefix("# "),
-                    color = SpotifyWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold
+                    color = SpfyWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold
                 )
                 trimmed.startsWith("- ") || trimmed.startsWith("* ") -> Text(
                     "  •  ${trimmed.drop(2).cleanMarkdown()}",
-                    color = SpotifyLightGray, fontSize = 14.sp, lineHeight = 20.sp
+                    color = SpfyLightGray, fontSize = 14.sp, lineHeight = 20.sp
                 )
                 trimmed.startsWith("> ") -> Text(
                     trimmed.removePrefix("> ").cleanMarkdown(),
-                    color = SpotifyLightGray.copy(alpha = 0.7f), fontSize = 13.sp,
+                    color = SpfyLightGray.copy(alpha = 0.7f), fontSize = 13.sp,
                     modifier = Modifier.padding(start = 12.dp)
                 )
                 else -> Text(
                     trimmed.cleanMarkdown(),
-                    color = SpotifyLightGray, fontSize = 14.sp, lineHeight = 20.sp
+                    color = SpfyLightGray, fontSize = 14.sp, lineHeight = 20.sp
                 )
             }
         }
@@ -161,15 +161,15 @@ fun ReleaseNotesDialog(onDismiss: () -> Unit) {
 
     TightAlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = SpotifyDarkGray,
-        title = { Text(stringResource(R.string.release_notes), color = SpotifyWhite) },
+        containerColor = SpfyDarkGray,
+        title = { Text(stringResource(R.string.release_notes), color = SpfyWhite) },
         text = {
             Box(Modifier.heightIn(max = 500.dp)) {
                 when {
                     isLoading -> Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                        LoadingIndicator(color = SpotifyLightGray)
+                        LoadingIndicator(color = SpfyLightGray)
                     }
-                    error != null -> Text(stringResource(R.string.release_load_failed_short, error ?: ""), color = SpotifyLightGray)
+                    error != null -> Text(stringResource(R.string.release_load_failed_short, error ?: ""), color = SpfyLightGray)
                     else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         itemsIndexed(releases) { index, note ->
                             ReleaseNoteCard(note, isLatest = index == 0)
@@ -180,7 +180,7 @@ fun ReleaseNotesDialog(onDismiss: () -> Unit) {
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.close), color = SpotifyLightGray)
+                Text(stringResource(R.string.close), color = SpfyLightGray)
             }
         }
     )

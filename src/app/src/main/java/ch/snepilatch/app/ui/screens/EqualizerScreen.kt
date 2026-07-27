@@ -57,15 +57,15 @@ fun EqualizerScreen(vm: PlaybackViewModel) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = { vm.goBack() }) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back), tint = SpotifyWhite)
+                Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back), tint = SpfyWhite)
             }
-            Text(stringResource(R.string.equalizer), color = SpotifyWhite, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.equalizer), color = SpfyWhite, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         }
 
         if (!supported) {
             Text(
                 stringResource(R.string.eq_requires_p),
-                color = SpotifyLightGray,
+                color = SpfyLightGray,
                 fontSize = 13.sp,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
@@ -99,8 +99,8 @@ private fun EqualizerHeader(
     onFlat: () -> Unit
 ) {
     ListItem(
-        headlineContent = { Text(stringResource(R.string.eq_in_app), color = SpotifyWhite) },
-        supportingContent = { Text(stringResource(R.string.eq_in_app_desc), color = SpotifyLightGray) },
+        headlineContent = { Text(stringResource(R.string.eq_in_app), color = SpfyWhite) },
+        supportingContent = { Text(stringResource(R.string.eq_in_app_desc), color = SpfyLightGray) },
         trailingContent = {
             // Tint from the album palette like every other toggle; the Material default is the
             // template's purple, which is what made this one stand out.
@@ -111,8 +111,8 @@ private fun EqualizerHeader(
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = accent,
                     checkedTrackColor = accent.copy(alpha = 0.5f),
-                    uncheckedThumbColor = SpotifyLightGray,
-                    uncheckedTrackColor = SpotifyLightGray.copy(alpha = 0.3f)
+                    uncheckedThumbColor = SpfyLightGray,
+                    uncheckedTrackColor = SpfyLightGray.copy(alpha = 0.3f)
                 )
             )
         },
@@ -124,8 +124,8 @@ private fun EqualizerHeader(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
-            Text(stringResource(R.string.eq_preamp, "%.1f".format(preamp)), color = SpotifyWhite, fontSize = 15.sp)
-            Text(stringResource(R.string.eq_preamp_auto), color = SpotifyLightGray, fontSize = 12.sp)
+            Text(stringResource(R.string.eq_preamp, "%.1f".format(preamp)), color = SpfyWhite, fontSize = 15.sp)
+            Text(stringResource(R.string.eq_preamp_auto), color = SpfyLightGray, fontSize = 12.sp)
         }
         TextButton(onClick = onFlat) { Text(stringResource(R.string.eq_flat), color = accent) }
     }
@@ -183,7 +183,7 @@ private fun EqualizerCurve(
         drawCurve(live, accent.copy(alpha = alpha), active)
     }
 
-    BandFrequencyRow(SpotifyLightGray.copy(alpha = alpha))
+    BandFrequencyRow(SpfyLightGray.copy(alpha = alpha))
 }
 
 @Composable
@@ -236,7 +236,7 @@ private fun DrawScope.drawGrid(accent: Color) {
         val y = (MAX_DB - db) / (2 * MAX_DB) * size.height
         val isZero = abs(db) < 0.01f
         drawLine(
-            color = if (isZero) accent.copy(alpha = 0.45f) else SpotifyLightGray.copy(alpha = 0.12f),
+            color = if (isZero) accent.copy(alpha = 0.45f) else SpfyLightGray.copy(alpha = 0.12f),
             start = Offset(0f, y),
             end = Offset(size.width, y),
             strokeWidth = if (isZero) 2f else 1f

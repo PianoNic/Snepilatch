@@ -123,7 +123,7 @@
     <string name="language_system_default">System Default</string>
 
     <!-- Settings (added) -->
-    <string name="lossless_off_spotify">Standard quality (Spotify)</string>
+    <string name="lossless_off_spfy">Standard quality (Spotify)</string>
     <string name="tidal">Tidal</string>
     <string name="qobuz">Qobuz</string>
     <string name="tidal_short_desc">FLAC up to 1411kbps</string>
@@ -158,7 +158,7 @@
     <string name="retrying_in">Retrying in %ds</string>
     <string name="login_different_account">Login with different account</string>
     <string name="connection_failed">Connection failed</string>
-    <string name="connecting_to_spotify">Connecting to Spotify…</string>
+    <string name="connecting_to_spfy">Connecting to Spotify…</string>
 
     <!-- Update Dialog (added) -->
     <string name="update_download_failed">Download failed. Please try again.</string>

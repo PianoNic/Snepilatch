@@ -7,7 +7,7 @@ import android.content.Intent
 class MediaActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val svc = MusicPlaybackService.instance ?: return
-        // Only forward to Spotify — ExoPlayer will sync via state callbacks
+        // Only forward to Spfy — ExoPlayer will sync via state callbacks
         when (intent.action) {
             "ch.snepilatch.app.PREV" -> svc.onSkipPrevious?.invoke()
             "ch.snepilatch.app.PLAY_PAUSE" -> {

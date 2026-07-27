@@ -122,7 +122,7 @@
     <string name="language_system_default">Системный</string>
 
     <!-- Settings (added) -->
-    <string name="lossless_off_spotify">Стандартное качество (Spotify)</string>
+    <string name="lossless_off_spfy">Стандартное качество (Spotify)</string>
     <string name="tidal">Tidal</string>
     <string name="qobuz">Qobuz</string>
     <string name="tidal_short_desc">FLAC до 1411 кбит/с</string>
@@ -156,7 +156,7 @@
     <string name="retrying_in">Повтор через %d с</string>
     <string name="login_different_account">Войти под другим аккаунтом</string>
     <string name="connection_failed">Ошибка соединения</string>
-    <string name="connecting_to_spotify">Подключение к Spotify…</string>
+    <string name="connecting_to_spfy">Подключение к Spotify…</string>
 
     <!-- Update Dialog (added) -->
     <string name="update_download_failed">Загрузка не удалась. Попробуйте ещё раз.</string>

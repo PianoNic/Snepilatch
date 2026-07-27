@@ -57,7 +57,7 @@ class RemotePlayPauseHandlerTest {
     }
 
     /**
-     * The cold-start double-play regression: transferPlaybackHere(restore_paused=true) makes Spotify
+     * The cold-start double-play regression: transferPlaybackHere(restore_paused=true) makes Spfy
      * echo a paused cluster state mid-start. While the cold-start (or reconnect) suppress guard is
      * held, that echo MUST NOT pause the ExoPlayer we're bringing up — otherwise audio stays silent,
      * the UI/Connect say playing, and the user has to tap play a second time.

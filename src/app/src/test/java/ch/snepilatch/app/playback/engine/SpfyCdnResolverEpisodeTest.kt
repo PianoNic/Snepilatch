@@ -4,7 +4,7 @@ import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import kotify.cdn.SpotifyPlayback
+import kotify.cdn.SpfyPlayback
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -14,12 +14,12 @@ import org.junit.Test
  * build a malformed gid lookup — they resolve their audio from the connect-state/track-playback state
  * machine instead. This pins that guard so the episode path never reaches the track metadata endpoint.
  */
-class SpotifyCdnResolverEpisodeTest {
+class SpfyCdnResolverEpisodeTest {
 
     @Test
     fun `episode uri returns null without a track metadata lookup`() = runBlocking {
-        val playback = mockk<SpotifyPlayback>(relaxed = true)
-        val resolver = SpotifyCdnResolver(mockk(relaxed = true), playback)
+        val playback = mockk<SpfyPlayback>(relaxed = true)
+        val resolver = SpfyCdnResolver(mockk(relaxed = true), playback)
 
         val result = resolver.fetchFileIdFromMetadata("spotify:episode:1f6tXaeR1XNYwSF0tqpEDT")
 
@@ -29,11 +29,11 @@ class SpotifyCdnResolverEpisodeTest {
 
     @Test
     fun `track uri still performs the metadata lookup`() = runBlocking {
-        val playback = mockk<SpotifyPlayback>(relaxed = true)
+        val playback = mockk<SpfyPlayback>(relaxed = true)
         every { playback.trackIdToGid(any()) } returns "gid123"
         coEvery { playback.getTrackMetadata(any()) } returns mockk(relaxed = true)
         every { playback.findFile(any(), any()) } returns null
-        val resolver = SpotifyCdnResolver(mockk(relaxed = true), playback)
+        val resolver = SpfyCdnResolver(mockk(relaxed = true), playback)
 
         resolver.fetchFileIdFromMetadata("spotify:track:4uLU6hMCjMI75M1A2tKUQC")
 

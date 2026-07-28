@@ -33,7 +33,9 @@ class JukeboxViz(
     val buckets: FloatArray,
     val bufferedFraction: Float,
     val playheadFraction: Float,
-    val remixing: Boolean
+    val remixing: Boolean,
+    /** Per-slice replay heat (0..1): how often the remix has looped back into that part. */
+    val heat: FloatArray = FloatArray(0)
 )
 
 class JukeboxController(
@@ -44,6 +46,14 @@ class JukeboxController(
         const val TAG = "Jukebox"
         const val CAPTURE_STALL_TICKS = 12 // ~12s of no new audio => proceed with what we have
         const val FALLBACK_HANDOFF_MS = 45_000L // used only when the track duration is unknown
+
+        // Hand the speaker to the engine once this much is captured. Jumps become POSSIBLE from here
+        // (the engine still only takes one probabilistically), instead of waiting for half the track.
+        const val HANDOFF_AFTER_MS = 30_000L
+
+        // ...but only once the analysis has something to work with. Handing over with two matches
+        // makes it bounce between the same points, which reads as random rather than as a remix.
+        const val MIN_PARALLELS_FOR_HANDOFF = 24
         const val REANALYZE_GROWTH_S = 30 // re-analyse + enrich jumps every +30s of newly captured audio
         const val VIZ_BUCKETS = 56 // number of pillars in the remix map
         const val VIZ_TICK_MS = 200L // how often the remix map refreshes (JukeboxTimeline eases between ticks)
@@ -52,7 +62,7 @@ class JukeboxController(
         // Refresh cadence for the preview similarities until the centre handoff. Was 5s, but each refresh
         // is a whole-buffer FFT + O(n^2) pass feeding only the cosmetic 56-bar histogram, so ~18s cuts the
         // reanalysis count ~4x with no correctness/handoff impact.
-        const val PREVIEW_EVERY_S = 18
+        const val PREVIEW_EVERY_S = 5 // refresh the similarity search every +5s of captured audio
         const val HANDOFF_OVERLAP_MS = 180L // overlap engine + ExoPlayer briefly so the takeover has no gap
         const val LOOP_MARGIN_MS = 3000L // seek the muted keep-alive player back this far before the end
     }
@@ -67,7 +77,7 @@ class JukeboxController(
     private var vizJob: Job? = null
     private var loopGuardJob: Job? = null
 
-    @Volatile private var engine: PcmJukeboxEngine? = null
+    @Volatile private var remixing = false
 
     // Similarity density shown on the remix map BEFORE the engine takes over (during first-half capture).
     @Volatile private var previewBuckets: IntArray? = null
@@ -97,9 +107,9 @@ class JukeboxController(
 
     fun disable() {
         _enabled.value = false
-        val wasRunning = engine != null
-        engine?.stop()
-        engine = null
+        val wasRunning = remixing
+        remixing = false
+        MusicPlaybackService.instance?.setJukeboxRemixEngaged(false)
         vizJob?.cancel()
         vizJob = null
         loopGuardJob?.cancel()
@@ -133,12 +143,13 @@ class JukeboxController(
         svc.setJukeboxStopHook { disable() } // tear the engine down on any skip / app teardown
         svc.setJukeboxPauseHook { p ->
             paused = p
-            engine?.setPaused(p)
+            // Nothing to do: the remix is a filter in the player's chain, so it pauses with it.
         }
         svc.setJukeboxRemixing(true) // hide the notification seekbar for the whole session (no auto-advance)
         // Enable analysis BEFORE seeking: the tap's isActive() is re-read on the seek's pipeline flush,
         // so analyzing must already be true for the flush to add the tap back into the audio chain.
         svc.setJukeboxAnalyzing(true)
+        svc.setJukeboxRemixEngaged(true) // join the audio chain on the seek below
         svc.jukeboxSeekToStart()
         LokiLogger.i(TAG, "capture pass started for $trackId")
 
@@ -150,7 +161,7 @@ class JukeboxController(
         // Let the song play through to its centre before going eternal, so the first half is heard
         // normally; only then does it start (optionally) switching. Falls back to a fixed point if the
         // duration isn't known yet.
-        val captureMs = if (durMs > 0) durMs / 2 else FALLBACK_HANDOFF_MS
+        val captureMs = if (durMs > 0) minOf(durMs / 2, HANDOFF_AFTER_MS) else FALLBACK_HANDOFF_MS
         val targetFrames = (captureMs * rate / 1000).toInt()
         val totalFrames = if (durMs > 0) (durMs * rate / 1000).toInt() else targetFrames * 2
         startViz(svc, rate, totalFrames) // drive the remix-map UI (buffering, similarities, playhead)
@@ -158,6 +169,7 @@ class JukeboxController(
         var lastFrames = 0
         var stall = 0
         var lastPreview = 0
+        var previewParallels = 0
         var done = false
         while (!done && currentCoroutineContext().isActive && _enabled.value) {
             if (currentTrackId() != trackId) {
@@ -171,17 +183,21 @@ class JukeboxController(
                 lastFrames = cf
                 // Early preview: run the first similarity search ~10s in, then refresh, so the remix map
                 // shows found similarities while the first half is still playing normally.
-                if (cf >= PREVIEW_START_S * rate && cf - lastPreview >= PREVIEW_EVERY_S * rate) {
+                val firstPreview = lastPreview == 0 && cf >= PREVIEW_START_S * rate
+                if (firstPreview || (lastPreview > 0 && cf - lastPreview >= PREVIEW_EVERY_S * rate)) {
                     val pMono = svc.jukeboxSnapshotMono().let { if (it.size > cf) it.copyOf(cf) else it }
-                    val pr = WaveformAnalyzer.analyze(pMono, rate)
-                    previewBuckets = bucketsFromParallels(pr.parallels, pr.frameHopSamples, totalFrames)
+                    val pr = BeatGraph.analyse(pMono, rate)
+                    previewBuckets = bucketsFromJumps(pr.jumps, totalFrames)
+                    previewParallels = pr.branchPoints
                     lastPreview = cf
-                    LokiLogger.i(TAG, "preview @${cf / rate}s: ${pr.parallels.size} similarities")
+                    val msg = "preview @${cf / rate}s: ${pr.branchPoints} branch points, " +
+                        "${pr.beats} beats @ ${pr.bpm} BPM"
+                    LokiLogger.i(TAG, msg)
                 }
             }
             when {
                 paused -> delay(300) // hold the capture where it is while paused
-                cf >= targetFrames - rate -> done = true
+                readyToHandOff(cf, targetFrames, rate, previewParallels, durMs) -> done = true
                 stall >= CAPTURE_STALL_TICKS -> {
                     LokiLogger.i(TAG, "capture stalled at ${cf / rate}s — using partial")
                     done = true
@@ -193,14 +209,32 @@ class JukeboxController(
         handOffToEngine(svc, rate, durMs, trackId)
     }
 
+    /**
+     * Enough captured to hand the stream to the remix: past the target AND with a jump table worth
+     * having — or past the half-track mark, which is where we used to take over unconditionally.
+     */
+    private fun readyToHandOff(
+        captured: Int,
+        targetFrames: Int,
+        rate: Int,
+        parallels: Int,
+        durMs: Long
+    ): Boolean {
+        if (captured >= targetFrames - rate && parallels >= MIN_PARALLELS_FOR_HANDOFF) return true
+        val halfFrames = if (durMs > 0) (durMs / 2 * rate / 1000).toInt() else Int.MAX_VALUE
+        return captured >= halfFrames - rate
+    }
+
     /** Analyse the captured opening, start the seamless engine, and keep enriching it to the full track. */
     private suspend fun handOffToEngine(svc: MusicPlaybackService, rate: Int, durMs: Long, trackId: String) {
         // 2. Analyse the captured waveform for self-similar sections.
         val mono = svc.jukeboxSnapshotMono()
-        val res = WaveformAnalyzer.analyze(mono, rate)
-        LokiLogger.i(TAG, "captured ${mono.size / rate}s, ${res.frameCount} frames, ${res.parallels.size} parallels")
-        if (res.parallels.isEmpty()) {
-            LokiLogger.i(TAG, "no waveform matches — jukebox off")
+        val res = BeatGraph.analyse(mono, rate)
+        val captured = "captured ${mono.size / rate}s, ${res.beats} beats @ ${res.bpm} BPM, " +
+            "${res.branchPoints} branch points"
+        LokiLogger.i(TAG, captured)
+        if (res.jumps.isEmpty()) {
+            LokiLogger.i(TAG, "no branches found — jukebox off")
             disable()
             return
         }
@@ -208,48 +242,44 @@ class JukeboxController(
         // 3. Hand off to the seamless PCM engine using the opening we've captured so far.
         val ch = svc.jukeboxChannels().coerceAtLeast(1)
         val snap = snapshotOf(svc, ch, res)
+        LokiLogger.i(TAG, "last branch point at ${res.lastBranchFrame / rate}s")
         // Start the engine exactly where the user is currently hearing the song, so the takeover is
         // inaudible — the engine replays the same samples, then starts wandering via crossfaded jumps.
+        // Both must be read on the player's thread.
         val posMs = withContext(Dispatchers.Main) { svc.getCurrentPosition() }
         val startFrame = (posMs * rate / 1000).toInt().coerceIn(0, maxOf(0, snap.frames - 1))
 
-        val eng = PcmJukeboxEngine(snap, ch, rate, startFrame)
-        if (!eng.hasJumps()) {
-            LokiLogger.i(TAG, "engine has no usable jumps — off")
+        if (snap.jumps.isEmpty()) {
+            LokiLogger.i(TAG, "no usable jumps — off")
             disable()
             return
         }
-        engine = eng
-        eng.start()
-        eng.setPaused(paused)
-        svc.setJukeboxPositionSource { eng.positionMs() } // scrubber + Spfy now jump with the audio
-        // Let the engine's AudioTrack fill and start sounding (same samples, same position) BEFORE muting
-        // ExoPlayer, so the two overlap for a beat instead of leaving a gap — no dropout at the takeover.
-        delay(HANDOFF_OVERLAP_MS)
-        svc.jukeboxSilentKeepAlive() // mute ExoPlayer; the engine owns the speaker now
-        startLoopGuard(svc, durMs) // loop the muted keep-alive player in code (no repeat mode)
-        LokiLogger.i(TAG, "seamless engine running (${snap.frames / rate}s buffer, ${snap.jumps.size} jump srcs)")
+        // Hand the stream to the remix filter. No mute, no second track, no overlap window: the next
+        // buffer the sink pulls simply comes from the remix instead of the decoder.
+        remixing = true
+        svc.setJukeboxRemix(snap, startFrame)
+        svc.setJukeboxPositionSource { svc.jukeboxRemixPlayheadMs() } // scrubber follows the remix
+        startLoopGuard(svc, durMs) // keep the decoder fed: it must not run off the end of the track
+        LokiLogger.i(TAG, "remix running (${snap.frames / rate}s buffer, ${snap.jumps.size} jump srcs)")
 
         // 4. Keep decoding the rest of the track in the background (still muted) and swap richer
         //    snapshots into the engine as more loads, so it isn't confined to the opening window.
-        growToFullTrack(svc, eng, trackId, rate, ch, durMs)
+        growToFullTrack(svc, trackId, rate, ch, durMs)
     }
 
     /** Snapshot the captured PCM (clamped to one clean playthrough) + its jump table for the engine. */
     private fun snapshotOf(
         svc: MusicPlaybackService,
         ch: Int,
-        res: WaveformAnalyzer.Result
-    ): PcmJukeboxEngine.Snapshot {
+        res: BeatGraph.Analysis
+    ): JukeboxRemixProcessor.Snapshot {
         val inter = svc.jukeboxSnapshotInterleaved()
         val frames = inter.size / ch
-        val jumps = PcmJukeboxEngine.buildJumps(res.parallels, res.frameHopSamples)
-        return PcmJukeboxEngine.Snapshot(inter, frames, jumps)
+        return JukeboxRemixProcessor.Snapshot(inter, frames, res.jumps, res.lastBranchFrame, res.endJumpFrame)
     }
 
     private suspend fun growToFullTrack(
         svc: MusicPlaybackService,
-        eng: PcmJukeboxEngine,
         trackId: String,
         rate: Int,
         ch: Int,
@@ -271,14 +301,20 @@ class JukeboxController(
             val complete = cap >= fullFrames - rate
             if (complete || cap - analyzedFrames >= rate * REANALYZE_GROWTH_S) {
                 val mono = svc.jukeboxSnapshotMono().let { if (it.size > cap) it.copyOf(cap) else it }
-                val res = WaveformAnalyzer.analyze(mono, rate)
-                if (res.parallels.isNotEmpty()) {
+                val res = BeatGraph.analyse(mono, rate)
+                if (res.jumps.isNotEmpty()) {
                     val interFull = svc.jukeboxSnapshotInterleaved()
                     val frames = minOf(interFull.size / ch, cap)
                     val inter = if (interFull.size > frames * ch) interFull.copyOf(frames * ch) else interFull
-                    val jumps = PcmJukeboxEngine.buildJumps(res.parallels, res.frameHopSamples)
-                    eng.update(PcmJukeboxEngine.Snapshot(inter, frames, jumps))
-                    LokiLogger.i(TAG, "grew to ${frames / rate}s, ${res.parallels.size} parallels, ${jumps.size} jump srcs")
+                    // startFrame omitted: the remix keeps playing where it is, just with more to work with.
+                    svc.setJukeboxRemix(
+                        JukeboxRemixProcessor.Snapshot(
+                            inter, frames, res.jumps, res.lastBranchFrame, res.endJumpFrame
+                        )
+                    )
+                    val grew = "grew to ${frames / rate}s, ${res.branchPoints} branch points, " +
+                        "last branch ${res.lastBranchFrame / rate}s"
+                    LokiLogger.i(TAG, grew)
                 }
                 analyzedFrames = cap
             }
@@ -322,6 +358,7 @@ class JukeboxController(
             var lastBuffered = -1
             var lastRemixing: Boolean? = null
             var lastBuckets: FloatArray? = null
+            var lastHeat: FloatArray? = null
             while (currentCoroutineContext().isActive && _enabled.value) {
                 // Frozen while paused: the playhead doesn't move and buckets don't change, so skip the
                 // recompute + emit entirely and just idle until resume.
@@ -329,29 +366,36 @@ class JukeboxController(
                     delay(VIZ_TICK_MS)
                     continue
                 }
-                val eng = engine
-                val posMs = if (eng != null) eng.positionMs() else withContext(Dispatchers.Main) { svc.getCurrentPosition() }
+                val live = remixing
+                val posMs = if (live) {
+                    svc.jukeboxRemixPlayheadMs()
+                } else {
+                    withContext(Dispatchers.Main) { svc.getCurrentPosition() }
+                }
                 val posFrames = (posMs * rate / 1000).toInt()
                 val buffered = svc.jukeboxCapturedFrames().coerceIn(0, total)
-                val remixing = eng != null
-                val buckets = normalizeBuckets(eng?.jumpBuckets(VIZ_BUCKETS, total) ?: previewBuckets)
+                val buckets = normalizeBuckets(svc.jukeboxRemixBuckets(VIZ_BUCKETS, total) ?: previewBuckets)
+                val heat = normalizeBuckets(svc.jukeboxRemixVisits(VIZ_BUCKETS, total) ?: IntArray(0))
                 // Emit (and trigger downstream recomposition) only when something observable changed.
                 val changed = lastBuckets == null ||
                     posFrames != lastPosFrames ||
                     buffered != lastBuffered ||
-                    remixing != lastRemixing ||
-                    !buckets.contentEquals(lastBuckets)
+                    live != lastRemixing ||
+                    !buckets.contentEquals(lastBuckets) ||
+                    !heat.contentEquals(lastHeat)
                 if (changed) {
                     _viz.value = JukeboxViz(
                         buckets = buckets,
                         bufferedFraction = buffered.toFloat() / total,
                         playheadFraction = (posFrames.toFloat() / total).coerceIn(0f, 1f),
-                        remixing = remixing
+                        remixing = live,
+                        heat = heat
                     )
                     lastPosFrames = posFrames
                     lastBuffered = buffered
-                    lastRemixing = remixing
+                    lastRemixing = live
                     lastBuckets = buckets
+                    lastHeat = heat
                 }
                 delay(VIZ_TICK_MS)
             }
@@ -368,17 +412,13 @@ class JukeboxController(
     }
 
     /** Similarity density per time-slice from raw parallels — for the pre-handoff remix-map preview. */
-    private fun bucketsFromParallels(
-        parallels: List<WaveformAnalyzer.Parallel>,
-        hopSamples: Int,
-        totalFrames: Int
-    ): IntArray {
+    /** Remix-map density before takeover: how many destinations each slice can branch to. */
+    private fun bucketsFromJumps(jumps: List<JukeboxRemixProcessor.Jump>, totalFrames: Int): IntArray {
         val out = IntArray(VIZ_BUCKETS)
         val span = maxOf(1, totalFrames)
-        for (p in parallels) {
-            val i = p.fromFrame * hopSamples
-            val b = (i.toLong() * VIZ_BUCKETS / span).toInt().coerceIn(0, VIZ_BUCKETS - 1)
-            out[b]++
+        for (j in jumps) {
+            val b = (j.src.toLong() * VIZ_BUCKETS / span).toInt().coerceIn(0, VIZ_BUCKETS - 1)
+            out[b] += j.dsts.size
         }
         return out
     }

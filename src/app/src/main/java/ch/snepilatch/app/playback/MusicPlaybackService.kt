@@ -84,6 +84,11 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     // Strictly after the tap — the tap must keep seeing the unmodified signal its beat matching needs.
     private val gainProcessor = GainAudioProcessor()
 
+    // The Eternal Jukebox itself: while a snapshot is set it replaces the decoded stream with the
+    // captured audio, spliced at matched points. After the tap (which must see the real stream) and
+    // before the gain (so headroom applies to the remix too).
+    private val remixProcessor = JukeboxRemixProcessor()
+
     // In-app 10-band EQ on the audio session. Unlike the headroom above it computes its own input
     // gain from the curve, so the two are never both needed — the UI disables one when the other is on.
     private val equalizer = EqualizerController()
@@ -250,7 +255,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 enableFloatOutput: Boolean,
                 enableAudioTrackPlaybackParams: Boolean
             ): AudioSink = DefaultAudioSink.Builder(context)
-                .setAudioProcessors(arrayOf(jukeboxTap, gainProcessor))
+                .setAudioProcessors(arrayOf(jukeboxTap, remixProcessor, gainProcessor))
                 .build()
         }
 
@@ -675,7 +680,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     fun setJukeboxSeekMode(enabled: Boolean) {
         mainHandler.post {
             player.setSeekParameters(if (enabled) SeekParameters.CLOSEST_SYNC else SeekParameters.DEFAULT)
-            if (!enabled) player.volume = 1f // undo any in-flight jump fade
+            if (!enabled && !engineOwnsOutput) player.volume = 1f // undo any in-flight jump fade
         }
     }
 
@@ -710,13 +715,49 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
      * — the controller loops the muted player in code (seek back near the end), since ExoPlayer's own
      * repeat sometimes fails to loop and lets the track end.
      */
+    /**
+     * Put the remix processor in the audio chain for the whole jukebox session. Call this BEFORE the
+     * capture pass seeks, so that seek's flush is what picks it up — see [JukeboxRemixProcessor.engaged].
+     */
+    fun setJukeboxRemixEngaged(on: Boolean) {
+        remixProcessor.engaged = on
+        if (!on) remixProcessor.setSnapshot(null)
+    }
+
+    /** Hand the audible stream to the remix (or back to normal playback with null). */
+    fun setJukeboxRemix(snap: JukeboxRemixProcessor.Snapshot?, startFrame: Int = -1) {
+        remixProcessor.setSnapshot(snap, startFrame)
+    }
+
+    /** Where the remix currently is, for the UI playhead. */
+    fun jukeboxRemixPlayheadMs(): Long = remixProcessor.playheadMs()
+
+    /** Remix-map density, or null when the remix isn't running. */
+    fun jukeboxRemixBuckets(nBuckets: Int, totalFrames: Int): IntArray? =
+        remixProcessor.jumpBuckets(nBuckets, totalFrames)
+
+    /** How often the remix has landed in each slice, for the remix-map heat. */
+    fun jukeboxRemixVisits(nBuckets: Int, totalFrames: Int): IntArray? =
+        remixProcessor.visitBuckets(nBuckets, totalFrames)
+
     fun jukeboxSilentKeepAlive() = mainHandler.post {
+        engineOwnsOutput = true
         player.volume = 0f
         player.playWhenReady = true
     }
 
+    /**
+     * True while the PCM engine owns the speaker. Every path that raises [ExoPlayer.volume] checks it,
+     * so a stray fade can never bring the muted keep-alive player back up underneath the remix.
+     */
+    @Volatile private var engineOwnsOutput = false
+
+    /** The attenuation normal playback is getting, so the remix can match it instead of blaring. */
+    fun jukeboxOutputGain(): Float = gainProcessor.gain()
+
     /** Undo [jukeboxSilentKeepAlive]: unmute, keeping playback going. */
     fun jukeboxRestorePlayback() = mainHandler.post {
+        engineOwnsOutput = false
         player.volume = 1f
     }
 
@@ -728,7 +769,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
      */
     fun jukeboxJump(positionMs: Long) {
         mainHandler.post {
-            if (player.mediaItemCount == 0) return@post
+            if (player.mediaItemCount == 0 || engineOwnsOutput) return@post
             val restore = if (player.volume > 0.1f) player.volume else 1f
             player.volume = 0f
             player.seekTo(positionMs)

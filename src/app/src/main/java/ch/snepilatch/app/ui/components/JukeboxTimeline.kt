@@ -12,6 +12,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
 import ch.snepilatch.app.playback.JukeboxViz
 
@@ -25,6 +26,8 @@ import ch.snepilatch.app.playback.JukeboxViz
  *  - a bright marker rides the current playhead, jumping around once it passes the centre and starts
  *    remixing.
  */
+private val HEAT_COLOR = Color(0xFFFF5A36) // deep ember for the most-replayed slices
+
 @Composable
 fun JukeboxTimeline(
     viz: JukeboxViz?,
@@ -32,6 +35,7 @@ fun JukeboxTimeline(
     modifier: Modifier = Modifier
 ) {
     val buckets = viz?.buckets ?: FloatArray(0)
+    val heat = viz?.heat ?: FloatArray(0)
     val buffered = viz?.bufferedFraction ?: 0f
     val targetPlayhead = viz?.playheadFraction ?: 0f
     // Ease the marker between the 120ms viz ticks so linear play glides and jumps still read as jumps.
@@ -53,11 +57,15 @@ fun JukeboxTimeline(
             val h = (0.16f + 0.84f * v) * maxH
             val x = i * (barW + gap)
             val loaded = frac <= buffered
-            val color = when {
+            val base = when {
                 !loaded -> unbufferedColor
                 frac <= playhead -> playedColor.copy(alpha = 0.45f + 0.55f * v)
                 else -> aheadColor.copy(alpha = 0.35f + 0.5f * v)
             }
+            // Replay heat: the more often the remix has looped back into this slice, the deeper the
+            // bar sits — so the map shows at a glance where it keeps returning to.
+            val hot = heat.getOrElse(i) { 0f }.coerceIn(0f, 1f)
+            val color = if (hot <= 0f) base else lerp(base, HEAT_COLOR, 0.25f + 0.55f * hot)
             drawRoundRect(
                 color = color,
                 topLeft = Offset(x, (maxH - h) / 2f),

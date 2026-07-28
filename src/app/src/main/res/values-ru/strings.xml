@@ -97,8 +97,6 @@
     <string name="searching_devices">Поиск устройств…</string>
 
     <!-- Notification -->
-    <string name="added_to_liked">Добавлено в любимые песни</string>
-    <string name="removed_from_liked">Удалено из любимых песен</string>
 
     <!-- Playback -->
     <string name="playback_ended">Воспроизведение завершено</string>
@@ -272,13 +270,7 @@
     <string name="infiniplay">InfiniPlay</string>
 
     <!-- Snackbars -->
-    <string name="following_artist">Вы подписались на исполнителя</string>
-    <string name="saved_to_library">Добавлено в медиатеку</string>
     <string name="save_to_library">Добавить в медиатеку</string>
-    <string name="added_to_playlist">Добавлено в плейлист</string>
-    <string name="added_tracks_to_playlist">Добавлено в плейлист треков: %1$d</string>
-    <string name="added_to_queue_msg">Добавлено в очередь</string>
-    <string name="added_tracks_to_queue">Добавлено в очередь треков: %1$d</string>
 
     <!-- Notification channels -->
     <string name="notif_channel_playback">Воспроизведение музыки</string>
@@ -291,4 +283,11 @@
     <string name="connect_failed">Не удалось подключиться после 5 попыток. Повторите попытку позже.</string>
     <string name="notif_connection_lost_title">Snepilatch: соединение потеряно</string>
     <string name="notif_connection_lost_text">Нажмите, чтобы переподключиться к Spotify</string>
+
+    <!-- Action errors -->
+    <string name="error_like">Не удалось обновить любимые песни</string>
+    <string name="error_follow">Не удалось подписаться на исполнителя</string>
+    <string name="error_save_library">Не удалось добавить в медиатеку</string>
+    <string name="error_add_playlist">Не удалось добавить в плейлист</string>
+    <string name="error_add_queue">Не удалось добавить в очередь</string>
 </resources>

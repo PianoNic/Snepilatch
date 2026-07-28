@@ -112,7 +112,6 @@ fun SpfyApp(vm: PlaybackViewModel) {
     val currentTrackUri by vm.currentTrackUri.collectAsState()
     val showDevices by vm.showDevices.collectAsState()
     val hazeState = remember { HazeState() }
-    val snackbarHostState = remember { SnackbarHostState() }
     val bottomOverlayHeight = remember { mutableStateOf(0.dp) }
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
@@ -139,13 +138,14 @@ fun SpfyApp(vm: PlaybackViewModel) {
         if (screen != Screen.NOW_PLAYING && screen != Screen.LYRICS) contentScreen = screen
     }
 
-    val snackbarContext = androidx.compose.ui.platform.LocalContext.current
+    val toastContext = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(Unit) {
-        vm.snackbarMessage.collect { message ->
-            snackbarHostState.showSnackbar(
-                snackbarContext.getString(message.id, *message.args.toTypedArray()),
-                duration = SnackbarDuration.Short
-            )
+        vm.errorMessage.collect { message ->
+            android.widget.Toast.makeText(
+                toastContext,
+                message.resolve(toastContext),
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -236,19 +236,6 @@ fun SpfyApp(vm: PlaybackViewModel) {
             ) {
                 BottomNav(screen, vm, hazeState)
             }
-        }
-
-        // Snackbar
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 140.dp)
-        ) { data ->
-            Snackbar(
-                snackbarData = data,
-                containerColor = SpfyGray,
-                contentColor = SpfyWhite,
-                shape = RoundedCornerShape(8.dp)
-            )
         }
 
         // Expanding player: lerps from the mini bar's bounds to fullscreen,

@@ -281,6 +281,9 @@ fun SpfyApp(vm: PlaybackViewModel) {
 
         if (showDevices) DevicesDialog(vm)
 
+        val showQueue by vm.queueSheetVisible.collectAsState()
+        if (showQueue) QueueSheet(vm)
+
         // Global playlist picker (triggered from TrackRow menu)
         val showPicker by vm.showPlaylistPicker.collectAsState()
         if (showPicker) {
@@ -349,7 +352,6 @@ private fun MainContent(screen: Screen, vm: PlaybackViewModel, hazeState: HazeSt
             Screen.SEARCH -> SearchScreen(vm)
             Screen.LIBRARY -> { LaunchedEffect(Unit) { libraryVm.loadLibrary() }; LibraryScreen() }
             Screen.ACCOUNT -> AccountScreen(vm)
-            Screen.QUEUE -> QueueScreen(vm)
             Screen.EQUALIZER -> EqualizerScreen(vm)
             Screen.PLAYLIST_DETAIL, Screen.ALBUM_DETAIL, Screen.ARTIST_DETAIL, Screen.SHOW_DETAIL -> DetailScreen(vm)
             Screen.NOW_PLAYING, Screen.LYRICS, Screen.LOGIN -> {}

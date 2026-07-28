@@ -243,6 +243,9 @@ class PlaybackViewModel : ViewModel() {
     // Queue
     private val _queue = MutableStateFlow<List<TrackInfo>>(emptyList())
     val queue: StateFlow<List<TrackInfo>> = _queue
+
+    private val _queueSheetVisible = MutableStateFlow(false)
+    val queueSheetVisible: StateFlow<Boolean> = _queueSheetVisible
     // Next track info (always available from WebSocket state for mini player swipe)
     val nextTrackPreview = MutableStateFlow<TrackInfo?>(null)
 
@@ -606,7 +609,7 @@ class PlaybackViewModel : ViewModel() {
             resolveJob?.cancel()
             resolveJob = viewModelScope.launch(Dispatchers.IO) {
                 resolveAndPlay(event)
-                if (currentScreen.value == Screen.QUEUE) refreshQueue()
+                if (queueSheetVisible.value) refreshQueue()
             }
         }
 
@@ -1801,8 +1804,12 @@ class PlaybackViewModel : ViewModel() {
     }
 
     fun openQueue() {
-        navigateTo(Screen.QUEUE)
+        _queueSheetVisible.value = true
         refreshQueue()
+    }
+
+    fun closeQueue() {
+        _queueSheetVisible.value = false
     }
 
     fun openLyrics() {

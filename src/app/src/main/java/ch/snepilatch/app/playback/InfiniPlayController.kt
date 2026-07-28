@@ -45,19 +45,16 @@ class InfiniPlayController(
     private companion object {
         const val TAG = "InfiniPlay"
         const val CAPTURE_STALL_TICKS = 12 // ~12s of no new audio => proceed with what we have
-        const val FALLBACK_HANDOFF_MS = 45_000L // used only when the track duration is unknown
+        const val FALLBACK_HANDOFF_MS = 45_000L // hand off here even with a thin graph (docs/infiniplay.md)
 
-        // Hand off once this much is captured (jumps become possible; most beats still play through).
-        const val HANDOFF_AFTER_MS = 30_000L
-        const val MIN_PARALLELS_FOR_HANDOFF = 24
-        const val REANALYZE_GROWTH_S = 30 // re-analyse + enrich jumps every +30s of newly captured audio
+        // Hand off as early as a usable graph can exist (intro guard + min jump distance eat ~18s).
+        const val HANDOFF_AFTER_MS = 20_000L
+        const val MIN_PARALLELS_FOR_HANDOFF = 4
+        const val REANALYZE_GROWTH_S = 15 // re-analyse + enrich jumps every +15s of newly captured audio
         const val VIZ_BUCKETS = 56 // number of pillars in the remix map
         const val VIZ_TICK_MS = 200L // how often the remix map refreshes (InfiniPlayTimeline eases between ticks)
         const val PREVIEW_START_S = 10 // run the first similarity search ~10s in (populates the remix map)
 
-        // Refresh cadence for the preview similarities until the centre handoff. Was 5s, but each refresh
-        // is a whole-buffer FFT + O(n^2) pass feeding only the cosmetic 56-bar histogram, so ~18s cuts the
-        // reanalysis count ~4x with no correctness/handoff impact.
         const val PREVIEW_EVERY_S = 5 // refresh the similarity search every +5s of captured audio
         const val HANDOFF_OVERLAP_MS = 180L // overlap engine + ExoPlayer briefly so the takeover has no gap
         const val LOOP_MARGIN_MS = 3000L // seek the muted keep-alive player back this far before the end
@@ -154,10 +151,8 @@ class InfiniPlayController(
             return
         }
         val durMs = withContext(Dispatchers.Main) { svc.infiniPlayDurationMs() }
-        // Let the song play through to its centre before going eternal, so the first half is heard
-        // normally; only then does it start (optionally) switching. Falls back to a fixed point if the
-        // duration isn't known yet.
-        val captureMs = if (durMs > 0) minOf(durMs / 2, HANDOFF_AFTER_MS) else FALLBACK_HANDOFF_MS
+        // Go eternal as early as possible: hand off the moment a usable graph exists.
+        val captureMs = if (durMs > 0) minOf(durMs / 2, HANDOFF_AFTER_MS) else HANDOFF_AFTER_MS
         val targetFrames = (captureMs * rate / 1000).toInt()
         val totalFrames = if (durMs > 0) (durMs * rate / 1000).toInt() else targetFrames * 2
         startViz(svc, rate, totalFrames) // drive the remix-map UI (buffering, similarities, playhead)
@@ -193,7 +188,7 @@ class InfiniPlayController(
             }
             when {
                 paused -> delay(300) // hold the capture where it is while paused
-                readyToHandOff(cf, targetFrames, rate, previewParallels, durMs) -> done = true
+                readyToHandOff(cf, targetFrames, rate, previewParallels) -> done = true
                 stall >= CAPTURE_STALL_TICKS -> {
                     LokiLogger.i(TAG, "capture stalled at ${cf / rate}s — using partial")
                     done = true
@@ -205,17 +200,10 @@ class InfiniPlayController(
         handOffToEngine(svc, rate, durMs, trackId)
     }
 
-    /** Past the capture target with a usable jump table, or past the half-track mark. */
-    private fun readyToHandOff(
-        captured: Int,
-        targetFrames: Int,
-        rate: Int,
-        parallels: Int,
-        durMs: Long
-    ): Boolean {
+    /** Past the capture target with any usable jump table; a track with zero jumps waits for the stall path. */
+    private fun readyToHandOff(captured: Int, targetFrames: Int, rate: Int, parallels: Int): Boolean {
         if (captured >= targetFrames - rate && parallels >= MIN_PARALLELS_FOR_HANDOFF) return true
-        val halfFrames = if (durMs > 0) (durMs / 2 * rate / 1000).toInt() else Int.MAX_VALUE
-        return captured >= halfFrames - rate
+        return captured >= (FALLBACK_HANDOFF_MS * rate / 1000).toInt() && parallels > 0
     }
 
     /** Analyse the captured opening, start the seamless engine, and keep enriching it to the full track. */

@@ -121,10 +121,27 @@ calls rather than assuming it fits in whatever the sink happens to pull.
 ## Session flow (`InfiniPlayController`)
 
 Capture starts from the top of the track (the seek also flushes the remix processor into the chain).
-The first analysis preview runs at 10 s and refreshes every 5 s. Handoff to the remix happens once
-~30 s are captured **and** the graph has at least 24 branch points — otherwise capture continues, up
-to at most the half-track point. After handoff, capture continues in the background and richer
-snapshots are swapped in every 30 s of new audio until the full track is held.
+The first analysis preview runs at 10 s and refreshes every 5 s. Handoff to the remix happens as
+early as possible: once ~20 s are captured **and** the graph has at least 4 branch points. (A usable
+graph cannot exist much earlier: the 10 s intro guard plus the 16-beat minimum jump distance eat
+~18 s.) A track whose opening yields fewer branch points hands off at 45 s with whatever exists; a
+track with zero jumps keeps capturing and tries once more when capture stalls at the full track.
+There is deliberately no "play the first half normally" wait. After handoff, capture continues in
+the background and richer snapshots are swapped in every 15 s of new audio until the full track is
+held — the short cadence matters now that the first snapshot only spans ~20 s.
+
+Growth simulation in the offline lab (rendering while the capture "grows" at 1x, swapping snapshots
+on the controller's exact schedule) showed two properties of incremental analysis worth knowing:
+
+- The beat grid's phase can shift between growth passes (tempo stays put), so the jump table can
+  churn wholesale from one snapshot to the next. This is harmless: each snapshot is internally
+  consistent, the playhead position is plain PCM frames, an in-flight crossfade stores raw frames
+  rather than jump references, and the ±12 ms splice alignment absorbs the residual offset. Seam
+  jolts stayed below the track's own 99th percentile throughout.
+- At handoff the playhead sits at the capture edge, which is past the young snapshot's last branch
+  point — so the very first splice is a forced jump back. Expected, not a bug. Until the first
+  growth pass lands, the remix lives in a small window and may revisit sections; the 15 s growth
+  cadence bounds how long that lasts.
 
 ## Tuning constants
 

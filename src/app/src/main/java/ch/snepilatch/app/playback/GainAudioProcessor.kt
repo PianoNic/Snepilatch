@@ -9,7 +9,7 @@ import java.nio.ByteOrder
 
 /**
  * Attenuates the decoded PCM by a settable linear gain — the headroom that lets an EQ (Wavelet, or our
- * own) boost without clipping. Sits AFTER [JukeboxAudioTap] in the sink's processor chain so the tap
+ * own) boost without clipping. Sits AFTER [InfiniPlayAudioTap] in the sink's processor chain so the tap
  * still sees the unmodified signal its beat matching was tuned on.
  *
  * 16-bit PCM only; anything else returns [AudioProcessor.AudioFormat.NOT_SET] from [onConfigure] so the

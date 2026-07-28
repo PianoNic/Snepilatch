@@ -9,7 +9,7 @@ import kotlin.math.sqrt
  * Waveform-native self-similarity analysis — the replacement for Spfy's beat/segment analysis.
  * Given the decoded mono PCM of a track (captured live from the audio pipeline, no separate download),
  * it splits the audio into short frames, computes a chroma (12 pitch-class) + coarse timbre feature per
- * frame via FFT, and finds pairs of frames that sound alike ("parallels") — the points the jukebox can
+ * frame via FFT, and finds pairs of frames that sound alike ("parallels") — the points the infiniPlay can
  * jump between. Onset-based beat snapping and sample-accurate splicing come next; this stage proves the
  * analysis finds musical parallels straight from the waveform.
  *
@@ -24,7 +24,9 @@ object WaveformAnalyzer {
         val frameCount: Int,
         val frameHopSamples: Int,
         val sampleRate: Int,
-        val parallels: List<Parallel>
+        val parallels: List<Parallel>,
+        /** Closest pair seen, even when it failed the cutoff — tells us how far off a track was. */
+        val closestDistance: Double = Double.NaN
     ) {
         fun frameToMs(frame: Int): Long = 1000L * frame.toLong() * frameHopSamples / sampleRate
     }
@@ -36,22 +38,66 @@ object WaveformAnalyzer {
     private const val SILENCE_GATE = 0.05 // frames below 5% of peak energy can't be jump points
 
     // The Hann window is immutable and FFT_SIZE-sized; compute it once instead of rebuilding it on
-    // every analyze() call (which runs repeatedly over the capture half during a jukebox session).
+    // every analyze() call (which runs repeatedly over the capture half during a infiniPlay session).
     private val WINDOW = DoubleArray(FFT_SIZE) { 0.5 - 0.5 * cos(2.0 * Math.PI * it / (FFT_SIZE - 1)) }
 
     /**
      * Analyse [mono] PCM at [sampleRate]. [minGapMs] keeps jumps from being trivially close; [maxDistance]
      * is the similarity cutoff (z-scored feature distance); [maxParallels] caps the returned list.
      */
+    /** Z-scored per-frame chroma+timbre features and the hop they were taken at. */
+    class Features(val rows: Array<DoubleArray>, val hopSamples: Int, val loud: BooleanArray)
+
+    /**
+     * The feature stage on its own, so a beat-level graph can average these across each beat instead
+     * of treating every 46ms frame as an independent jump candidate.
+     */
+    fun features(mono: ShortArray, sampleRate: Int): Features {
+        val nFrames = if (mono.size < FFT_SIZE) 0 else 1 + (mono.size - FFT_SIZE) / HOP
+        if (nFrames < 4) return Features(emptyArray(), HOP, BooleanArray(0))
+        val dim = CHROMA_BINS + TIMBRE_BANDS
+        val feats = Array(nFrames) { DoubleArray(dim) }
+        val energy = DoubleArray(nFrames)
+        val re = DoubleArray(FFT_SIZE)
+        val im = DoubleArray(FFT_SIZE)
+        val mag = DoubleArray(FFT_SIZE / 2)
+        for (f in 0 until nFrames) {
+            val off = f * HOP
+            for (i in 0 until FFT_SIZE) {
+                re[i] = (mono[off + i] / 32768.0) * WINDOW[i]
+                im[i] = 0.0
+            }
+            fft(re, im)
+            var e = 0.0
+            for (k in 0 until FFT_SIZE / 2) {
+                mag[k] = sqrt(re[k] * re[k] + im[k] * im[k])
+                e += mag[k]
+            }
+            energy[f] = e
+            chromaAndTimbre(mag, sampleRate, feats[f])
+        }
+        zScore(feats)
+        var peak = 0.0
+        for (e in energy) if (e > peak) peak = e
+        val gate = peak * SILENCE_GATE
+        return Features(feats, HOP, BooleanArray(nFrames) { energy[it] >= gate })
+    }
+
     fun analyze(
         mono: ShortArray,
         sampleRate: Int,
         minGapMs: Int = 2000,
-        maxDistance: Double = 0.85, // stricter: only genuinely similar frames match (was 1.1)
+        // Unrelated frames sit around distance 6 in this 20-dim z-scored space, near-duplicates near
+        // 0. KotifyClient's InfiniPlayGraph — the Infinite Jukebox port this mirrors — cuts off at 1.3
+        // over 25 dims, which scales to 1.3 * sqrt(20/25) = 1.16 here. 0.85 was below anything real
+        // music produces: measured on a track, the closest pair of 2350 frames was 0.95, so every
+        // track analysed to zero matches and the infiniPlay switched itself off.
+        maxDistance: Double = 1.1,
         maxParallels: Int = 4000
     ): Result {
         val nFrames = if (mono.size < FFT_SIZE) 0 else 1 + (mono.size - FFT_SIZE) / HOP
         if (nFrames < 4) return Result(nFrames, HOP, sampleRate, emptyList())
+        var closest = Double.MAX_VALUE
 
         val dim = CHROMA_BINS + TIMBRE_BANDS
         val feats = Array(nFrames) { DoubleArray(dim) }
@@ -96,6 +142,7 @@ object WaveformAnalyzer {
                 while (j < nFrames) {
                     if (loud[j]) {
                         val d = dist(feats[i], feats[j])
+                        if (d < closest) closest = d
                         if (d <= maxDistance) out.add(Parallel(i, j, d))
                     }
                     j++
@@ -104,7 +151,11 @@ object WaveformAnalyzer {
             i++
         }
         out.sortBy { it.distance }
-        return Result(nFrames, HOP, sampleRate, if (out.size > maxParallels) out.subList(0, maxParallels) else out)
+        return Result(
+            nFrames, HOP, sampleRate,
+            if (out.size > maxParallels) out.subList(0, maxParallels) else out,
+            if (closest == Double.MAX_VALUE) Double.NaN else closest
+        )
     }
 
     // --- features -----------------------------------------------------------------------------
@@ -172,6 +223,29 @@ object WaveformAnalyzer {
         }
         return sqrt(s)
     }
+
+    /**
+     * Fine-resolution magnitude spectrum for join-continuity checks in [BeatGraph]. The resolution is
+     * the point: at the analyser's own 2048-point/21.5Hz bins, adjacent harmonics blur together and
+     * two different chords can look near-identical — which is how a harmonically wrong join passed the
+     * graph veto while the rendered seam (and the ear) rejected it. 8192 points resolve individual
+     * harmonics, so a pitch clash shows up as a low cosine.
+     */
+    fun magnitudeSpectrum(x: DoubleArray): DoubleArray {
+        val re = DoubleArray(JOIN_FFT_SIZE)
+        val im = DoubleArray(JOIN_FFT_SIZE)
+        for (i in 0 until minOf(JOIN_FFT_SIZE, x.size)) re[i] = x[i] * JOIN_WINDOW[i]
+        fft(re, im)
+        return DoubleArray(JOIN_FFT_SIZE / 2) { sqrt(re[it] * re[it] + im[it] * im[it]) }
+    }
+
+    private const val JOIN_FFT_SIZE = 8192
+
+    /** Samples one [magnitudeSpectrum] input needs (~186ms at 44.1k). */
+    const val SPECTRUM_SAMPLES = JOIN_FFT_SIZE
+
+    private val JOIN_WINDOW =
+        DoubleArray(JOIN_FFT_SIZE) { 0.5 - 0.5 * cos(2.0 * Math.PI * it / (JOIN_FFT_SIZE - 1)) }
 
     /** In-place iterative radix-2 FFT ([re]/[im] length must be a power of two). */
     private fun fft(re: DoubleArray, im: DoubleArray) {

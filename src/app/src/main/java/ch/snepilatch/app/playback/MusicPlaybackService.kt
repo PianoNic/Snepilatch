@@ -77,12 +77,16 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         private set
 
     // Taps the decoded PCM in the audio pipeline — the foundation of the waveform-based seamless
-    // jukebox. Pass-through; only observes when analyzing is toggled on.
-    private val jukeboxTap = JukeboxAudioTap()
+    // infiniPlay. Pass-through; only observes when analyzing is toggled on.
+    private val infiniPlayTap = InfiniPlayAudioTap()
 
     // EQ headroom: attenuates the decoded PCM so an external EQ (Wavelet & co.) has room to boost into.
     // Strictly after the tap — the tap must keep seeing the unmodified signal its beat matching needs.
     private val gainProcessor = GainAudioProcessor()
+
+    // The remix filter: replaces the decoded stream with captured audio spliced at matched beats.
+    // Must sit after the tap and before the gain (see docs/eternal-infiniPlay.md).
+    private val remixProcessor = InfiniPlayRemixProcessor()
 
     // In-app 10-band EQ on the audio session. Unlike the headroom above it computes its own input
     // gain from the curve, so the two are never both needed — the UI disables one when the other is on.
@@ -230,18 +234,18 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 3_000     // rebuffer: 3s
             )
             // Retain up to 3 min of already-played audio. Costs no extra data (it just keeps what was
-            // downloaded) and lets the Eternal Jukebox's backward loop-jumps replay instantly instead
+            // downloaded) and lets the Eternal InfiniPlay's backward loop-jumps replay instantly instead
             // of re-fetching from the CDN.
             .setBackBuffer(180_000, true)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
         // Custom renderers factory so our PCM tap sits in the audio processor chain and can read the
-        // decoded waveform (for the seamless-jukebox engine). It passes audio through untouched.
+        // decoded waveform (for the seamless-infiniPlay engine). It passes audio through untouched.
         val renderersFactory = object : DefaultRenderersFactory(this) {
             // enableFloatOutput is deliberately ignored. It only does anything when the decoder
             // already emits 32-bit float, so it is a no-op for the 16-bit AAC Spfy path and would
-            // apply only to high-bit-depth FLAC — where it would break two things: JukeboxAudioTap
+            // apply only to high-bit-depth FLAC — where it would break two things: InfiniPlayAudioTap
             // captures into a ShortArray, and GainAudioProcessor bypasses itself on any encoding
             // other than PCM_16BIT, so the EQ headroom would silently stop working. Teach both
             // ENCODING_PCM_FLOAT first if this is ever wanted.
@@ -250,7 +254,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 enableFloatOutput: Boolean,
                 enableAudioTrackPlaybackParams: Boolean
             ): AudioSink = DefaultAudioSink.Builder(context)
-                .setAudioProcessors(arrayOf(jukeboxTap, gainProcessor))
+                .setAudioProcessors(arrayOf(infiniPlayTap, remixProcessor, gainProcessor))
                 .build()
         }
 
@@ -285,7 +289,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
                 // Pause/resume the remix engine with the session instead of tearing it down — a pause
                 // should hold the remix where it is, not drop out to the muted underlying track.
-                pauseJukebox(!playWhenReady)
+                pauseInfiniPlay(!playWhenReady)
 
                 // Keep the control plane (dealer socket + advance) awake for the whole play session,
                 // not just while ExoPlayer is buffering. Released on pause/stop to spare the battery.
@@ -339,8 +343,8 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 // A real track change (skip / auto-advance / new queue) — not our own repeat loop —
-                // means the jukebox's captured song is no longer what's playing: tear it down.
-                if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) stopJukebox()
+                // means the infiniPlay's captured song is no longer what's playing: tear it down.
+                if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) stopInfiniPlay()
                 if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && metadataQueue.size > 1) {
                     // ExoPlayer auto-advanced to next track — swap metadata
                     metadataQueue.removeAt(0)
@@ -623,38 +627,38 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         }
     }
 
-    // While the Eternal Jukebox engine owns the speaker, the true "where are we" is its playhead
+    // While the Eternal InfiniPlay engine owns the speaker, the true "where are we" is its playhead
     // (which jumps around), not ExoPlayer's linear muted clock. When set, it overrides the reported
     // position so the UI scrubber and the Spfy Connect reports jump with the audio.
-    @Volatile private var jukeboxPositionSource: (() -> Long)? = null
-    fun setJukeboxPositionSource(src: (() -> Long)?) { jukeboxPositionSource = src }
+    @Volatile private var infiniPlayPositionSource: (() -> Long)? = null
+    fun setInfiniPlayPositionSource(src: (() -> Long)?) { infiniPlayPositionSource = src }
 
-    // Registered by the jukebox controller so the service can tear the detached engine down on ANY real
+    // Registered by the infiniPlay controller so the service can tear the detached engine down on ANY real
     // playback change — a skip, an auto-advance, the app being swiped away, or the service dying. Without
     // this the engine's own AudioTrack keeps playing the old track after a skip / with the app gone.
-    @Volatile private var jukeboxStopHook: (() -> Unit)? = null
-    fun setJukeboxStopHook(hook: (() -> Unit)?) { jukeboxStopHook = hook }
-    private fun stopJukebox() { jukeboxStopHook?.invoke() }
+    @Volatile private var infiniPlayStopHook: (() -> Unit)? = null
+    fun setInfiniPlayStopHook(hook: (() -> Unit)?) { infiniPlayStopHook = hook }
+    private fun stopInfiniPlay() { infiniPlayStopHook?.invoke() }
 
     // Pausing should PAUSE the remix (keep the engine, just stop its audio), not tear it down. The
     // controller registers this; the service calls it when playback is paused/resumed.
-    @Volatile private var jukeboxPauseHook: ((Boolean) -> Unit)? = null
-    fun setJukeboxPauseHook(hook: ((Boolean) -> Unit)?) { jukeboxPauseHook = hook }
-    private fun pauseJukebox(paused: Boolean) { jukeboxPauseHook?.invoke(paused) }
+    @Volatile private var infiniPlayPauseHook: ((Boolean) -> Unit)? = null
+    fun setInfiniPlayPauseHook(hook: ((Boolean) -> Unit)?) { infiniPlayPauseHook = hook }
+    private fun pauseInfiniPlay(paused: Boolean) { infiniPlayPauseHook?.invoke(paused) }
 
     // While remixing, the track no longer has a meaningful linear position/duration, and the system
     // media notification's seekbar would otherwise fight the engine (and can trigger an auto-advance
     // when it "reaches the end"). Blank the duration/position so no seekbar is shown.
-    @Volatile private var jukeboxRemixing = false
-    fun setJukeboxRemixing(on: Boolean) {
-        jukeboxRemixing = on
+    @Volatile private var infiniPlayRemixing = false
+    fun setInfiniPlayRemixing(on: Boolean) {
+        infiniPlayRemixing = on
         mainHandler.post {
             updateMediaSessionMetadata()
             updatePlaybackState()
         }
     }
 
-    fun getCurrentPosition(): Long = jukeboxPositionSource?.invoke() ?: player.currentPosition
+    fun getCurrentPosition(): Long = infiniPlayPositionSource?.invoke() ?: player.currentPosition
     fun isPlaying(): Boolean = player.isPlaying
 
     fun syncSeek(positionMs: Long) {
@@ -667,68 +671,101 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     }
 
     /**
-     * Toggle jukebox seek behaviour. When on, seeks snap to the nearest audio sync frame
+     * Toggle infiniPlay seek behaviour. When on, seeks snap to the nearest audio sync frame
      * ([SeekParameters.CLOSEST_SYNC]) instead of exact-seeking, which avoids re-decoding from a distant
      * keyframe on every beat jump — far smoother, at the cost of a few ms of position accuracy that's
      * inaudible for beat matching. Restores exact seeking when off.
      */
-    fun setJukeboxSeekMode(enabled: Boolean) {
+    fun setInfiniPlaySeekMode(enabled: Boolean) {
         mainHandler.post {
             player.setSeekParameters(if (enabled) SeekParameters.CLOSEST_SYNC else SeekParameters.DEFAULT)
-            if (!enabled) player.volume = 1f // undo any in-flight jump fade
+            if (!enabled && !engineOwnsOutput) player.volume = 1f // undo any in-flight jump fade
         }
     }
 
     /** Turn the decoded-PCM waveform capture on/off; allocates the buffer on, frees the ~63MB on off. */
-    fun setJukeboxAnalyzing(enabled: Boolean) {
+    fun setInfiniPlayAnalyzing(enabled: Boolean) {
         if (enabled) {
-            jukeboxTap.resetCapture()
-            jukeboxTap.analyzing = true
+            infiniPlayTap.resetCapture()
+            infiniPlayTap.analyzing = true
         } else {
-            jukeboxTap.analyzing = false
-            jukeboxTap.releaseBuffer()
+            infiniPlayTap.analyzing = false
+            infiniPlayTap.releaseBuffer()
         }
     }
 
-    fun jukeboxSampleRate(): Int = jukeboxTap.sampleRate()
-    fun jukeboxChannels(): Int = jukeboxTap.channelCount()
-    fun jukeboxCapturedFrames(): Int = jukeboxTap.capturedFrames()
-    fun jukeboxSnapshotMono(): ShortArray = jukeboxTap.snapshotMono()
-    fun jukeboxSnapshotInterleaved(): ShortArray = jukeboxTap.snapshotInterleaved()
+    fun infiniPlaySampleRate(): Int = infiniPlayTap.sampleRate()
+    fun infiniPlayChannels(): Int = infiniPlayTap.channelCount()
+    fun infiniPlayCapturedFrames(): Int = infiniPlayTap.capturedFrames()
+    fun infiniPlaySnapshotMono(): ShortArray = infiniPlayTap.snapshotMono()
+    fun infiniPlaySnapshotInterleaved(): ShortArray = infiniPlayTap.snapshotInterleaved()
 
     /** Track duration in ms — MUST be called on the main thread. */
-    fun jukeboxDurationMs(): Long = player.duration
+    fun infiniPlayDurationMs(): Long = player.duration
 
-    fun jukeboxSeekToStart() = mainHandler.post { if (player.mediaItemCount > 0) player.seekTo(0) }
+    fun infiniPlaySeekToStart() = mainHandler.post { if (player.mediaItemCount > 0) player.seekTo(0) }
 
-    /** Raw ExoPlayer position (NOT the jukebox override) — for the code-side loop guard. Main thread. */
-    fun jukeboxRawPositionMs(): Long = player.currentPosition
+    /** Raw ExoPlayer position (NOT the infiniPlay override) — for the code-side loop guard. Main thread. */
+    fun infiniPlayRawPositionMs(): Long = player.currentPosition
 
     /**
-     * Hand the speaker to the PCM jukebox engine while keeping ExoPlayer's clock alive: mute it and keep
+     * Hand the speaker to the PCM infiniPlay engine while keeping ExoPlayer's clock alive: mute it and keep
      * it playing so [getCurrentPosition]'s underlying clock keeps advancing. We do NOT enable repeat here
      * — the controller loops the muted player in code (seek back near the end), since ExoPlayer's own
      * repeat sometimes fails to loop and lets the track end.
      */
-    fun jukeboxSilentKeepAlive() = mainHandler.post {
+    /** Join/leave the audio chain for the session; call before the capture pass's seek (its flush applies it). */
+    fun setInfiniPlayRemixEngaged(on: Boolean) {
+        remixProcessor.engaged = on
+        if (!on) remixProcessor.setSnapshot(null)
+    }
+
+    /** Hand the audible stream to the remix (or back to normal playback with null). */
+    fun setInfiniPlayRemix(snap: InfiniPlayRemixProcessor.Snapshot?, startFrame: Int = -1) {
+        remixProcessor.setSnapshot(snap, startFrame)
+    }
+
+    /** Where the remix currently is, for the UI playhead. */
+    fun infiniPlayRemixPlayheadMs(): Long = remixProcessor.playheadMs()
+
+    /** Remix-map density, or null when the remix isn't running. */
+    fun infiniPlayRemixBuckets(nBuckets: Int, totalFrames: Int): IntArray? =
+        remixProcessor.jumpBuckets(nBuckets, totalFrames)
+
+    /** How often the remix has landed in each slice, for the remix-map heat. */
+    fun infiniPlayRemixVisits(nBuckets: Int, totalFrames: Int): IntArray? =
+        remixProcessor.visitBuckets(nBuckets, totalFrames)
+
+    fun infiniPlaySilentKeepAlive() = mainHandler.post {
+        engineOwnsOutput = true
         player.volume = 0f
         player.playWhenReady = true
     }
 
-    /** Undo [jukeboxSilentKeepAlive]: unmute, keeping playback going. */
-    fun jukeboxRestorePlayback() = mainHandler.post {
+    /**
+     * True while the PCM engine owns the speaker. Every path that raises [ExoPlayer.volume] checks it,
+     * so a stray fade can never bring the muted keep-alive player back up underneath the remix.
+     */
+    @Volatile private var engineOwnsOutput = false
+
+    /** The attenuation normal playback is getting, so the remix can match it instead of blaring. */
+    fun infiniPlayOutputGain(): Float = gainProcessor.gain()
+
+    /** Undo [infiniPlaySilentKeepAlive]: unmute, keeping playback going. */
+    fun infiniPlayRestorePlayback() = mainHandler.post {
+        engineOwnsOutput = false
         player.volume = 1f
     }
 
     /**
-     * Jump for the Eternal Jukebox: cut the volume, seek, then fade back in over ~145ms so the seek's
+     * Jump for the Eternal InfiniPlay: cut the volume, seek, then fade back in over ~145ms so the seek's
      * unavoidable decoder-flush gap happens in silence and the new beat eases in — masking the seam a
      * plain [seekTo] would expose. (A true gapless crossfade isn't possible here: the audio is
      * Widevine-DRM'd, so we can't decode it to PCM and mix two streams.)
      */
-    fun jukeboxJump(positionMs: Long) {
+    fun infiniPlayJump(positionMs: Long) {
         mainHandler.post {
-            if (player.mediaItemCount == 0) return@post
+            if (player.mediaItemCount == 0 || engineOwnsOutput) return@post
             val restore = if (player.volume > 0.1f) player.volume else 1f
             player.volume = 0f
             player.seekTo(positionMs)
@@ -740,7 +777,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     }
 
     fun stop() {
-        stopJukebox()
+        stopInfiniPlay()
         metadataQueue.clear()
         currentDurationMs = 0L
         idleArtUrl = null
@@ -995,7 +1032,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         // fall back to currentDurationMs which is set by setIdleMetadata so
         // the system shows the right duration before the song actually loads.
         val duration = when {
-            jukeboxRemixing -> 0L // no seekbar in remix mode
+            infiniPlayRemixing -> 0L // no seekbar in remix mode
             player.duration > 0 -> player.duration
             currentDurationMs > 0 -> currentDurationMs
             else -> 0L
@@ -1025,9 +1062,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
             PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
             PlaybackStateCompat.ACTION_STOP
-        if (!jukeboxRemixing) actions = actions or PlaybackStateCompat.ACTION_SEEK_TO
+        if (!infiniPlayRemixing) actions = actions or PlaybackStateCompat.ACTION_SEEK_TO
         // In remix mode report an unknown position so the notification shows no seekbar to auto-advance.
-        val reportedPos = if (jukeboxRemixing) PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN else player.currentPosition
+        val reportedPos = if (infiniPlayRemixing) PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN else player.currentPosition
         val builder = PlaybackStateCompat.Builder()
             .setActions(actions)
             .setState(state, reportedPos, 1f)
@@ -1209,7 +1246,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         // App swiped from recents — kill everything
-        stopJukebox()
+        stopInfiniPlay()
         player.stop()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -1278,7 +1315,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     }
 
     override fun onDestroy() {
-        stopJukebox()
+        stopInfiniPlay()
         unregisterNetworkCallback()
         releaseControlPlaneLocks()
         equalizer.release()

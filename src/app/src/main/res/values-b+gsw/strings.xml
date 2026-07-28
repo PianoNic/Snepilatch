@@ -269,7 +269,7 @@
     <string name="gradient_bg_off">Fliessends Albumcover</string>
     <string name="lossless_on_flac">FLAC</string>
     <string name="region_nearest">Am nöchste (automatisch)</string>
-    <string name="eternal_jukebox">Eternal Jukebox</string>
+    <string name="infiniplay">InfiniPlay</string>
 
     <!-- Snackbars -->
     <string name="following_artist">Em Künstler folgsch jetz</string>

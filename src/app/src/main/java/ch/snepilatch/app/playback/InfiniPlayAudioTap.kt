@@ -10,10 +10,10 @@ import java.nio.ByteOrder
 /**
  * Taps the DECODED PCM in ExoPlayer's audio pipeline (proven readable despite Widevine DRM) and, while
  * [analyzing] is on, accumulates the track as interleaved stereo samples — the raw material for both
- * [WaveformAnalyzer] (mono downmix) and the seamless [PcmJukeboxEngine] (stereo playback). No separate
+ * [WaveformAnalyzer] (mono downmix) and the seamless [PcmInfiniPlayEngine] (stereo playback). No separate
  * download: this is the same audio being decoded for playback. Pure pass-through; playback is untouched.
  */
-class JukeboxAudioTap : BaseAudioProcessor() {
+class InfiniPlayAudioTap : BaseAudioProcessor() {
 
     @Volatile var analyzing: Boolean = false
 
@@ -74,7 +74,7 @@ class JukeboxAudioTap : BaseAudioProcessor() {
         len = 0
     }
 
-    // Only participate in the audio chain while analyzing: when the jukebox is off ExoPlayer bypasses
+    // Only participate in the audio chain while analyzing: when the infiniPlay is off ExoPlayer bypasses
     // this processor entirely, so there is no per-buffer queueInput copy. isActive is re-read on a
     // pipeline flush — the enable path sets analyzing before seeking, so the seek's flush activates it.
     override fun isActive(): Boolean = analyzing
@@ -119,7 +119,7 @@ class JukeboxAudioTap : BaseAudioProcessor() {
     }
 
     private companion object {
-        const val TAG = "JukeboxTap"
+        const val TAG = "InfiniPlayTap"
         const val MAX_MINUTES = 6
     }
 }

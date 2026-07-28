@@ -9,8 +9,8 @@ import ch.snepilatch.app.data.UiMessage
 import ch.snepilatch.app.util.LokiLogger
 import ch.snepilatch.app.util.detectActiveAudioOutput
 import ch.snepilatch.app.util.normalizeSpfyImageUrl
-import ch.snepilatch.app.playback.JukeboxController
-import ch.snepilatch.app.playback.JukeboxViz
+import ch.snepilatch.app.playback.InfiniPlayController
+import ch.snepilatch.app.playback.InfiniPlayViz
 import ch.snepilatch.app.playback.MusicPlaybackService
 import ch.snepilatch.app.playback.PositionInterpolator
 import ch.snepilatch.app.playback.SessionHolder
@@ -94,16 +94,16 @@ class PlaybackViewModel : ViewModel() {
     )
     private var currentStreamUri: String? = null
 
-    // Eternal Jukebox: fetches the current track's audio-analysis, builds a beat-similarity graph, and
-    // seeks ExoPlayer to similar beats so the song plays forever. Logic only — toggle via toggleJukebox().
-    private val jukebox = JukeboxController(
+    // Eternal InfiniPlay: fetches the current track's audio-analysis, builds a beat-similarity graph, and
+    // seeks ExoPlayer to similar beats so the song plays forever. Logic only — toggle via toggleInfiniPlay().
+    private val infiniPlay = InfiniPlayController(
         scope = viewModelScope,
         currentTrackId = { currentStreamUri?.takeIf { it.startsWith("spotify:track:") }?.substringAfterLast(":") },
     )
-    val jukeboxEnabled: StateFlow<Boolean> = jukebox.enabled
-    val jukeboxViz: StateFlow<JukeboxViz?> = jukebox.viz
-    private var savedRepeatForJukebox: String? = null
-    private var jukeboxRepeatObserverStarted = false
+    val infiniPlayEnabled: StateFlow<Boolean> = infiniPlay.enabled
+    val infiniPlayViz: StateFlow<InfiniPlayViz?> = infiniPlay.viz
+    private var savedRepeatForInfiniPlay: String? = null
+    private var infiniPlayRepeatObserverStarted = false
 
     private var nextStreamUrl: String? = null
     private var nextTrackInfo: TrackInfo? = null
@@ -338,7 +338,7 @@ class PlaybackViewModel : ViewModel() {
     }
 
     fun initialize(cookies: Map<String, String>) {
-        startJukeboxRepeatGuard()
+        startInfiniPlayRepeatGuard()
         // Clean up any leftover from previous session
         SessionHolder.player?.let {
             try { kotlinx.coroutines.runBlocking { it.disconnect() } } catch (_: Exception) {}
@@ -1087,24 +1087,24 @@ class PlaybackViewModel : ViewModel() {
     private fun stopPositionTicker() = positionInterpolator.stop()
 
     /**
-     * While the jukebox owns playback, force the Spfy Connect session to repeat the current track so
+     * While the infiniPlay owns playback, force the Spfy Connect session to repeat the current track so
      * the cloud never auto-advances the queue when the track's duration elapses (which would tear the
-     * engine down and jump to the next song). Restores the prior repeat mode when the jukebox turns off.
+     * engine down and jump to the next song). Restores the prior repeat mode when the infiniPlay turns off.
      */
-    private fun startJukeboxRepeatGuard() {
-        if (jukeboxRepeatObserverStarted) return
-        jukeboxRepeatObserverStarted = true
+    private fun startInfiniPlayRepeatGuard() {
+        if (infiniPlayRepeatObserverStarted) return
+        infiniPlayRepeatObserverStarted = true
         viewModelScope.launch {
-            jukebox.enabled.collect { on ->
-                if (on && savedRepeatForJukebox == null) {
-                    savedRepeatForJukebox = _playback.value.repeatMode
+            infiniPlay.enabled.collect { on ->
+                if (on && savedRepeatForInfiniPlay == null) {
+                    savedRepeatForInfiniPlay = _playback.value.repeatMode
                     runCatching { player?.setRepeat("track") }
                     _playback.value = _playback.value.copy(repeatMode = "track")
                 } else if (!on) {
-                    savedRepeatForJukebox?.let { prev ->
+                    savedRepeatForInfiniPlay?.let { prev ->
                         runCatching { player?.setRepeat(prev) }
                         _playback.value = _playback.value.copy(repeatMode = prev)
-                        savedRepeatForJukebox = null
+                        savedRepeatForInfiniPlay = null
                     }
                 }
             }
@@ -1112,20 +1112,20 @@ class PlaybackViewModel : ViewModel() {
     }
 
     /**
-     * Toggle the Eternal Jukebox for the currently-streaming track. Only meaningful while streaming a
+     * Toggle the Eternal InfiniPlay for the currently-streaming track. Only meaningful while streaming a
      * track locally (it drives ExoPlayer seeks); a no-op otherwise. Logic only — no UI wired.
      */
-    fun toggleJukebox() {
-        if (jukebox.isEnabled()) {
-            jukebox.disable()
+    fun toggleInfiniPlay() {
+        if (infiniPlay.isEnabled()) {
+            infiniPlay.disable()
             return
         }
         val uri = currentStreamUri?.takeIf { it.startsWith("spotify:track:") }
         if (uri == null) {
-            LokiLogger.i(TAG, "jukebox: not streaming a track, ignoring toggle")
+            LokiLogger.i(TAG, "infiniPlay: not streaming a track, ignoring toggle")
             return
         }
-        jukebox.enable(uri)
+        infiniPlay.enable(uri)
     }
 
     fun togglePlayPause() {
@@ -2064,7 +2064,7 @@ class PlaybackViewModel : ViewModel() {
      * After a notification-button command, re-read the true source-of-truth state (which the toggle's
      * optimistic push or an onState round-trip may not have repainted) and repaint the notification.
      * Each caller sets ONLY its own field via [apply] — mirroring the others would paint a fresher-than-
-     * today glyph for state that lags (e.g. the jukebox repeat guard writes _playback but not svc).
+     * today glyph for state that lags (e.g. the infiniPlay repeat guard writes _playback but not svc).
      */
     private fun resyncNotificationAfterCommand(svc: MusicPlaybackService, apply: () -> Unit) {
         viewModelScope.launch {

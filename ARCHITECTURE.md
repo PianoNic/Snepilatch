@@ -38,7 +38,7 @@ src/app/src/main/java/ch/snepilatch/app/
 - **`util/`** is pure. No Compose, no ViewModel, no service. Top-level functions, easy to test.
 - **`data/`** is types + mappers. No business logic. The mappers translate KotifyClient DTOs into the UI models defined here.
 - **`playback/`** owns everything Android about playback: the foreground service, ExoPlayer, the media buttons, the session holder. Code here can use Android APIs but should not reach into the ViewModel.
-- **`ui/`** is Compose only. Screens take a `PlaybackViewModel` and read its state flows. No direct API calls, no service references — go through the ViewModel.
+- **`ui/`** is Compose only. Screens take a `PlaybackViewModel` and read its state flows. No direct API calls, no service references; go through the ViewModel.
 - **`viewmodel/`** holds the single `PlaybackViewModel`. It owns the UI state, dispatches user actions, and bridges between the UI layer and the playback / data layers.
 
 ## Session ownership
@@ -47,7 +47,7 @@ There is exactly one Kotify `Session`, `PlayerConnect`, `SpotifyPlayback`, and `
 
 **Do not** create `Session` or `PlayerConnect` in any other place. **Do not** store them on Activity-scoped objects. The whole point of `SessionHolder` is that headphone-cold-launch and similar non-Activity entry points need them.
 
-## Playback rules — read before touching
+## Playback rules (read before touching)
 
 The playback path has subtle ordering invariants between `onState`, `onTrackChange`, `onPlay`, `onPause`, and `onPlaybackId`. Refactoring it without tests is dangerous; we have a graveyard of regressions to prove it.
 
@@ -87,11 +87,11 @@ When you fix a playback bug, **add a test that would have caught it.** The "brow
 
 ## Build
 
-- Two product flavors on the `environment` dimension: **prod** (`ch.snepilatch.app`, "Snepilatch") and **dev** (`ch.snepilatch.app.dev`, "Snepilatch Dev", `-dev` versionName). They differ only in identity — same code — so a dev build installs alongside the shipped app. Variants are `{prod,dev}{Debug,Release}`.
-- `./gradlew :app:assembleDebug` — both debug APKs (`assembleProdDebug` / `assembleDevDebug` for one)
-- `./gradlew :app:testProdDebugUnitTest` — unit tests (`:app:test` for every variant)
+- Two product flavors on the `environment` dimension: **prod** (`ch.snepilatch.app`, "Snepilatch") and **dev** (`ch.snepilatch.app.dev`, "Snepilatch Dev", `-dev` versionName). They differ only in identity (same code), so a dev build installs alongside the shipped app. Variants are `{prod,dev}{Debug,Release}`.
+- `./gradlew :app:assembleDebug`: both debug APKs (`assembleProdDebug` / `assembleDevDebug` for one)
+- `./gradlew :app:testProdDebugUnitTest`: unit tests (`:app:test` for every variant)
 - KotifyClient is consumed as a local jar: `app/libs/KotifyClient.jar`. Rebuild with `cd ../KotifyClient && ./gradlew obfuscate` and copy `build/libs/KotifyClient-obfuscated.jar` over.
-- Two `.so` files per ABI in `app/src/main/jniLibs/<abi>/` are required at runtime: `libtls_client_go.so` (the Go TLS engine) and `libjnidispatch.so` (JNA's native dispatcher — JNA can't extract its own `.so` at runtime on Android due to W^X). CI re-fetches both on every release build; for local dev, the committed copies are fine unless KotifyClient bumps its kotlin-tls-client or JNA version. See `CLAUDE.md` for the bump procedure.
+- Two `.so` files per ABI in `app/src/main/jniLibs/<abi>/` are required at runtime: `libtls_client_go.so` (the Go TLS engine) and `libjnidispatch.so` (JNA's native dispatcher; JNA can't extract its own `.so` at runtime on Android due to W^X). CI re-fetches both on every release build; for local dev, the committed copies are fine unless KotifyClient bumps its kotlin-tls-client or JNA version. See `CLAUDE.md` for the bump procedure.
 - Local logs go to Loki when `loki.endpoint` is set in `local.properties` (gitignored). Otherwise logs are local.
 
 ## Conventions

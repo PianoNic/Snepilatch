@@ -4,13 +4,13 @@ Living notes about non-obvious things in this repo. Keep this short and only add
 
 ## Native TLS binary lives in `jniLibs/` and must match KotifyClient
 
-KotifyClient's JAR is code only — the JNA-loaded `libtls_client_go.so` ships separately from [`PianoNic/kotlin-tls-client-natives`](https://github.com/PianoNic/kotlin-tls-client-natives/releases/latest). We commit one `.so` per ABI under `src/app/src/main/jniLibs/<abi>/` so local debug builds work without a network step.
+KotifyClient's JAR is code only; the JNA-loaded `libtls_client_go.so` ships separately from [`PianoNic/kotlin-tls-client-natives`](https://github.com/PianoNic/kotlin-tls-client-natives/releases/latest). We commit one `.so` per ABI under `src/app/src/main/jniLibs/<abi>/` so local debug builds work without a network step.
 
 CI (`.github/workflows/build-and-release.yml`) re-fetches the latest natives release on every release build, overwriting whatever is in the tree, so production APKs always ship matching binaries even if the committed copies have drifted.
 
 **When you bump KotifyClient locally**, refresh the four ABIs (`arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64`) from the natives release matching the kotlin-tls-client version your new KotifyClient depends on. Otherwise you'll get `UnsatisfiedLinkError` for any FFI symbol added since your last refresh (e.g. `wsOpen` after the WebSocket migration).
 
-`libjnidispatch.so` (JNA's own dispatcher) sits next to `libtls_client_go.so` in each ABI directory. KotifyClient's shadow jar bundles JNA's Java classes but not its per-ABI native — Android's W^X rules forbid extracting `.so` files from inside a jar at runtime, so the file must be on disk in `jniLibs/`. CI re-extracts the latest from the JNA AAR alongside the natives step; locally, the committed copies are fine unless KotifyClient bumps its JNA dependency.
+`libjnidispatch.so` (JNA's own dispatcher) sits next to `libtls_client_go.so` in each ABI directory. KotifyClient's shadow jar bundles JNA's Java classes but not its per-ABI native; Android's W^X rules forbid extracting `.so` files from inside a jar at runtime, so the file must be on disk in `jniLibs/`. CI re-extracts the latest from the JNA AAR alongside the natives step; locally, the committed copies are fine unless KotifyClient bumps its JNA dependency.
 
 ## Verification before merging anything
 
@@ -25,9 +25,9 @@ All three must be green. The test rig + detekt baseline catch most regressions b
 
 ## Build flavors
 
-There are two product flavors on the `environment` dimension: **prod** (`ch.snepilatch.app`, "Snepilatch" — what ships) and **dev** (`ch.snepilatch.app.dev`, "Snepilatch Dev", `-dev` versionName suffix). They differ only in identity, not behaviour, so a dev build installs side-by-side with the production app.
+There are two product flavors on the `environment` dimension: **prod** (`ch.snepilatch.app`, "Snepilatch", the one that ships) and **dev** (`ch.snepilatch.app.dev`, "Snepilatch Dev", `-dev` versionName suffix). They differ only in identity, not behaviour, so a dev build installs side-by-side with the production app.
 
-Variant task names are flavor-qualified: `assembleProdDebug` / `assembleDevDebug`, `testProdDebugUnitTest` / `testDevDebugUnitTest`. The umbrella `assembleDebug` still builds both; there is no `testDebugUnitTest` anymore — use `:app:testProdDebugUnitTest` or `:app:test`. The dev `app_name` override lives in `app/src/dev/res/values/strings.xml`. The release pipeline builds `assembleProdRelease`.
+Variant task names are flavor-qualified: `assembleProdDebug` / `assembleDevDebug`, `testProdDebugUnitTest` / `testDevDebugUnitTest`. The umbrella `assembleDebug` still builds both; there is no `testDebugUnitTest` anymore; use `:app:testProdDebugUnitTest` or `:app:test`. The dev `app_name` override lives in `app/src/dev/res/values/strings.xml`. The release pipeline builds `assembleProdRelease`.
 
 ## Test rig
 
@@ -39,8 +39,8 @@ When fixing a playback bug, add a test that would have caught it.
 
 Two helpers in `PlaybackViewModel` cover most IO launches:
 
-- **`launchWithSession("tag") { sess -> ... }`** — null-checks the session, runs on `Dispatchers.IO`, catches and logs against the tag.
-- **`launchWithPlayer("tag") { pc -> ... }`** — same shape, but for transport commands that need `PlayerConnect`.
+- **`launchWithSession("tag") { sess -> ... }`**: null-checks the session, runs on `Dispatchers.IO`, catches and logs against the tag.
+- **`launchWithPlayer("tag") { pc -> ... }`**: same shape, but for transport commands that need `PlayerConnect`.
 
 Prefer these over hand-rolled `viewModelScope.launch(Dispatchers.IO) { try { val s = session ?: return@launch ... } catch ... }` blocks.
 
@@ -58,24 +58,24 @@ The pre-resolved cache (`nextCdnUrl` + `nextCdnFileId` from `onNextPlaybackId`) 
 
 ## ViewModel split strategy
 
-`PlaybackViewModel` is large (~3k lines). We extract feature-scoped ViewModels incrementally. **Extracted so far: `SearchViewModel`, `LyricsViewModel`, `DetailViewModel`, `LibraryViewModel`, `HomeViewModel`** (Detail/Library built on the shared `Navigator`; Home/Library load their feed in `init`). Each lands with its own tests. That's the clean feature set — what's left on `PlaybackViewModel` is playback, the playback-coupled features (Queue/Account/Devices), and cross-cutting settings/theme.
+`PlaybackViewModel` is large (~3k lines). We extract feature-scoped ViewModels incrementally. **Extracted so far: `SearchViewModel`, `LyricsViewModel`, `DetailViewModel`, `LibraryViewModel`, `HomeViewModel`** (Detail/Library built on the shared `Navigator`; Home/Library load their feed in `init`). Each lands with its own tests. That's the clean feature set; what's left on `PlaybackViewModel` is playback, the playback-coupled features (Queue/Account/Devices), and cross-cutting settings/theme.
 
-**Persisted user settings live in the process-scoped `AppSettings` store** (like `SessionHolder`/`Navigator`): audio source, content region, language, lyrics-anim direction, notification buttons, player gradient, canvas toggle — plus `load(context)`, `effectiveRegion()`, and the setters (incl. side effects: notification push to the service, locale change). `PlaybackViewModel` reads `AppSettings` in the stream-resolution path (`preferredAudioSource`, `effectiveRegion()`); the UI reads/writes it directly. `canvasUrl` (the current track's video URL — playback state, not persisted) stays on `PlaybackViewModel`, whose thin `setCanvasEnabled` wraps `AppSettings.setCanvasEnabled` to also clear it.
+**Persisted user settings live in the process-scoped `AppSettings` store** (like `SessionHolder`/`Navigator`): audio source, content region, language, lyrics-anim direction, notification buttons, player gradient, canvas toggle, plus `load(context)`, `effectiveRegion()`, and the setters (incl. side effects: notification push to the service, locale change). `PlaybackViewModel` reads `AppSettings` in the stream-resolution path (`preferredAudioSource`, `effectiveRegion()`); the UI reads/writes it directly. `canvasUrl` (the current track's video URL: playback state, not persisted) stays on `PlaybackViewModel`, whose thin `setCanvasEnabled` wraps `AppSettings.setCanvasEnabled` to also clear it.
 
 **The album-art accent palette lives in the process-scoped `ThemeController`** (`themeColors` + `updateFromArt`, fed by PlaybackViewModel on track change; read by the ~12 screens that tint themselves).
 
-**Navigation is a process-scoped `Navigator`** (like `SessionHolder`): it owns `currentScreen` + the back stack + `navigateTo`/`navigateToTab`/`goBack`. `PlaybackViewModel` delegates to it and `reset()`s it on construction. Feature VMs navigate through `Navigator` directly — that's what unblocked the Detail extraction. For a feature VM whose openers must also be reachable from `PlaybackViewModel`'s own code (deep links, playback-context bridges) or from non-composable UI builders, add a tiny process-scoped router object next to the VM (see `DetailRoutes`): the live VM registers itself in `init` and the callers hop through it, so no one holds a cross-VM reference. A screen (normally Home) is always composed before any deep link is processed, so a VM is always registered in time.
+**Navigation is a process-scoped `Navigator`** (like `SessionHolder`): it owns `currentScreen` + the back stack + `navigateTo`/`navigateToTab`/`goBack`. `PlaybackViewModel` delegates to it and `reset()`s it on construction. Feature VMs navigate through `Navigator` directly; that's what unblocked the Detail extraction. For a feature VM whose openers must also be reachable from `PlaybackViewModel`'s own code (deep links, playback-context bridges) or from non-composable UI builders, add a tiny process-scoped router object next to the VM (see `DetailRoutes`): the live VM registers itself in `init` and the callers hop through it, so no one holds a cross-VM reference. A screen (normally Home) is always composed before any deep link is processed, so a VM is always registered in time.
 
 Pattern (proven by `SearchViewModel`/`LyricsViewModel`):
 1. Move the feature's state + methods into a new `<Feature>ViewModel : SessionViewModel("<Tag>")`.
-2. `SessionViewModel` (the base for all five feature VMs) provides `launchWithSession(op) { sess -> }` and `launchWithSessionLoading(op, loadingFlag) { sess -> }` — both null-check `SessionHolder.session`, rethrow cancellation, and log against the tag. Don't re-roll these. `PlaybackViewModel` is NOT a `SessionViewModel` (it owns the session lifecycle and needs player-scoped launches too).
-3. A screen can hold **both** ViewModels at once — obtain the feature VM in the body with `val featureVm: <Feature>ViewModel = viewModel()`. `LyricsScreen` reads playback/transport/theme from `PlaybackViewModel` and lyrics content from `LyricsViewModel` side by side. The feature VM doesn't need to own the whole screen.
+2. `SessionViewModel` (the base for all five feature VMs) provides `launchWithSession(op) { sess -> }` and `launchWithSessionLoading(op, loadingFlag) { sess -> }`; both null-check `SessionHolder.session`, rethrow cancellation, and log against the tag. Don't re-roll these. `PlaybackViewModel` is NOT a `SessionViewModel` (it owns the session lifecycle and needs player-scoped launches too).
+3. A screen can hold **both** ViewModels at once: obtain the feature VM in the body with `val featureVm: <Feature>ViewModel = viewModel()`. `LyricsScreen` reads playback/transport/theme from `PlaybackViewModel` and lyrics content from `LyricsViewModel` side by side. The feature VM doesn't need to own the whole screen.
 4. Pass the inputs the feature needs down from the screen (e.g. `lyricsVm.fetch(track.uri)`), rather than having the feature VM reach back into `PlaybackViewModel` state.
 
 **What makes a feature safe to extract now vs. what's blocked:**
 - Clean = the feature reads the session, writes its own state, and navigates through `Navigator`. `Lyrics` needed no navigation at all; `Detail` navigates via `Navigator` and exposes `DetailRoutes` for the `PlaybackViewModel`/non-composable callers.
-- **`Account` and `Devices` are NOT clean extractions — leave them on `PlaybackViewModel`.** They're playback-coupled: `AccountInfo.isPremium` gates audio-source logic inside the VM, and `activeDeviceName` is written from the playback state handler (`updatePlaybackFromState`) while `loadDevices`/`transferPlayback` need `PlayerConnect`. Extracting them would drag playback state across a VM boundary — the same reason we don't extract playback itself.
-- **`LibraryViewModel`** took the clean part: the library list + pagination + `createPlaylist`/`removeFromLibrary`. It loads in `init` (the old eager load lived in `PlaybackViewModel.initialize`, which runs before any composable exists) and reads `username` from `SessionHolder`. The snackbar-emitting `followArtist`/`savePlaylist` and the add-to-playlist picker stayed on `PlaybackViewModel` (they'd have needed the snackbar channel + a router for non-composable callers) — "add external content to the library" is a separable concern from browsing it.
+- **`Account` and `Devices` are NOT clean extractions; leave them on `PlaybackViewModel`.** They're playback-coupled: `AccountInfo.isPremium` gates audio-source logic inside the VM, and `activeDeviceName` is written from the playback state handler (`updatePlaybackFromState`) while `loadDevices`/`transferPlayback` need `PlayerConnect`. Extracting them would drag playback state across a VM boundary, the same reason we don't extract playback itself.
+- **`LibraryViewModel`** took the clean part: the library list + pagination + `createPlaylist`/`removeFromLibrary`. It loads in `init` (the old eager load lived in `PlaybackViewModel.initialize`, which runs before any composable exists) and reads `username` from `SessionHolder`. The snackbar-emitting `followArtist`/`savePlaylist` and the add-to-playlist picker stayed on `PlaybackViewModel` (they'd have needed the snackbar channel + a router for non-composable callers); "add external content to the library" is a separable concern from browsing it.
 
 Don't try to extract playback. The handler-extraction + test rig pattern (see `RemotePlayPauseHandlerTest`) is the safer route for that area.
 
@@ -89,7 +89,7 @@ cd ../KotifyClient
 cp build/libs/KotifyClient-obfuscated.jar ../Snepilatch/src/app/libs/KotifyClient.jar
 ```
 
-**Symptom of a stale jar:** `:app:compileProdDebugKotlin` fails with a wall of unresolved references in `PlaybackViewModel.kt` (`onAd`, `onSeek`, `artistNames`, `passthroughUrl`, `saveToLibrary`, wrong `playTrack` arity). That is the committed jar lagging the app source — rebuild it with the recipe above. It is not a bug in whatever file you were editing.
+**Symptom of a stale jar:** `:app:compileProdDebugKotlin` fails with a wall of unresolved references in `PlaybackViewModel.kt` (`onAd`, `onSeek`, `artistNames`, `passthroughUrl`, `saveToLibrary`, wrong `playTrack` arity). That is the committed jar lagging the app source; rebuild it with the recipe above. It is not a bug in whatever file you were editing.
 
 ## Logging
 

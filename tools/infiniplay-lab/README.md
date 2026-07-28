@@ -1,6 +1,6 @@
 # InfiniPlay offline lab
 
-Renders an InfiniPlay remix from a local audio file on the JVM — no phone in the loop — using the
+Renders an InfiniPlay remix from a local audio file on the JVM (no phone in the loop) using the
 **real** app classes (`BeatGrid`, `BeatGraph`, `InfiniPlayRemixProcessor`), then checks the result
 numerically and visually. Background and methodology: [docs/infiniplay.md](../../docs/infiniplay.md).
 
@@ -48,7 +48,7 @@ python tools/infiniplay-lab/analyze.py /path/to/remix.wav
 Writes `<name>-report.txt` (per-seam RMS/kick/spectral-cosine health, ranked worst first),
 `<name>-overview.png` (full-render spectrogram with seam markers) and `<name>-seam-<k>.png`
 (waveform zoom + band-energy panels per seam). Note: the pre-window of a seam includes the
-crossfade blend, so the reported cosine is systematically pessimistic — calibrate against the
+crossfade blend, so the reported cosine is systematically pessimistic; calibrate against the
 graph-side numbers and your ears, not this alone.
 
 ## 4. Listen
@@ -58,5 +58,5 @@ ffmpeg -i remix.wav -b:a 192k remix.mp3
 ```
 
 The numbers catch lurches and level jumps; whether a join makes *musical* sense is still decided
-by ear. Every veto in `BeatGraph` came from a seam that measured fine and sounded wrong — see the
+by ear. Every veto in `BeatGraph` came from a seam that measured fine and sounded wrong; see the
 tuning table in the docs.

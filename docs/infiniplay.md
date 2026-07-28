@@ -3,7 +3,7 @@
 Endless, ever-varying playback of a single track: the app captures the decoded PCM while the song
 plays, finds beats that sound alike, and then plays the captured audio out of order, splicing between
 matched beats with short crossfades. In the tradition of Paul Lamere's Infinite Jukebox and Pithaya's
-Spicetify Eternal Jukebox — but computed entirely from the waveform, since no per-track analysis API
+Spicetify Eternal Jukebox, but computed entirely from the waveform, since no per-track analysis API
 is available to us.
 
 Code lives in `app/src/main/java/ch/snepilatch/app/playback/`:
@@ -39,7 +39,7 @@ gain processor must come after the remix so EQ headroom applies to remixed audio
 playback.
 
 media3 detail: the sink re-reads a processor's `isActive()` only on a pipeline flush. The processor
-therefore joins the chain when the infiniplay session starts (`engaged` — the capture pass's seek
+therefore joins the chain when the infiniplay session starts (`engaged`; the capture pass's seek
 provides the flush) and passes audio through until a snapshot arrives. Activating it later would
 require a flush at takeover, and a seek to the current position is a no-op.
 
@@ -51,7 +51,7 @@ Constant tempo is assumed, which holds for the produced music this feature targe
 Two precision details, both introduced after audible failures:
 
 - **Fractional period.** The autocorrelation lag grid is one hop (~11.6 ms) coarse. Rounding the
-  period to a whole lag accumulates error beat by beat — by mid-track the grid sat hundreds of
+  period to a whole lag accumulates error beat by beat; by mid-track the grid sat hundreds of
   milliseconds beside the real beats and splices landed audibly "rushed". Parabolic interpolation of
   the autocorrelation peak gives a sub-sample period; beats are laid with per-beat rounding.
 - **Onset snapping.** Each nominal beat then snaps to the strongest onset within ±3 hops (~35 ms),
@@ -72,7 +72,7 @@ Candidates are beat pairs; each surviving pair becomes a branch the player may t
 | Onset level within 4 dB | The join replaces the source beat's opening with the destination's; beat averages can agree while the first 150 ms differ by 8 dB |
 | Spectral join continuity | Fine-resolution (8192-pt) spectra of the audio leading into the cut vs. the audio landing after it; the join must be nearly as continuous as the original transition at that boundary (absolute floor + relative slack). Coarse spectra blur adjacent harmonics and cannot see a wrong-chord landing |
 
-Scoring: `contextDistance` — the join judged across a window around the cut (offsets −1, 0, +1, +2
+Scoring: `contextDistance`, the join judged across a window around the cut (offsets −1, 0, +1, +2
 with weights 0.5, 1.0, 1.0, 0.75), because what the listener evaluates is whether the beats *after*
 the landing point continue what was playing. Features per beat: frame chroma/timbre averaged across
 the beat, plus z-scored loudness and a 4-slot kick pattern (the shape features are deliberately
@@ -80,26 +80,26 @@ level-blind, so dynamics must be added explicitly).
 
 Selection: **no branch-count target.** The vetoes gate quality; selection keeps the globally best
 edges up to n/4 by score. An earlier design loosened a similarity threshold until a target count of
-beats could branch — which meant every candidate a veto removed was replaced by a worse one that had
+beats could branch, which meant every candidate a veto removed was replaced by a worse one that had
 been over the line. Quality rules must reduce the graph, never degrade it.
 
 Post-processing, following the reference implementation:
 
-- **De-sequencing** — consecutive beats may not share a jump distance (the stutter-in-place artefact).
-- **Reachability → last branch point** — the last beat from which the song can still branch onward.
+- **De-sequencing**: consecutive beats may not share a jump distance (the stutter-in-place artefact).
+- **Reachability → last branch point**: the last beat from which the song can still branch onward.
   Branches past it are dropped; the player must never run into the outro, finish, and restart.
-- **Landing runway** — destinations within 2 bars of the last branch point are pruned (and the player
+- **Landing runway**: destinations within 2 bars of the last branch point are pruned (and the player
   enforces a 4 s guard). Landing just under the forced-branch zone chains two jumps back to back.
-- **End jump** — the best backward branch near the last branch point, pre-selected with the same
+- **End jump**: the best backward branch near the last branch point, pre-selected with the same
   scoring as every other edge, so the forced end-of-song jump is never a blind cut.
 
 ## Playback (`InfiniPlayRemixProcessor`)
 
-- A splice may only start when the playhead stands exactly on a matched source — the crossfade's
+- A splice may only start when the playhead stands exactly on a matched source; the crossfade's
   outgoing side has to *be* the matched audio. Linear runs stop precisely on the next source or the
   last branch point, whichever comes first.
 - Most sources are played through: 35 % take probability, 2.5 s cooldown.
-- Past the last branch point the coin flip no longer applies — a branch is forced. Forced jumps relax
+- Past the last branch point the coin flip no longer applies; a branch is forced. Forced jumps relax
   the freshness rule (a quality-checked edge that repeats beats the blind fallback) and fall back to
   the graph's end jump only when no legal edge exists.
 - **Anti-boredom:** destinations recently landed in are skipped; if every legal destination is recent,
@@ -108,12 +108,12 @@ Post-processing, following the reference implementation:
 
 The splice itself:
 
-1. **Waveform alignment** — the destination slides within ±12 ms to where its waveform correlates
+1. **Waveform alignment**: the destination slides within ±12 ms to where its waveform correlates
    best with the outgoing audio; beat detection is only accurate to a few ms and joining out of phase
    cancels bass and smears the attack.
-2. **Equal-power crossfade** (40 ms, √-weighted) — linear fades dip ~3 dB mid-fade on uncorrelated
+2. **Equal-power crossfade** (40 ms, √-weighted): linear fades dip ~3 dB mid-fade on uncorrelated
    material.
-3. **Bounded level match** — the destination's gain is nudged up to ±3 dB toward the outgoing level.
+3. **Bounded level match**: the destination's gain is nudged up to ±3 dB toward the outgoing level.
 
 The fade is longer than one sink buffer, so it runs as a small state machine across `queueInput`
 calls rather than assuming it fits in whatever the sink happens to pull.
@@ -128,7 +128,7 @@ graph cannot exist much earlier: the 10 s intro guard plus the 16-beat minimum j
 track with zero jumps keeps capturing and tries once more when capture stalls at the full track.
 There is deliberately no "play the first half normally" wait. After handoff, capture continues in
 the background and richer snapshots are swapped in every 15 s of new audio until the full track is
-held — the short cadence matters now that the first snapshot only spans ~20 s.
+held; the short cadence matters now that the first snapshot only spans ~20 s.
 
 Growth simulation in the offline lab (rendering while the capture "grows" at 1x, swapping snapshots
 on the controller's exact schedule) showed two properties of incremental analysis worth knowing:
@@ -139,7 +139,7 @@ on the controller's exact schedule) showed two properties of incremental analysi
   rather than jump references, and the ±12 ms splice alignment absorbs the residual offset. Seam
   jolts stayed below the track's own 99th percentile throughout.
 - At handoff the playhead sits at the capture edge, which is past the young snapshot's last branch
-  point — so the very first splice is a forced jump back. Expected, not a bug. Until the first
+  point, so the very first splice is a forced jump back. Expected, not a bug. Until the first
   growth pass lands, the remix lives in a small window and may revisit sections; the 15 s growth
   cadence bounds how long that lasts.
 
@@ -153,7 +153,7 @@ The authoritative values live in the code (`BeatGraph`, `InfiniPlayRemixProcesso
 | `JUMP_PROB = 0.35`, `COOLDOWN_MS = 2500` | Remix character: mostly linear, occasional branches |
 | `MIN_JUMP_BEATS = 16` | Nothing shorter than 4 bars reads as a real jump |
 | `LEVEL/KICK/ONSET vetoes (4/6/4 dB)` | Calibrated against seams the listening tests rejected |
-| `JOIN_COS_MIN = 0.55`, slack `0.10` | Same — the rejected seam measured 0.61, accepted ones ≥ 0.75 |
+| `JOIN_COS_MIN = 0.55`, slack `0.10` | Same: the rejected seam measured 0.61, accepted ones ≥ 0.75 |
 | `INTRO_GUARD_S = 10` | The song must establish itself; intro texture doesn't blend |
 | `XFADE_MS = 40` | Long enough to blend, short enough not to smear the attack |
 
@@ -162,9 +162,9 @@ The authoritative values live in the code (`BeatGraph`, `InfiniPlayRemixProcesso
 All of the above was developed and validated offline, without a phone in the loop:
 
 1. `yt-dlp` + `ffmpeg` fetch a track as 44.1 kHz/16-bit WAV.
-2. A JVM harness — the env-gated unit test `InfiniPlayLab` — uses the **actual app classes**
-   (analyzer, graph, processor) and drives the processor exactly as ExoPlayer's sink does —
-   fixed-size buffers in a loop — rendering minutes of remix to WAV in seconds, plus a `-seams.csv`
+2. A JVM harness (the env-gated unit test `InfiniPlayLab`) uses the **actual app classes**
+   (analyzer, graph, processor) and drives the processor exactly as ExoPlayer's sink does,
+   fixed-size buffers in a loop, rendering minutes of remix to WAV in seconds, plus a `-seams.csv`
    log of every splice (output position, from, to). `LAB_MODE=growth` replays the device's
    incremental capture timeline instead of analysing the full file once.
 3. A Python suite (`numpy`/`matplotlib`) computes per-seam health (RMS step, kick-band step, spectral
@@ -174,7 +174,7 @@ All of the above was developed and validated offline, without a phone in the loo
 Invariants the harness asserts on every run: all splices land on grid beats, no consecutive beats
 share a jump distance, and the playhead never passes the last branch point ("never ran into the
 outro"). When a listener reports a bad moment at a timestamp, the seam log identifies the exact
-branch, and the analysis panel usually identifies the failure class — that loop drove every rule in
+branch, and the analysis panel usually identifies the failure class; that loop drove every rule in
 the table above.
 
 The lab lives in the repo: the harness at `app/src/test/.../InfiniPlayLab.kt`, the analysis suite

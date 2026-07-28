@@ -168,9 +168,12 @@ fun PlaylistInfo.toDetailData(playlistId: String) = DetailData(
 
 private const val PLAYLIST_PAGE_SIZE = 50
 
+/** The official Liked Songs cover art (heart on gradient), served from the same CDN the clients use. */
+const val LIKED_SONGS_COVER_URL = "https://misc.scdn.co/liked-songs/liked-songs-640.png"
+
 fun LikedSongsPage.toDetailData(offset: Int) = DetailData(
     name = "Liked Songs",
-    imageUrl = "https://image-cdn-ak.spotifycdn.com/image/ab67706c0000da84587ecba4a27774b2f6f07174",
+    imageUrl = LIKED_SONGS_COVER_URL,
     tracks = items.map { it.toTrackInfo() },
     uri = "spotify:collection:tracks",
     totalCount = total,

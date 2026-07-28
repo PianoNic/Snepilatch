@@ -2,7 +2,6 @@ package ch.snepilatch.app.ui.screens
 
 import ch.snepilatch.app.ui.theme.SpfyWhite
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -32,7 +31,7 @@ import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Search
@@ -57,7 +56,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -65,6 +63,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
+import ch.snepilatch.app.data.LIKED_SONGS_COVER_URL
 import ch.snepilatch.app.data.LibraryItem
 import ch.snepilatch.app.ui.components.SpfyImage
 import ch.snepilatch.app.ui.components.TightAlertDialog
@@ -77,7 +76,6 @@ import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.LibraryViewModel
 
 private const val PREFS_NAME = "kotify_prefs"
-private const val LIKED_SONGS_IMAGE = "https://image-cdn-ak.spotifycdn.com/image/ab67706c0000da84587ecba4a27774b2f6f07174"
 
 // --- Library Screen ---
 
@@ -339,7 +337,7 @@ fun LibraryGridCard(item: LibraryItem) {
     ) {
         if (item.type == "collection") {
             SpfyImage(
-                url = LIKED_SONGS_IMAGE,
+                url = LIKED_SONGS_COVER_URL,
                 modifier = Modifier.fillMaxWidth().aspectRatio(1f),
                 shape = RoundedCornerShape(8.dp)
             )
@@ -385,14 +383,12 @@ fun LibraryListItem(item: LibraryItem) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (item.type == "collection") {
-            // Liked Songs with gradient background like Spfy
-            Box(
-                Modifier.size(56.dp).clip(RoundedCornerShape(4.dp))
-                    .background(Brush.linearGradient(listOf(Color(0xFF450AF5), Color(0xFFC4EAFD)))),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Filled.FavoriteBorder, null, tint = SpfyWhite, modifier = Modifier.size(28.dp))
-            }
+            SpfyImage(
+                url = LIKED_SONGS_COVER_URL,
+                modifier = Modifier.size(56.dp),
+                shape = RoundedCornerShape(4.dp),
+                icon = Icons.Rounded.Favorite
+            )
         } else {
             SpfyImage(
                 url = item.imageUrl,

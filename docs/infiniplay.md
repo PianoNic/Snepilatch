@@ -162,9 +162,11 @@ The authoritative values live in the code (`BeatGraph`, `InfiniPlayRemixProcesso
 All of the above was developed and validated offline, without a phone in the loop:
 
 1. `yt-dlp` + `ffmpeg` fetch a track as 44.1 kHz/16-bit WAV.
-2. A JVM harness compiles the **actual app sources** (analyzer, graph, processor) and drives the
-   processor exactly as ExoPlayer's sink does — fixed-size buffers in a loop — rendering minutes of
-   remix to WAV in seconds, plus a `-seams.csv` log of every splice (output position, from, to).
+2. A JVM harness — the env-gated unit test `InfiniPlayLab` — uses the **actual app classes**
+   (analyzer, graph, processor) and drives the processor exactly as ExoPlayer's sink does —
+   fixed-size buffers in a loop — rendering minutes of remix to WAV in seconds, plus a `-seams.csv`
+   log of every splice (output position, from, to). `LAB_MODE=growth` replays the device's
+   incremental capture timeline instead of analysing the full file once.
 3. A Python suite (`numpy`/`matplotlib`) computes per-seam health (RMS step, kick-band step, spectral
    cosine, a jolt measure compared against the track's own 99th percentile) and renders per-seam
    panels (waveform zoom, spectrogram, band energy) plus a full-track overview.
@@ -175,5 +177,5 @@ outro"). When a listener reports a bad moment at a timestamp, the seam log ident
 branch, and the analysis panel usually identifies the failure class — that loop drove every rule in
 the table above.
 
-The lab currently lives outside the repo (session scratchpad). If it moves in, `scripts/infiniplay-lab/`
-is the intended home.
+The lab lives in the repo: the harness at `app/src/test/.../InfiniPlayLab.kt`, the analysis suite
+and workflow guide in [`tools/infiniplay-lab/`](../tools/infiniplay-lab/README.md).

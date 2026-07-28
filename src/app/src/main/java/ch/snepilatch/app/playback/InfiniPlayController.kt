@@ -42,7 +42,7 @@ class InfiniPlayController(
     private val scope: CoroutineScope,
     private val currentTrackId: () -> String?,
 ) {
-    private companion object {
+    companion object { // non-private: InfiniPlayLab mirrors the handoff/growth schedule from these
         const val TAG = "InfiniPlay"
         const val CAPTURE_STALL_TICKS = 12 // ~12s of no new audio => proceed with what we have
         const val FALLBACK_HANDOFF_MS = 45_000L // hand off here even with a thin graph (docs/infiniplay.md)

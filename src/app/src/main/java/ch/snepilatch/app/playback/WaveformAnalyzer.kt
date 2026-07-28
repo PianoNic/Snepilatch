@@ -9,7 +9,7 @@ import kotlin.math.sqrt
  * Waveform-native self-similarity analysis — the replacement for Spfy's beat/segment analysis.
  * Given the decoded mono PCM of a track (captured live from the audio pipeline, no separate download),
  * it splits the audio into short frames, computes a chroma (12 pitch-class) + coarse timbre feature per
- * frame via FFT, and finds pairs of frames that sound alike ("parallels") — the points the jukebox can
+ * frame via FFT, and finds pairs of frames that sound alike ("parallels") — the points the infiniPlay can
  * jump between. Onset-based beat snapping and sample-accurate splicing come next; this stage proves the
  * analysis finds musical parallels straight from the waveform.
  *
@@ -38,7 +38,7 @@ object WaveformAnalyzer {
     private const val SILENCE_GATE = 0.05 // frames below 5% of peak energy can't be jump points
 
     // The Hann window is immutable and FFT_SIZE-sized; compute it once instead of rebuilding it on
-    // every analyze() call (which runs repeatedly over the capture half during a jukebox session).
+    // every analyze() call (which runs repeatedly over the capture half during a infiniPlay session).
     private val WINDOW = DoubleArray(FFT_SIZE) { 0.5 - 0.5 * cos(2.0 * Math.PI * it / (FFT_SIZE - 1)) }
 
     /**
@@ -88,10 +88,10 @@ object WaveformAnalyzer {
         sampleRate: Int,
         minGapMs: Int = 2000,
         // Unrelated frames sit around distance 6 in this 20-dim z-scored space, near-duplicates near
-        // 0. KotifyClient's JukeboxGraph — the Infinite Jukebox port this mirrors — cuts off at 1.3
+        // 0. KotifyClient's InfiniPlayGraph — the Infinite Jukebox port this mirrors — cuts off at 1.3
         // over 25 dims, which scales to 1.3 * sqrt(20/25) = 1.16 here. 0.85 was below anything real
         // music produces: measured on a track, the closest pair of 2350 frames was 0.95, so every
-        // track analysed to zero matches and the jukebox switched itself off.
+        // track analysed to zero matches and the infiniPlay switched itself off.
         maxDistance: Double = 1.1,
         maxParallels: Int = 4000
     ): Result {

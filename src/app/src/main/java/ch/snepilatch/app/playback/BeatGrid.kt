@@ -6,14 +6,8 @@ import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 /**
- * Finds the beat grid of a track straight from its PCM — the thing Spfy's analysis hands the original
- * Infinite Jukebox for free, and which we have to derive ourselves.
- *
- * It matters because every splice has to land ON a beat: a jump that arrives mid-beat is heard as a
- * stumble no matter how well the two points match spectrally.
- *
- * Spectral flux onset envelope → autocorrelation for the tempo → phase search for the downbeat offset.
- * Constant tempo is assumed, which holds for the produced music this feature is used on.
+ * Beat detection straight from PCM: spectral-flux onsets → autocorrelation tempo → phase search.
+ * Constant tempo assumed. See docs/eternal-infiniPlay.md for rationale and precision notes.
  */
 object BeatGrid {
 
@@ -55,11 +49,7 @@ object BeatGrid {
             }
         }
 
-        // Sub-lag precision via parabolic interpolation of the autocorrelation peak. The lag grid is
-        // HOP samples (~11.6ms) coarse — up to half a step of period error, which ACCUMULATES beat by
-        // beat: by mid-track the grid can sit hundreds of milliseconds beside the real beats, and
-        // every splice there lands audibly off-beat ("rushed"). Fractional period + per-beat rounding
-        // keeps the drift under one sample per beat instead.
+        // Sub-lag period via parabolic interpolation: integer-lag rounding accumulates audible drift.
         val lagFrac = if (bestLag in (minLag + 1) until maxLag) {
             val y1 = scores[bestLag - 1]
             val y2 = scores[bestLag]
@@ -89,9 +79,7 @@ object BeatGrid {
 
         val first = bestPhase * HOP
         val count = ((mono.size - first) / periodSamples).toInt().coerceAtLeast(0)
-        // Snap each nominal beat to the strongest onset within ±SNAP_HOPS hops: absorbs what is left
-        // of the drift plus the track's own micro-timing, beat by beat, instead of trusting a rigid
-        // grid end to end.
+        // Snap each nominal beat to the strongest onset nearby (residual drift + micro-timing).
         val beats = IntArray(count) {
             val nominal = first + (it * periodSamples).roundToInt()
             val centre = nominal / HOP

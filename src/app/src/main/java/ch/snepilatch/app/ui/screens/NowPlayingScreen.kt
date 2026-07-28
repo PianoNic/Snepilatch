@@ -45,7 +45,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import ch.snepilatch.app.ui.components.SheetNavBarFix
 import ch.snepilatch.app.ui.components.SpfyImage
 import ch.snepilatch.app.ui.components.TightAlertDialog
-import ch.snepilatch.app.ui.components.JukeboxTimeline
+import ch.snepilatch.app.ui.components.InfiniPlayTimeline
 import ch.snepilatch.app.ui.components.rememberSmoothPositionMs
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.util.formatTime
@@ -56,7 +56,7 @@ import ch.snepilatch.app.viewmodel.AppSettings
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 
 /**
- * The seek bar + elapsed/duration labels (or the jukebox remix timeline), pulled into its own leaf
+ * The seek bar + elapsed/duration labels (or the infiniPlay remix timeline), pulled into its own leaf
  * composable. rememberSmoothPositionMs updates once per display frame while playing; keeping that read
  * — and the eager Slider `value`/formatTime reads it feeds — inside this leaf confines the per-frame
  * invalidation here instead of recomposing the whole orientation Column each frame.
@@ -73,14 +73,14 @@ private fun PlaybackProgress(
     val positionMs by vm.positionFlow.collectAsState()
     val durationMs by vm.durationFlow.collectAsState()
     val isPlaying by vm.isPlayingFlow.collectAsState()
-    val jukeboxOn by vm.jukeboxEnabled.collectAsState()
-    val jukeboxViz by vm.jukeboxViz.collectAsState()
-    var jukeboxElapsedMs by remember { mutableLongStateOf(0L) }
-    LaunchedEffect(jukeboxOn) {
-        jukeboxElapsedMs = 0L
-        while (jukeboxOn) {
+    val infiniPlayOn by vm.infiniPlayEnabled.collectAsState()
+    val infiniPlayViz by vm.infiniPlayViz.collectAsState()
+    var infiniPlayElapsedMs by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(infiniPlayOn) {
+        infiniPlayElapsedMs = 0L
+        while (infiniPlayOn) {
             kotlinx.coroutines.delay(1000)
-            jukeboxElapsedMs += 1000
+            infiniPlayElapsedMs += 1000
         }
     }
     var seekDragging by remember { mutableStateOf(false) }
@@ -92,9 +92,9 @@ private fun PlaybackProgress(
     // does integer division), the outer only re-runs formatTime when the second actually changes.
     val elapsedSec by remember { derivedStateOf { smoothPos.value / 1000 } }
     val elapsedLabel by remember { derivedStateOf { formatTime(elapsedSec * 1000) } }
-    if (jukeboxOn) {
-        JukeboxTimeline(
-            viz = jukeboxViz,
+    if (infiniPlayOn) {
+        InfiniPlayTimeline(
+            viz = infiniPlayViz,
             primary = animatedPrimary,
             modifier = Modifier.fillMaxWidth()
         )
@@ -122,8 +122,8 @@ private fun PlaybackProgress(
         )
     }
     Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(if (jukeboxOn) "" else elapsedLabel, color = timeColor, fontSize = timeFontSize)
-        Text(if (jukeboxOn) formatTime(jukeboxElapsedMs) else formatTime(durationMs), color = timeColor, fontSize = timeFontSize)
+        Text(if (infiniPlayOn) "" else elapsedLabel, color = timeColor, fontSize = timeFontSize)
+        Text(if (infiniPlayOn) formatTime(infiniPlayElapsedMs) else formatTime(durationMs), color = timeColor, fontSize = timeFontSize)
     }
 }
 
@@ -567,7 +567,7 @@ fun NowPlayingScreen(
 
                         Spacer(Modifier.height(8.dp))
 
-                        // Progress bar — or the jukebox remix map while remixing. Extracted to a leaf so
+                        // Progress bar — or the infiniPlay remix map while remixing. Extracted to a leaf so
                         // its per-frame smooth-position updates recompose only the bar, not this Column.
                         PlaybackProgress(
                             vm = vm,
@@ -768,7 +768,7 @@ fun NowPlayingScreen(
 
                     Spacer(Modifier.height(20.dp))
 
-                    // Progress bar — thick rounded bar, or the jukebox remix map while remixing. Extracted
+                    // Progress bar — thick rounded bar, or the infiniPlay remix map while remixing. Extracted
                     // to a leaf so its per-frame smooth-position updates recompose only the bar, not this Column.
                     PlaybackProgress(
                         vm = vm,
@@ -1209,21 +1209,21 @@ private fun NowPlayingMenu(
                 }
             }
 
-            // Eternal Jukebox toggle — endless, ever-varying playback of the current track. Tinted
+            // Eternal InfiniPlay toggle — endless, ever-varying playback of the current track. Tinted
             // Spfy-green while active. Only does something while streaming a track locally.
-            val jukeboxOn by vm.jukeboxEnabled.collectAsState()
-            val jukeboxLabel = stringResource(R.string.eternal_jukebox)
-            val jukeboxTint = if (jukeboxOn) Color(0xFF1ED760) else SpfyWhite
+            val infiniPlayOn by vm.infiniPlayEnabled.collectAsState()
+            val infiniPlayLabel = stringResource(R.string.infiniplay)
+            val infiniPlayTint = if (infiniPlayOn) Color(0xFF1ED760) else SpfyWhite
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .clickable { vm.toggleJukebox(); onShowMore(false) }
+                    .clickable { vm.toggleInfiniPlay(); onShowMore(false) }
                     .padding(horizontal = 20.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Rounded.AllInclusive, null, tint = jukeboxTint, modifier = Modifier.size(24.dp))
+                Icon(Icons.Rounded.AllInclusive, null, tint = infiniPlayTint, modifier = Modifier.size(24.dp))
                 Spacer(Modifier.width(16.dp))
-                Text(jukeboxLabel, color = jukeboxTint, fontSize = 15.sp)
+                Text(infiniPlayLabel, color = infiniPlayTint, fontSize = 15.sp)
             }
             Spacer(Modifier.navigationBarsPadding().height(12.dp))
         }

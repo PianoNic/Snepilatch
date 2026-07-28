@@ -10,44 +10,30 @@ import kotlin.math.sqrt
 import kotlin.random.Random
 
 /**
- * The Eternal Jukebox, as a filter in ExoPlayer's own audio chain: while a [Snapshot] is set this
- * replaces the decoded stream with captured audio played back out of order, splicing at matched points
- * with a short PCM crossfade so a jump has no gap.
- *
- * It sits AFTER [JukeboxAudioTap] (which must keep seeing the real stream) and BEFORE
- * [GainAudioProcessor] (so EQ headroom applies to the remix exactly as it does to normal playback).
- *
- * Being a processor rather than a second AudioTrack is the whole point: there is one stream, one
- * volume and one audio session, so the remix cannot double up against the player, drift out of level,
- * or keep playing on its own. Pause, seek and teardown need no handling here — when the sink stops
- * pulling, the remix stops.
+ * The Eternal InfiniPlay as a filter in ExoPlayer's audio chain: while a [Snapshot] is set, the decoded
+ * stream is replaced with captured audio played out of order, spliced at matched beats. Sits after
+ * [InfiniPlayAudioTap] and before [GainAudioProcessor]. See docs/eternal-infiniPlay.md.
  */
-class JukeboxRemixProcessor : BaseAudioProcessor() {
+class InfiniPlayRemixProcessor : BaseAudioProcessor() {
 
     /** A splice candidate: playing through [src] may cut to any of [dsts]. */
     class Jump(val src: Int, val dsts: IntArray)
 
-    /**
-     * Captured audio plus the jump points found in it; swapped in as more of the track is analysed.
-     * [lastBranchFrame] is the last position it is safe to branch from — the remix must never play
-     * past it, or it runs into the outro, finishes, and has to restart. That is the one thing an
-     * endless remix may not do.
-     */
+    /** Captured audio plus its jump graph; swapped in as more of the track is analysed. */
     class Snapshot(
         val pcm: ShortArray,
         val frames: Int,
         val jumps: List<Jump>,
+        /** Last position it is safe to branch from; playback must never pass it. */
         val lastBranchFrame: Int = frames,
-        /** Graph-chosen destination for the forced end-of-song branch; never a blind cut. */
+        /** Graph-chosen destination for the forced end-of-song branch. */
         val endJumpFrame: Int = frames / 3
     )
 
     /**
-     * Whether the jukebox session is on. The sink only re-reads [isActive] on a pipeline flush, so the
-     * processor joins the chain when the session starts (the capture pass seeks, which flushes) and
-     * simply passes audio through until a [Snapshot] arrives. Waiting for the snapshot to activate it
-     * would need a flush at takeover — and a seek to the position we are already at is a no-op, so
-     * there would not be one.
+     * True for the whole infiniPlay session: the sink only re-reads [isActive] on a flush, so the
+     * processor joins the chain on the session's opening seek and passes audio through until a
+     * snapshot arrives.
      */
     @Volatile var engaged: Boolean = false
 
@@ -115,7 +101,7 @@ class JukeboxRemixProcessor : BaseAudioProcessor() {
         }
     }
 
-    // In the chain for the whole jukebox session; normal playback still pays nothing.
+    // In the chain for the whole infiniPlay session; normal playback still pays nothing.
     override fun isActive(): Boolean = engaged || snapshot != null
 
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
@@ -148,27 +134,21 @@ class JukeboxRemixProcessor : BaseAudioProcessor() {
             val toEnd = snap.frames - playheadFrame
             val idx = firstSrcAtOrAfter(snap.jumps, playheadFrame)
             val toNext = if (idx < snap.jumps.size) snap.jumps[idx].src - playheadFrame else Int.MAX_VALUE
-            // Decide once: spliceAllowed consumes a random draw and pickDst updates the recent-regions
-            // memory, so neither may be evaluated twice per iteration.
-            // Past the last safe branch point the coin flip no longer applies: we MUST leave now.
+            // Decide once per iteration: spliceAllowed and pickDst both have side effects. Past the
+            // last branch point the jump is forced.
             val splice = when {
-                fadeRemaining > 0 -> null // one already in flight
+                fadeRemaining > 0 -> null
                 playheadFrame >= snap.lastBranchFrame ->
                     pickDst(snap, lastJumpAtOrBefore(snap, playheadFrame), forced = true) ?: snap.endJumpFrame
                 toEnd <= 1 -> pickDst(snap, snap.jumps.lastOrNull(), forced = true) ?: snap.endJumpFrame
-                // Standing exactly ON a matched source is the only place a splice may start, because
-                // the crossfade's outgoing side has to BE the matched audio. A source with no legal
-                // destination is played through rather than forced somewhere bad.
                 toNext <= 0 && spliceAllowed() -> pickDst(snap, snap.jumps[idx])
                 else -> null
             }
             if (splice != null) startSplice(snap, splice)
             framesLeft -= when {
-                // A splice in flight always finishes first. It is longer than one sink buffer, so it
-                // continues across calls instead of being limited to what this one happens to hold.
+                // A fade in flight finishes first; it spans sink buffers.
                 fadeRemaining > 0 -> writeFade(dst, snap, minOf(framesLeft, fadeRemaining))
-                // Play straight, stopping exactly on the next source — or on the last branch point,
-                // whichever comes first, so neither is ever overshot.
+                // Play straight, stopping exactly on the next source or the last branch point.
                 else -> {
                     val toLast = snap.lastBranchFrame - playheadFrame
                     val room = minOf(framesLeft, toEnd).coerceAtLeast(1)
@@ -201,28 +181,18 @@ class JukeboxRemixProcessor : BaseAudioProcessor() {
         return lo
     }
 
-    /**
-     * Destination for [j], or null when it has none outside the intro. Never falls back into the first
-     * [INTRO_GUARD_S] seconds: landing there sounds like the song restarting, so a source whose only
-     * matches are in the intro is simply played through instead.
-     */
+    /** Destination for [j] under all landing rules, or null (the source is played through). */
     private fun pickDst(snap: Snapshot, j: Jump?, forced: Boolean = false): Int? {
         if (j == null) return null
         val guard = sampleRate * INTRO_GUARD_S
         val bucket = (sampleRate.toLong() * BUCKET_MS / 1000).toInt().coerceAtLeast(1)
-        // Runway guard: landing just before the forced-branch zone chains two jumps back to back,
-        // which reads as a stutter of material that just played.
         val runway = snap.lastBranchFrame - sampleRate * RUNWAY_S
         val legal = j.dsts.filter { it >= guard && it + xfade < snap.frames && it < runway }
         if (legal.isEmpty()) return null
-        // Anti-boredom, two layers. When every legal destination was visited recently, DECLINE and
-        // play onward — repeating one of them anyway is how the remix got stuck cycling the same loop.
-        // A FORCED jump (end of the song, nowhere to go) relaxes freshness instead: a quality-checked
-        // graph edge that repeats still beats the blind end fallback, which bypasses every veto.
+        // Anti-boredom: skip recently visited destinations; decline entirely when all are recent,
+        // unless the jump is forced. Among the fresh, prefer the least-replayed region.
         val fresh = legal.filter { !recent.contains(it / bucket) }.ifEmpty { if (forced) legal else emptyList() }
         if (fresh.isEmpty()) return null
-        // And among the fresh ones, prefer the least-replayed region of the song (the same counters
-        // that drive the remix-map heat), so the walk spreads out instead of wearing a groove.
         val pick = fresh
             .sortedBy { visitsPerSecond.getOrElse(it / sampleRate) { 0 } }
             .take(TOP_PICK)
@@ -232,11 +202,7 @@ class JukeboxRemixProcessor : BaseAudioProcessor() {
         return pick
     }
 
-    /**
-     * Slide [target] by up to [ALIGN_SEARCH_MS] to wherever its waveform best matches the audio we are
-     * leaving. Beat detection is only accurate to a few ms; without this the two sides can join out of
-     * phase, which cancels low end and reads as a lurch even though both beats are "correct".
-     */
+    /** Slide [target] by up to ±[ALIGN_SEARCH_MS] to where it phase-matches the outgoing audio. */
     private fun alignToWaveform(snap: Snapshot, target: Int): Int {
         val search = sampleRate * ALIGN_SEARCH_MS / 1000
         val window = sampleRate * ALIGN_WINDOW_MS / 1000
@@ -300,19 +266,7 @@ class JukeboxRemixProcessor : BaseAudioProcessor() {
         cooldown = (cooldown - frames).coerceAtLeast(0)
     }
 
-    /**
-     * The seam. Three things happen here that a plain cut-on-the-beat does not do, and together they
-     * are what makes a jump stop sounding like the band stumbled:
-     *
-     *  1. **Waveform alignment.** The beat grid is only accurate to a few milliseconds, and at that
-     *     scale two matching beats can still be out of phase — joining them cancels bass and smears
-     *     the attack. So we slide the destination within [ALIGN_SEARCH_MS] and keep the offset whose
-     *     waveform correlates best with what is already playing.
-     *  2. **Equal-power crossfade.** Linear fading dips ~3dB in the middle when both sides are
-     *     uncorrelated; sqrt weights hold the energy flat across the join.
-     *  3. **Level match.** If the destination sits at a different dynamic point of the song, its gain
-     *     is nudged (bounded by [MAX_LEVEL_FIX_DB]) so the seam doesn't step in loudness.
-     */
+    /** Arm a splice: waveform-align the destination, level-match it, start the crossfade. */
     private fun startSplice(snap: Snapshot, requestedDst: Int) {
         val dstFrame = alignToWaveform(snap, requestedDst)
         fadeGain = levelMatch(snap, dstFrame)
@@ -368,7 +322,7 @@ class JukeboxRemixProcessor : BaseAudioProcessor() {
         }
 
         const val MAX_DST_PER_SRC = 6
-        private const val TAG = "JukeboxRemix"
+        private const val TAG = "InfiniPlayRemix"
         private const val XFADE_MS = 40 // long enough to blend, short enough not to smear the attack
         private const val ALIGN_SEARCH_MS = 12 // how far the splice may slide to find phase agreement
         private const val ALIGN_WINDOW_MS = 25 // correlation window used to judge that agreement

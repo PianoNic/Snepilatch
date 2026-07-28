@@ -14,10 +14,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
-import ch.snepilatch.app.playback.JukeboxViz
+import ch.snepilatch.app.playback.InfiniPlayViz
 
 /**
- * The Eternal Jukebox "remix map" that replaces the seek bar while the jukebox is on. It is NOT
+ * The Eternal InfiniPlay "remix map" that replaces the seek bar while the infiniPlay is on. It is NOT
  * draggable — it's a live picture of the remix:
  *
  *  - each pillar is a slice of the track; its height/brightness shows how many self-similar matches
@@ -29,8 +29,8 @@ import ch.snepilatch.app.playback.JukeboxViz
 private val HEAT_COLOR = Color(0xFFFF5A36) // deep ember for the most-replayed slices
 
 @Composable
-fun JukeboxTimeline(
-    viz: JukeboxViz?,
+fun InfiniPlayTimeline(
+    viz: InfiniPlayViz?,
     primary: Color,
     modifier: Modifier = Modifier
 ) {
@@ -39,7 +39,7 @@ fun JukeboxTimeline(
     val buffered = viz?.bufferedFraction ?: 0f
     val targetPlayhead = viz?.playheadFraction ?: 0f
     // Ease the marker between the 120ms viz ticks so linear play glides and jumps still read as jumps.
-    val playhead by animateFloatAsState(targetPlayhead, tween(120), label = "jukeboxPlayhead")
+    val playhead by animateFloatAsState(targetPlayhead, tween(120), label = "infiniPlayPlayhead")
 
     Canvas(modifier.fillMaxWidth().height(44.dp)) {
         val n = buckets.size

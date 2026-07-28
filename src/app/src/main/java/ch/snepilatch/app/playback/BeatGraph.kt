@@ -4,46 +4,16 @@ import kotlin.math.abs
 import kotlin.math.sqrt
 
 /**
- * Builds the jump graph over a beat grid, following the Infinite Jukebox / Eternal Jukebox model
- * (Paul Lamere; Pithaya's Spicetify rewrite) rather than the naive "every similar frame is a jump".
- *
- * The rules that matter for how it SOUNDS, and which a plain nearest-neighbour search lacks:
- *  - branches are between BEATS, so a splice can never land mid-beat;
- *  - the similarity threshold is dynamic — raised until enough beats branch — instead of a constant
- *    that is either unreachable on one track and far too loose on the next;
- *  - at most [MAX_BRANCHES] nearest destinations per beat;
- *  - consecutive beats may not share a jump distance, which is what makes a remix stutter in place;
- *  - a reachability pass finds the last beat you can still branch from, and branches past it are
- *    dropped so the remix can never strand itself in the outro.
+ * Builds the jump graph over a beat grid: which beat may splice to which. Every rule and constant
+ * here exists because its absence was audible — see docs/eternal-infiniPlay.md for the full rationale.
  */
 object BeatGraph {
 
     private const val MAX_BRANCHES = 4
-
-    /**
-     * Beats per bar. A branch may only join beats at the SAME position in their bar — beat 3 to beat 3,
-     * never beat 3 to beat 1. Two beats can be near-identical in pitch and timbre yet sit at different
-     * points of the phrase, and cutting between those drops or inserts beats mid-bar: the listener hears
-     * the band stumble. The reference does this with a flat distance penalty on a mismatched bar
-     * position; since both beats sit on one grid, requiring (i - j) % BEATS_PER_BAR == 0 is the same
-     * constraint and needs no downbeat detection.
-     */
     private const val BEATS_PER_BAR = 4
-
-    /**
-     * Never branch closer than four bars. A short hop lands inside the phrase that just played, so the
-     * listener hears the same material twice in a row — the "it played the similar thing again" trip.
-     * (The processor's recent-region memory also discourages this, but the graph shouldn't offer it.)
-     */
     private const val MIN_JUMP_BEATS = 4 * BEATS_PER_BAR
-
-    // The join is judged across a window around the cut: lead-in, the cut itself, and — weighted
-    // highest — the two beats that follow the landing point, because that's what the listener hears
-    // as "does this continue sensibly".
     private val CONTEXT_OFFSETS = intArrayOf(-1, 0, 1, 2)
     private val CONTEXT_WEIGHTS = doubleArrayOf(0.5, 1.0, 1.0, 0.75)
-
-    // Loudness/rhythm columns appended to the shape features (see beatExtras).
     private const val KICK_LP_HZ = 150.0
     private const val KICK_SLOTS = 4
     private const val LEVEL_WEIGHT = 2.0
@@ -55,25 +25,21 @@ object BeatGraph {
     private const val JOIN_COS_MIN = 0.55
     private const val JOIN_COS_SLACK = 0.10
     private const val LANDING_MARGIN_BEATS = 2 * BEATS_PER_BAR
-    private const val INTRO_GUARD_S = 10 // no branch may start or land inside the song's opening
-    private const val MAX_EDGES_PER_BEATS = 1 / 4.0 // keep the best edges up to n/4 of the beat count
+    private const val INTRO_GUARD_S = 10
+    private const val MAX_EDGES_PER_BEATS = 1 / 4.0
 
-    /** Everything the jukebox needs from a capture: the grid, the graph, and where it must branch by. */
+    /** Everything the infiniPlay needs from a capture: the grid, the graph, and where it must branch by. */
     class Analysis(
-        val jumps: List<JukeboxRemixProcessor.Jump>,
+        val jumps: List<InfiniPlayRemixProcessor.Jump>,
         val lastBranchFrame: Int,
         val branchPoints: Int,
         val beats: Int,
         val bpm: Int,
-        /**
-         * The graph's chosen fallback for the forced end-of-song branch: the destination of the best
-         * long backward branch. Without it the player fell back to a blind cut at track/3, which the
-         * seam analysis flagged as one of the worst joins.
-         */
+        /** Graph-chosen destination for the forced end-of-song branch. */
         val endJumpFrame: Int = 0
     )
 
-    /** Beat grid + features + graph in one call — the whole analysis side of the jukebox. */
+    /** Beat grid + features + graph in one call — the whole analysis side of the infiniPlay. */
     fun analyse(mono: ShortArray, sampleRate: Int): Analysis {
         val grid = BeatGrid.detect(mono, sampleRate)
         if (grid.beats.size < 8) return Analysis(emptyList(), mono.size, 0, grid.beats.size, 0)
@@ -92,9 +58,6 @@ object BeatGraph {
             val to = if (i + 1 < grid.beats.size) grid.beats[i + 1] else mono.size
             beatFeature(frames.rows, frames.hopSamples, grid.beats[i], to) + extras[i]
         }
-        // The intro is out of bounds for BOTH ends of a branch: landing there sounds like a restart,
-        // and jumping OUT of its sparse texture into the full arrangement never blends — the ear
-        // hears the band appear mid-bar. Let the song establish itself first.
         val introBeat = grid.beats.indexOfFirst { it >= sampleRate * INTRO_GUARD_S }.coerceAtLeast(0)
         val graph = build(grid.beats, beatFeatures, levels, kickLevels, onsetLevels, joinSpectra, introBeat)
         val lastBranchFrame = grid.beats[graph.lastBranchPoint.coerceIn(0, grid.beats.size - 1)]
@@ -105,7 +68,7 @@ object BeatGraph {
     }
 
     class Result(
-        val jumps: List<JukeboxRemixProcessor.Jump>,
+        val jumps: List<InfiniPlayRemixProcessor.Jump>,
         val beatCount: Int,
         val branchingBeats: Int,
         val threshold: Double,
@@ -113,11 +76,6 @@ object BeatGraph {
         val endJumpBeat: Int = 0
     )
 
-    /**
-     * [beats] are beat start positions in sample frames; [features] is a vector per beat (the
-     * analyser's per-frame chroma/timbre averaged across it plus the loudness/kick extras); [levels]
-     * is the raw per-beat level in dB, used for the hard dynamics veto.
-     */
     fun build(
         beats: IntArray,
         features: Array<DoubleArray>,
@@ -148,10 +106,7 @@ object BeatGraph {
             scored.take(MAX_BRANCHES)
         }
 
-        // No count-targeting threshold. The hard vetoes are the quality gate; here we only cap HOW MANY
-        // of the passing edges to keep — globally best first. A loop that loosens until it hits a
-        // branch-count target undoes the vetoes: every candidate they remove gets replaced by a worse
-        // one that was previously over the line.
+        // Vetoes gate quality; selection only caps the count, globally best first (no count target).
         val kept = candidates.withIndex()
             .flatMap { (i, list) -> list.map { Triple(i, it.first, it.second) } }
             .sortedBy { it.third }
@@ -162,7 +117,7 @@ object BeatGraph {
             neighbours[i] = edges.map { it.second to it.third }
         }
 
-        // Consecutive beats sharing a jump distance is what makes a remix stutter in one spot.
+        // No consecutive beats sharing a jump distance.
         val deSequenced = Array(n) { i ->
             if (i == 0) {
                 neighbours[i]
@@ -173,23 +128,19 @@ object BeatGraph {
         }
 
         val lastBranchPoint = findLastBranchPoint(deSequenced, n)
-        // Landings need runway: a destination just under the last branch point triggers the forced
-        // end-branch within a second of arriving, which chains two jumps back to back — heard as a
-        // stutter of material that just played. Leave at least two bars before the forced zone.
         val landingCeiling = lastBranchPoint - LANDING_MARGIN_BEATS
         val pruned = Array(n) { i ->
             if (i < lastBranchPoint) deSequenced[i].filter { it.first < landingCeiling } else deSequenced[i]
         }
 
-        val jumps = ArrayList<JukeboxRemixProcessor.Jump>(n)
+        val jumps = ArrayList<InfiniPlayRemixProcessor.Jump>(n)
         for (i in 0 until n) {
             val dsts = pruned[i]
             if (dsts.isEmpty()) continue
-            jumps.add(JukeboxRemixProcessor.Jump(beats[i], IntArray(dsts.size) { beats[dsts[it].first] }))
+            jumps.add(InfiniPlayRemixProcessor.Jump(beats[i], IntArray(dsts.size) { beats[dsts[it].first] }))
         }
 
-        // The end fallback: the best backward branch near the last branch point, chosen with the same
-        // scoring as every other edge — so the forced end-of-song jump is never a blind cut.
+        // End fallback: best backward branch near the last branch point, same scoring as any edge.
         var endJumpBeat = n / 3
         var endBest = Double.MAX_VALUE
         for (i in (lastBranchPoint - BEATS_PER_BAR).coerceAtLeast(0)..lastBranchPoint.coerceAtMost(n - 1)) {
@@ -203,12 +154,6 @@ object BeatGraph {
         return Result(jumps, n, pruned.count { it.isNotEmpty() }, threshold, lastBranchPoint, endJumpBeat)
     }
 
-    /**
-     * Hard dynamics veto: however well two beats match in shape, if their levels — or the levels of the
-     * two beats that follow them — differ by more than [LEVEL_VETO_DB], the join steps audibly in
-     * loudness and is not offered at all. The z-scored level feature only discourages this; the seam
-     * analysis showed +7..10 dB joins still slipping through, hence the veto.
-     */
     private fun levelCompatible(levels: DoubleArray?, i: Int, j: Int, n: Int): Boolean =
         levelVeto(levels, i, j, n, LEVEL_VETO_DB)
 
@@ -223,12 +168,6 @@ object BeatGraph {
         return true
     }
 
-    /**
-     * The join replaces the OPENING of the source beat with the opening of the destination beat, so
-     * the step the listener actually hears is between those two onsets — beat averages can agree while
-     * the first 150ms differ by 8 dB, which is exactly the seam the ear rejected. Compare the onsets
-     * themselves.
-     */
     private fun onsetVeto(onsets: DoubleArray?, i: Int, j: Int): Boolean {
         if (onsets == null) return true
         return abs(onsets[i] - onsets[j]) <= ONSET_VETO_DB
@@ -248,24 +187,14 @@ object BeatGraph {
             return out
         }
 
-        // One fine-resolution window either side of the boundary — the same ~186ms the listener
-        // judges, at a bin width where individual harmonics resolve and a wrong chord shows.
         val tail = Array(beats.size) { WaveformAnalyzer.magnitudeSpectrum(window(beats[it] - len)) }
         val onset = Array(beats.size) { WaveformAnalyzer.magnitudeSpectrum(window(beats[it])) }
         return JoinSpectra(tail, onset)
     }
 
-    /**
-     * The join-continuity veto, the offline seam metric moved into the graph: every seam the ear
-     * rejected had a LOW spectral cosine between the audio leading into the cut and the audio landing
-     * after it, while level-based vetoes let them through. A branch is only offered when landing on j
-     * is spectrally at least almost as continuous as the original continuation onto i was.
-     */
+    /** Join must be nearly as spectrally continuous as the song's own transition at this boundary. */
     private fun spectralJoinOk(spectra: JoinSpectra?, i: Int, j: Int): Boolean {
         if (spectra == null) return true
-        // Relative to the ORIGINAL transition at this boundary: a natural drop steps spectrally too,
-        // and an absolute floor would forbid it — while a landing that is much less continuous than
-        // what the song itself did there is exactly the join the ear rejects.
         val natural = cosine(spectra.tail[i], spectra.onset[i])
         val joined = cosine(spectra.tail[i], spectra.onset[j])
         return joined >= JOIN_COS_MIN && joined >= natural - JOIN_COS_SLACK
@@ -284,7 +213,6 @@ object BeatGraph {
         return if (denom > 1e-12) dot / denom else 0.0
     }
 
-    /** Raw per-beat kick-band level in dB — the drums either side of a join must actually match. */
     private fun kickLevels(mono: ShortArray, sampleRate: Int, beats: IntArray): DoubleArray {
         val lp = DoubleArray(mono.size)
         val a = kotlin.math.exp(-2.0 * Math.PI * KICK_LP_HZ / sampleRate)
@@ -299,11 +227,7 @@ object BeatGraph {
         }
     }
 
-    /**
-     * How far the song can still reach from each beat, following branches. The last beat with a good
-     * reach is the last point it is safe to branch from — past it the remix would run into the outro
-     * with nowhere to go.
-     */
+    /** Last beat it is safe to branch from; past it the remix would run into the outro. */
     private fun findLastBranchPoint(neighbours: Array<List<Pair<Int, Double>>>, n: Int): Int {
         val reach = IntArray(n) { n - it }
         repeat(REACH_ITERATIONS) {
@@ -333,15 +257,7 @@ object BeatGraph {
         return longest
     }
 
-    /**
-     * Per-beat loudness and rhythm features the chroma/timbre rows deliberately lack (they are
-     * per-frame normalized — shape, not level). Without them a quiet breakdown branches happily into a
-     * full-scale chorus: the shapes match while the energy differs by 10 dB, and the seam analysis
-     * showed exactly that as the worst joins. Columns, all z-scored then weighted:
-     *  - overall beat level in dB, so branches stay within a similar dynamic section;
-     *  - a 4-slot kick pattern: low-passed energy per beat quarter, so the drum figure on both sides
-     *    of a join actually lines up rather than merely the harmony.
-     */
+    /** Per-beat loudness + 4-slot kick pattern, z-scored and weighted (shape features are level-blind). */
     private fun beatExtras(mono: ShortArray, sampleRate: Int, beats: IntArray): Array<DoubleArray> {
         val n = beats.size
         // One-pole low-pass around the kick band; analysis-grade is all this needs.

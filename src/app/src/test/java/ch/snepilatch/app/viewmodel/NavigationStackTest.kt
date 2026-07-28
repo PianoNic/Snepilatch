@@ -31,8 +31,8 @@ class NavigationStackTest {
     @Test fun backFromPageOpenedFromPlayerReturnsToContentNotPlayer() {
         vm.navigateTo(Screen.PLAYLIST_DETAIL) // stack=[HOME]
         vm.navigateTo(Screen.NOW_PLAYING) // stack=[HOME, PLAYLIST_DETAIL]
-        vm.navigateTo(Screen.QUEUE) // overlay→content: stack unchanged
-        assertEquals(Screen.QUEUE, vm.currentScreen.value)
+        vm.navigateTo(Screen.EQUALIZER) // overlay→content: stack unchanged
+        assertEquals(Screen.EQUALIZER, vm.currentScreen.value)
 
         vm.goBack()
         // The bug was this returning NOW_PLAYING; it must be the page beneath the player.
@@ -70,8 +70,8 @@ class NavigationStackTest {
     }
 
     @Test fun duplicateNavigateDoesNotStackOntoItself() {
-        vm.navigateTo(Screen.QUEUE)
-        vm.navigateTo(Screen.QUEUE)
+        vm.navigateTo(Screen.EQUALIZER)
+        vm.navigateTo(Screen.EQUALIZER)
         vm.goBack()
         assertEquals(Screen.HOME, vm.currentScreen.value)
     }

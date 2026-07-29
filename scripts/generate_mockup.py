@@ -27,6 +27,8 @@ SCREENSHOTS = [
     'screenshot_playlist.PNG',
     'screenshot_player.PNG',
     'screenshot_search.PNG',
+    'screenshot_artist.PNG',
+    'screenshot_album.PNG',
 ]
 
 # The one screen shown upright and full size.

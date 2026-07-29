@@ -86,6 +86,11 @@ class PlaybackViewModel : ViewModel() {
         set(value) { SessionHolder.cdnResolver = value }
     private var latestFileId: String? = null  // from TrackPlaybackHandler via onPlaybackId
 
+    // The track [latestFileId] belongs to. A file id is only usable for the track it was issued for:
+    // when a local advance and the server name different tracks, pairing the last id we saw with the
+    // incoming URI loads the wrong song's audio. Null means "unknown", which is never treated as a match.
+    private var latestFileIdUri: String? = null
+
     // Direct https audio URLs for external/RSS podcast episodes (no Spfy file id, no DRM), keyed by
     // episode uri and pushed via onExternalUrl. Small bounded cache; hosted content never appears here.
     private val externalUrlByUri = java.util.Collections.synchronizedMap(
@@ -121,6 +126,7 @@ class PlaybackViewModel : ViewModel() {
     private var pendingUserPlay = false
     private var nextCdnUrl: String? = null      // Pre-resolved Spfy CDN URL (DRM)
     private var nextCdnFileId: String? = null   // File ID for the pre-resolved CDN track
+    private var nextCdnUri: String? = null      // Track the pre-resolved CDN URL belongs to
     private var lastCommandTs: Long = 0L  // timing: when last user command was sent
     private var lastCommandName: String = ""
 
@@ -536,9 +542,10 @@ class PlaybackViewModel : ViewModel() {
      * protocol.
      */
     private fun wirePlayerConnectCallbacks(pc: PlayerConnect) {
-        pc.onPlaybackId { fileId ->
-            LokiLogger.i(TAG, "Got file ID from state machine: $fileId")
+        pc.onPlaybackId { fileId, uri ->
+            LokiLogger.i(TAG, "Got file ID from state machine: $fileId (${uri ?: "uri unknown"})")
             latestFileId = fileId
+            latestFileIdUri = uri
             // Cold-start: complete the deferred so coldStartPlay can proceed
             // with resolving the CDN URL and loading ExoPlayer.
             val deferred = coldStartFileId
@@ -555,7 +562,7 @@ class PlaybackViewModel : ViewModel() {
             if (uri != null) externalUrlByUri[uri] = url
         }
 
-        pc.onNextPlaybackId { fileId, _, name ->
+        pc.onNextPlaybackId { fileId, uri, name ->
             if (AppSettings.preferredAudioSource.value != null) return@onNextPlaybackId
             // Deduplicate — don't re-resolve if we already have this file ID cached
             if (fileId == nextCdnFileId && nextCdnUrl != null) return@onNextPlaybackId
@@ -570,6 +577,7 @@ class PlaybackViewModel : ViewModel() {
                     // needs its own Widevine license session.
                     nextCdnUrl = stream.cdnUrl
                     nextCdnFileId = fileId
+                    nextCdnUri = uri
                     isNextReady.value = true
                     LokiLogger.i(TAG, "Next Spfy CDN pre-resolved: $name")
                 } catch (e: Exception) {
@@ -2303,33 +2311,49 @@ class PlaybackViewModel : ViewModel() {
      * still absent, and resolve mirrors. Throws if the resolver is uninitialised or no file id is
      * available — the caller's try/catch falls through to the third-party CDN on any throw.
      */
+    /**
+     * Whether audio tagged with [ownerUri] may be used for [trackUri]. A null owner means the source
+     * didn't tell us which track it belongs to; that stays usable (it is how cold start and older
+     * pushes behave) since rejecting it would strand playback. A known, different owner never matches.
+     * Internal for unit tests.
+     */
+    internal fun belongsTo(ownerUri: String?, trackUri: String): Boolean =
+        ownerUri == null || ownerUri == trackUri
+
     private suspend fun resolveSpfyCdnStream(
         event: kotify.api.playerstatus.TrackChangeEvent,
         trackUri: String
     ): SpfyStream {
         val resolver = cdnResolver ?: throw IllegalStateException("CdnResolver not initialized")
 
-        // Check if we already pre-resolved this CDN URL
-        // IMPORTANT: nextCdnUrl is for the NEXT track. Only use it if the
-        // file ID matches what we need for the CURRENT track.
-        val currentFileId = event.currentFileId ?: latestFileId
-        val cachedCdnUrl = if (currentFileId != null && nextCdnFileId == currentFileId) nextCdnUrl else null
+        // A file id is only valid for the track it was issued for. event.currentFileId comes with this
+        // event so it always matches; latestFileId is whatever arrived last and may belong to a
+        // different track (a local advance and the server can name different tracks), so it is only
+        // used when its recorded URI matches. The pre-resolved CDN cache is checked the same way —
+        // matching file ids alone let one track's audio load against another track's URI.
+        val currentFileId = event.currentFileId ?: latestFileId.takeIf { belongsTo(latestFileIdUri, trackUri) }
+        val cacheMatches = currentFileId != null &&
+            nextCdnFileId == currentFileId &&
+            belongsTo(nextCdnUri, trackUri)
+        val cachedCdnUrl = if (cacheMatches) nextCdnUrl else null
         return if (cachedCdnUrl != null) {
             LokiLogger.i(TAG, "SpfyCDN: Using pre-resolved CDN URL (fileId=$currentFileId)")
             nextCdnUrl = null
             nextCdnFileId = null
+            nextCdnUri = null
             resolver.buildStreamForCachedUrl(cachedCdnUrl, currentFileId)
         } else {
-            // Use file ID from cluster state or from onPlaybackId (state machine)
-            var fileId = event.currentFileId ?: latestFileId
+            // Same pairing rule as above: a file id from the state machine is only ours if it was
+            // issued for this track.
+            var fileId = currentFileId
             if (fileId == null) {
                 // Wait for onPlaybackId — the state machine pushes the account's ENTITLED file id
                 // (MP4_128 on free). Give it real time before self-resolving, because the media
                 // endpoint below only offers premium MP4_256 on many accounts, which a free CDM
                 // can't license. Cheap: only runs when the cluster hasn't supplied a file id yet.
                 LokiLogger.d(TAG, "SpfyCDN: Waiting for state-machine file ID...")
-                pollFor(15) { latestFileId != null }
-                fileId = latestFileId
+                pollFor(15) { latestFileId != null && belongsTo(latestFileIdUri, trackUri) }
+                fileId = latestFileId.takeIf { belongsTo(latestFileIdUri, trackUri) }
             }
             // Still null: self-resolve. Use the media endpoint only when the file id is
             // licensable for this account (see safeMediaFileId), else metadata/4/track.

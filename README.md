@@ -16,15 +16,38 @@
 
 ## Features
 
+**Playback**
+
+- Plays locally on your phone as its own Connect device, so transport actions are never skip-capped
+- Ads are consumed silently and skipped, without spending a skip
+- Lossless audio option (FLAC via Qobuz or Deezer) alongside the standard stream
+- Gapless-style prepared boundaries, with the next track resolved before the current one ends
+- Full Connect control: transfer to and from other devices
+
+**Sound**
+
+- Ten-band in-app equalizer with a drag-and-drop curve editor
+- Automatic gain staging so boosted bands cannot clip
+- EQ headroom for anyone running an external equalizer such as Wavelet
+
+**InfiniPlay**
+
+- Turns any track into a never-ending remix, beat-matched and crossfaded in the audio chain
+- Builds a beat graph from the waveform itself, with no per-track analysis API
+
+**Library and browsing**
+
+- Liked songs, playlists, albums, artists and podcasts
+- Search, home feed, and queue management in a bottom drawer
+- Word-level synced lyrics
+
+**Interface**
+
 - Fully native UI built with Jetpack Compose and Material 3
-- Full playback controls with Spfy Connect
-- Synced lyrics display
-- Queue management with direct track navigation
-- Library: liked songs, playlists, albums, artists
-- Search and browse
 - Dynamic color theming from album art
 - Gesture-based player with swipe navigation
 - Canvas background animations
+- English, German, Russian and Swiss German
 - Automatic in-app updates
 
 ## Screenshots

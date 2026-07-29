@@ -4,6 +4,7 @@ import ch.snepilatch.app.playback.SessionHolder
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.After
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -50,6 +51,27 @@ class AdWatchdogEpochTest {
         assertTrue("still on an ad", rig.vm.playback.value.isAd)
         assertFalse(
             "watchdog for ad #1 must not force an advance while ad #2 is playing",
+            rig.vm.adWatchdogShouldFire(armedEpoch, armedUri)
+        )
+    }
+
+    @Test
+    fun watchdogDoesNotFireOnceTheEngineAlreadyLeftTheAd() {
+        rig.seedStreaming()
+
+        rig.vm.handleAd(1000L)
+        val armedEpoch = rig.vm.currentAdEpoch()
+        val armedUri = rig.vm.currentStreamUri
+
+        // The engine advances off the ad and the post-ad track's audio is announced. isAd is still set
+        // and the stream URI has not moved yet — the post-ad state lands ~1.5s later — so only this
+        // signal can stop the watchdog. Captured live at 11:05:45.855 skipping "Wieso?" 3.2s in.
+        rig.vm.handlePlaybackId("postAdFileId", "spotify:track:postad")
+
+        assertTrue("still flagged as an ad", rig.vm.playback.value.isAd)
+        assertEquals("stream has not moved yet", armedUri, rig.vm.currentStreamUri)
+        assertFalse(
+            "the engine already advanced — the watchdog must not force another advance",
             rig.vm.adWatchdogShouldFire(armedEpoch, armedUri)
         )
     }

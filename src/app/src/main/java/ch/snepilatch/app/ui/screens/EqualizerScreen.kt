@@ -39,7 +39,8 @@ private const val GRID_STEP_DB = 6f
 @Composable
 fun EqualizerScreen(vm: PlaybackViewModel) {
     val context = LocalContext.current
-    val enabled by AppSettings.eqEnabled.collectAsState()
+    val eqMode by AppSettings.eqMode.collectAsState()
+    val enabled = eqMode == AppSettings.EQ_IN_APP
     val bands by AppSettings.eqBands.collectAsState()
     val theme by ThemeController.themeColors.collectAsState()
     // Reported by the service; on API 26–27 DynamicsProcessing doesn't exist and the EQ stays inert.
@@ -76,7 +77,10 @@ fun EqualizerScreen(vm: PlaybackViewModel) {
             supported = supported,
             preamp = preamp,
             accent = theme.primary,
-            onEnabledChange = { AppSettings.setEqEnabled(it, context) },
+            // The header switch only toggles our own EQ; External is chosen from the Account tab.
+            onEnabledChange = {
+                AppSettings.setEqMode(if (it) AppSettings.EQ_IN_APP else AppSettings.EQ_OFF, context)
+            },
             onFlat = { AppSettings.setEqBands(FloatArray(EqualizerHeadroom.BANDS), context) }
         )
 

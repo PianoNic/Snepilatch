@@ -31,12 +31,20 @@ SCREENSHOTS = [
     'screenshot_album.PNG',
 ]
 
-# The one screen shown upright and full size.
-HERO = 'screenshot_player.PNG'
+# Shown upright and full size in front of the field: what the app actually does, in the order you
+# meet it. Browse, play, follow the words, shape the sound.
+FOREGROUND = [
+    'screenshot_home.PNG',
+    'screenshot_player.PNG',
+    'screenshot_lyrics.PNG',
+    'screenshot_equalizer.PNG',
+]
 
 CANVAS_W, CANVAS_H = 2600, 1180
 OUTPUT_W = 1800       # composed large, delivered smaller: sharper edges, a third of the file size
-HERO_H = 780          # height of the upright hero
+HERO_H = 660          # height of the upright foreground screens
+HERO_OVERLAP = 0.10   # how much neighbouring foreground screens overlap, as a fraction of width
+HERO_STAGGER = 34     # outer screens sit this many px lower than the inner pair
 TILE_H = 460          # height of each tilted screen in the field
 TILE_ANGLE = -30      # degrees; one angle for the whole field keeps it isometric
 COL_STEP = 1.12       # column pitch, as a multiple of a phone's width  (>1 leaves a gutter)
@@ -135,23 +143,34 @@ def build_field(seed):
 
 
 def dim_towards_centre(canvas):
-    """Fade the field down in the middle so the hero separates from it instead of competing."""
+    """Fade the field down behind the foreground row so it reads as backdrop, not competition.
+
+    A wide ellipse rather than a circle, because the foreground is a row of four.
+    """
     veil = Image.new('RGBA', canvas.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(veil)
     cx, cy = canvas.size[0] // 2, canvas.size[1] // 2
-    reach = int(canvas.size[0] * 0.40)
+    reach = int(canvas.size[0] * 0.60)
     for radius in range(reach, 0, -3):
-        alpha = int(140 * (1 - radius / reach))
-        draw.ellipse([cx - radius, cy - int(radius * 0.74), cx + radius, cy + int(radius * 0.74)],
+        alpha = int(150 * (1 - radius / reach))
+        draw.ellipse([cx - radius, cy - int(radius * 0.44), cx + radius, cy + int(radius * 0.44)],
                      fill=(10, 11, 13, alpha))
-    return Image.alpha_composite(canvas, veil.filter(ImageFilter.GaussianBlur(70)))
+    return Image.alpha_composite(canvas, veil.filter(ImageFilter.GaussianBlur(80)))
 
 
 def generate(seed=DEFAULT_SEED):
     canvas = dim_towards_centre(build_field(seed))
-    hero = add_shadow(load_screen(HERO, HERO_H), blur=34, opacity=170)
-    cx, cy = CANVAS_W // 2, CANVAS_H // 2
-    canvas.paste(hero, (cx - hero.size[0] // 2, cy - hero.size[1] // 2), hero)
+
+    phones = [add_shadow(load_screen(name, HERO_H), blur=34, opacity=170) for name in FOREGROUND]
+    overlap = int(phones[0].size[0] * HERO_OVERLAP)
+    total = sum(p.size[0] for p in phones) - overlap * (len(phones) - 1)
+    x = (CANVAS_W - total) // 2
+    mid = (len(phones) - 1) / 2
+    for i, phone in enumerate(phones):
+        # Outer screens ride lower, so the row arcs slightly instead of sitting on one line.
+        drop = int(HERO_STAGGER * abs(i - mid) / mid) if mid else 0
+        canvas.paste(phone, (x, (CANVAS_H - phone.size[1]) // 2 + drop), phone)
+        x += phone.size[0] - overlap
 
     height = round(CANVAS_H * OUTPUT_W / CANVAS_W)
     canvas = canvas.convert('RGB').resize((OUTPUT_W, height), Image.LANCZOS)

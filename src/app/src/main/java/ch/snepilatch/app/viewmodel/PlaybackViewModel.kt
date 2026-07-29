@@ -2477,10 +2477,18 @@ class PlaybackViewModel : ViewModel() {
                 isStreamLoading.value = false
                 LokiLogger.i(TAG, "[Timing] resolveAndPlay DRM loaded in ${System.currentTimeMillis() - resolveStart}ms (${System.currentTimeMillis() - lastCommandTs}ms total from CMD)")
                 preResolveNextTrack()
-                return
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                LokiLogger.w(TAG, "Spfy CDN failed: ${e.message}, falling back to third-party CDN")
+                // The user picked Spfy, so never silently switch to a third-party source. Reuse the
+                // bounded playback-error recovery instead: retry with a fresh token, and skip forward
+                // once the budget is spent. The third-party path below is only for an explicit choice.
+                LokiLogger.w(TAG, "Spfy CDN failed for $trackUri: ${e.message} — recovering, not falling back")
+                isStreamLoading.value = false
+                recoverFromPlaybackError(trackUri, 0L)
             }
+            // Spfy is the chosen source: this branch owns the outcome either way, success or recovery.
+            return
         }
 
         try {

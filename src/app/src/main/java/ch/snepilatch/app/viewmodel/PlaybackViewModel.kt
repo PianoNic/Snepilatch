@@ -506,12 +506,32 @@ class PlaybackViewModel : ViewModel() {
      * clamps currentTime to [0, duration] — so we ignore any target outside the known duration.
      */
     /**
+     * The state machine announced the current track's audio file id, with the track it belongs to.
+     * Ads never emit one, so this also proves any ad is over. Internal for unit tests.
+     */
+    internal fun handlePlaybackId(fileId: String, uri: String?) {
+        LokiLogger.i(TAG, "Got file ID from state machine: $fileId (${uri ?: "uri unknown"})")
+        latestFileId = fileId
+        latestFileIdUri = uri
+        // The post-ad state (which clears isAd and moves currentStreamUri) lands over a second later,
+        // so without this an armed watchdog still sees "stuck on the ad" and forces a redundant
+        // advance, skipping the track that is just starting.
+        leaveAdContext()
+        // Cold-start: complete the deferred so coldStartPlay can proceed
+        // with resolving the CDN URL and loading ExoPlayer.
+        val deferred = coldStartFileId
+        if (coldStartPending && deferred != null && !deferred.isCompleted) {
+            deferred.complete(fileId)
+        }
+    }
+
+    /**
      * An ad became current: play a local silent clip so the MediaSession stays alive and show the
      * skipping placeholder. Bumping [adEpoch] supersedes any watchdog armed for a previous ad.
      * Internal for unit tests.
      */
     internal fun handleAd(durationMs: Long) {
-        adEpoch++
+        leaveAdContext() // a new ad supersedes any watchdog armed for the previous one
         adSkipStartTs = System.currentTimeMillis()
         LokiLogger.i(TAG, "[AdTiming] onAd received (clip=${durationMs}ms) — T0")
         LokiLogger.i(TAG, "Ad — skipping with local silent clip (~${durationMs}ms)")
@@ -542,17 +562,7 @@ class PlaybackViewModel : ViewModel() {
      * protocol.
      */
     private fun wirePlayerConnectCallbacks(pc: PlayerConnect) {
-        pc.onPlaybackId { fileId, uri ->
-            LokiLogger.i(TAG, "Got file ID from state machine: $fileId (${uri ?: "uri unknown"})")
-            latestFileId = fileId
-            latestFileIdUri = uri
-            // Cold-start: complete the deferred so coldStartPlay can proceed
-            // with resolving the CDN URL and loading ExoPlayer.
-            val deferred = coldStartFileId
-            if (coldStartPending && deferred != null && !deferred.isCompleted) {
-                deferred.complete(fileId)
-            }
-        }
+        pc.onPlaybackId { fileId, uri -> handlePlaybackId(fileId, uri) }
 
         pc.onExternalUrl { url, uri, name ->
             // External/RSS episode: no Spfy file id, no Widevine — just a direct https audio url.
@@ -2121,6 +2131,15 @@ class PlaybackViewModel : ViewModel() {
 
     /** Current ad generation; see [adWatchdogShouldFire]. Internal for tests. */
     internal fun currentAdEpoch(): Long = adEpoch
+
+    /**
+     * The ad context ended: bump the generation so any watchdog armed for it can no longer fire.
+     * Called both when a new ad supersedes the old one and when a real track's audio is announced.
+     * Internal for tests.
+     */
+    internal fun leaveAdContext() {
+        adEpoch++
+    }
 
     /**
      * ExoPlayer lifecycle events — track transitions, errors, end-of-track,

@@ -93,7 +93,7 @@ class PlaybackViewModel : ViewModel() {
             override fun removeEldestEntry(eldest: Map.Entry<String, String>) = size > 32
         }
     )
-    private var currentStreamUri: String? = null
+    internal var currentStreamUri: String? = null // internal so tests can stand in a committed stream
 
     // Eternal InfiniPlay: fetches the current track's audio-analysis, builds a beat-similarity graph, and
     // seeks ExoPlayer to similar beats so the song plays forever. Logic only — toggle via toggleInfiniPlay().
@@ -128,6 +128,9 @@ class PlaybackViewModel : ViewModel() {
     // so we can see exactly where a single-ad skip spends its ~3s (silent clip / advance / post-ad
     // resolve). Reset to 0 once the post-ad real track's audio is producing.
     private var adSkipStartTs: Long = 0L
+
+    // Generation counter for ads; a new ad supersedes any watchdog armed for the previous one.
+    private var adEpoch: Long = 0L
     private var playUrlAt: Long = 0L      // timing: when playUrl/playDrmUrl was last called
 
     // Cold-start sync: when the user taps play with nothing loaded in ExoPlayer,
@@ -496,6 +499,22 @@ class PlaybackViewModel : ViewModel() {
      * past the end and instantly kill the track. The web player never hits this — the media element
      * clamps currentTime to [0, duration] — so we ignore any target outside the known duration.
      */
+    /**
+     * An ad became current: play a local silent clip so the MediaSession stays alive and show the
+     * skipping placeholder. Bumping [adEpoch] supersedes any watchdog armed for a previous ad.
+     * Internal for unit tests.
+     */
+    internal fun handleAd(durationMs: Long) {
+        adEpoch++
+        adSkipStartTs = System.currentTimeMillis()
+        LokiLogger.i(TAG, "[AdTiming] onAd received (clip=${durationMs}ms) — T0")
+        LokiLogger.i(TAG, "Ad — skipping with local silent clip (~${durationMs}ms)")
+        _playback.value = _playback.value.copy(isAd = true, isPlaying = true, isPaused = false)
+        viewModelScope.launch(Dispatchers.Main) {
+            MusicPlaybackService.instance?.playSilentAd()
+        }
+    }
+
     internal fun handleRemoteSeek(positionMs: Long) {
         if (!isStreaming.value) return
         val duration = _playback.value.durationMs
@@ -559,23 +578,7 @@ class PlaybackViewModel : ViewModel() {
             }
         }
 
-        pc.onAd { durationMs ->
-            // KotifyClient signals an ad (no ad audio is ever fetched) and clocks it out in ~1s,
-            // advancing to the next real track on its own. Play a local silent clip so the
-            // MediaSession stays alive (no idle gap) and flip the UI to a "Skipping ad…" placeholder.
-            // isAd is cleared when the next real track's state rebuilds PlaybackUiState.
-            adSkipStartTs = System.currentTimeMillis()
-            LokiLogger.i(TAG, "[AdTiming] onAd received (clip=${durationMs}ms) — T0")
-            LokiLogger.i(TAG, "Ad — skipping with local silent clip (~${durationMs}ms)")
-            // Ad is handled invisibly: keep the CURRENT song's cover/title/progress frozen on screen
-            // (track is unchanged during an ad) and let the UI show a loading spinner (driven by isAd)
-            // for the ~2.5s skip, so it reads as "loading the next track", not an ad interruption. The
-            // next real track's state clears isAd and slides its cover in.
-            _playback.value = _playback.value.copy(isAd = true, isPlaying = true, isPaused = false)
-            viewModelScope.launch(Dispatchers.Main) {
-                MusicPlaybackService.instance?.playSilentAd()
-            }
-        }
+        pc.onAd { durationMs -> handleAd(durationMs) }
 
         pc.onSeek { positionMs -> handleRemoteSeek(positionMs) }
 
@@ -2084,11 +2087,12 @@ class PlaybackViewModel : ViewModel() {
      * the same local advance a manual skip does.
      */
     private fun armAdAdvanceWatchdog() {
-        val adStuckUri = currentStreamUri
+        val armedEpoch = adEpoch
+        val armedUri = currentStreamUri
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 delay(AD_ADVANCE_WATCHDOG_MS)
-                if (_playback.value.isAd && currentStreamUri == adStuckUri) {
+                if (adWatchdogShouldFire(armedEpoch, armedUri)) {
                     LokiLogger.w(TAG, "Ad advance didn't fire (still on the ad) — forcing local advance")
                     player?.forceAdvance()
                 }
@@ -2096,6 +2100,19 @@ class PlaybackViewModel : ViewModel() {
             catch (e: Exception) { handleAdvanceFailure(e) }
         }
     }
+
+    /**
+     * True only when the ad this watchdog was armed for is still the current one and nothing has
+     * advanced off it. [currentStreamUri] alone can't tell ads apart (the silent clip never sets it,
+     * so it stays on the pre-ad track for the whole break), hence the [adEpoch] check: without it a
+     * watchdog armed for the first of two back-to-back ads fires while the second is legitimately
+     * playing and forces an advance the engine already made, eating a real track. Internal for tests.
+     */
+    internal fun adWatchdogShouldFire(armedEpoch: Long, armedUri: String?): Boolean =
+        adEpoch == armedEpoch && _playback.value.isAd && currentStreamUri == armedUri
+
+    /** Current ad generation; see [adWatchdogShouldFire]. Internal for tests. */
+    internal fun currentAdEpoch(): Long = adEpoch
 
     /**
      * ExoPlayer lifecycle events — track transitions, errors, end-of-track,

@@ -2125,6 +2125,22 @@ class PlaybackViewModel : ViewModel() {
     internal fun currentAdEpoch(): Long = adEpoch
 
     /**
+     * Whether the end-of-track grace should force an advance. It must not when anything else already
+     * advanced: a new stream committed, audio is playing, or the ad epoch moved.
+     *
+     * That last test carries the weight. An ad break can span the whole grace window, and the other
+     * two miss it entirely, because the silent clip never sets [currentStreamUri] (so it still reads
+     * as the outgoing track) and the clip has already ended (so nothing is playing). The epoch moves
+     * on every ad and on every real track's audio, so a change means the advance happened without us.
+     * Observed live: a track ended at 15:01:42.5, two ads ran, the post-ad track's stream committed
+     * 16ms after the grace expired, and the forced advance ate it. Internal for tests.
+     */
+    internal fun graceAdvanceShouldFire(endedUri: String?, armedEpoch: Long, exoPlaying: Boolean): Boolean {
+        val newTrackLoaded = currentStreamUri != null && currentStreamUri != endedUri
+        return !newTrackLoaded && !exoPlaying && adEpoch == armedEpoch
+    }
+
+    /**
      * The ad context ended: bump the generation so any watchdog armed for it can no longer fire.
      * Called both when a new ad supersedes the old one and when a real track's audio is announced.
      * Internal for tests.
@@ -2182,16 +2198,17 @@ class PlaybackViewModel : ViewModel() {
             // headroom; the silent fallback only fires when Spfy Connect
             // genuinely fails to advance.
             val endedUri = currentStreamUri
+            val armedEpoch = adEpoch
             viewModelScope.launch(Dispatchers.IO) {
                 try {
                     LokiLogger.i(TAG, "ExoPlayer ended — waiting ${AUTO_ADVANCE_GRACE_MS}ms for auto-advance...")
                     delay(AUTO_ADVANCE_GRACE_MS)
-                    val newTrackLoaded = currentStreamUri != null && currentStreamUri != endedUri
                     val exoPlaying = withContext(Dispatchers.Main) {
                         MusicPlaybackService.instance?.isPlaying() == true
                     }
-                    if (newTrackLoaded || exoPlaying) {
-                        LokiLogger.d(TAG, "Auto-advance fired naturally (newTrackLoaded=$newTrackLoaded, exoPlaying=$exoPlaying)")
+                    if (!graceAdvanceShouldFire(endedUri, armedEpoch, exoPlaying)) {
+                        val why = "stream=$currentStreamUri exoPlaying=$exoPlaying adEpoch=$adEpoch/$armedEpoch"
+                        LokiLogger.d(TAG, "Auto-advance fired naturally ($why)")
                     } else {
                         // Advance locally (no skip command) so a slightly-late auto-advance (e.g. the
                         // post-ad track) resolves without burning a Free skip and hitting the cap.

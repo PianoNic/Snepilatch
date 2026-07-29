@@ -39,6 +39,8 @@ TILE_H = 460          # height of each tilted screen in the field
 TILE_ANGLE = -30      # degrees; one angle for the whole field keeps it isometric
 COL_STEP = 1.12       # column pitch, as a multiple of a phone's width  (>1 leaves a gutter)
 ROW_STEP = 1.10       # row pitch, as a multiple of a phone's height
+ROW_DRIFT = 0.30      # each row slides this fraction of a column sideways, so successive rows step
+                      # up instead of squaring off into a plain grid. 0 gives an exact rectangle.
 CORNER_RADIUS = 18
 DEFAULT_SEED = 11
 
@@ -110,14 +112,18 @@ def build_field(seed):
     span = int((CANVAS_W ** 2 + CANVAS_H ** 2) ** 0.5) + 2 * max(step_x, step_y)
     cols, rows = span // step_x + 2, span // step_y + 2
 
-    grid = Image.new('RGBA', (cols * step_x, rows * step_y), (0, 0, 0, 0))
+    # Each row slides sideways by a constant amount, which reads as a step up once the field is
+    # tilted. The lattice stays exact — it is a parallelogram rather than a rectangle — so the
+    # diagonals still run unbroken. Width grows to cover the total slide.
+    drift = int(step_x * ROW_DRIFT)
+    grid = Image.new('RGBA', (cols * step_x + rows * drift, rows * step_y), (0, 0, 0, 0))
     bag = []
     for r in range(rows):
         for c in range(cols):
             if not bag:
                 bag = tiles[:]
                 rnd.shuffle(bag)
-            grid.paste(bag[-1], (c * step_x - pad, r * step_y - pad), bag.pop())
+            grid.paste(bag[-1], (c * step_x + r * drift - pad, r * step_y - pad), bag.pop())
 
     grid = grid.rotate(TILE_ANGLE, resample=Image.BICUBIC, expand=True)
     left = (grid.size[0] - CANVAS_W) // 2

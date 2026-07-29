@@ -32,12 +32,12 @@ SCREENSHOTS = [
 ]
 
 # Shown upright and full size in front of the field: what the app actually does, in the order you
-# meet it. Browse, play, follow the words, shape the sound.
+# meet it. Discover, play, follow the words, come back to your own collection.
 FOREGROUND = [
     'screenshot_home.PNG',
     'screenshot_player.PNG',
     'screenshot_lyrics.PNG',
-    'screenshot_equalizer.PNG',
+    'screenshot_library.PNG',
 ]
 
 CANVAS_W, CANVAS_H = 2600, 1180
@@ -51,6 +51,7 @@ COL_STEP = 1.12       # column pitch, as a multiple of a phone's width  (>1 leav
 ROW_STEP = 1.10       # row pitch, as a multiple of a phone's height
 ROW_DRIFT = 0.30      # each row slides this fraction of a column sideways, so successive rows step
                       # up instead of squaring off into a plain grid. 0 gives an exact rectangle.
+FIELD_BLUR = 5        # softens the field so it sits behind the foreground instead of competing
 CORNER_RADIUS = 18
 DEFAULT_SEED = 11
 
@@ -139,6 +140,9 @@ def build_field(seed):
     left = (grid.size[0] - CANVAS_W) // 2
     top = (grid.size[1] - CANVAS_H) // 2
     field = grid.crop((left, top, left + CANVAS_W, top + CANVAS_H))
+    if FIELD_BLUR:
+        # Blur before compositing, so the gradient underneath stays clean.
+        field = field.filter(ImageFilter.GaussianBlur(FIELD_BLUR))
     return Image.alpha_composite(create_gradient_background(CANVAS_W, CANVAS_H), field)
 
 

@@ -37,8 +37,8 @@ OUTPUT_W = 1800       # composed large, delivered smaller: sharper edges, a thir
 HERO_H = 780          # height of the upright hero
 TILE_H = 460          # height of each tilted screen in the field
 TILE_ANGLE = -30      # degrees; one angle for the whole field keeps it isometric
-COL_STEP = 0.78       # horizontal spacing, as a fraction of a tile's width
-ROW_STEP = 0.33       # vertical spacing, as a fraction of a tile's height
+COL_STEP = 1.12       # column pitch, as a multiple of a phone's width  (>1 leaves a gutter)
+ROW_STEP = 1.10       # row pitch, as a multiple of a phone's height
 CORNER_RADIUS = 18
 DEFAULT_SEED = 11
 
@@ -94,25 +94,36 @@ def load_screen(name, height):
 
 
 def build_field(seed):
-    """The tilted lattice that fills the canvas and bleeds off every edge."""
-    rnd = random.Random(seed)
-    tiles = [add_shadow(load_screen(name, TILE_H).rotate(TILE_ANGLE, resample=Image.BICUBIC, expand=True))
-             for name in SCREENSHOTS]
-    tw, th = tiles[0].size
-    dx, dy = int(tw * COL_STEP), int(th * ROW_STEP)
+    """The tilted field that fills the canvas and bleeds off every edge.
 
-    layer = Image.new('RGBA', (CANVAS_W, CANVAS_H), (0, 0, 0, 0))
+    Built upright on a plain grid and rotated as a whole, NOT by rotating each phone onto a tilted
+    lattice. Rotating the finished grid keeps both axes aligned, so the phones read as continuous
+    diagonal lines; tilting them individually leaves the columns visibly out of step.
+    """
+    rnd = random.Random(seed)
+    tiles = [add_shadow(load_screen(name, TILE_H)) for name in SCREENSHOTS]
+    pw, ph = load_screen(SCREENSHOTS[0], TILE_H).size
+    pad = (tiles[0].size[0] - pw) // 2          # shadow padding, so phones land on the grid itself
+    step_x, step_y = int(pw * COL_STEP), int(ph * ROW_STEP)
+
+    # Rotating shrinks the usable area to the inscribed rectangle, so build past the diagonal.
+    span = int((CANVAS_W ** 2 + CANVAS_H ** 2) ** 0.5) + 2 * max(step_x, step_y)
+    cols, rows = span // step_x + 2, span // step_y + 2
+
+    grid = Image.new('RGBA', (cols * step_x, rows * step_y), (0, 0, 0, 0))
     bag = []
-    for r in range(-2, CANVAS_H // dy + 3):
-        # Alternate rows shift half a column, which is what turns a grid into a weave.
-        x = -tw // 2 + (dx // 2 if r % 2 else 0)
-        while x < CANVAS_W + tw // 2:
+    for r in range(rows):
+        for c in range(cols):
             if not bag:
                 bag = tiles[:]
                 rnd.shuffle(bag)
-            layer.paste(bag[-1], (x, r * dy - th // 2), bag.pop())
-            x += dx
-    return Image.alpha_composite(create_gradient_background(CANVAS_W, CANVAS_H), layer)
+            grid.paste(bag[-1], (c * step_x - pad, r * step_y - pad), bag.pop())
+
+    grid = grid.rotate(TILE_ANGLE, resample=Image.BICUBIC, expand=True)
+    left = (grid.size[0] - CANVAS_W) // 2
+    top = (grid.size[1] - CANVAS_H) // 2
+    field = grid.crop((left, top, left + CANVAS_W, top + CANVAS_H))
+    return Image.alpha_composite(create_gradient_background(CANVAS_W, CANVAS_H), field)
 
 
 def dim_towards_centre(canvas):

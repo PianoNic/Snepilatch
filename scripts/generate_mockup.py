@@ -15,9 +15,11 @@ SCREENSHOTS = [
     'screenshot_library.PNG',
 ]
 
+# Working area; the finished banner is cropped to the phones plus PAD_X/PAD_Y.
 CANVAS_W, CANVAS_H = 1400, 750
 TARGET_H = 520
 CORNER_RADIUS = 18
+PAD_X, PAD_Y = 8, 8
 
 # App brand colors
 BG_COLOR_TOP = (18, 18, 18)       # #121212
@@ -93,7 +95,6 @@ def add_shadow(img, offset=10, blur=20, opacity=100):
 
 def generate():
     imgs = [Image.open(os.path.join(ASSETS_DIR, s)).convert('RGBA') for s in SCREENSHOTS]
-    canvas = create_gradient_background(CANVAS_W, CANVAS_H)
 
     # Resize and round corners
     processed = []
@@ -115,18 +116,33 @@ def generate():
         phone = apply_perspective(processed[i], direction, strength)
         final_phones.append(add_shadow(phone, offset=8, blur=15, opacity=80))
 
-    # Position with overlap
+    # Lay the phones out on their own transparent layer, overlapping, outer two sitting lower.
+    layer = Image.new('RGBA', (CANVAS_W, CANVAS_H), (0, 0, 0, 0))
     total_width = sum(p.size[0] for p in final_phones) - 180
     x = (CANVAS_W - total_width) // 2
     y_offsets = [60, 30, 30, 60]
 
     for i, phone in enumerate(final_phones):
-        canvas.paste(phone, (x, y_offsets[i]), phone)
+        layer.paste(phone, (x, y_offsets[i]), phone)
         x += phone.size[0] - 60
+
+    # Crop to what was actually drawn, so the framing doesn't depend on the screenshots' aspect
+    # ratio. Without this a taller or shorter set leaves a band of empty gradient (the previous
+    # banner had to be trimmed by hand after generating).
+    box = layer.getbbox()
+    left, top, right, bottom = box
+    left = max(0, left - PAD_X)
+    right = min(CANVAS_W, right + PAD_X)
+    top = max(0, top - PAD_Y)
+    bottom = min(CANVAS_H, bottom + PAD_Y)
+    w, h = right - left, bottom - top
+
+    canvas = create_gradient_background(w, h)
+    canvas = Image.alpha_composite(canvas, layer.crop((left, top, right, bottom)))
 
     out = os.path.join(ASSETS_DIR, 'product_mockup.png')
     canvas.save(out, 'PNG')
-    print(f'Saved {CANVAS_W}x{CANVAS_H} -> {out}')
+    print(f'Saved {w}x{h} -> {out}')
 
 
 if __name__ == '__main__':

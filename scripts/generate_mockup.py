@@ -1,149 +1,189 @@
 """
-Generate product mockup image for README / app store listings.
-Usage: python scripts/generate_mockup.py
+Generate the product mockup banner for the README.
+Usage: python scripts/generate_mockup.py [seed]
 
-Reads screenshots from assets/ and outputs assets/product_mockup.png
+Reads the screenshots from assets/ and writes assets/product_mockup.png.
+
+Layout: an isometric weave of every screenshot, with one upright hero standing in the middle. The
+lattice is exact so the field reads as a pattern rather than a scatter; only WHICH screen lands in
+each slot is shuffled, drawn from a bag so no screen repeats until all of them have appeared. Pass a
+different seed for a different arrangement of the same screens.
 """
 from PIL import Image, ImageDraw, ImageFilter
 import os
+import random
+import sys
 
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), '..', 'assets')
+
+# Every screen we have. Order only affects the shuffle, not the composition.
 SCREENSHOTS = [
+    'screenshot_library.PNG',
+    'screenshot_player_alt.PNG',
+    'screenshot_lyrics.PNG',
     'screenshot_home.PNG',
+    'screenshot_player_wave.PNG',
+    'screenshot_equalizer.PNG',
+    'screenshot_playlist.PNG',
     'screenshot_player.PNG',
     'screenshot_search.PNG',
+    'screenshot_artist.PNG',
+    'screenshot_album.PNG',
+]
+
+# Shown upright and full size in front of the field: what the app actually does, in the order you
+# meet it. Discover, play, follow the words, come back to your own collection.
+FOREGROUND = [
+    'screenshot_home.PNG',
+    'screenshot_player.PNG',
+    'screenshot_lyrics.PNG',
     'screenshot_library.PNG',
 ]
 
-# Working area; the finished banner is cropped to the phones plus PAD_X/PAD_Y.
-CANVAS_W, CANVAS_H = 1400, 750
-TARGET_H = 520
+CANVAS_W, CANVAS_H = 2600, 1180
+OUTPUT_W = 1800       # composed large, delivered smaller: sharper edges, a third of the file size
+HERO_H = 660          # height of the upright foreground screens
+HERO_OVERLAP = 0.10   # how much neighbouring foreground screens overlap, as a fraction of width
+HERO_STAGGER = 34     # outer screens sit this many px lower than the inner pair
+TILE_H = 460          # height of each tilted screen in the field
+TILE_ANGLE = -30      # degrees; one angle for the whole field keeps it isometric
+COL_STEP = 1.12       # column pitch, as a multiple of a phone's width  (>1 leaves a gutter)
+ROW_STEP = 1.10       # row pitch, as a multiple of a phone's height
+ROW_DRIFT = 0.30      # each row slides this fraction of a column sideways, so successive rows step
+                      # up instead of squaring off into a plain grid. 0 gives an exact rectangle.
+FIELD_BLUR = 5        # softens the field so it sits behind the foreground instead of competing
 CORNER_RADIUS = 18
-PAD_X, PAD_Y = 8, 8
+DEFAULT_SEED = 11
 
-# App brand colors
 BG_COLOR_TOP = (18, 18, 18)       # #121212
 BG_COLOR_BOTTOM = (20, 22, 30)
 ACCENT_GREEN = (29, 185, 84)      # #1DB954
 
 
 def create_gradient_background(w, h):
-    canvas = Image.new('RGBA', (w, h), (0, 0, 0, 0))
+    canvas = Image.new('RGBA', (w, h))
     draw = ImageDraw.Draw(canvas)
     for y in range(h):
-        t = y / h
-        r = int(BG_COLOR_TOP[0] + (BG_COLOR_BOTTOM[0] - BG_COLOR_TOP[0]) * t)
-        g = int(BG_COLOR_TOP[1] + (BG_COLOR_BOTTOM[1] - BG_COLOR_TOP[1]) * t)
-        b = int(BG_COLOR_TOP[2] + (BG_COLOR_BOTTOM[2] - BG_COLOR_TOP[2]) * t)
-        draw.line([(0, y), (w, y)], fill=(r, g, b, 255))
+        t = y / max(1, h)
+        draw.line([(0, y), (w, y)], fill=(
+            int(BG_COLOR_TOP[0] + (BG_COLOR_BOTTOM[0] - BG_COLOR_TOP[0]) * t),
+            int(BG_COLOR_TOP[1] + (BG_COLOR_BOTTOM[1] - BG_COLOR_TOP[1]) * t),
+            int(BG_COLOR_TOP[2] + (BG_COLOR_BOTTOM[2] - BG_COLOR_TOP[2]) * t), 255))
 
-    # Subtle green glow at bottom center
     glow = Image.new('RGBA', (w, h), (0, 0, 0, 0))
     glow_draw = ImageDraw.Draw(glow)
-    cx, cy = w // 2, h + 100
-    for radius in range(400, 0, -1):
-        alpha = int(12 * (1 - radius / 400))
+    cx, cy = w // 2, h + 80
+    for radius in range(420, 0, -1):
+        alpha = int(14 * (1 - radius / 420))
         glow_draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius],
-                          fill=(ACCENT_GREEN[0], ACCENT_GREEN[1], ACCENT_GREEN[2], alpha))
-    glow = glow.filter(ImageFilter.GaussianBlur(40))
-    return Image.alpha_composite(canvas, glow)
+                          fill=(*ACCENT_GREEN, alpha))
+    return Image.alpha_composite(canvas, glow.filter(ImageFilter.GaussianBlur(40)))
 
 
 def add_rounded_corners(img, radius=CORNER_RADIUS):
     mask = Image.new('L', img.size, 0)
-    d = ImageDraw.Draw(mask)
-    d.rounded_rectangle([0, 0, img.size[0] - 1, img.size[1] - 1], radius=radius, fill=255)
+    ImageDraw.Draw(mask).rounded_rectangle([0, 0, img.size[0] - 1, img.size[1] - 1],
+                                           radius=radius, fill=255)
     result = Image.new('RGBA', img.size, (0, 0, 0, 0))
     result.paste(img, mask=mask)
     return result
 
 
-def apply_perspective(img, direction, strength=0.12):
-    w, h = img.size
-    s = strength
-    if direction == 'left':
-        coeffs = [1 + s * 0.3, s * 0.15, -w * s * 0.1,
-                  s * 0.05, 1 + s * 0.1, 0,
-                  s * 0.0004, s * 0.00008, 1]
-    elif direction == 'right':
-        coeffs = [1 + s * 0.3, -s * 0.15, w * s * 0.05,
-                  -s * 0.05, 1 + s * 0.1, 0,
-                  -s * 0.0004, s * 0.00008, 1]
-    elif direction == 'slight_left':
-        s *= 0.5
-        coeffs = [1 + s * 0.2, s * 0.1, -w * s * 0.05,
-                  s * 0.03, 1 + s * 0.05, 0,
-                  s * 0.0003, s * 0.00005, 1]
-    else:  # slight_right
-        s *= 0.5
-        coeffs = [1 + s * 0.2, -s * 0.1, w * s * 0.03,
-                  -s * 0.03, 1 + s * 0.05, 0,
-                  -s * 0.0003, s * 0.00005, 1]
-    return img.transform((int(w * 1.2), int(h * 1.1)), Image.PERSPECTIVE, coeffs, Image.BICUBIC)
+def add_shadow(img, blur=16, opacity=95, offset=10):
+    pad = blur * 2
+    layer = Image.new('RGBA', (img.size[0] + pad, img.size[1] + pad + offset), (0, 0, 0, 0))
+    base = Image.new('RGBA', img.size, (0, 0, 0, opacity))
+    base.putalpha(img.split()[3])
+    layer.paste(base, (blur, blur + offset))
+    layer = layer.filter(ImageFilter.GaussianBlur(blur))
+    layer.paste(img, (blur, blur), img)
+    return layer
 
 
-def add_shadow(img, offset=10, blur=20, opacity=100):
-    shadow = Image.new('RGBA', (img.size[0] + blur * 2 + offset, img.size[1] + blur * 2 + offset), (0, 0, 0, 0))
-    shadow_base = Image.new('RGBA', img.size, (0, 0, 0, opacity))
-    if img.mode == 'RGBA':
-        shadow_base.putalpha(img.split()[3])
-    shadow.paste(shadow_base, (blur + offset, blur + offset))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(blur))
-    shadow.paste(img, (blur, blur), img)
-    return shadow
+def load_screen(name, height):
+    img = Image.open(os.path.join(ASSETS_DIR, name)).convert('RGBA')
+    ratio = height / img.size[1]
+    return add_rounded_corners(img.resize((int(img.size[0] * ratio), height), Image.LANCZOS))
 
 
-def generate():
-    imgs = [Image.open(os.path.join(ASSETS_DIR, s)).convert('RGBA') for s in SCREENSHOTS]
+def build_field(seed):
+    """The tilted field that fills the canvas and bleeds off every edge.
 
-    # Resize and round corners
-    processed = []
-    for img in imgs:
-        ratio = TARGET_H / img.size[1]
-        resized = img.resize((int(img.size[0] * ratio), TARGET_H), Image.LANCZOS)
-        processed.append(add_rounded_corners(resized))
+    Built upright on a plain grid and rotated as a whole, NOT by rotating each phone onto a tilted
+    lattice. Rotating the finished grid keeps both axes aligned, so the phones read as continuous
+    diagonal lines; tilting them individually leaves the columns visibly out of step.
+    """
+    rnd = random.Random(seed)
+    tiles = [add_shadow(load_screen(name, TILE_H)) for name in SCREENSHOTS]
+    pw, ph = load_screen(SCREENSHOTS[0], TILE_H).size
+    pad = (tiles[0].size[0] - pw) // 2          # shadow padding, so phones land on the grid itself
+    step_x, step_y = int(pw * COL_STEP), int(ph * ROW_STEP)
 
-    # Perspective configs: (direction, strength)
-    configs = [
-        ('left', 0.14),
-        ('slight_left', 0.08),
-        ('slight_right', 0.08),
-        ('right', 0.14),
-    ]
+    # Rotating shrinks the usable area to the inscribed rectangle, so build past the diagonal.
+    span = int((CANVAS_W ** 2 + CANVAS_H ** 2) ** 0.5) + 2 * max(step_x, step_y)
+    cols, rows = span // step_x + 2, span // step_y + 2
 
-    final_phones = []
-    for i, (direction, strength) in enumerate(configs):
-        phone = apply_perspective(processed[i], direction, strength)
-        final_phones.append(add_shadow(phone, offset=8, blur=15, opacity=80))
+    # Each row slides sideways by a constant amount, which reads as a step up once the field is
+    # tilted. The lattice stays exact — it is a parallelogram rather than a rectangle — so the
+    # diagonals still run unbroken. Width grows to cover the total slide.
+    drift = int(step_x * ROW_DRIFT)
+    grid = Image.new('RGBA', (cols * step_x + rows * drift, rows * step_y), (0, 0, 0, 0))
+    bag = []
+    for r in range(rows):
+        for c in range(cols):
+            if not bag:
+                bag = tiles[:]
+                rnd.shuffle(bag)
+            grid.paste(bag[-1], (c * step_x + r * drift - pad, r * step_y - pad), bag.pop())
 
-    # Lay the phones out on their own transparent layer, overlapping, outer two sitting lower.
-    layer = Image.new('RGBA', (CANVAS_W, CANVAS_H), (0, 0, 0, 0))
-    total_width = sum(p.size[0] for p in final_phones) - 180
-    x = (CANVAS_W - total_width) // 2
-    y_offsets = [60, 30, 30, 60]
+    grid = grid.rotate(TILE_ANGLE, resample=Image.BICUBIC, expand=True)
+    left = (grid.size[0] - CANVAS_W) // 2
+    top = (grid.size[1] - CANVAS_H) // 2
+    field = grid.crop((left, top, left + CANVAS_W, top + CANVAS_H))
+    if FIELD_BLUR:
+        # Blur before compositing, so the gradient underneath stays clean.
+        field = field.filter(ImageFilter.GaussianBlur(FIELD_BLUR))
+    return Image.alpha_composite(create_gradient_background(CANVAS_W, CANVAS_H), field)
 
-    for i, phone in enumerate(final_phones):
-        layer.paste(phone, (x, y_offsets[i]), phone)
-        x += phone.size[0] - 60
 
-    # Crop to what was actually drawn, so the framing doesn't depend on the screenshots' aspect
-    # ratio. Without this a taller or shorter set leaves a band of empty gradient (the previous
-    # banner had to be trimmed by hand after generating).
-    box = layer.getbbox()
-    left, top, right, bottom = box
-    left = max(0, left - PAD_X)
-    right = min(CANVAS_W, right + PAD_X)
-    top = max(0, top - PAD_Y)
-    bottom = min(CANVAS_H, bottom + PAD_Y)
-    w, h = right - left, bottom - top
+def dim_towards_centre(canvas):
+    """Fade the field down behind the foreground row so it reads as backdrop, not competition.
 
-    canvas = create_gradient_background(w, h)
-    canvas = Image.alpha_composite(canvas, layer.crop((left, top, right, bottom)))
+    A wide ellipse rather than a circle, because the foreground is a row of four.
+    """
+    veil = Image.new('RGBA', canvas.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(veil)
+    cx, cy = canvas.size[0] // 2, canvas.size[1] // 2
+    reach = int(canvas.size[0] * 0.60)
+    for radius in range(reach, 0, -3):
+        alpha = int(150 * (1 - radius / reach))
+        draw.ellipse([cx - radius, cy - int(radius * 0.44), cx + radius, cy + int(radius * 0.44)],
+                     fill=(10, 11, 13, alpha))
+    return Image.alpha_composite(canvas, veil.filter(ImageFilter.GaussianBlur(80)))
+
+
+def generate(seed=DEFAULT_SEED):
+    canvas = dim_towards_centre(build_field(seed))
+
+    phones = [add_shadow(load_screen(name, HERO_H), blur=34, opacity=170) for name in FOREGROUND]
+    overlap = int(phones[0].size[0] * HERO_OVERLAP)
+    total = sum(p.size[0] for p in phones) - overlap * (len(phones) - 1)
+    x = (CANVAS_W - total) // 2
+    mid = (len(phones) - 1) / 2
+    for i, phone in enumerate(phones):
+        # Outer screens ride lower, so the row arcs slightly instead of sitting on one line.
+        drop = int(HERO_STAGGER * abs(i - mid) / mid) if mid else 0
+        canvas.paste(phone, (x, (CANVAS_H - phone.size[1]) // 2 + drop), phone)
+        x += phone.size[0] - overlap
+
+    height = round(CANVAS_H * OUTPUT_W / CANVAS_W)
+    canvas = canvas.convert('RGB').resize((OUTPUT_W, height), Image.LANCZOS)
 
     out = os.path.join(ASSETS_DIR, 'product_mockup.png')
-    canvas.save(out, 'PNG')
-    print(f'Saved {w}x{h} -> {out}')
+    canvas.save(out, 'PNG', optimize=True)
+    size_mb = os.path.getsize(out) / 1024 / 1024
+    print(f'Saved {OUTPUT_W}x{height} ({size_mb:.1f} MB, seed {seed}) -> {out}')
 
 
 if __name__ == '__main__':
-    generate()
+    generate(int(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_SEED)

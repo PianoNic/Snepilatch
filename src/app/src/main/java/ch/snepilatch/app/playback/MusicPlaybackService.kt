@@ -460,13 +460,14 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
      * metadata), so every track takes the flat user-set attenuation.
      */
     fun applyHeadroomGain(trackLoudnessDb: Double? = null) {
-        val gain = if (AppSettings.eqHeadroomEnabled.value) {
+        // Only an external equalizer needs this: our own computes its input gain from the curve.
+        val gain = if (AppSettings.eqExternal) {
             LoudnessNormalization.gainFor(trackLoudnessDb, AppSettings.eqHeadroomDb.value.toDouble())
         } else {
             1f
         }
         val branch = if (trackLoudnessDb != null) "loudness=${trackLoudnessDb}dB" else "flat"
-        LokiLogger.i(TAG, "Headroom gain=$gain ($branch, enabled=${AppSettings.eqHeadroomEnabled.value})")
+        LokiLogger.i(TAG, "Headroom gain=$gain ($branch, eqMode=${AppSettings.eqMode.value})")
         gainProcessor.setGain(gain)
     }
 
@@ -490,7 +491,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
     fun syncEqualizer() {
         equalizer.debugLowPriority = lowPriorityDebug
-        if (AppSettings.eqEnabled.value) {
+        if (AppSettings.eqInApp) {
             // Evict external effect apps first — see broadcastAudioEffectAction for why sharing fails.
             if (openAudioEffectSession) {
                 broadcastAudioEffectAction(AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION)
@@ -498,11 +499,12 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             }
             equalizer.attach(currentAudioSessionId, AppSettings.eqBands.value)
             // The effect refused to be created on a live session (some Samsung firmware does this).
-            // Turn the feature off rather than leave the user with neither our EQ nor their external
-            // one: this flips the toggle, releases, and re-advertises the session on the way back in.
+            // Drop to Off rather than leave the user with neither our EQ nor their external one: the
+            // else branch below then releases and re-advertises the session for external effect apps.
+            // Off rather than External, so nobody gets silent attenuation with no equalizer attached.
             if (equalizer.supported && currentAudioSessionId != 0 && !equalizer.attached) {
                 LokiLogger.e(TAG, "EQ unavailable on this device — falling back to external effects")
-                AppSettings.setEqEnabled(false, this)
+                AppSettings.setEqMode(AppSettings.EQ_OFF, this)
             }
         } else {
             equalizer.release()
@@ -518,7 +520,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     fun setEqCurve(bands: FloatArray) {
         if (!equalizer.applyCurve(bands)) {
             LokiLogger.e(TAG, "EQ curve could not be applied — disabling in-app EQ")
-            AppSettings.setEqEnabled(false, this)
+            AppSettings.setEqMode(AppSettings.EQ_OFF, this)
         }
     }
 
@@ -1258,7 +1260,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         // a Galaxy (Android 16): once Samsung's SoundAlive attaches after this broadcast, every
         // DynamicsProcessing write on the same session fails with "invalid parameter operation" — and
         // two EQs in one chain would double-process anyway. CLOSE always goes out, so they detach.
-        if (action == AudioEffect.ACTION_OPEN_AUDIO_EFFECT_CONTROL_SESSION && AppSettings.eqEnabled.value) {
+        if (action == AudioEffect.ACTION_OPEN_AUDIO_EFFECT_CONTROL_SESSION && AppSettings.eqInApp) {
             LokiLogger.i(TAG, "Not advertising session $currentAudioSessionId — in-app EQ owns it")
             return
         }

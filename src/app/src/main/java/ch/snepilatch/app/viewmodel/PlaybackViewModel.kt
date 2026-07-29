@@ -1796,7 +1796,7 @@ class PlaybackViewModel : ViewModel() {
 
     /** In-app EQ on: our screen owns the curve. Off: hand the user to their external EQ app. */
     fun openEqualizer(context: android.content.Context) {
-        if (AppSettings.eqEnabled.value) {
+        if (AppSettings.eqInApp) {
             navigateTo(Screen.EQUALIZER)
             return
         }

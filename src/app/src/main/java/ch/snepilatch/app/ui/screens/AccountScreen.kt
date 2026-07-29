@@ -13,7 +13,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ExitToApp
-import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -139,9 +138,150 @@ fun AccountScreen(vm: PlaybackViewModel) {
         )
 
         Spacer(Modifier.height(24.dp))
-        AccountSectionHeader(stringResource(R.string.account_section_appearance))
+        AccountSectionHeader(stringResource(R.string.account_section_playback))
 
         val audioContext = androidx.compose.ui.platform.LocalContext.current
+
+        // Audio settings
+        val audioSource by AppSettings.preferredAudioSource.collectAsState()
+        val isLossless = audioSource != null
+        val losslessSubtitle = if (isLossless) {
+            stringResource(R.string.lossless_on_flac)
+        } else {
+            stringResource(R.string.lossless_off_spfy)
+        }
+
+        // Lossless toggle — when on, the resolver picks the best source
+        // (Qobuz, then Deezer) autonomously; no provider choice.
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.lossless_audio), color = SpfyWhite) },
+            supportingContent = { Text(losslessSubtitle, color = SpfyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.MusicNote, null, tint = SpfyLightGray) },
+            trailingContent = {
+                Switch(
+                    checked = isLossless,
+                    onCheckedChange = { enabled ->
+                        AppSettings.setPreferredAudioSource(if (enabled) "lossless" else null, audioContext)
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = animatedPrimary,
+                        checkedTrackColor = animatedPrimary.copy(alpha = 0.5f),
+                        uncheckedThumbColor = SpfyLightGray,
+                        uncheckedTrackColor = SpfyLightGray.copy(alpha = 0.3f)
+                    )
+                )
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+        )
+
+        // Content region picker
+        val currentRegion by AppSettings.contentRegion.collectAsState()
+        var showRegionPicker by remember { mutableStateOf(false) }
+        val regionLabel = if (currentRegion == "nearest") {
+            stringResource(R.string.region_nearest)
+        } else {
+            currentRegion
+        }
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.content_region), color = SpfyWhite) },
+            supportingContent = { Text(regionLabel, color = SpfyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.Language, null, tint = SpfyLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable { showRegionPicker = true }
+        )
+        if (showRegionPicker) {
+            val regionOptions = listOf(
+                "nearest" to stringResource(R.string.region_nearest),
+                "US" to stringResource(R.string.region_us),
+                "GB" to stringResource(R.string.region_gb),
+                "DE" to stringResource(R.string.region_de),
+                "CH" to stringResource(R.string.region_ch),
+                "FR" to stringResource(R.string.region_fr),
+                "JP" to stringResource(R.string.region_jp),
+                "KR" to stringResource(R.string.region_kr),
+                "AU" to stringResource(R.string.region_au),
+                "BR" to stringResource(R.string.region_br),
+                "CA" to stringResource(R.string.region_ca),
+                "SE" to stringResource(R.string.region_se)
+            )
+            RadioPickerDialog(
+                title = stringResource(R.string.content_region),
+                options = regionOptions.map { RadioOption(it.first, it.second, it.first) },
+                selected = currentRegion,
+                selectedColor = animatedPrimary,
+                onSelect = {
+                    AppSettings.setContentRegion(it, audioContext)
+                    showRegionPicker = false
+                },
+                onDismiss = { showRegionPicker = false }
+            )
+        }
+
+        // Connect to device (Playback)
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.connect_to_device), color = SpfyWhite) },
+            leadingContent = { Icon(Icons.Rounded.Devices, null, tint = SpfyLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable { vm.loadDevices(); vm.showDevices.value = true }
+        )
+
+        Spacer(Modifier.height(24.dp))
+        AccountSectionHeader(stringResource(R.string.account_section_sound))
+
+        // Equalizer: one choice, because the options exclude each other. Our EQ computes its own
+        // input gain from the curve; the headroom attenuation exists only to give an external EQ room
+        // to boost into. See AppSettings.eqMode.
+        val eqMode by AppSettings.eqMode.collectAsState()
+        val headroomDb by AppSettings.eqHeadroomDb.collectAsState()
+        var showEqPicker by remember { mutableStateOf(false) }
+        val eqModeLabel = when (eqMode) {
+            AppSettings.EQ_IN_APP -> stringResource(R.string.eq_in_app)
+            AppSettings.EQ_EXTERNAL -> stringResource(R.string.eq_mode_external_at, headroomDb.toInt())
+            else -> stringResource(R.string.state_off)
+        }
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.equalizer), color = SpfyWhite) },
+            supportingContent = { Text(eqModeLabel, color = SpfyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.GraphicEq, null, tint = SpfyLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable { showEqPicker = true }
+        )
+        if (showEqPicker) {
+            RadioPickerDialog(
+                title = stringResource(R.string.equalizer),
+                options = listOf(
+                    RadioOption(AppSettings.EQ_OFF, stringResource(R.string.state_off), stringResource(R.string.eq_mode_off_desc)),
+                    RadioOption(AppSettings.EQ_IN_APP, stringResource(R.string.eq_in_app), stringResource(R.string.eq_mode_in_app_desc)),
+                    RadioOption(AppSettings.EQ_EXTERNAL, stringResource(R.string.eq_mode_external), stringResource(R.string.eq_mode_external_desc))
+                ),
+                selected = eqMode,
+                selectedColor = animatedPrimary,
+                onSelect = { picked ->
+                    AppSettings.setEqMode(picked, audioContext)
+                    showEqPicker = false
+                    // Straight into the curve editor: picking In-app is a request to shape it.
+                    if (picked == AppSettings.EQ_IN_APP) vm.navigateTo(ch.snepilatch.app.data.Screen.EQUALIZER)
+                },
+                onDismiss = { showEqPicker = false }
+            )
+        }
+        // Only External uses this attenuation; the in-app EQ stages its own gain.
+        if (eqMode == AppSettings.EQ_EXTERNAL) {
+            Slider(
+                value = headroomDb,
+                onValueChange = { AppSettings.setEqHeadroomDb(it.toInt().toFloat(), audioContext) },
+                valueRange = -18f..0f,
+                steps = 17,
+                colors = SliderDefaults.colors(thumbColor = animatedPrimary, activeTrackColor = animatedPrimary),
+                modifier = Modifier.padding(horizontal = 24.dp)
+            )
+        }
+
+        Spacer(Modifier.height(24.dp))
+        AccountSectionHeader(stringResource(R.string.account_section_appearance))
 
         // Language picker
         val appLanguage by AppSettings.appLanguage.collectAsState()
@@ -209,98 +349,6 @@ fun AccountScreen(vm: PlaybackViewModel) {
             )
         }
 
-        Spacer(Modifier.height(24.dp))
-        AccountSectionHeader(stringResource(R.string.account_section_playback))
-
-        // Audio settings
-        val audioSource by AppSettings.preferredAudioSource.collectAsState()
-        val isLossless = audioSource != null
-        val losslessSubtitle = if (isLossless) {
-            stringResource(R.string.lossless_on_flac)
-        } else {
-            stringResource(R.string.lossless_off_spfy)
-        }
-
-        // Lossless toggle — when on, the resolver picks the best source
-        // (Qobuz, then Deezer) autonomously; no provider choice.
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.lossless_audio), color = SpfyWhite) },
-            supportingContent = { Text(losslessSubtitle, color = SpfyLightGray) },
-            leadingContent = { Icon(Icons.Rounded.MusicNote, null, tint = SpfyLightGray) },
-            trailingContent = {
-                Switch(
-                    checked = isLossless,
-                    onCheckedChange = { enabled ->
-                        AppSettings.setPreferredAudioSource(if (enabled) "lossless" else null, audioContext)
-                    },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = animatedPrimary,
-                        checkedTrackColor = animatedPrimary.copy(alpha = 0.5f),
-                        uncheckedThumbColor = SpfyLightGray,
-                        uncheckedTrackColor = SpfyLightGray.copy(alpha = 0.3f)
-                    )
-                )
-            },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-        )
-
-        // EQ headroom — a flat attenuation for people running an EXTERNAL equalizer. Off by default:
-        // with no EQ attached it is pure level loss, and the in-app EQ makes its own headroom.
-        val headroomOn by AppSettings.eqHeadroomEnabled.collectAsState()
-        val headroomDb by AppSettings.eqHeadroomDb.collectAsState()
-        // The in-app EQ owns its own gain staging, so stacking this on top would double-attenuate.
-        val inAppEqOn by AppSettings.eqEnabled.collectAsState()
-
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.equalizer), color = SpfyWhite) },
-            supportingContent = {
-                Text(stringResource(if (inAppEqOn) R.string.state_on else R.string.state_off), color = SpfyLightGray)
-            },
-            leadingContent = { Icon(Icons.Rounded.GraphicEq, null, tint = SpfyLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            modifier = Modifier.clickable { vm.navigateTo(ch.snepilatch.app.data.Screen.EQUALIZER) }
-        )
-
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.eq_headroom), color = SpfyWhite) },
-            supportingContent = {
-                Text(
-                    when {
-                        inAppEqOn -> stringResource(R.string.eq_headroom_handled)
-                        headroomOn -> stringResource(R.string.eq_headroom_on, headroomDb.toInt())
-                        else -> stringResource(R.string.eq_headroom_off)
-                    },
-                    color = SpfyLightGray
-                )
-            },
-            leadingContent = { Icon(Icons.AutoMirrored.Rounded.VolumeUp, null, tint = SpfyLightGray) },
-            trailingContent = {
-                Switch(
-                    checked = headroomOn && !inAppEqOn,
-                    enabled = !inAppEqOn,
-                    onCheckedChange = { AppSettings.setEqHeadroomEnabled(it, audioContext) },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = animatedPrimary,
-                        checkedTrackColor = animatedPrimary.copy(alpha = 0.5f),
-                        uncheckedThumbColor = SpfyLightGray,
-                        uncheckedTrackColor = SpfyLightGray.copy(alpha = 0.3f)
-                    )
-                )
-            },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-        )
-        if (headroomOn && !inAppEqOn) {
-            Slider(
-                value = headroomDb,
-                onValueChange = { AppSettings.setEqHeadroomDb(it.toInt().toFloat(), audioContext) },
-                valueRange = -18f..0f,
-                steps = 17,
-                colors = SliderDefaults.colors(thumbColor = animatedPrimary, activeTrackColor = animatedPrimary),
-                modifier = Modifier.padding(horizontal = 24.dp)
-            )
-        }
-
         // Canvas background
         val canvasOn by AppSettings.canvasEnabled.collectAsState()
         ListItem(
@@ -349,59 +397,6 @@ fun AccountScreen(vm: PlaybackViewModel) {
                 )
             },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-        )
-
-        // Content region picker
-        val currentRegion by AppSettings.contentRegion.collectAsState()
-        var showRegionPicker by remember { mutableStateOf(false) }
-        val regionLabel = if (currentRegion == "nearest") {
-            stringResource(R.string.region_nearest)
-        } else {
-            currentRegion
-        }
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.content_region), color = SpfyWhite) },
-            supportingContent = { Text(regionLabel, color = SpfyLightGray) },
-            leadingContent = { Icon(Icons.Rounded.Language, null, tint = SpfyLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            modifier = Modifier.clickable { showRegionPicker = true }
-        )
-        if (showRegionPicker) {
-            val regionOptions = listOf(
-                "nearest" to stringResource(R.string.region_nearest),
-                "US" to stringResource(R.string.region_us),
-                "GB" to stringResource(R.string.region_gb),
-                "DE" to stringResource(R.string.region_de),
-                "CH" to stringResource(R.string.region_ch),
-                "FR" to stringResource(R.string.region_fr),
-                "JP" to stringResource(R.string.region_jp),
-                "KR" to stringResource(R.string.region_kr),
-                "AU" to stringResource(R.string.region_au),
-                "BR" to stringResource(R.string.region_br),
-                "CA" to stringResource(R.string.region_ca),
-                "SE" to stringResource(R.string.region_se)
-            )
-            RadioPickerDialog(
-                title = stringResource(R.string.content_region),
-                options = regionOptions.map { RadioOption(it.first, it.second, it.first) },
-                selected = currentRegion,
-                selectedColor = animatedPrimary,
-                onSelect = {
-                    AppSettings.setContentRegion(it, audioContext)
-                    showRegionPicker = false
-                },
-                onDismiss = { showRegionPicker = false }
-            )
-        }
-
-        // Connect to device (Playback)
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.connect_to_device), color = SpfyWhite) },
-            leadingContent = { Icon(Icons.Rounded.Devices, null, tint = SpfyLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            modifier = Modifier.clickable { vm.loadDevices(); vm.showDevices.value = true }
         )
 
         Spacer(Modifier.height(24.dp))

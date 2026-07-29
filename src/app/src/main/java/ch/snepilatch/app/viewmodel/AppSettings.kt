@@ -20,6 +20,11 @@ object AppSettings {
     const val PREFS = "kotify_prefs"
     private const val TAG = "AppSettings"
 
+    // Equalizer modes; see [eqMode].
+    const val EQ_OFF = "off"
+    const val EQ_IN_APP = "inapp"
+    const val EQ_EXTERNAL = "external"
+
     @Volatile private var appContext: Context? = null
 
     // Audio source preference: null = Spfy (default), "lossless" = third-party FLAC chain.
@@ -44,15 +49,23 @@ object AppSettings {
     // Canvas background toggle (the URL itself is playback state on PlaybackViewModel).
     val canvasEnabled = MutableStateFlow(false)
 
-    // EQ headroom: a flat attenuation before the audio session, so an EXTERNAL equalizer (Wavelet &
-    // co.) has room to boost into instead of clipping. Off by default — with no EQ attached it is pure
-    // level loss. The in-app EQ doesn't need it; that one computes its own input gain from the curve.
-    val eqHeadroomEnabled = MutableStateFlow(false)
+    // How the equalizer is handled. One choice, because the options exclude each other: the in-app EQ
+    // computes its own input gain from the curve, while the headroom attenuation exists only to give an
+    // EXTERNAL equalizer (Wavelet & co.) room to boost into. Running both would attenuate twice.
+    //   [EQ_OFF]      no EQ, no attenuation
+    //   [EQ_IN_APP]   our 10-band EQ, which makes its own headroom
+    //   [EQ_EXTERNAL] no in-app EQ, just [eqHeadroomDb] of attenuation for the external one
+    val eqMode = MutableStateFlow(EQ_OFF)
     val eqHeadroomDb = MutableStateFlow(-6f)
 
-    // In-app 10-band EQ: on/off plus the per-band gains in dB (see EqualizerHeadroom.FREQUENCIES).
-    val eqEnabled = MutableStateFlow(false)
+    // Per-band gains in dB for the in-app EQ (see EqualizerHeadroom.FREQUENCIES).
     val eqBands = MutableStateFlow(FloatArray(ch.snepilatch.app.playback.EqualizerHeadroom.BANDS))
+
+    /** True when our own equalizer should be attached. */
+    val eqInApp: Boolean get() = eqMode.value == EQ_IN_APP
+
+    /** True when we should attenuate for someone else's equalizer. */
+    val eqExternal: Boolean get() = eqMode.value == EQ_EXTERNAL
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -77,9 +90,8 @@ object AppSettings {
             context.resources.updateConfiguration(config, context.resources.displayMetrics)
         }
         canvasEnabled.value = prefs.getBoolean("canvas_enabled", true)
-        eqHeadroomEnabled.value = prefs.getBoolean("eq_headroom_enabled", false)
         eqHeadroomDb.value = prefs.getFloat("eq_headroom_db", -6f)
-        eqEnabled.value = prefs.getBoolean("eq_enabled", false)
+        eqMode.value = prefs.getString("eq_mode", null) ?: migratedEqMode(prefs)
         eqBands.value = parseBands(prefs.getString("eq_bands", null))
         playerGradientBg.value = prefs.getBoolean("player_gradient_bg", true)
         contentRegion.value = prefs.getString("content_region", "nearest") ?: "nearest"
@@ -187,9 +199,21 @@ object AppSettings {
      * Persist the headroom toggle / attenuation and push the new gain to the service. It lands on the
      * next configure (track change or seek), so the level doesn't jump mid-track.
      */
-    fun setEqHeadroomEnabled(enabled: Boolean, context: Context) {
-        eqHeadroomEnabled.value = enabled
-        prefs(context).edit().putBoolean("eq_headroom_enabled", enabled).apply()
+    /**
+     * The two booleans this replaced could both be set, which the UI had to paper over. Carry the old
+     * state across once: the in-app EQ wins if it was on, otherwise headroom means an external one.
+     */
+    internal fun migratedEqMode(prefs: android.content.SharedPreferences): String = when {
+        prefs.getBoolean("eq_enabled", false) -> EQ_IN_APP
+        prefs.getBoolean("eq_headroom_enabled", false) -> EQ_EXTERNAL
+        else -> EQ_OFF
+    }
+
+    /** Switch equalizer mode: re-attach or drop our EQ, and re-stage the gain for the new mode. */
+    fun setEqMode(mode: String, context: Context) {
+        eqMode.value = mode
+        prefs(context).edit().putString("eq_mode", mode).apply()
+        MusicPlaybackService.instance?.syncEqualizer()
         MusicPlaybackService.instance?.applyHeadroomGain()
     }
 
@@ -198,12 +222,6 @@ object AppSettings {
         val bands = ch.snepilatch.app.playback.EqualizerHeadroom.BANDS
         val parsed = raw?.split(",")?.mapNotNull { it.trim().toFloatOrNull() } ?: emptyList()
         return if (parsed.size == bands) parsed.toFloatArray() else FloatArray(bands)
-    }
-
-    fun setEqEnabled(enabled: Boolean, context: Context) {
-        eqEnabled.value = enabled
-        prefs(context).edit().putBoolean("eq_enabled", enabled).apply()
-        MusicPlaybackService.instance?.syncEqualizer()
     }
 
     fun setEqBands(bands: FloatArray, context: Context) {

@@ -14,14 +14,17 @@
   <a href="https://discord.gg/NJxKMSNYRG"><img src="https://img.shields.io/discord/1288927764787752990?color=5865F2&label=Discord&logo=discord&logoColor=white" alt="Discord"/></a>
 </p>
 
+<p align="center">
+  <img src="./assets/product_mockup.png" alt="">
+</p>
+
 ## Features
 
 **Playback**
 
 - Plays locally on your phone as its own Connect device, so transport actions are never skip-capped
-- Ads are consumed silently and skipped, without spending a skip
-- Lossless audio option (FLAC via Qobuz or Deezer) alongside the standard stream
-- Gapless-style prepared boundaries, with the next track resolved before the current one ends
+- Ad-free listening
+- Optional lossless audio alongside the standard stream
 - Full Connect control: transfer to and from other devices
 
 **Sound**
@@ -49,10 +52,6 @@
 - Canvas background animations
 - English, German, Russian and Swiss German
 - Automatic in-app updates
-
-## Screenshots
-
-![Screenshots](assets/product_mockup.png)
 
 ## Installation
 

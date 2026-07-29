@@ -261,6 +261,12 @@
     <string name="eq_preamp">Preamp %1$s dB</string>
     <string name="eq_preamp_auto">Automatic</string>
     <string name="eq_flat">Flat</string>
+    <string name="account_section_sound">Sound</string>
+    <string name="eq_mode_off_desc">No equalizer, no attenuation</string>
+    <string name="eq_mode_in_app_desc">10 bands, automatic headroom</string>
+    <string name="eq_mode_external">External equalizer</string>
+    <string name="eq_mode_external_desc">Lower playback so an app like Wavelet can boost</string>
+    <string name="eq_mode_external_at">External, lowered %1$d dB</string>
     <string name="eq_headroom">EQ headroom</string>
     <string name="eq_headroom_handled">Handled by the in-app equalizer</string>
     <string name="eq_headroom_on">Playback lowered %1$d dB. Set this to match your largest EQ boost</string>

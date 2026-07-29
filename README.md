@@ -14,6 +14,10 @@
   <a href="https://discord.gg/NJxKMSNYRG"><img src="https://img.shields.io/discord/1288927764787752990?color=5865F2&label=Discord&logo=discord&logoColor=white" alt="Discord"/></a>
 </p>
 
+<p align="center">
+  <img src="./assets/product_mockup.png" alt="">
+</p>
+
 ## Features
 
 **Playback**
@@ -48,10 +52,6 @@
 - Canvas background animations
 - English, German, Russian and Swiss German
 - Automatic in-app updates
-
-## Screenshots
-
-![Screenshots](assets/product_mockup.png)
 
 ## Installation
 

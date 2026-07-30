@@ -872,8 +872,8 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         }
 
         mainHandler.post {
-            if (player.mediaItemCount > 1) {
-                player.removeMediaItems(1, player.mediaItemCount)
+            staleQueueStart(player.currentMediaItemIndex, player.mediaItemCount)?.let { from ->
+                player.removeMediaItems(from, player.mediaItemCount)
             }
             // Header-gated sources (anandserver Qobuz) must be enqueued as a
             // header-injecting MediaSource, or the gapless advance hits a 401.
@@ -1340,3 +1340,13 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         super.onDestroy()
     }
 }
+
+/**
+ * Index to start dropping stale queued items from, or null when nothing follows the current one.
+ *
+ * A fixed index of 1 looks right only while the current track is the first item. After ExoPlayer
+ * advances gaplessly the played item stays in the playlist and the current index moves past it, so
+ * trimming from 1 removes the track that is playing and playback ends on the spot (#492).
+ */
+internal fun staleQueueStart(currentIndex: Int, itemCount: Int): Int? =
+    (currentIndex + 1).takeIf { it < itemCount }

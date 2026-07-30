@@ -310,7 +310,7 @@ fun LibraryScreen() {
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
                 itemsIndexed(sortedLibrary, key = { _, item -> item.uri }) { index, item ->
-                    LibraryListItem(item)
+                    LibraryListItem(item, downloadedGroup = selectedFilter == "Downloaded")
                     // See the grid branch: trigger on the visible list size, not the raw library, so
                     // pagination still fires when a filter/search shrinks the list.
                     if (libraryHasMore && index >= sortedLibrary.size - 10) {

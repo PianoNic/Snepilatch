@@ -327,7 +327,10 @@
     <string name="downloaded_indicator">Downloaded</string>
     <string name="downloads_active">Active</string>
     <string name="downloads_idle">Nothing downloading right now</string>
-    <string name="remove_download_message">Delete the downloaded files for %1$s? (%2$d tracks)</string>
+    <plurals name="remove_download_message">
+        <item quantity="one">Delete the downloaded file for %1$s? (%2$d track)</item>
+        <item quantity="other">Delete the downloaded files for %1$s? (%2$d tracks)</item>
+    </plurals>
     <string name="auto_save_listened">Keep what I listen to</string>
     <string name="auto_save_listened_desc">Save a track once you have played it through</string>
 </resources>

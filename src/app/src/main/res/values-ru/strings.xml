@@ -321,7 +321,12 @@
     <string name="downloaded_indicator">Загружено</string>
     <string name="downloads_active">Активные</string>
     <string name="downloads_idle">Сейчас ничего не загружается</string>
-    <string name="remove_download_message">Удалить загруженные файлы %1$s? (%2$d треков)</string>
+    <plurals name="remove_download_message">
+        <item quantity="one">Удалить загруженный файл %1$s? (%2$d трек)</item>
+        <item quantity="few">Удалить загруженные файлы %1$s? (%2$d трека)</item>
+        <item quantity="many">Удалить загруженные файлы %1$s? (%2$d треков)</item>
+        <item quantity="other">Удалить загруженные файлы %1$s? (%2$d трека)</item>
+    </plurals>
     <string name="auto_save_listened">Сохранять прослушанное</string>
     <string name="auto_save_listened_desc">Сохраняет трек после полного прослушивания</string>
 </resources>

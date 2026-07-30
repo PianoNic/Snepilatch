@@ -57,6 +57,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -514,7 +515,7 @@ private fun DownloadRemoveDialog(item: LibraryItem, onDismiss: () -> Unit) {
         title = { Text(stringResource(R.string.remove_download), color = SpfyWhite) },
         text = {
             Text(
-                stringResource(R.string.remove_download_message, item.name, tracks.size),
+                pluralStringResource(R.plurals.remove_download_message, tracks.size, item.name, tracks.size),
                 color = SpfyLightGray
             )
         },

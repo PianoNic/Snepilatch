@@ -57,8 +57,8 @@
     <string name="audio_source_spotify">Spotify</string>
     <string name="audio_source_spotify_desc">Стандартное качество, поток из Spotify</string>
     <string name="audio_source_lossless_desc">FLAC, если трек есть у стороннего сервиса</string>
-    <string name="audio_source_ytm">YouTube Music</string>
-    <string name="audio_source_ytm_desc">Подбор по названию и длительности. Аккаунт не нужен. Некоторые треки недоступны.</string>
+    <string name="audio_source_ytm">YouTube Music (Beta)</string>
+    <string name="audio_source_ytm_desc">Некоторые треки недоступны</string>
     <string name="lossless_audio">Без потерь (Beta)</string>
     <string name="lossless_on">FLAC через %s</string>
     <string name="lossless_off">Стандартное качество</string>

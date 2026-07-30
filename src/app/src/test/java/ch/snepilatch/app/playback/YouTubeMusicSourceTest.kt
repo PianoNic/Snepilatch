@@ -36,7 +36,7 @@ class YouTubeMusicSourceTest {
 
     @Test
     fun picksTheAlbumCutWhenTheSpotifyTrackIsTheAlbumCut() {
-        val match = YouTubeMusicSource.bestMatch(candidates, "Get Lucky", durationMs = 369_000)
+        val match = YouTubeMusicSource.bestMatch(candidates, "Get Lucky", "Daft Punk", durationMs = 369_000)
         assertNotNull(match)
         assertEquals("4D7u5KF7SP8", match!!.videoId)
         assertEquals(370L, match.durationSec)
@@ -45,7 +45,7 @@ class YouTubeMusicSourceTest {
     @Test
     fun picksTheRadioEditWhenThatIsWhatTheDurationSays() {
         // Same query, same shelf, different Spotify track. Search rank alone would return the 6:10 cut.
-        val match = YouTubeMusicSource.bestMatch(candidates, "Get Lucky", durationMs = 249_000)
+        val match = YouTubeMusicSource.bestMatch(candidates, "Get Lucky", "Daft Punk", durationMs = 249_000)
         assertNotNull(match)
         assertEquals(249L, match!!.durationSec)
         assertTrue("got '${match.title}'", match.title.contains("Radio Edit"))
@@ -53,12 +53,12 @@ class YouTubeMusicSourceTest {
 
     @Test
     fun refusesToGuessWhenNoCandidateIsCloseEnough() {
-        assertNull(YouTubeMusicSource.bestMatch(candidates, "Get Lucky", durationMs = 480_000))
+        assertNull(YouTubeMusicSource.bestMatch(candidates, "Get Lucky", "Daft Punk", durationMs = 480_000))
     }
 
     @Test
     fun matchesOnTitleAloneWhenTheDurationIsUnknown() {
-        val match = YouTubeMusicSource.bestMatch(candidates, "Get Lucky", durationMs = 0)
+        val match = YouTubeMusicSource.bestMatch(candidates, "Get Lucky", "Daft Punk", durationMs = 0)
         assertNotNull(match)
         assertEquals("4D7u5KF7SP8", match!!.videoId)
     }
@@ -67,7 +67,7 @@ class YouTubeMusicSourceTest {
     fun neverPicksADifferentSongOnDurationAlone() {
         // "Lose Yourself to Dance" (5:54) sits in this shelf and is the closest thing by length to a
         // 5:54 request. The title score has to keep it out no matter how well the duration lines up.
-        val match = YouTubeMusicSource.bestMatch(candidates, "Get Lucky", durationMs = 354_000)
+        val match = YouTubeMusicSource.bestMatch(candidates, "Get Lucky", "Daft Punk", durationMs = 354_000)
         assertTrue(
             "picked '${match?.title}', which is not Get Lucky",
             match == null || match.title.contains("Get Lucky")
@@ -83,9 +83,38 @@ class YouTubeMusicSourceTest {
             YouTubeMusicSource.Candidate("aaa", "Team Melone (Hardstyle Remix)", "Chaosflo44", 152),
             YouTubeMusicSource.Candidate("bbb", "Tobbs stinkt | Chaosflo44", "Chaosflo44", 188),
         )
-        val match = YouTubeMusicSource.bestMatch(yt, "Tobbss stinkt", durationMs = 168_000)
+        val match = YouTubeMusicSource.bestMatch(yt, "Tobbss stinkt", "Chaosflo44", durationMs = 168_000)
         assertNotNull(match)
         assertEquals("bbb", match!!.videoId)
+    }
+
+    @Test
+    fun rejectsCoversAndReworksTheRequestNeverAskedFor() {
+        // Reported from the device: downloads kept landing on piano covers and re-sings. The title
+        // carries every wanted word, so word coverage alone scores them perfectly.
+        val yt = listOf(
+            YouTubeMusicSource.Candidate("cover", "Get Lucky (Piano Cover)", "Some Pianist", 370),
+            YouTubeMusicSource.Candidate("karaoke", "Get Lucky - Karaoke Version", "Sing King", 370),
+            YouTubeMusicSource.Candidate("real", "Get Lucky", "Daft Punk", 369),
+        )
+        val match = YouTubeMusicSource.bestMatch(yt, "Get Lucky", "Daft Punk", durationMs = 369_000)
+        assertNotNull(match)
+        assertEquals("real", match!!.videoId)
+    }
+
+    @Test
+    fun aRequestedRemixStillMatchesItsRemix() {
+        // The marker only disqualifies a candidate when the request did not ask for it.
+        val yt = listOf(YouTubeMusicSource.Candidate("rmx", "Sonne (Remix)", "Rammstein", 272))
+        val match = YouTubeMusicSource.bestMatch(yt, "Sonne (Remix)", "Rammstein", durationMs = 272_000)
+        assertNotNull(match)
+        assertEquals("rmx", match!!.videoId)
+    }
+
+    @Test
+    fun aDifferentUploaderIsNotTheArtist() {
+        val yt = listOf(YouTubeMusicSource.Candidate("x", "Creep", "Random Channel", 239))
+        assertNull(YouTubeMusicSource.bestMatch(yt, "Creep", "Radiohead", durationMs = 239_000))
     }
 
     @Test
@@ -104,7 +133,7 @@ class YouTubeMusicSourceTest {
             YouTubeMusicSource.Candidate("wrong", "Es ist immer das Gleiche", "Someone", 210),
             YouTubeMusicSource.Candidate("right", "RAPPE NUR DAS GLEICHE feat. LarsOderSo", "Arazhul", 190),
         )
-        val match = YouTubeMusicSource.bestMatch(yt, "Rappe nur das Gleiche", durationMs = 191_000)
+        val match = YouTubeMusicSource.bestMatch(yt, "Rappe nur das Gleiche", "Arazhul", durationMs = 191_000)
         assertNotNull(match)
         assertEquals("right", match!!.videoId)
     }

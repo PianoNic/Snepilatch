@@ -50,6 +50,10 @@ import ch.snepilatch.app.viewmodel.DetailRoutes
 import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 
+/** Header actions share a footprint so save, download and the overflow menu line up. */
+private val HEADER_BUTTON = 40.dp
+private val HEADER_ICON = 24.dp
+
 @Composable
 fun DetailScreen(vm: PlaybackViewModel) {
     val detailVm: DetailViewModel = viewModel()
@@ -243,11 +247,12 @@ fun DetailScreen(vm: PlaybackViewModel) {
                                 contentColor = SpfyWhite,
                                 checkedContentColor = accentColor,
                             ),
+                            modifier = Modifier.size(HEADER_BUTTON),
                         ) {
                             Icon(
                                 if (saved) Icons.Rounded.Favorite else Icons.Filled.FavoriteBorder,
                                 stringResource(R.string.save),
-                                modifier = Modifier.size(28.dp)
+                                modifier = Modifier.size(HEADER_ICON)
                             )
                         }
                     }
@@ -272,7 +277,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                             }
                         },
                         enabled = detail.tracks.isNotEmpty(),
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(HEADER_BUTTON)
                     ) {
                         Icon(
                             Icons.Rounded.DownloadForOffline,
@@ -280,17 +285,22 @@ fun DetailScreen(vm: PlaybackViewModel) {
                                 if (allDownloaded) R.string.remove_download else R.string.download_all
                             ),
                             tint = if (allDownloaded) accentColor else SpfyLightGray,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(HEADER_ICON)
                         )
                     }
-                    Spacer(Modifier.width(4.dp))
                 }
 
                 // 3-dot menu — opens a bottom sheet with every action
                 // KotifyClient supports for the current detail type.
                 var showHeaderMenu by remember { mutableStateOf(false) }
-                IconButton(onClick = { showHeaderMenu = true }, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SpfyLightGray, modifier = Modifier.size(24.dp))
+                IconButton(
+                    onClick = { showHeaderMenu = true },
+                    modifier = Modifier.width(32.dp).height(HEADER_BUTTON)
+                ) {
+                    Icon(
+                        Icons.Rounded.MoreVert, stringResource(R.string.more),
+                        tint = SpfyLightGray, modifier = Modifier.size(HEADER_ICON)
+                    )
                 }
                 if (showHeaderMenu) {
                     DetailHeaderMenu(
@@ -332,7 +342,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                         if (isPlayingThis) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                         stringResource(R.string.play),
                         tint = Color.Black,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(36.dp)
                     )
                 }
             }

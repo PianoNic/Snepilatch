@@ -49,6 +49,16 @@ object YouTubeMusicSource {
     /** Share of the wanted title's words a candidate must carry. At 0.5 shared filler words matched. */
     internal const val MIN_TITLE_SCORE = 0.8
 
+    /**
+     * Words that mark a re-recording. A candidate carrying one the request did not ask for is a
+     * cover, a karaoke track or an edit, not the recording the user has in their library.
+     */
+    private val REWORK_MARKERS = setOf(
+        "cover", "covers", "karaoke", "instrumental", "remix", "nightcore", "sped", "slowed",
+        "reverb", "piano", "acoustic", "tribute", "parody", "mashup", "rendition", "remake",
+        "unplugged", "orchestral", "lofi", "8d", "guitar", "violin", "flute",
+    )
+
     private const val MAX_CANDIDATES = 10
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -106,7 +116,7 @@ object YouTubeMusicSource {
             val body = post(SEARCH_URL, searchBody(query, region, visitor, params), WEB_UA, visitor)
             val candidates = body?.let { runCatching { parseCandidates(it) }.getOrNull() }.orEmpty()
             seen += candidates.size
-            bestMatch(candidates, title, durationMs)
+            bestMatch(candidates, title, artist, durationMs)
         }
         if (match == null) {
             LokiLogger.i(TAG, "no match for '$query' ($seen candidates, ${durationMs / 1000}s)")
@@ -213,14 +223,43 @@ object YouTubeMusicSource {
     }
 
     /** Null rather than a guess: the wrong recording is worse than none, and the caller skips. */
-    internal fun bestMatch(candidates: List<Candidate>, wantTitle: String, durationMs: Long): Candidate? {
+    internal fun bestMatch(
+        candidates: List<Candidate>,
+        wantTitle: String,
+        wantArtist: String,
+        durationMs: Long,
+    ): Candidate? {
         val want = words(wantTitle)
-        val titled = candidates.filter { want.isEmpty() || titleScore(it.title, want) >= MIN_TITLE_SCORE }
-        if (durationMs <= 0L) return titled.firstOrNull()
+        val wantArtistWords = words(wantArtist)
+        val viable = candidates.filter { candidate ->
+            (want.isEmpty() || titleScore(candidate.title, want) >= MIN_TITLE_SCORE) &&
+                !addsRework(candidate.title, want + wantArtistWords) &&
+                artistMatches(candidate.artist, wantArtistWords)
+        }
+        if (durationMs <= 0L) return viable.firstOrNull()
         val wantSec = durationMs / 1000
-        return titled
+        return viable
             .filter { it.durationSec > 0 && abs(it.durationSec - wantSec) <= DURATION_TOLERANCE_SEC }
             .minByOrNull { abs(it.durationSec - wantSec) }
+    }
+
+    /**
+     * True when the candidate advertises a rework the request never asked for. Asking for a track
+     * that genuinely is a remix keeps working, because the marker is then in [asked] too.
+     */
+    internal fun addsRework(candidateTitle: String, asked: Set<String>): Boolean =
+        words(candidateTitle).any { it in REWORK_MARKERS && it !in asked }
+
+    /**
+     * The strongest signal against a cover: a piano rendition is uploaded by whoever played it, not
+     * by the artist. Spotify may credit several artists where YouTube credits one, so sharing a
+     * single name is enough. An unknown artist on either side cannot rule anything out.
+     */
+    internal fun artistMatches(candidateArtist: String?, wantArtist: Set<String>): Boolean {
+        if (wantArtist.isEmpty()) return true
+        val have = words(candidateArtist.orEmpty())
+        if (have.isEmpty()) return true
+        return have.any { h -> wantArtist.any { nearlyEqual(h, it) } }
     }
 
     /** Share of the wanted title's words the candidate carries. */

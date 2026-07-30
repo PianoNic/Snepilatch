@@ -25,9 +25,14 @@ object AppSettings {
     const val EQ_IN_APP = "inapp"
     const val EQ_EXTERNAL = "external"
 
+    // Audio source ids for [preferredAudioSource]; null means Spfy's own CDN.
+    const val SOURCE_LOSSLESS = "lossless"
+    const val SOURCE_YTM = "ytm"
+
     @Volatile private var appContext: Context? = null
 
-    // Audio source preference: null = Spfy (default), "lossless" = third-party FLAC chain.
+    // Audio source: null = Spfy (default), [SOURCE_LOSSLESS] = third-party FLAC chain,
+    // [SOURCE_YTM] = YouTube Music (ch.snepilatch.app.playback.YouTubeMusicSource).
     val preferredAudioSource = MutableStateFlow<String?>(null)
 
     // Lyrics animation direction for line-synced (non word-synced): "vertical" or "horizontal"

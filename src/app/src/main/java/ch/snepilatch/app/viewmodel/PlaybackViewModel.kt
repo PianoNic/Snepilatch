@@ -15,6 +15,7 @@ import ch.snepilatch.app.playback.InfiniPlayViz
 import ch.snepilatch.app.playback.MusicPlaybackService
 import ch.snepilatch.app.playback.PositionInterpolator
 import ch.snepilatch.app.playback.SessionHolder
+import ch.snepilatch.app.playback.AudioSourceResolver
 import ch.snepilatch.app.playback.engine.SpfyCdnResolver
 import ch.snepilatch.app.playback.engine.SpfyStream
 import ch.snepilatch.app.data.*
@@ -27,7 +28,6 @@ import kotify.api.playerstatus.PlayerTrack
 import kotify.api.song.Song
 import kotify.api.user.User
 import kotify.api.canvas.Canvas
-import kotify.cdn.CdnPlayback
 import kotify.cdn.SpfyPlayback
 import kotify.cdn.StreamResult
 import kotify.session.Session
@@ -77,7 +77,6 @@ class PlaybackViewModel : ViewModel() {
     private var initRetryCount = 0
 
     // Streaming
-    private val cdn = CdnPlayback()
     private var spfyPlayback: SpfyPlayback?
         get() = SessionHolder.spfyPlayback
         set(value) { SessionHolder.spfyPlayback = value }
@@ -1312,10 +1311,7 @@ class PlaybackViewModel : ViewModel() {
                 val query = listOf(artist, title)
                     .filter { it.isNotBlank() && it != "Unknown" }
                     .joinToString(" ")
-                val result = cdn.resolveStreamUrl(
-                    trackId, region = AppSettings.effectiveRegion(),
-                    searchQuery = query, preferredSource = AppSettings.preferredAudioSource.value
-                )
+                val result = AudioSourceResolver.byQuery(trackId, query, title, artist, track.durationMs)
                 if (result is StreamResult.Success) {
                     val info = result.info
                     playUrlAt = System.currentTimeMillis()
@@ -2509,7 +2505,7 @@ class PlaybackViewModel : ViewModel() {
         }
 
         try {
-            val result = cdn.resolveFromTrack(event, region = AppSettings.effectiveRegion(), preferredSource = AppSettings.preferredAudioSource.value)
+            val result = AudioSourceResolver.fromTrack(event)
             when (result) {
                 is StreamResult.Success -> {
                     // Don't resume Spfy yet — onReady callback will sync after ExoPlayer buffers
@@ -2532,6 +2528,9 @@ class PlaybackViewModel : ViewModel() {
                     MusicPlaybackService.instance?.stop()
                     isStreaming.value = false
                     streamProvider.value = null
+                    if (AppSettings.preferredAudioSource.value == AppSettings.SOURCE_YTM) {
+                        skipUnmatchedYtmTrack(trackUri)
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -2541,6 +2540,29 @@ class PlaybackViewModel : ViewModel() {
         }
 
         preResolveNextTrack()
+    }
+
+
+    /**
+     * Skip rather than sit in silence, bounded by the playback-error budget so a run of unmatched
+     * tracks cannot race through the queue. The budget resets on the next successful onReady.
+     */
+    private suspend fun skipUnmatchedYtmTrack(trackUri: String) {
+        if (playbackErrorRetries >= MAX_PLAYBACK_ERROR_RETRIES) {
+            LokiLogger.w(TAG, "[Ytm] $MAX_PLAYBACK_ERROR_RETRIES unmatched in a row, stopping")
+            playbackErrorRetries = 0
+            return
+        }
+        playbackErrorRetries++
+        val pc = player ?: return
+        LokiLogger.w(TAG, "[Ytm] no match for $trackUri, skipping ($playbackErrorRetries/$MAX_PLAYBACK_ERROR_RETRIES)")
+        try {
+            pc.localNext()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            LokiLogger.e(TAG, "[Ytm] skip failed: ${e.message}")
+        }
     }
 
     /**
@@ -2715,10 +2737,7 @@ class PlaybackViewModel : ViewModel() {
             try {
                 val art = normalizeSpfyImageUrl(track.imageLargeUrl ?: track.imageUrl)
 
-                val result = cdn.resolveStreamUrl(
-                    trackId, region = AppSettings.effectiveRegion(),
-                    searchQuery = searchQuery, preferredSource = AppSettings.preferredAudioSource.value
-                )
+                val result = AudioSourceResolver.byQuery(trackId, searchQuery, title, artist, track.durationMs)
                 when (result) {
                     is StreamResult.Success -> {
                         playUrlAt = System.currentTimeMillis()
@@ -2774,12 +2793,7 @@ class PlaybackViewModel : ViewModel() {
                 .joinToString(" ").takeIf { it.isNotBlank() }
 
             LokiLogger.i(TAG, "Pre-resolving next: $title by $artist")
-            val result = cdn.resolveStreamUrl(
-                nextId,
-                region = AppSettings.effectiveRegion(),
-                searchQuery = searchQuery,
-                preferredSource = AppSettings.preferredAudioSource.value
-            )
+            val result = AudioSourceResolver.byQuery(nextId, searchQuery, title, artist, nextTrack.durationMs)
             if (result is StreamResult.Success) {
                 val info = result.info
                 val key = info.decryptionKey

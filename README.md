@@ -24,7 +24,7 @@
 
 - Plays locally on your phone as its own Connect device, so transport actions are never skip-capped
 - Ad-free listening
-- Optional lossless audio alongside the standard stream
+- Choose your audio source: the standard stream, optional lossless, or YouTube Music
 - Full Connect control: transfer to and from other devices
 
 **Sound**
@@ -64,6 +64,12 @@ Download the latest APK from the [Releases](https://github.com/PianoNic/Snepilat
 ## Community
 
 [Discord](https://discord.gg/NJxKMSNYRG)
+
+## Credits
+
+The YouTube Music audio source follows the approach shown by [Meld](https://github.com/FrancescoGrazioso/Meld) and its [Metrolist](https://github.com/MetrolistGroup/Metrolist) / [OuterTune](https://github.com/DD3Boh/OuterTune) / [InnerTune](https://github.com/z-huang/InnerTune) lineage.
+
+No code of theirs is used; this is an independent implementation.
 
 ## License
 

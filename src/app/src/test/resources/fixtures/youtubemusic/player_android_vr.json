@@ -1,0 +1,50 @@
+{
+ "playabilityStatus": {
+  "status": "OK"
+ },
+ "videoDetails": {
+  "videoId": "4D7u5KF7SP8",
+  "title": "Get Lucky (feat. Pharrell Williams and Nile Rodgers)",
+  "lengthSeconds": "370",
+  "author": "Daft Punk - Topic"
+ },
+ "streamingData": {
+  "adaptiveFormats": [
+   {
+    "itag": 139,
+    "url": "https://rr3---sn-1gi7znes.googlevideo.com/videoplayback?expire=1785417231&ei=r_lqas3ULKfT6dsP4arOgAQ&ip=141.195.95.82&id=o-ACMC9-FZ0N1dAr4WOWZhVVYmdvZWiYiFS-tLEW6n4Pyc&itag=139&source=youtube&requiressl=yes&xpc=EgVo2aDSNQ%3D%3D&cps=737&met=1785395631%2C&mh=V0&mm=31%2C26&mn=sn-1gi7znes%2Csn-h0jelnez&ms=au%2Conr&mv=m&mvi=3&pl=23&rms=au%2Cau&gcr=ch&initcwndbps=4426250&bui=AZFlqhOWl3leUajU_qSt0Mb6WZo45MokzOkH1IwEWJphuc86szYFuG-TRT5Fc3L69w-hGNEk9eSgKSXG&spc=KBGBcuyuD9WgrVEXgG4gGfqb6fMSnUMC-mtNntr8uWxv&vprv=1&svpuc=1&mime=audio%2Fmp4&rqh=1&gir=yes&clen=2255955&dur=369.668&lmt=1665106604157144&mt=1785395374&fvip=5&keepalive=yes&fexp=51565116&c=ANDROID_VR&txp=4532434&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cxpc%2Cgcr%2Cbui%2Cspc%2Cvprv%2Csvpuc%2Cmime%2Crqh%2Cgir%2Cclen%2Cdur%2Clmt&sig=AE0s2JYwRQIgbiwVzBVYFKzitbshnhZ7QRuY_xF0cb3aoYvMuIuZvPUCIQCZQIEqS4qnam2lYs91BzZ_2GUo_RGtwSTDHxbtdofl_A%3D%3D&lsparams=cps%2Cmet%2Cmh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Crms%2Cinitcwndbps&lsig=APaTxxMwRAIgFUetj2ypgKjVmidirR_n-Vqv5hwpIHM6exFJxEa1RocCIBoxywbEzqM5yKZBRIrFd1qtRD9d_rJKWho_Ns2giLsY",
+    "mimeType": "audio/mp4; codecs=\"mp4a.40.5\"",
+    "bitrate": 50609,
+    "contentLength": "2255955"
+   },
+   {
+    "itag": 140,
+    "url": "https://rr3---sn-1gi7znes.googlevideo.com/videoplayback?expire=1785417231&ei=r_lqas3ULKfT6dsP4arOgAQ&ip=141.195.95.82&id=o-ACMC9-FZ0N1dAr4WOWZhVVYmdvZWiYiFS-tLEW6n4Pyc&itag=140&source=youtube&requiressl=yes&xpc=EgVo2aDSNQ%3D%3D&cps=737&met=1785395631%2C&mh=V0&mm=31%2C26&mn=sn-1gi7znes%2Csn-h0jelnez&ms=au%2Conr&mv=m&mvi=3&pl=23&rms=au%2Cau&gcr=ch&initcwndbps=4426250&bui=AZFlqhOWl3leUajU_qSt0Mb6WZo45MokzOkH1IwEWJphuc86szYFuG-TRT5Fc3L69w-hGNEk9eSgKSXG&spc=KBGBcuyuD9WgrVEXgG4gGfqb6fMSnUMC-mtNntr8uWxv&vprv=1&svpuc=1&mime=audio%2Fmp4&rqh=1&gir=yes&clen=5983790&dur=369.626&lmt=1665106603576375&mt=1785395374&fvip=5&keepalive=yes&fexp=51565116&c=ANDROID_VR&txp=4532434&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cxpc%2Cgcr%2Cbui%2Cspc%2Cvprv%2Csvpuc%2Cmime%2Crqh%2Cgir%2Cclen%2Cdur%2Clmt&sig=AE0s2JYwRQIhAIn2bwPwUolnQiZV4HrZlLlPvz9uBNhUjYCgp4ue7YIEAiB5BiE5IPGYB4kIDKAUNIl-pGuH5yAQG8bRoZvLn6LYjw%3D%3D&lsparams=cps%2Cmet%2Cmh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Crms%2Cinitcwndbps&lsig=APaTxxMwRAIgFUetj2ypgKjVmidirR_n-Vqv5hwpIHM6exFJxEa1RocCIBoxywbEzqM5yKZBRIrFd1qtRD9d_rJKWho_Ns2giLsY",
+    "mimeType": "audio/mp4; codecs=\"mp4a.40.2\"",
+    "bitrate": 137064,
+    "contentLength": "5983790"
+   },
+   {
+    "itag": 249,
+    "url": "https://rr3---sn-1gi7znes.googlevideo.com/videoplayback?expire=1785417231&ei=r_lqas3ULKfT6dsP4arOgAQ&ip=141.195.95.82&id=o-ACMC9-FZ0N1dAr4WOWZhVVYmdvZWiYiFS-tLEW6n4Pyc&itag=249&source=youtube&requiressl=yes&xpc=EgVo2aDSNQ%3D%3D&cps=737&met=1785395631%2C&mh=V0&mm=31%2C26&mn=sn-1gi7znes%2Csn-h0jelnez&ms=au%2Conr&mv=m&mvi=3&pl=23&rms=au%2Cau&gcr=ch&initcwndbps=4426250&bui=AZFlqhOWl3leUajU_qSt0Mb6WZo45MokzOkH1IwEWJphuc86szYFuG-TRT5Fc3L69w-hGNEk9eSgKSXG&spc=KBGBcuyuD9WgrVEXgG4gGfqb6fMSnUMC-mtNntr8uWxv&vprv=1&svpuc=1&mime=audio%2Fwebm&rqh=1&gir=yes&clen=2367546&dur=369.641&lmt=1714447227183010&mt=1785395374&fvip=5&keepalive=yes&fexp=51565116&c=ANDROID_VR&txp=4532434&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cxpc%2Cgcr%2Cbui%2Cspc%2Cvprv%2Csvpuc%2Cmime%2Crqh%2Cgir%2Cclen%2Cdur%2Clmt&sig=AE0s2JYwRQIgEwxkyYjaTYAHqj9S5CWhbsnBBtfiize3G_Z4-T_XpZMCIQDl-OMgRYENb7oc22jjrfgS1TAJL75lv_TAZdL_I0iy3A%3D%3D&lsparams=cps%2Cmet%2Cmh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Crms%2Cinitcwndbps&lsig=APaTxxMwRAIgFUetj2ypgKjVmidirR_n-Vqv5hwpIHM6exFJxEa1RocCIBoxywbEzqM5yKZBRIrFd1qtRD9d_rJKWho_Ns2giLsY",
+    "mimeType": "audio/webm; codecs=\"opus\"",
+    "bitrate": 54853,
+    "contentLength": "2367546"
+   },
+   {
+    "itag": 251,
+    "url": "https://rr3---sn-1gi7znes.googlevideo.com/videoplayback?expire=1785417231&ei=r_lqas3ULKfT6dsP4arOgAQ&ip=141.195.95.82&id=o-ACMC9-FZ0N1dAr4WOWZhVVYmdvZWiYiFS-tLEW6n4Pyc&itag=251&source=youtube&requiressl=yes&xpc=EgVo2aDSNQ%3D%3D&cps=737&met=1785395631%2C&mh=V0&mm=31%2C26&mn=sn-1gi7znes%2Csn-h0jelnez&ms=au%2Conr&mv=m&mvi=3&pl=23&rms=au%2Cau&gcr=ch&initcwndbps=4426250&bui=AZFlqhOWl3leUajU_qSt0Mb6WZo45MokzOkH1IwEWJphuc86szYFuG-TRT5Fc3L69w-hGNEk9eSgKSXG&spc=KBGBcuyuD9WgrVEXgG4gGfqb6fMSnUMC-mtNntr8uWxv&vprv=1&svpuc=1&mime=audio%2Fwebm&rqh=1&gir=yes&clen=6214188&dur=369.641&lmt=1714447227166300&mt=1785395374&fvip=5&keepalive=yes&fexp=51565116&c=ANDROID_VR&txp=4532434&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cxpc%2Cgcr%2Cbui%2Cspc%2Cvprv%2Csvpuc%2Cmime%2Crqh%2Cgir%2Cclen%2Cdur%2Clmt&sig=AE0s2JYwRQIgIVIMbg6-U_W8RB0iMd9fpgh30lsTdtnbUafUEXxAwzECIQDpYVF6LRiZoULelMd2ng_bZCB2fzV-LFIWvPzifErLwQ%3D%3D&lsparams=cps%2Cmet%2Cmh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Crms%2Cinitcwndbps&lsig=APaTxxMwRAIgFUetj2ypgKjVmidirR_n-Vqv5hwpIHM6exFJxEa1RocCIBoxywbEzqM5yKZBRIrFd1qtRD9d_rJKWho_Ns2giLsY",
+    "mimeType": "audio/webm; codecs=\"opus\"",
+    "bitrate": 146453,
+    "contentLength": "6214188"
+   },
+   {
+    "itag": 137,
+    "url": "https://rr3---sn-1gi7znes.googlevideo.com/videoplayback?expire=1785417231&ei=r_lqas3ULKfT6dsP4arOgAQ&ip=141.195.95.82&id=o-ACMC9-FZ0N1dAr4WOWZhVVYmdvZWiYiFS-tLEW6n4Pyc&itag=137&source=youtube&requiressl=yes&xpc=EgVo2aDSNQ%3D%3D&cps=737&met=1785395631%2C&mh=V0&mm=31%2C26&mn=sn-1gi7znes%2Csn-h0jelnez&ms=au%2Conr&mv=m&mvi=3&pl=23&rms=au%2Cau&gcr=ch&initcwndbps=4426250&bui=AZFlqhOWl3leUajU_qSt0Mb6WZo45MokzOkH1IwEWJphuc86szYFuG-TRT5Fc3L69w-hGNEk9eSgKSXG&spc=KBGBcuyuD9WgrVEXgG4gGfqb6fMSnUMC-mtNntr8uWxv&vprv=1&svpuc=1&mime=video%2Fmp4&rqh=1&gir=yes&clen=1932332&dur=369.600&lmt=1665111733891416&mt=1785395374&fvip=5&keepalive=yes&fexp=51565116&c=ANDROID_VR&txp=4532434&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cxpc%2Cgcr%2Cbui%2Cspc%2Cvprv%2Csvpuc%2Cmime%2Crqh%2Cgir%2Cclen%2Cdur%2Clmt&sig=AE0s2JYwRQIhAJ0_DKGdfpTJ0ZuLVmjWDXG4VIXL7zGKZRDjgfoYbF9SAiBLZ45jhccLeEeRjodEufzcghqysc1Sh6SUN09RGyxiNw%3D%3D&lsparams=cps%2Cmet%2Cmh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Crms%2Cinitcwndbps&lsig=APaTxxMwRAIgFUetj2ypgKjVmidirR_n-Vqv5hwpIHM6exFJxEa1RocCIBoxywbEzqM5yKZBRIrFd1qtRD9d_rJKWho_Ns2giLsY",
+    "mimeType": "video/mp4; codecs=\"avc1.640020\"",
+    "bitrate": 49042,
+    "contentLength": "1932332"
+   }
+  ]
+ }
+}

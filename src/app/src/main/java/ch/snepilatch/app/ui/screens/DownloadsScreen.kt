@@ -1,6 +1,7 @@
 package ch.snepilatch.app.ui.screens
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,11 +13,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import ch.snepilatch.app.R
 import ch.snepilatch.app.download.DownloadedTrack
 import ch.snepilatch.app.download.Downloads
@@ -71,30 +75,7 @@ fun DownloadsScreen(vm: PlaybackViewModel) {
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = LocalBottomOverlayHeight.current.value + 16.dp)
         ) {
-            items(tracks, key = { it.trackUri }) { track ->
-                ListItem(
-                    headlineContent = { Text(track.title, color = SpfyWhite, maxLines = 1) },
-                    supportingContent = {
-                        Text(
-                            "${track.artist} · ${track.sizeBytes / 1024 / 1024} MB · ${track.provider ?: track.source}",
-                            color = SpfyLightGray,
-                            maxLines = 1
-                        )
-                    },
-                    leadingContent = { Icon(Icons.Rounded.MusicNote, null, tint = SpfyLightGray) },
-                    trailingContent = {
-                        IconButton(onClick = { vm.removeDownload(track.trackUri) }) {
-                            Icon(
-                                Icons.Rounded.Delete,
-                                stringResource(R.string.remove_download),
-                                tint = SpfyLightGray
-                            )
-                        }
-                    },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    modifier = Modifier.clickable { vm.playTrack(track.trackUri) }
-                )
-            }
+            items(tracks, key = { it.trackUri }) { track -> DownloadRow(track, vm) }
         }
     }
 
@@ -107,6 +88,39 @@ fun DownloadsScreen(vm: PlaybackViewModel) {
             }
         )
     }
+}
+
+@Composable
+private fun DownloadRow(track: DownloadedTrack, vm: PlaybackViewModel) {
+    ListItem(
+        headlineContent = { Text(track.title, color = SpfyWhite, maxLines = 1) },
+        supportingContent = {
+            Text(
+                "${track.artist} · ${track.sizeBytes / 1024 / 1024} MB · ${track.provider ?: track.source}",
+                color = SpfyLightGray,
+                maxLines = 1
+            )
+        },
+        leadingContent = {
+            if (track.coverUrl != null) {
+                AsyncImage(
+                    model = track.coverUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(48.dp).clip(RoundedCornerShape(4.dp))
+                )
+            } else {
+                Icon(Icons.Rounded.MusicNote, null, tint = SpfyLightGray)
+            }
+        },
+        trailingContent = {
+            IconButton(onClick = { vm.removeDownload(track.trackUri) }) {
+                Icon(Icons.Rounded.Delete, stringResource(R.string.remove_download), tint = SpfyLightGray)
+            }
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = Modifier.clickable { vm.playTrack(track.trackUri) }
+    )
 }
 
 @Composable

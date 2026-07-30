@@ -51,17 +51,25 @@ object TrackDownloader {
             .build()
     }
 
-    suspend fun download(request: DownloadRequest, context: Context): DownloadOutcome =
+    suspend fun download(
+        request: DownloadRequest,
+        context: Context,
+        notify: Boolean = true,
+    ): DownloadOutcome =
         withContext(Dispatchers.IO) {
             // Anything unexpected becomes a failed notification; a download must not crash the app.
-            runCatching { downloadInner(request, context) }.getOrElse {
+            runCatching { downloadInner(request, context, notify) }.getOrElse {
                 LokiLogger.e(TAG, "download crashed for ${request.title}", it)
                 DownloadNotifier.failed(context, request.title, it.message ?: "unexpected error")
                 DownloadOutcome.Failed(it.message ?: "unexpected error")
             }
         }
 
-    private suspend fun downloadInner(request: DownloadRequest, context: Context): DownloadOutcome =
+    private suspend fun downloadInner(
+        request: DownloadRequest,
+        context: Context,
+        notify: Boolean,
+    ): DownloadOutcome =
         withContext(Dispatchers.IO) {
             LokiLogger.i(
                 TAG,
@@ -84,7 +92,7 @@ object TrackDownloader {
             val temp = File.createTempFile("download", null, context.cacheDir)
             try {
                 val fetched = runCatching {
-                    fetchTo(info, temp) { DownloadNotifier.progress(context, request.title, it) }
+                    fetchTo(info, temp) { if (notify) DownloadNotifier.progress(context, request.title, it) }
                 }.getOrElse {
                     LokiLogger.e(TAG, "fetch failed for ${request.title}: ${it.message}")
                     DownloadNotifier.failed(context, request.title, it.message ?: "failed")
@@ -101,7 +109,7 @@ object TrackDownloader {
                     DownloadNotifier.failed(context, request.title, "could not write to the folder")
                     DownloadOutcome.Failed("could not write into the download folder")
                 } else {
-                    DownloadNotifier.finished(context, request.title)
+                    if (notify) DownloadNotifier.finished(context, request.title)
                     DownloadOutcome.Done(stored)
                 }
             } finally {
@@ -192,6 +200,7 @@ object TrackDownloader {
             source = AppSettings.downloadSource.value,
             provider = info.provider,
             mimeType = mimeTypeFor(finalExtension),
+            coverUrl = request.coverUrl,
             sizeBytes = written,
             title = request.title,
             artist = request.artist,

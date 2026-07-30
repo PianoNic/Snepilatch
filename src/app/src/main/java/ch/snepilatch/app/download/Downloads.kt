@@ -15,6 +15,7 @@ data class DownloadedTrack(
     val source: String,
     val provider: String?,
     val mimeType: String?,
+    val coverUrl: String?,
     val sizeBytes: Long,
     val title: String,
     val artist: String,
@@ -31,7 +32,7 @@ data class DownloadedTrack(
 object Downloads {
 
     private const val DB_NAME = "downloads.db"
-    private const val DB_VERSION = 1
+    private const val DB_VERSION = 2
     private const val TABLE = "downloads"
 
     private var helper: Helper? = null
@@ -51,6 +52,7 @@ object Downloads {
                     source TEXT NOT NULL,
                     provider TEXT,
                     mime_type TEXT,
+                    cover_url TEXT,
                     size_bytes INTEGER NOT NULL,
                     title TEXT NOT NULL,
                     artist TEXT NOT NULL,
@@ -65,7 +67,10 @@ object Downloads {
          * file: the audio stays in the user's folder while the app forgets it was ever downloaded,
          * and re-downloading is the only way back. Add columns, never recreate.
          */
-        override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+        override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+            // v2 added the cover art url. Additive, so existing downloads keep working untagged.
+            if (oldVersion < 2) db.execSQL("ALTER TABLE $TABLE ADD COLUMN cover_url TEXT")
+        }
 
         /** Sideloading an older build must not crash; the default implementation throws. */
         override fun onDowngrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
@@ -124,6 +129,7 @@ object Downloads {
         put("source", source)
         put("provider", provider)
         put("mime_type", mimeType)
+        put("cover_url", coverUrl)
         put("size_bytes", sizeBytes)
         put("title", title)
         put("artist", artist)
@@ -136,6 +142,7 @@ object Downloads {
         source = getString(getColumnIndexOrThrow("source")),
         provider = getStringOrNull("provider"),
         mimeType = getStringOrNull("mime_type"),
+        coverUrl = getStringOrNull("cover_url"),
         sizeBytes = getLong(getColumnIndexOrThrow("size_bytes")),
         title = getString(getColumnIndexOrThrow("title")),
         artist = getString(getColumnIndexOrThrow("artist")),

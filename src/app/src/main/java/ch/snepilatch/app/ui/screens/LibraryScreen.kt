@@ -63,6 +63,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
+import ch.snepilatch.app.download.Downloads
+import ch.snepilatch.app.viewmodel.Navigator
 import ch.snepilatch.app.data.LIKED_SONGS_COVER_URL
 import ch.snepilatch.app.data.LibraryItem
 import ch.snepilatch.app.ui.components.SpfyImage
@@ -181,6 +183,30 @@ fun LibraryScreen() {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(vertical = 8.dp)
         ) {
+            // The library lists playlists, artists and albums; downloads are individual tracks, so this
+            // opens the downloads manager rather than filtering the list in place.
+            item {
+                val downloadedCount by Downloads.downloaded.collectAsState()
+                if (downloadedCount.isNotEmpty()) {
+                    FilterChip(
+                        selected = false,
+                        onClick = { Navigator.navigateTo(ch.snepilatch.app.data.Screen.DOWNLOADS) },
+                        label = {
+                            Text(
+                                stringResource(R.string.library_filter_downloaded, downloadedCount.size),
+                                fontSize = 13.sp
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = SpfyWhite,
+                            selectedLabelColor = SpfyBlack,
+                            containerColor = SpfyGray,
+                            labelColor = SpfyWhite
+                        ),
+                        border = null
+                    )
+                }
+            }
             items(filters.size) { i ->
                 FilterChip(
                     selected = selectedFilter == filters[i].first,

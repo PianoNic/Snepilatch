@@ -320,4 +320,8 @@
     <string name="remove_all">Remove all</string>
     <string name="remove_all_confirm">Delete every downloaded file? The tracks will stream again.</string>
     <string name="downloads_count">%1$d downloaded</string>
+    <string name="downloading_count">Downloading %1$d of %2$d</string>
+    <string name="downloaded_count">%1$d of %2$d downloaded</string>
+    <string name="download_all">Download all</string>
+    <string name="library_filter_downloaded">Downloaded (%1$d)</string>
 </resources>

@@ -66,7 +66,7 @@ object AudioSourceResolver {
             return null
         }
         return StreamResult.Success(
-            StreamInfo(url = local.documentUri, provider = "Downloaded", mimeType = local.mimeType)
+            StreamInfo(url = local.documentUri, provider = "Local", mimeType = local.mimeType)
         )
     }
 

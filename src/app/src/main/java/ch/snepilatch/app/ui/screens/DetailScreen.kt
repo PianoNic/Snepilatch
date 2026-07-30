@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.rounded.MoreVert
@@ -267,6 +268,16 @@ fun DetailScreen(vm: PlaybackViewModel) {
                 }
 
                 Spacer(Modifier.weight(1f))
+
+                IconButton(
+                    onClick = { vm.downloadTracks(detail.tracks, context) },
+                    enabled = detail.tracks.isNotEmpty()
+                ) {
+                    Icon(
+                        Icons.Rounded.Download, stringResource(R.string.download_all),
+                        tint = SpfyWhite, modifier = Modifier.size(24.dp)
+                    )
+                }
 
                 IconButton(onClick = { vm.toggleShuffle() }) {
                     Icon(

@@ -2564,7 +2564,7 @@ class PlaybackViewModel : ViewModel() {
         withContext(Dispatchers.Main) {
             MusicPlaybackService.instance?.playUrl(local.info.url, title, artist, art, startPlaying = !coldStart)
         }
-        commitStream(trackUri, "Downloaded")
+        commitStream(trackUri, "Local")
         isStreamLoading.value = false
         LokiLogger.i(TAG, "Playing downloaded copy of $trackUri")
         preResolveNextTrack()
@@ -2594,6 +2594,40 @@ class PlaybackViewModel : ViewModel() {
                     context, track.name, context.getString(R.string.download_needs_folder)
                 )
             }
+        }
+    }
+
+    /**
+     * Downloads a whole album or playlist, one track at a time so the per-track notifications are
+     * replaced by a single count. Tracks already on disk are skipped by the downloader itself.
+     */
+    fun downloadTracks(tracks: List<TrackInfo>, context: android.content.Context) {
+        if (tracks.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            var failed = 0
+            tracks.forEachIndexed { index, track ->
+                DownloadNotifier.batch(context, track.name, index + 1, tracks.size)
+                val outcome = TrackDownloader.download(
+                    DownloadRequest(
+                        trackUri = track.uri,
+                        title = track.name,
+                        artist = track.artist,
+                        album = track.albumName,
+                        coverUrl = track.albumArt,
+                        durationMs = track.durationMs,
+                    ),
+                    context,
+                    notify = false,
+                )
+                if (outcome !is DownloadOutcome.Done) failed++
+                if (outcome is DownloadOutcome.NoFolder) {
+                    DownloadNotifier.failed(
+                        context, track.name, context.getString(R.string.download_needs_folder)
+                    )
+                    return@launch
+                }
+            }
+            DownloadNotifier.batchFinished(context, tracks.size, failed)
         }
     }
 

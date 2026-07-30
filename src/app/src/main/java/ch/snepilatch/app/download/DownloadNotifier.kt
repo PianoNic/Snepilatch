@@ -64,6 +64,24 @@ object DownloadNotifier {
         manager(context).notify(NOTIFICATION_ID, builder.build())
     }
 
+    /** Aggregate progress for an album or playlist, replacing the per-track notification. */
+    fun batch(context: Context, title: String, done: Int, total: Int) {
+        val builder = base(context, title)
+            .setContentTitle(context.getString(R.string.downloading_count, done, total))
+            .setOngoing(true)
+            .setProgress(total, done, false)
+        manager(context).notify(NOTIFICATION_ID, builder.build())
+    }
+
+    fun batchFinished(context: Context, total: Int, failed: Int) {
+        val builder = base(context, "")
+            .setContentTitle(context.getString(R.string.download_complete))
+            .setContentText(context.getString(R.string.downloaded_count, total - failed, total))
+            .setOngoing(false)
+            .setAutoCancel(true)
+        manager(context).notify(NOTIFICATION_ID, builder.build())
+    }
+
     fun finished(context: Context, title: String) {
         val builder = base(context, title)
             .setContentTitle(context.getString(R.string.download_complete))

@@ -142,6 +142,7 @@ class YouTubeMusicSourceTest {
     @Test
     fun refusesAPlayerResponseThatDemandsALogin() {
         // What the older ANDROID_VR versions return; the pinned one must keep working.
-        assertNull(YouTubeMusicSource.pickAudio(fixture("player_login_required.json")))
+        val denied = """{"playabilityStatus":{"status":"LOGIN_REQUIRED","reason":"Sign in"}}"""
+        assertNull(YouTubeMusicSource.pickAudio(denied))
     }
 }

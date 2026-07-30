@@ -19,11 +19,9 @@ import kotlin.math.abs
  * Audio from YouTube Music over the InnerTube JSON API. No account, no PO token, no signature
  * cipher. Search runs on WEB_REMIX, the player call on ANDROID_VR.
  *
- * Two things here are load-bearing and cost a long afternoon to find. The player client version must
- * be [VR_VERSION]: 1.61.47 and 1.62.27 both answer LOGIN_REQUIRED ("Sign in to confirm you're not a
- * bot"). And every request needs [visitorData]; without it the same client is refused, and clients
- * that do answer without it (IOS) hand back a URL that only serves its first megabyte before
- * returning 403 forever. With both in place the URL is plain and the whole file is readable.
+ * Two things are load-bearing. [VR_VERSION] must stay current: 1.61.47 and 1.62.27 answer
+ * LOGIN_REQUIRED. And every request needs visitorData; without it the client is refused, and clients
+ * that answer anyway (IOS) return a URL that serves one megabyte and then 403s.
  */
 object YouTubeMusicSource {
 
@@ -32,12 +30,8 @@ object YouTubeMusicSource {
     private const val SEARCH_URL = "https://music.youtube.com/youtubei/v1/search"
     private const val PLAYER_URL = "https://youtubei.googleapis.com/youtubei/v1/player"
 
-    /**
-     * Search filters. Songs is the catalog proper and is tried first because its durations match
-     * Spotify's masters. Plenty of tracks only exist as uploads though (German YouTuber rap, for
-     * one), and for those the songs shelf silently returns other work by the same artist, so a miss
-     * retries against videos.
-     */
+    // Songs first (durations match Spotify's masters). Tracks that only exist as uploads are absent
+    // from that shelf, which returns other work by the same artist instead, so a miss retries videos.
     private const val SONGS_PARAMS = "EgWKAQIIAWoKEAoQAxAEEAkQBQ%3D%3D"
     private const val VIDEOS_PARAMS = "EgWKAQIQAWoKEAoQAxAEEAkQBQ%3D%3D"
 
@@ -49,18 +43,10 @@ object YouTubeMusicSource {
     private const val VR_UA =
         "com.google.android.apps.youtube.vr.oculus/$VR_VERSION (Linux; U; Android 12; GB) gzip"
 
-    /**
-     * A catalog master matches Spotify's within a second or two, but a music-video upload of the
-     * same track carries an intro or outro, so the window has to allow for that. Combined with the
-     * title score below it is still tight enough to reject a different song of similar length.
-     */
+    /** Wide because a music-video upload of the same track carries an intro or outro. */
     internal const val DURATION_TOLERANCE_SEC = 30L
 
-    /**
-     * Share of the wanted title's words a candidate must carry. High on purpose: at 0.5 the shared
-     * filler in "Rappe nur das Gleiche" and "Es ist immer das Gleiche" was enough to match, and a
-     * confidently wrong track is worse than none.
-     */
+    /** Share of the wanted title's words a candidate must carry. At 0.5 shared filler words matched. */
     internal const val MIN_TITLE_SCORE = 0.8
 
     private const val MAX_CANDIDATES = 10
@@ -217,10 +203,7 @@ object YouTubeMusicSource {
         return parts.fold(0L) { acc, part -> acc * 60 + part.toLong() }
     }
 
-    /**
-     * Returning null rather than guessing is deliberate: the wrong recording is worse than none, and
-     * the caller already skips a track it cannot resolve.
-     */
+    /** Null rather than a guess: the wrong recording is worse than none, and the caller skips. */
     internal fun bestMatch(candidates: List<Candidate>, wantTitle: String, durationMs: Long): Candidate? {
         val want = words(wantTitle)
         val titled = candidates.filter { want.isEmpty() || titleScore(it.title, want) >= MIN_TITLE_SCORE }
@@ -231,22 +214,14 @@ object YouTubeMusicSource {
             .minByOrNull { abs(it.durationSec - wantSec) }
     }
 
-    /**
-     * Share of the wanted title's words the candidate carries. Word overlap rather than substring
-     * containment, because YouTube and Spotify disagree on spelling often enough to matter and one
-     * differing word should not throw the match away.
-     */
+    /** Share of the wanted title's words the candidate carries. */
     internal fun titleScore(candidateTitle: String, want: Set<String>): Double {
         if (want.isEmpty()) return 0.0
         val have = words(candidateTitle)
         return want.count { w -> have.any { nearlyEqual(it, w) } }.toDouble() / want.size
     }
 
-    /**
-     * Equal, or one edit apart for words long enough that a single differing character is a spelling
-     * variant rather than a different word. Spotify's "Tobbss" and YouTube's "Tobbs" are the same
-     * track, and exact comparison threw it away.
-     */
+    /** Equal, or one edit apart, so a spelling variant like "Tobbs" / "Tobbss" still matches. */
     private fun nearlyEqual(a: String, b: String): Boolean {
         if (a == b) return true
         if (minOf(a.length, b.length) < 4 || abs(a.length - b.length) > 1) return false

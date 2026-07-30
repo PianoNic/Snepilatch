@@ -15,7 +15,7 @@ import ch.snepilatch.app.playback.InfiniPlayViz
 import ch.snepilatch.app.playback.MusicPlaybackService
 import ch.snepilatch.app.playback.PositionInterpolator
 import ch.snepilatch.app.playback.SessionHolder
-import ch.snepilatch.app.playback.YouTubeMusicSource
+import ch.snepilatch.app.playback.AudioSourceResolver
 import ch.snepilatch.app.playback.engine.SpfyCdnResolver
 import ch.snepilatch.app.playback.engine.SpfyStream
 import ch.snepilatch.app.data.*
@@ -28,9 +28,7 @@ import kotify.api.playerstatus.PlayerTrack
 import kotify.api.song.Song
 import kotify.api.user.User
 import kotify.api.canvas.Canvas
-import kotify.cdn.CdnPlayback
 import kotify.cdn.SpfyPlayback
-import kotify.cdn.StreamInfo
 import kotify.cdn.StreamResult
 import kotify.session.Session
 import kotify.session.SessionConfig
@@ -79,7 +77,6 @@ class PlaybackViewModel : ViewModel() {
     private var initRetryCount = 0
 
     // Streaming
-    private val cdn = CdnPlayback()
     private var spfyPlayback: SpfyPlayback?
         get() = SessionHolder.spfyPlayback
         set(value) { SessionHolder.spfyPlayback = value }
@@ -1314,11 +1311,7 @@ class PlaybackViewModel : ViewModel() {
                 val query = listOf(artist, title)
                     .filter { it.isNotBlank() && it != "Unknown" }
                     .joinToString(" ")
-                val result = resolveYtmOrNull(title, artist, track.durationMs)
-                    ?: cdn.resolveStreamUrl(
-                        trackId, region = AppSettings.effectiveRegion(),
-                        searchQuery = query, preferredSource = AppSettings.preferredAudioSource.value
-                    )
+                val result = AudioSourceResolver.byQuery(trackId, query, title, artist, track.durationMs)
                 if (result is StreamResult.Success) {
                     val info = result.info
                     playUrlAt = System.currentTimeMillis()
@@ -2512,8 +2505,7 @@ class PlaybackViewModel : ViewModel() {
         }
 
         try {
-            val result = resolveYtmOrNull(title, artist, current.durationMs)
-                ?: cdn.resolveFromTrack(event, region = AppSettings.effectiveRegion(), preferredSource = AppSettings.preferredAudioSource.value)
+            val result = AudioSourceResolver.fromTrack(event)
             when (result) {
                 is StreamResult.Success -> {
                     // Don't resume Spfy yet — onReady callback will sync after ExoPlayer buffers
@@ -2550,38 +2542,10 @@ class PlaybackViewModel : ViewModel() {
         preResolveNextTrack()
     }
 
-    /**
-     * YouTube Music resolves in-app; every other non-Spfy source goes through KotifyClient's relay
-     * chain. Returns null when YouTube Music isn't the chosen source, so callers fall through to
-     * their existing `cdn.*` call unchanged.
-     *
-     * A miss is a [StreamResult.Failure], never null: falling through would hand the track to
-     * Qobuz/Deezer, and silently swapping the source the user picked is what #480 removed.
-     */
-    private suspend fun resolveYtmOrNull(title: String?, artist: String?, durationMs: Long): StreamResult? {
-        if (AppSettings.preferredAudioSource.value != AppSettings.SOURCE_YTM) return null
-        val stream = YouTubeMusicSource.resolve(
-            title = title.orEmpty(),
-            artist = artist.orEmpty(),
-            region = AppSettings.effectiveRegion(),
-            durationMs = durationMs,
-        ) ?: return StreamResult.Failure(
-            "No YouTube Music match for ${listOfNotNull(artist, title).joinToString(" ")}"
-        )
-        return StreamResult.Success(
-            StreamInfo(
-                url = stream.url,
-                provider = "YouTube Music",
-                mimeType = stream.mimeType,
-                headers = stream.headers,
-            )
-        )
-    }
 
     /**
-     * No YouTube Music match, so there is no audio for this track. Skip forward rather than sitting
-     * in silence, bounded by the existing playback-error budget so a run of unmatched tracks cannot
-     * race through the queue. The budget resets on the next successful onReady.
+     * Skip rather than sit in silence, bounded by the playback-error budget so a run of unmatched
+     * tracks cannot race through the queue. The budget resets on the next successful onReady.
      */
     private suspend fun skipUnmatchedYtmTrack(trackUri: String) {
         if (playbackErrorRetries >= MAX_PLAYBACK_ERROR_RETRIES) {
@@ -2773,11 +2737,7 @@ class PlaybackViewModel : ViewModel() {
             try {
                 val art = normalizeSpfyImageUrl(track.imageLargeUrl ?: track.imageUrl)
 
-                val result = resolveYtmOrNull(title, artist, track.durationMs)
-                    ?: cdn.resolveStreamUrl(
-                        trackId, region = AppSettings.effectiveRegion(),
-                        searchQuery = searchQuery, preferredSource = AppSettings.preferredAudioSource.value
-                    )
+                val result = AudioSourceResolver.byQuery(trackId, searchQuery, title, artist, track.durationMs)
                 when (result) {
                     is StreamResult.Success -> {
                         playUrlAt = System.currentTimeMillis()
@@ -2833,13 +2793,7 @@ class PlaybackViewModel : ViewModel() {
                 .joinToString(" ").takeIf { it.isNotBlank() }
 
             LokiLogger.i(TAG, "Pre-resolving next: $title by $artist")
-            val result = resolveYtmOrNull(title, artist, nextTrack.durationMs)
-                ?: cdn.resolveStreamUrl(
-                    nextId,
-                    region = AppSettings.effectiveRegion(),
-                    searchQuery = searchQuery,
-                    preferredSource = AppSettings.preferredAudioSource.value
-                )
+            val result = AudioSourceResolver.byQuery(nextId, searchQuery, title, artist, nextTrack.durationMs)
             if (result is StreamResult.Success) {
                 val info = result.info
                 val key = info.decryptionKey

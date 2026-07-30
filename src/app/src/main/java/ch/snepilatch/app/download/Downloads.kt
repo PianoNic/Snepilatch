@@ -48,6 +48,19 @@ object Downloads {
     /** Track URIs with a local copy, for the UI to tint rows without querying per item. */
     val downloaded: StateFlow<Set<String>> = _downloaded.asStateFlow()
 
+    private val _inProgress = MutableStateFlow<Set<String>>(emptySet())
+
+    /** Track URIs being fetched right now, so a row can show a spinner instead of a download icon. */
+    val inProgress: StateFlow<Set<String>> = _inProgress.asStateFlow()
+
+    fun markStarted(trackUri: String) {
+        _inProgress.value = _inProgress.value + trackUri
+    }
+
+    fun markFinished(trackUri: String) {
+        _inProgress.value = _inProgress.value - trackUri
+    }
+
     private class Helper(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_VERSION) {
         override fun onCreate(db: SQLiteDatabase) {
             db.execSQL(

@@ -57,19 +57,32 @@ object DownloadNotifier {
         .setSilent(true)
 
     /** [percent] below zero shows an indeterminate bar, which is what a missing Content-Length gives. */
-    fun progress(context: Context, title: String, percent: Int) {
+    fun progress(context: Context, title: String, percent: Int, bytesPerSecond: Long = 0L) {
         val builder = base(context, title)
+            .setContentText(withRate(title, bytesPerSecond))
             .setOngoing(true)
             .setProgress(100, percent.coerceIn(0, 100), percent < 0)
         manager(context).notify(NOTIFICATION_ID, builder.build())
     }
 
-    /** Aggregate progress for an album or playlist, replacing the per-track notification. */
-    fun batch(context: Context, title: String, done: Int, total: Int) {
+    /**
+     * Aggregate progress for an album or playlist, replacing the per-track notification. Scaled by a
+     * hundred so the current track's own progress moves the bar between tracks rather than it
+     * sitting still and then jumping a whole step.
+     */
+    fun batch(
+        context: Context,
+        title: String,
+        done: Int,
+        total: Int,
+        trackPercent: Int = 0,
+        bytesPerSecond: Long = 0L,
+    ) {
         val builder = base(context, title)
             .setContentTitle(context.getString(R.string.downloading_count, done, total))
+            .setContentText(withRate(title, bytesPerSecond))
             .setOngoing(true)
-            .setProgress(total, done, false)
+            .setProgress(total * 100, (done - 1) * 100 + trackPercent.coerceIn(0, 100), false)
         manager(context).notify(NOTIFICATION_ID, builder.build())
     }
 
@@ -97,6 +110,18 @@ object DownloadNotifier {
             .setOngoing(false)
             .setAutoCancel(true)
         manager(context).notify(NOTIFICATION_ID, builder.build())
+    }
+
+    /** "Artist - Title · 4.2 MB/s", or just the title before any bytes have moved. */
+    private fun withRate(title: String, bytesPerSecond: Long): String {
+        if (bytesPerSecond <= 0L) return title
+        val megabytes = bytesPerSecond / 1024.0 / 1024.0
+        val rate = if (megabytes >= 1.0) {
+            String.format(java.util.Locale.US, "%.1f MB/s", megabytes)
+        } else {
+            String.format(java.util.Locale.US, "%.0f KB/s", bytesPerSecond / 1024.0)
+        }
+        return "$title · $rate"
     }
 
     fun clear(context: Context) = manager(context).cancel(NOTIFICATION_ID)

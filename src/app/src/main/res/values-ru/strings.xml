@@ -319,4 +319,6 @@
     <string name="download_all">Скачать все</string>
     <string name="library_filter_downloaded">Загружено (%1$d)</string>
     <string name="downloaded_indicator">Загружено</string>
+    <string name="downloads_active">Активные</string>
+    <string name="downloads_idle">Сейчас ничего не загружается</string>
 </resources>

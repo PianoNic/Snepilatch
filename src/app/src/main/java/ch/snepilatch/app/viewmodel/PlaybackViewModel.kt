@@ -2649,7 +2649,9 @@ class PlaybackViewModel : ViewModel() {
                     ),
                     context,
                     notify = false,
-                )
+                ) { percent, bps ->
+                    DownloadNotifier.batch(context, track.name, index + 1, tracks.size, percent, bps)
+                }
                 if (outcome !is DownloadOutcome.Done) failed++
                 if (outcome is DownloadOutcome.NoFolder) {
                     DownloadNotifier.failed(

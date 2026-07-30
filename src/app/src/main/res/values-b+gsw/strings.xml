@@ -319,4 +319,6 @@
     <string name="download_all">Alli abelade</string>
     <string name="library_filter_downloaded">Abeglade (%1$d)</string>
     <string name="downloaded_indicator">Abeglade</string>
+    <string name="downloads_active">Aktiv</string>
+    <string name="downloads_idle">Grad laufed kei Downloads</string>
 </resources>

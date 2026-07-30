@@ -319,4 +319,6 @@
     <string name="download_all">Alle herunterladen</string>
     <string name="library_filter_downloaded">Heruntergeladen (%1$d)</string>
     <string name="downloaded_indicator">Heruntergeladen</string>
+    <string name="downloads_active">Aktiv</string>
+    <string name="downloads_idle">Gerade laufen keine Downloads</string>
 </resources>

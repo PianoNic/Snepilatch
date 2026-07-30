@@ -325,4 +325,6 @@
     <string name="download_all">Download all</string>
     <string name="library_filter_downloaded">Downloaded (%1$d)</string>
     <string name="downloaded_indicator">Downloaded</string>
+    <string name="downloads_active">Active</string>
+    <string name="downloads_idle">Nothing downloading right now</string>
 </resources>

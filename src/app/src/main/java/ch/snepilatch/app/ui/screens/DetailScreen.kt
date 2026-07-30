@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.rounded.DownloadForOffline
+import androidx.compose.material.icons.rounded.OfflinePin
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.rounded.MoreVert
@@ -263,6 +264,8 @@ fun DetailScreen(vm: PlaybackViewModel) {
                 val downloadable = detail.type in setOf("album", "playlist", "collection")
                 // Flips to a tick once every track is on disk, and then removes them instead.
                 val downloadedUris by Downloads.downloaded.collectAsState()
+                val inFlight by Downloads.inProgress.collectAsState()
+                val downloading = detail.tracks.any { it.uri in inFlight }
                 val allDownloaded = detail.tracks.isNotEmpty() &&
                     detail.tracks.all { it.uri in downloadedUris }
                 if (downloadable) {
@@ -276,17 +279,30 @@ fun DetailScreen(vm: PlaybackViewModel) {
                                 )
                             }
                         },
-                        enabled = detail.tracks.isNotEmpty(),
+                        enabled = detail.tracks.isNotEmpty() && !downloading,
                         modifier = Modifier.size(HEADER_BUTTON)
                     ) {
-                        Icon(
-                            Icons.Rounded.DownloadForOffline,
-                            stringResource(
-                                if (allDownloaded) R.string.remove_download else R.string.download_all
-                            ),
-                            tint = if (allDownloaded) accentColor else SpfyLightGray,
-                            modifier = Modifier.size(HEADER_ICON)
-                        )
+                        when {
+                            downloading -> CircularProgressIndicator(
+                                color = accentColor,
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(HEADER_ICON)
+                            )
+                            // A distinct glyph, not the same one recoloured: colour alone is easy to
+                            // miss and says nothing on its own.
+                            allDownloaded -> Icon(
+                                Icons.Rounded.OfflinePin,
+                                stringResource(R.string.remove_download),
+                                tint = accentColor,
+                                modifier = Modifier.size(HEADER_ICON)
+                            )
+                            else -> Icon(
+                                Icons.Rounded.DownloadForOffline,
+                                stringResource(R.string.download_all),
+                                tint = SpfyLightGray,
+                                modifier = Modifier.size(HEADER_ICON)
+                            )
+                        }
                     }
                 }
 

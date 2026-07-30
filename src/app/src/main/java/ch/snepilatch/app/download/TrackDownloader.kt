@@ -61,13 +61,19 @@ object TrackDownloader {
         request: DownloadRequest,
         context: Context,
         notify: Boolean = true,
+        onProgress: ((percent: Int, bytesPerSecond: Long) -> Unit)? = null,
     ): DownloadOutcome =
         withContext(Dispatchers.IO) {
             // Anything unexpected becomes a failed notification; a download must not crash the app.
-            runCatching { downloadInner(request, context, notify) }.getOrElse {
-                LokiLogger.e(TAG, "download crashed for ${request.title}", it)
-                DownloadNotifier.failed(context, request.title, it.message ?: "unexpected error")
-                DownloadOutcome.Failed(it.message ?: "unexpected error")
+            Downloads.markStarted(request.trackUri)
+            try {
+                runCatching { downloadInner(request, context, notify, onProgress) }.getOrElse {
+                    LokiLogger.e(TAG, "download crashed for ${request.title}", it)
+                    DownloadNotifier.failed(context, request.title, it.message ?: "unexpected error")
+                    DownloadOutcome.Failed(it.message ?: "unexpected error")
+                }
+            } finally {
+                Downloads.markFinished(request.trackUri)
             }
         }
 
@@ -75,6 +81,7 @@ object TrackDownloader {
         request: DownloadRequest,
         context: Context,
         notify: Boolean,
+        onProgress: ((percent: Int, bytesPerSecond: Long) -> Unit)?,
     ): DownloadOutcome =
         withContext(Dispatchers.IO) {
             LokiLogger.i(
@@ -98,7 +105,10 @@ object TrackDownloader {
             val temp = File.createTempFile("download", null, context.cacheDir)
             try {
                 val fetched = runCatching {
-                    fetchTo(info, temp) { if (notify) DownloadNotifier.progress(context, request.title, it) }
+                    fetchTo(info, temp) { percent, bps ->
+                        onProgress?.invoke(percent, bps)
+                        if (notify) DownloadNotifier.progress(context, request.title, percent, bps)
+                    }
                 }.recoverCatching { failure ->
                     // A refused media url usually means the cached visitor id went stale, so mint a
                     // fresh one and resolve again before giving up.
@@ -107,7 +117,10 @@ object TrackDownloader {
                     YouTubeMusicSource.invalidateVisitorData()
                     val retry = resolve(request)
                     if (retry !is StreamResult.Success) throw failure
-                    fetchTo(retry.info, temp) { if (notify) DownloadNotifier.progress(context, request.title, it) }
+                    fetchTo(retry.info, temp) { percent, bps ->
+                        onProgress?.invoke(percent, bps)
+                        if (notify) DownloadNotifier.progress(context, request.title, percent, bps)
+                    }
                 }.getOrElse {
                     LokiLogger.e(TAG, "fetch failed for ${request.title}: ${it.message}")
                     DownloadNotifier.failed(context, request.title, it.message ?: "failed")
@@ -231,12 +244,12 @@ object TrackDownloader {
         return record
     }
 
-    private fun fetchTo(info: StreamInfo, target: File, onProgress: (Int) -> Unit): Long {
+    private fun fetchTo(info: StreamInfo, target: File, onProgress: (Int, Long) -> Unit): Long {
         val key = info.decryptionKey
         if (key != null) {
             // Deezer's cipher needs one contiguous stream from block zero, and its relay does not
             // throttle, so it keeps the single request.
-            onProgress(-1)
+            onProgress(-1, 0L)
             open(info, range = null).use { body ->
                 target.outputStream().use { sink ->
                     DeezerBlockCipher.decryptInto(sink, body.byteStream(), DeezerBlockCipher.hexToBytes(key))
@@ -255,17 +268,33 @@ object TrackDownloader {
      * about three minutes. Asking for explicit ranges sidesteps that and the same track lands in
      * seconds. Ranges are sequential, so the file is written in order and nothing needs reassembling.
      */
-    private fun fetchChunked(info: StreamInfo, target: File, onProgress: (Int) -> Unit) {
+    private fun fetchChunked(info: StreamInfo, target: File, onProgress: (Int, Long) -> Unit) {
         var position = 0L
         var total = -1L
+        var lastPercent = -1
+        val startedAt = System.currentTimeMillis()
+        val buffer = ByteArray(BUFFER)
         target.outputStream().use { sink ->
             while (total < 0 || position < total) {
                 val end = position + CHUNK_BYTES - 1
                 open(info, range = "bytes=$position-$end").use { body ->
                     if (total < 0) total = contentRangeTotal(body.contentRange) ?: body.contentLength()
-                    position += body.byteStream().copyTo(sink, BUFFER)
+                    val stream = body.byteStream()
+                    // Reported per buffer rather than per chunk, or a six megabyte track would move
+                    // the bar exactly twice.
+                    while (true) {
+                        val read = stream.read(buffer)
+                        if (read < 0) break
+                        sink.write(buffer, 0, read)
+                        position += read
+                        val percent = if (total > 0) ((position * 100) / total).toInt() else -1
+                        if (percent != lastPercent) {
+                            lastPercent = percent
+                            val elapsed = (System.currentTimeMillis() - startedAt).coerceAtLeast(1)
+                            onProgress(percent.coerceAtMost(100), position * 1000 / elapsed)
+                        }
+                    }
                 }
-                if (total > 0) onProgress(((position * 100) / total).toInt().coerceAtMost(100))
                 // A short final chunk means the server has nothing left, whatever the declared total.
                 if (total < 0) break
             }

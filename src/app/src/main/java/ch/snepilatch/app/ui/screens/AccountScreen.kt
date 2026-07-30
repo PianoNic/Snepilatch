@@ -780,7 +780,7 @@ private fun RadioPickerDialog(
 }
 
 /** Turns a SAF tree uri into something recognisable, e.g. "primary:Music/Snepilatch" -> "Music/Snepilatch". */
-private fun readableFolder(uri: android.net.Uri): String {
+internal fun readableFolder(uri: android.net.Uri): String {
     val id = runCatching { android.provider.DocumentsContract.getTreeDocumentId(uri) }.getOrNull()
     return id?.substringAfter(':')?.takeIf { it.isNotBlank() } ?: uri.lastPathSegment.orEmpty()
 }

@@ -53,6 +53,31 @@ object Downloads {
     /** Track URIs being fetched right now, so a row can show a spinner instead of a download icon. */
     val inProgress: StateFlow<Set<String>> = _inProgress.asStateFlow()
 
+    /** What is being fetched right now, as the album, playlist or single the user asked for. */
+    data class ActiveJob(
+        val name: String,
+        val type: String,
+        val imageUrl: String?,
+        val done: Int,
+        val total: Int,
+        val trackPercent: Int,
+    )
+
+    private val _activeJob = MutableStateFlow<ActiveJob?>(null)
+    val activeJob: StateFlow<ActiveJob?> = _activeJob.asStateFlow()
+
+    fun startJob(name: String, type: String, imageUrl: String?, total: Int) {
+        _activeJob.value = ActiveJob(name, type, imageUrl, done = 1, total = total, trackPercent = 0)
+    }
+
+    fun updateJob(done: Int, trackPercent: Int) {
+        _activeJob.value = _activeJob.value?.copy(done = done, trackPercent = trackPercent)
+    }
+
+    fun clearJob() {
+        _activeJob.value = null
+    }
+
     fun markStarted(trackUri: String) {
         _inProgress.value = _inProgress.value + trackUri
     }

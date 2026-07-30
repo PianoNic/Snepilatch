@@ -61,6 +61,12 @@ internal class OggOpusWriter(
         writePage(packets, granule + preSkip, firstPage = false, lastPage = last)
     }
 
+    /**
+     * Emits [packets] as one or more pages. A page carries at most 255 lacing values, so a packet
+     * bigger than 255 * 255 bytes has to span pages with the continuation flag set. Cover art pushes
+     * the comment packet well past that, and writing it as a single page silently truncated the
+     * segment count into a byte and corrupted the stream.
+     */
     private fun writePage(packets: List<ByteArray>, granulePosition: Long, firstPage: Boolean, lastPage: Boolean) {
         val lacing = ArrayList<Int>()
         for (packet in packets) {
@@ -71,21 +77,6 @@ internal class OggOpusWriter(
             }
             lacing += remaining
         }
-
-        val header = ByteArray(27 + lacing.size)
-        header[0] = 'O'.code.toByte()
-        header[1] = 'g'.code.toByte()
-        header[2] = 'g'.code.toByte()
-        header[3] = 'S'.code.toByte()
-        header[4] = 0
-        header[5] = ((if (firstPage) 0x02 else 0) or (if (lastPage) 0x04 else 0)).toByte()
-        writeLong(header, 6, granulePosition)
-        writeInt(header, 14, serial)
-        writeInt(header, 18, sequence++)
-        // 22..25 is the checksum, left zero while it is computed over the whole page.
-        header[26] = lacing.size.toByte()
-        lacing.forEachIndexed { i, value -> header[27 + i] = value.toByte() }
-
         val body = ByteArray(packets.sumOf { it.size })
         var offset = 0
         for (packet in packets) {
@@ -93,8 +84,60 @@ internal class OggOpusWriter(
             offset += packet.size
         }
 
-        val crc = OggCrc.of(header, body)
-        writeInt(header, 22, crc)
+        var segmentStart = 0
+        var bodyStart = 0
+        var continued = false
+        while (segmentStart < lacing.size || (lacing.isEmpty() && !continued)) {
+            val segmentEnd = minOf(segmentStart + MAX_SEGMENTS_PER_PAGE, lacing.size)
+            val segments = lacing.subList(segmentStart, segmentEnd)
+            val bodyLength = segments.sum()
+            val isFinalPage = segmentEnd == lacing.size
+            emitPage(
+                Page(
+                    segments = segments,
+                    granulePosition = granulePosition,
+                    firstPage = firstPage && !continued,
+                    lastPage = lastPage && isFinalPage,
+                    continued = continued,
+                ),
+                body.copyOfRange(bodyStart, bodyStart + bodyLength),
+            )
+            segmentStart = segmentEnd
+            bodyStart += bodyLength
+            continued = true
+            if (lacing.isEmpty()) break
+        }
+    }
+
+    private class Page(
+        val segments: List<Int>,
+        val granulePosition: Long,
+        val firstPage: Boolean,
+        val lastPage: Boolean,
+        val continued: Boolean,
+    )
+
+    private fun emitPage(page: Page, body: ByteArray) {
+        val segments = page.segments
+        val header = ByteArray(27 + segments.size)
+        header[0] = 'O'.code.toByte()
+        header[1] = 'g'.code.toByte()
+        header[2] = 'g'.code.toByte()
+        header[3] = 'S'.code.toByte()
+        header[4] = 0
+        header[5] = (
+            (if (page.continued) 0x01 else 0) or
+                (if (page.firstPage) 0x02 else 0) or
+                (if (page.lastPage) 0x04 else 0)
+            ).toByte()
+        writeLong(header, 6, page.granulePosition)
+        writeInt(header, 14, serial)
+        writeInt(header, 18, sequence++)
+        // 22..25 is the checksum, left zero while it is computed over the whole page.
+        header[26] = segments.size.toByte()
+        segments.forEachIndexed { i, value -> header[27 + i] = value.toByte() }
+
+        writeInt(header, 22, OggCrc.of(header, body))
         out.write(header)
         out.write(body)
     }

@@ -98,6 +98,32 @@ class OggOpusWriterTest {
     }
 
     @Test
+    fun aCommentPacketBiggerThanOnePageSpansPages() {
+        // Every real download was corrupt: a page holds at most 255 lacing values, so cover art
+        // pushed the comment packet past 65025 bytes and the segment count truncated into a byte.
+        val out = ByteArrayOutputStream()
+        OggOpusWriter(out, serial = 9, preSkip = 312).writeHeaders(opusHead, ByteArray(200_000))
+        val bytes = out.toByteArray()
+
+        val pages = pageOffsets(bytes)
+        assertTrue("expected the comment packet to span pages, got ${pages.size}", pages.size >= 4)
+        // Header page, then the comment packet's first page, then continuations.
+        assertEquals("first page is beginning-of-stream", 0x02, bytes[pages[0] + 5].toInt())
+        assertEquals("comment packet starts a fresh packet", 0x00, bytes[pages[1] + 5].toInt())
+        assertEquals("later pages continue it", 0x01, bytes[pages[2] + 5].toInt())
+        pages.forEach { at ->
+            assertTrue("segment count must fit a byte", (bytes[at + 26].toInt() and 0xFF) <= 255)
+        }
+    }
+
+    /** Offsets of every "OggS" capture pattern, i.e. where each page starts. */
+    private fun pageOffsets(bytes: ByteArray): List<Int> =
+        (0..bytes.size - 4).filter {
+            bytes[it] == 'O'.code.toByte() && bytes[it + 1] == 'g'.code.toByte() &&
+                bytes[it + 2] == 'g'.code.toByte() && bytes[it + 3] == 'S'.code.toByte()
+        }
+
+    @Test
     fun theChecksumIsNotLeftZero() {
         val out = ByteArrayOutputStream()
         OggOpusWriter(out, serial = 3, preSkip = 0)

@@ -34,6 +34,17 @@ fun DownloadsScreen(vm: PlaybackViewModel) {
     val folder by DownloadFolder.folder.collectAsState()
     val stored = remember(downloadedUris) { Downloads.all() }
     val totalMb = remember(stored) { (stored.sumOf { it.sizeBytes } / 1024 / 1024).toInt() }
+    var confirmClearAll by remember { mutableStateOf(false) }
+
+    if (confirmClearAll) {
+        ClearAllDialog(
+            onConfirm = {
+                stored.forEach { vm.removeDownload(it.trackUri) }
+                confirmClearAll = false
+            },
+            onDismiss = { confirmClearAll = false },
+        )
+    }
 
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -47,8 +58,14 @@ fun DownloadsScreen(vm: PlaybackViewModel) {
                 stringResource(R.string.downloads),
                 color = SpfyWhite,
                 fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
             )
+            if (stored.isNotEmpty()) {
+                TextButton(onClick = { confirmClearAll = true }) {
+                    Text(stringResource(R.string.remove_all), color = SpfyLightGray)
+                }
+            }
         }
 
         ListItem(
@@ -88,24 +105,47 @@ fun DownloadsScreen(vm: PlaybackViewModel) {
             return@Column
         }
 
-        LazyColumn(
-            contentPadding = PaddingValues(bottom = LocalBottomOverlayHeight.current.value + 16.dp)
-        ) {
-            items(inFlight.toList(), key = { it }) { trackUri ->
-                ListItem(
-                    headlineContent = {
-                        Text(trackUri.substringAfterLast(':'), color = SpfyWhite, maxLines = 1)
-                    },
-                    supportingContent = {
-                        Text(stringResource(R.string.downloading), color = SpfyLightGray)
-                    },
-                    leadingContent = { Icon(Icons.Rounded.Downloading, null, tint = SpfyLightGray) },
-                    trailingContent = {
-                        CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
-                    },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                )
-            }
+        ActiveDownloads(inFlight.toList())
+    }
+}
+
+@Composable
+private fun ActiveDownloads(trackUris: List<String>) {
+    LazyColumn(
+        contentPadding = PaddingValues(bottom = LocalBottomOverlayHeight.current.value + 16.dp)
+    ) {
+        items(trackUris, key = { it }) { trackUri ->
+            ListItem(
+                headlineContent = {
+                    Text(trackUri.substringAfterLast(':'), color = SpfyWhite, maxLines = 1)
+                },
+                supportingContent = { Text(stringResource(R.string.downloading), color = SpfyLightGray) },
+                leadingContent = { Icon(Icons.Rounded.Downloading, null, tint = SpfyLightGray) },
+                trailingContent = {
+                    CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+            )
         }
     }
+}
+
+@Composable
+private fun ClearAllDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = SpfyGray,
+        title = { Text(stringResource(R.string.remove_all), color = SpfyWhite) },
+        text = { Text(stringResource(R.string.remove_all_confirm), color = SpfyLightGray) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.remove_all), color = SpfyWhite)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel), color = SpfyLightGray)
+            }
+        }
+    )
 }

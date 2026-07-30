@@ -1,6 +1,5 @@
 package ch.snepilatch.app.download
 
-import android.util.Base64
 import java.io.ByteArrayOutputStream
 
 /** Metadata to embed. Everything comes from Spfy, which knows the release far better than YouTube. */
@@ -87,8 +86,10 @@ internal object VorbisComments {
      * Cover art rides in a base64 FLAC picture block, which is how both Opus and FLAC carry images.
      * Dimensions are declared zero: they are optional and players read them from the image itself.
      */
+    // java.util.Base64 rather than android.util.Base64: identical output, available from API 26, and
+    // it does not return null under unit tests, which is what hid the oversized-packet bug.
     private fun encodePicture(cover: TrackTags.Cover): String =
-        Base64.encodeToString(pictureBlock(cover), Base64.NO_WRAP)
+        java.util.Base64.getEncoder().encodeToString(pictureBlock(cover))
 
     private fun writeLe(out: ByteArrayOutputStream, value: Int) {
         for (i in 0 until 4) out.write((value ushr (8 * i)) and 0xFF)

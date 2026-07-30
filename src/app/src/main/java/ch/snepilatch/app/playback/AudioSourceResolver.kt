@@ -2,6 +2,7 @@ package ch.snepilatch.app.playback
 
 import ch.snepilatch.app.download.DownloadFolder
 import ch.snepilatch.app.download.Downloads
+import ch.snepilatch.app.util.LokiLogger
 import ch.snepilatch.app.viewmodel.AppSettings
 import kotify.api.playerstatus.TrackChangeEvent
 import kotify.cdn.CdnPlayback
@@ -17,6 +18,8 @@ import kotify.cdn.StreamResult
  * PlaybackViewModel keeps it.
  */
 object AudioSourceResolver {
+
+    private const val TAG = "AudioSource"
 
     private val cdn = CdnPlayback()
 
@@ -60,11 +63,17 @@ object AudioSourceResolver {
      * the folder is dropped rather than played.
      */
     fun localOrNull(trackUri: String): StreamResult? {
-        val local = Downloads.find(trackUri) ?: return null
+        val local = Downloads.find(trackUri)
+        if (local == null) {
+            LokiLogger.d(TAG, "no local copy indexed for $trackUri")
+            return null
+        }
         if (!DownloadFolder.exists(local.documentUri)) {
+            LokiLogger.w(TAG, "indexed file is gone for $trackUri, dropping the row")
             Downloads.remove(trackUri)
             return null
         }
+        LokiLogger.i(TAG, "using the local copy of $trackUri")
         return StreamResult.Success(
             StreamInfo(url = local.documentUri, provider = "Local", mimeType = local.mimeType)
         )

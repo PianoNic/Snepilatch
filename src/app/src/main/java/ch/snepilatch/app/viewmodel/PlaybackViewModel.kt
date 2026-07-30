@@ -16,6 +16,7 @@ import ch.snepilatch.app.playback.MusicPlaybackService
 import ch.snepilatch.app.playback.PositionInterpolator
 import ch.snepilatch.app.playback.SessionHolder
 import ch.snepilatch.app.download.DownloadNotifier
+import ch.snepilatch.app.download.Downloads
 import ch.snepilatch.app.download.DownloadOutcome
 import ch.snepilatch.app.download.DownloadRequest
 import ch.snepilatch.app.download.TrackDownloader
@@ -2588,7 +2589,8 @@ class PlaybackViewModel : ViewModel() {
                     durationMs = track.durationMs,
                 ),
                 context,
-            )
+            ) { percent -> Downloads.updateJob(1, percent) }
+            Downloads.clearJob()
             if (outcome is DownloadOutcome.NoFolder) {
                 DownloadNotifier.failed(
                     context, track.name, context.getString(R.string.download_needs_folder)
@@ -2600,6 +2602,7 @@ class PlaybackViewModel : ViewModel() {
     /** Downloads one track, with its own progress notification. */
     fun downloadTrack(track: TrackInfo, context: android.content.Context) {
         viewModelScope.launch(Dispatchers.IO) {
+            Downloads.startJob(track.name, "single", track.albumArt, total = 1)
             val outcome = TrackDownloader.download(
                 DownloadRequest(
                     trackUri = track.uri,
@@ -2632,6 +2635,12 @@ class PlaybackViewModel : ViewModel() {
     ) {
         if (tracks.isEmpty()) return
         viewModelScope.launch(Dispatchers.IO) {
+            Downloads.startJob(
+                name = contextName ?: tracks.first().name,
+                type = contextType ?: "single",
+                imageUrl = tracks.first().albumArt,
+                total = tracks.size,
+            )
             var failed = 0
             tracks.forEachIndexed { index, track ->
                 DownloadNotifier.batch(context, track.name, index + 1, tracks.size)
@@ -2649,17 +2658,20 @@ class PlaybackViewModel : ViewModel() {
                     ),
                     context,
                     notify = false,
-                ) { percent, bps ->
-                    DownloadNotifier.batch(context, track.name, index + 1, tracks.size, percent, bps)
+                ) { percent ->
+                    Downloads.updateJob(index + 1, percent)
+                    DownloadNotifier.batch(context, track.name, index + 1, tracks.size, percent)
                 }
                 if (outcome !is DownloadOutcome.Done) failed++
                 if (outcome is DownloadOutcome.NoFolder) {
                     DownloadNotifier.failed(
                         context, track.name, context.getString(R.string.download_needs_folder)
                     )
+                    Downloads.clearJob()
                     return@launch
                 }
             }
+            Downloads.clearJob()
             DownloadNotifier.batchFinished(context, tracks.size, failed)
         }
     }

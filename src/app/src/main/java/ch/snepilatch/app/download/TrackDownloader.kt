@@ -61,7 +61,7 @@ object TrackDownloader {
         request: DownloadRequest,
         context: Context,
         notify: Boolean = true,
-        onProgress: ((percent: Int, bytesPerSecond: Long) -> Unit)? = null,
+        onProgress: ((percent: Int) -> Unit)? = null,
     ): DownloadOutcome =
         withContext(Dispatchers.IO) {
             // Anything unexpected becomes a failed notification; a download must not crash the app.
@@ -81,7 +81,7 @@ object TrackDownloader {
         request: DownloadRequest,
         context: Context,
         notify: Boolean,
-        onProgress: ((percent: Int, bytesPerSecond: Long) -> Unit)?,
+        onProgress: ((percent: Int) -> Unit)?,
     ): DownloadOutcome =
         withContext(Dispatchers.IO) {
             LokiLogger.i(
@@ -105,9 +105,9 @@ object TrackDownloader {
             val temp = File.createTempFile("download", null, context.cacheDir)
             try {
                 val fetched = runCatching {
-                    fetchTo(info, temp) { percent, bps ->
-                        onProgress?.invoke(percent, bps)
-                        if (notify) DownloadNotifier.progress(context, request.title, percent, bps)
+                    fetchTo(info, temp) { percent ->
+                        onProgress?.invoke(percent)
+                        if (notify) DownloadNotifier.progress(context, request.title, percent)
                     }
                 }.recoverCatching { failure ->
                     // A refused media url usually means the cached visitor id went stale, so mint a
@@ -117,9 +117,9 @@ object TrackDownloader {
                     YouTubeMusicSource.invalidateVisitorData()
                     val retry = resolve(request)
                     if (retry !is StreamResult.Success) throw failure
-                    fetchTo(retry.info, temp) { percent, bps ->
-                        onProgress?.invoke(percent, bps)
-                        if (notify) DownloadNotifier.progress(context, request.title, percent, bps)
+                    fetchTo(retry.info, temp) { percent ->
+                        onProgress?.invoke(percent)
+                        if (notify) DownloadNotifier.progress(context, request.title, percent)
                     }
                 }.getOrElse {
                     LokiLogger.e(TAG, "fetch failed for ${request.title}: ${it.message}")
@@ -244,12 +244,12 @@ object TrackDownloader {
         return record
     }
 
-    private fun fetchTo(info: StreamInfo, target: File, onProgress: (Int, Long) -> Unit): Long {
+    private fun fetchTo(info: StreamInfo, target: File, onProgress: (Int) -> Unit): Long {
         val key = info.decryptionKey
         if (key != null) {
             // Deezer's cipher needs one contiguous stream from block zero, and its relay does not
             // throttle, so it keeps the single request.
-            onProgress(-1, 0L)
+            onProgress(-1)
             open(info, range = null).use { body ->
                 target.outputStream().use { sink ->
                     DeezerBlockCipher.decryptInto(sink, body.byteStream(), DeezerBlockCipher.hexToBytes(key))
@@ -268,11 +268,10 @@ object TrackDownloader {
      * about three minutes. Asking for explicit ranges sidesteps that and the same track lands in
      * seconds. Ranges are sequential, so the file is written in order and nothing needs reassembling.
      */
-    private fun fetchChunked(info: StreamInfo, target: File, onProgress: (Int, Long) -> Unit) {
+    private fun fetchChunked(info: StreamInfo, target: File, onProgress: (Int) -> Unit) {
         var position = 0L
         var total = -1L
         var lastPercent = -1
-        val startedAt = System.currentTimeMillis()
         val buffer = ByteArray(BUFFER)
         target.outputStream().use { sink ->
             while (total < 0 || position < total) {
@@ -290,8 +289,7 @@ object TrackDownloader {
                         val percent = if (total > 0) ((position * 100) / total).toInt() else -1
                         if (percent != lastPercent) {
                             lastPercent = percent
-                            val elapsed = (System.currentTimeMillis() - startedAt).coerceAtLeast(1)
-                            onProgress(percent.coerceAtMost(100), position * 1000 / elapsed)
+                            onProgress(percent.coerceAtMost(100))
                         }
                     }
                 }

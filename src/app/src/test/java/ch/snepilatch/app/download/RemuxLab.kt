@@ -26,10 +26,13 @@ class RemuxLab {
         val target = File(output!!)
         assumeTrue("missing $input", source.exists())
 
+        // A cover on purpose: without one the comment packet is tiny and fits a single page, which
+        // is exactly the case that passed while every real download was corrupt.
         val tags = TrackTags(
             title = "Remux Lab",
             artist = "Snepilatch",
             album = "Test",
+            cover = TrackTags.Cover(ByteArray(80_000) { (it % 251).toByte() }, "image/jpeg"),
         )
         val ok = source.inputStream().use { from ->
             target.outputStream().use { to ->

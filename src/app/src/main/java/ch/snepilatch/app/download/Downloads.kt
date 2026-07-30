@@ -143,6 +143,18 @@ object Downloads {
         }
     }
 
+    /**
+     * A downloaded row matching by title and artist rather than uri. Only used to explain why a
+     * lookup missed: Spotify relinks recordings, so the same song can arrive under a different uri
+     * than the one it was downloaded under.
+     */
+    fun findByMetadata(title: String, artist: String): DownloadedTrack? {
+        if (title.isBlank()) return null
+        return all().firstOrNull {
+            it.title.equals(title, ignoreCase = true) && it.artist.equals(artist, ignoreCase = true)
+        }
+    }
+
     fun all(): List<DownloadedTrack> {
         val db = helper?.readableDatabase ?: return emptyList()
         db.query(TABLE, null, null, null, null, null, "downloaded_at DESC").use { c ->
@@ -165,8 +177,8 @@ object Downloads {
     }
 
     /** Drops rows whose file is gone, which happens when the user deletes from the folder. */
-    fun prune(exists: (String) -> Boolean) {
-        val stale = all().filterNot { exists(it.documentUri) }
+    fun prune(exists: (String) -> Boolean?) {
+        val stale = all().filter { exists(it.documentUri) == false }
         if (stale.isEmpty()) return
         val db = helper?.writableDatabase ?: return
         stale.forEach { db.delete(TABLE, "track_uri = ?", arrayOf(it.trackUri)) }

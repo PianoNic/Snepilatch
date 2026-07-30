@@ -91,7 +91,8 @@ object TrackDownloader {
             )
             if (!DownloadFolder.isConfigured) return@withContext DownloadOutcome.NoFolder
             Downloads.find(request.trackUri)?.let { existing ->
-                if (DownloadFolder.exists(existing.documentUri)) {
+                // Only a definite "not there" re-downloads; an inconclusive check keeps the row.
+                if (DownloadFolder.exists(existing.documentUri) != false) {
                     return@withContext DownloadOutcome.Done(existing)
                 }
                 Downloads.remove(request.trackUri)

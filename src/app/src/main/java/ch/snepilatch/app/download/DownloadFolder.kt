@@ -78,12 +78,23 @@ object DownloadFolder {
         return runCatching { ctx.contentResolver.openOutputStream(documentUri) }.getOrNull()
     }
 
-    fun exists(documentUri: String): Boolean {
-        val ctx = appContext ?: return false
+    /**
+     * Whether the document is still there, or null when that cannot be determined: before [load] has
+     * run, or when the query itself fails.
+     *
+     * The distinction matters because callers drop the index row on a false. Reporting "gone" for a
+     * check that never ran deletes downloads the user still has, which is exactly what happened when
+     * playback resolved before startup had wired the context up.
+     */
+    fun exists(documentUri: String): Boolean? {
+        val ctx = appContext ?: return null
         return runCatching {
-            ctx.contentResolver.query(Uri.parse(documentUri), arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID), null, null, null)
-                .use { it != null && it.moveToFirst() }
-        }.getOrDefault(false)
+            ctx.contentResolver.query(
+                Uri.parse(documentUri),
+                arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID),
+                null, null, null
+            ).use { it != null && it.moveToFirst() }
+        }.getOrNull()
     }
 
     fun delete(documentUri: String): Boolean {

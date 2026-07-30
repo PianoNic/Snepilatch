@@ -26,7 +26,7 @@ object AudioSourceResolver {
     /** Resolve from a track-change event, which already carries title, artist and duration. */
     suspend fun fromTrack(event: TrackChangeEvent, trackUri: String): StreamResult {
         val current = event.current
-        return localOrNull(trackUri)
+        return localOrNull(trackUri, current?.name, current?.artistName)
             ?: youTubeMusic(
                 title = current?.name,
                 artist = current?.artistName,
@@ -48,7 +48,7 @@ object AudioSourceResolver {
         artist: String?,
         durationMs: Long,
         source: String? = AppSettings.preferredAudioSource.value,
-    ): StreamResult = localOrNull(trackUri)
+    ): StreamResult = localOrNull(trackUri, title, artist)
         ?: youTubeMusic(title, artist, durationMs, source)
         ?: cdn.resolveStreamUrl(
             trackUri.substringAfterLast(':'),
@@ -62,21 +62,39 @@ object AudioSourceResolver {
      * disk, so it plays from disk wherever it turns up. A row whose file has since been deleted from
      * the folder is dropped rather than played.
      */
-    fun localOrNull(trackUri: String): StreamResult? {
+    @JvmOverloads
+    fun localOrNull(trackUri: String, title: String? = null, artist: String? = null): StreamResult? {
         val local = Downloads.find(trackUri)
         if (local == null) {
-            LokiLogger.d(TAG, "no local copy indexed for $trackUri")
+            LokiLogger.i(TAG, "MISS $trackUri${relinkHint(trackUri, title, artist)}")
             return null
         }
-        if (!DownloadFolder.exists(local.documentUri)) {
-            LokiLogger.w(TAG, "indexed file is gone for $trackUri, dropping the row")
-            Downloads.remove(trackUri)
-            return null
+        // Only a definite "not there" drops the row. An inconclusive check means we cannot tell, and
+        // forgetting a download the user still has is far worse than trying to play it and failing.
+        when (DownloadFolder.exists(local.documentUri)) {
+            false -> {
+                LokiLogger.w(TAG, "GONE $trackUri, file missing from the folder, dropping the row")
+                Downloads.remove(trackUri)
+                return null
+            }
+            null -> LokiLogger.w(TAG, "cannot check the folder yet, using the indexed copy anyway")
+            true -> Unit
         }
-        LokiLogger.i(TAG, "using the local copy of $trackUri")
+        LokiLogger.i(TAG, "HIT  $trackUri -> ${local.documentUri.substringAfterLast("%2F")}")
         return StreamResult.Success(
             StreamInfo(url = local.documentUri, provider = "Local", mimeType = local.mimeType)
         )
+    }
+
+    /**
+     * Explains a miss. The interesting case is a track downloaded under a different uri, which is
+     * what Spotify relinking does and which a uri-keyed index cannot see.
+     */
+    private fun relinkHint(trackUri: String, title: String?, artist: String?): String {
+        if (title.isNullOrBlank()) return " (${Downloads.downloaded.value.size} downloaded)"
+        val other = Downloads.findByMetadata(title, artist.orEmpty())
+            ?: return " ('$title' is not downloaded)"
+        return " BUT '$title' is downloaded as ${other.trackUri} — relinked, so the uri lookup missed"
     }
 
     /**

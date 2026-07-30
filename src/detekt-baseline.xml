@@ -41,6 +41,7 @@
     <ID>LongMethod:SpfyApp.kt$@Composable fun SpfyApp(vm: PlaybackViewModel)</ID>
     <ID>LongMethod:PlaybackViewModel.kt$PlaybackViewModel$fun initialize(cookies: Map&lt;String, String&gt;)</ID>
     <ID>LongMethod:PlaybackViewModel.kt$PlaybackViewModel$private suspend fun coldStartPlay()</ID>
+    <ID>ReturnCount:PlaybackViewModel.kt$PlaybackViewModel$private suspend fun coldStartPlay()</ID>
     <ID>LongMethod:PlaybackViewModel.kt$PlaybackViewModel$private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent)</ID>
     <ID>LongMethod:PlaybackViewModel.kt$PlaybackViewModel$private suspend fun updatePlaybackFromState(state: PlayerStateData)</ID>
     <ID>LongMethod:UpdateDialog.kt$@Composable fun UpdateDialog( updateInfo: UpdateInfo, onDismiss: () -&gt; Unit )</ID>

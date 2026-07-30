@@ -1212,6 +1212,67 @@ class PlaybackViewModel : ViewModel() {
         }
     }
 
+    /** Cold-start play of a downloaded copy, resuming where the user left off. */
+    private suspend fun coldStartLocal(
+        track: TrackInfo,
+        title: String,
+        artist: String,
+        art: String?,
+        startPositionMs: Long,
+    ): Boolean {
+        val local = AudioSourceResolver.localOrNull(track.uri, title, artist) as? StreamResult.Success
+            ?: return false
+        playUrlAt = System.currentTimeMillis()
+        withContext(Dispatchers.Main) {
+            MusicPlaybackService.instance?.playUrl(
+                local.info.url, title, artist, art,
+                startPlaying = true, startPositionMs = startPositionMs
+            )
+        }
+        commitStream(track.uri, "Local")
+        LokiLogger.i(TAG, "[ColdStart] playing the downloaded copy at ${startPositionMs}ms")
+        return true
+    }
+
+    /**
+     * Cold-start play through the third-party chain, so resume-from-idle behaves like the rest of
+     * the lossless flow rather than dropping to Spfy's Widevine CDN.
+     */
+    private suspend fun coldStartThirdParty(
+        track: TrackInfo,
+        title: String,
+        artist: String,
+        art: String?,
+        startPositionMs: Long,
+    ): Boolean {
+        if (AppSettings.preferredAudioSource.value == null) return false
+        val query = listOf(artist, title).filter { it.isNotBlank() && it != "Unknown" }.joinToString(" ")
+        val result = AudioSourceResolver.byQuery(track.uri, query, title, artist, track.durationMs)
+        if (result !is StreamResult.Success) {
+            LokiLogger.w(TAG, "[ColdStart] lossless resolve failed, falling back to Spfy CDN")
+            return false
+        }
+        val info = result.info
+        playUrlAt = System.currentTimeMillis()
+        withContext(Dispatchers.Main) {
+            val svc = MusicPlaybackService.instance
+            val key = info.decryptionKey
+            if (key != null) {
+                svc?.playDeezer(info.url, key, info.headers, title, artist, art, startPositionMs = startPositionMs)
+            } else {
+                svc?.playUrl(
+                    info.url, title, artist, art,
+                    startPlaying = true, headers = info.headers, startPositionMs = startPositionMs
+                )
+            }
+        }
+        currentStreamUri = track.uri
+        isStreaming.value = true
+        streamProvider.value = info.provider
+        LokiLogger.i(TAG, "[ColdStart] lossless (${info.provider}) loading at ${startPositionMs}ms")
+        return true
+    }
+
     /**
      * Cold-start playback that mirrors the Spfy web player's protocol.
      *
@@ -1308,6 +1369,16 @@ class PlaybackViewModel : ViewModel() {
 
         try {
             val resolver = cdnResolver ?: throw IllegalStateException("CdnResolver not initialized")
+
+            // A downloaded copy plays from disk whatever the source, and this is the path the first
+            // track after opening the app takes. The Spfy branch below goes straight to the CDN, so
+            // without this a downloaded track streamed on launch and only played locally once it had
+            // been skipped to.
+            if (coldStartLocal(track, title, artist, art, savedPositionAtEntry) ||
+                coldStartThirdParty(track, title, artist, art, savedPositionAtEntry)
+            ) {
+                return
+            }
 
             // Lossless mode: resolve via the third-party chain (Qobuz → Deezer →
             // Deezer) and play locally instead of Spfy's Widevine CDN, so
@@ -1682,15 +1753,7 @@ class PlaybackViewModel : ViewModel() {
     private suspend fun optimisticTapPlay(track: TrackInfo) {
         val t0 = System.currentTimeMillis()
         try {
-            val resolver = cdnResolver ?: return
             val trackUri = track.uri
-            val fileId = safeMediaFileId(trackUri) ?: run {
-                LokiLogger.i(TAG, "[InstantTap] no licensable media file id for $trackUri, deferring to echo")
-                return
-            }
-            val stream = resolver.resolveForFileId(fileId)
-            // The echo may have already loaded this exact track while we were resolving — don't double-load.
-            if (currentStreamUri == trackUri) return
             val title = track.name.ifBlank { "Unknown" }
             val artist = track.artist.ifBlank { "Unknown" }
             val art = normalizeSpfyImageUrl(track.albumArt)
@@ -1699,6 +1762,21 @@ class PlaybackViewModel : ViewModel() {
             ThemeController.updateFromArt(art)
             checkLikedState(trackUri)
             fetchCanvasForTrack(trackUri)
+            // A downloaded copy wins here too. This path plays a full second before the echo reaches
+            // resolveAndPlay, so leaving the check to the echo means the CDN always gets there first
+            // and a downloaded track streams anyway.
+            if (playDownloaded(trackUri, title, artist, art)) {
+                LokiLogger.i(TAG, "[InstantTap] downloaded copy started in ${System.currentTimeMillis() - t0}ms")
+                return
+            }
+            val resolver = cdnResolver ?: return
+            val fileId = safeMediaFileId(trackUri) ?: run {
+                LokiLogger.i(TAG, "[InstantTap] no licensable media file id for $trackUri, deferring to echo")
+                return
+            }
+            val stream = resolver.resolveForFileId(fileId)
+            // The echo may have already loaded this exact track while we were resolving — don't double-load.
+            if (currentStreamUri == trackUri) return
             // DRM: stop the old player to close its Widevine session, then load the new track.
             withContext(Dispatchers.Main) { MusicPlaybackService.instance?.stop() }
             playUrlAt = System.currentTimeMillis()
@@ -2454,7 +2532,7 @@ class PlaybackViewModel : ViewModel() {
         }
 
         // Both fast paths skip resolving entirely; sharing one exit keeps this function's returns down.
-        if (playPreResolved(trackUri, title, artist, art) || playDownloaded(trackUri, title, artist, art)) {
+        if (playDownloaded(trackUri, title, artist, art) || playPreResolved(trackUri, title, artist, art)) {
             return
         }
 
@@ -2562,7 +2640,8 @@ class PlaybackViewModel : ViewModel() {
      * resolver, so a downloaded track plays from disk whatever the selected source is.
      */
     private suspend fun playDownloaded(trackUri: String, title: String, artist: String, art: String?): Boolean {
-        val local = AudioSourceResolver.localOrNull(trackUri) as? StreamResult.Success ?: return false
+        val local = AudioSourceResolver.localOrNull(trackUri, title, artist) as? StreamResult.Success
+            ?: return false
         withContext(Dispatchers.Main) { MusicPlaybackService.instance?.stop() }
         playUrlAt = System.currentTimeMillis()
         val coldStart = coldStartPending

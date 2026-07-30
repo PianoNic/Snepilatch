@@ -1447,6 +1447,16 @@ class PlaybackViewModel : ViewModel() {
     }
 
     /** Reset the transient cold-start handoff flags. Variant fields (file id, stream state) stay inline. */
+    /**
+     * Whether a ready stream should hand Spfy Connect a resume. Only when we loaded audio without
+     * issuing a transport command: playTrack already starts Connect by itself, and a downloaded copy
+     * reaches STATE_READY in ~250ms, well before the cluster has switched tracks. Resuming into that
+     * window restarts whatever was playing before, which then runs on and advances — on the web
+     * player too — and drags this device onto the next track a moment later.
+     */
+    internal fun shouldResumeConnectOnReady(): Boolean =
+        AppSettings.preferredAudioSource.value == null && !pendingUserPlay
+
     private fun resetColdStart() {
         coldStartPending = false
         coldStartFileId = null
@@ -2335,10 +2345,7 @@ class PlaybackViewModel : ViewModel() {
                 startPositionTicker()
                 viewModelScope.launch(Dispatchers.IO) {
                     try {
-                        // For Spfy CDN: resume Spfy so other clients show us as playing
-                        if (AppSettings.preferredAudioSource.value == null) {
-                            player?.resume()
-                        }
+                        if (shouldResumeConnectOnReady()) player?.resume()
                     } catch (_: Exception) {}
                 }
             }

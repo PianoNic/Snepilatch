@@ -66,6 +66,7 @@ import ch.snepilatch.app.R
 import ch.snepilatch.app.download.Downloads
 import ch.snepilatch.app.data.LIKED_SONGS_COVER_URL
 import ch.snepilatch.app.data.LibraryItem
+import ch.snepilatch.app.data.TrackInfo
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import ch.snepilatch.app.ui.components.SpfyImage
 import ch.snepilatch.app.ui.components.TightAlertDialog
@@ -329,8 +330,15 @@ fun LibraryScreen() {
     }
 }
 
-fun libraryItemClick(item: LibraryItem, detailVm: DetailViewModel) {
+fun libraryItemClick(item: LibraryItem, detailVm: DetailViewModel, vm: PlaybackViewModel? = null) {
     when (item.type) {
+        // A one-off download has no album or playlist to open, so it is the track itself: play it.
+        "single" -> {
+            val row = Downloads.find(item.uri) ?: return
+            vm?.playTrack(
+                TrackInfo(uri = item.uri, name = row.title, artist = row.artist, albumArt = row.coverUrl)
+            )
+        }
         "collection" -> detailVm.openLikedSongs()
         "playlist" -> {
             val id = item.uri.split(":").lastOrNull() ?: return
@@ -355,6 +363,7 @@ fun libraryItemClick(item: LibraryItem, detailVm: DetailViewModel) {
 @Composable
 fun LibraryGridCard(item: LibraryItem, downloadedGroup: Boolean = false) {
     val detailVm: DetailViewModel = viewModel()
+    val playbackVm: PlaybackViewModel = viewModel()
     val isArtist = item.type == "artist"
     var showRemove by remember { mutableStateOf(false) }
     if (showRemove && item.type != "collection") {
@@ -368,7 +377,7 @@ fun LibraryGridCard(item: LibraryItem, downloadedGroup: Boolean = false) {
         Modifier
             .fillMaxWidth()
             .combinedClickable(
-                onClick = { libraryItemClick(item, detailVm) },
+                onClick = { libraryItemClick(item, detailVm, playbackVm) },
                 onLongClick = { if (item.type != "collection") showRemove = true }
             ),
         horizontalAlignment = if (isArtist) Alignment.CenterHorizontally else Alignment.Start
@@ -405,6 +414,7 @@ fun LibraryGridCard(item: LibraryItem, downloadedGroup: Boolean = false) {
 @Composable
 fun LibraryListItem(item: LibraryItem, downloadedGroup: Boolean = false) {
     val detailVm: DetailViewModel = viewModel()
+    val playbackVm: PlaybackViewModel = viewModel()
     val isArtist = item.type == "artist"
     var showRemove by remember { mutableStateOf(false) }
     if (showRemove && item.type != "collection") {
@@ -418,7 +428,7 @@ fun LibraryListItem(item: LibraryItem, downloadedGroup: Boolean = false) {
         Modifier
             .fillMaxWidth()
             .combinedClickable(
-                onClick = { libraryItemClick(item, detailVm) },
+                onClick = { libraryItemClick(item, detailVm, playbackVm) },
                 onLongClick = { if (item.type != "collection") showRemove = true }
             )
             .padding(horizontal = 16.dp, vertical = 8.dp),

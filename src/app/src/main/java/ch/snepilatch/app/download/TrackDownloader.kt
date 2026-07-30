@@ -35,6 +35,12 @@ data class DownloadRequest(
      * track-change path, where the capture has to be claimed before the next track overwrites it.
      */
     val capture: MusicPlaybackService.Capture? = null,
+    /**
+     * Save only from audio the app already has, never from the network. What the
+     * keep-what-I-listen-to setting means: hold on to the recording that was just played, rather
+     * than fetch a different upload of the same song.
+     */
+    val localOnly: Boolean = false,
 )
 
 sealed interface DownloadOutcome {
@@ -107,10 +113,16 @@ object TrackDownloader {
 
             val temp = File.createTempFile("download", null, context.cacheDir)
             try {
-                // Bytes ExoPlayer already pulled while the track played. Saving one the user
-                // listened through then costs nothing: no second fetch, and the same encoded packets
-                // as a fresh download, so the file is identical.
-                val cached = fromCapturedPcm(request, temp) ?: fromPlaybackCache(request, temp)
+                // Two ways to save a track the user already played, and the order between them is a
+                // quality decision rather than a coincidence of which was written first.
+                //
+                // The playback cache holds the encoded bytes ExoPlayer actually pulled, so it
+                // remuxes out byte-identical. The capture is those same bytes decoded and re-encoded,
+                // which is a generation of loss on top of an already lossy source. Whenever both
+                // exist — any non-DRM stream played through — the cache is strictly better and also
+                // cheaper, so it goes first. Widevine playback never fills the cache, which is
+                // exactly the case the capture is there for.
+                val cached = fromPlaybackCache(request, temp) ?: fromCapturedPcm(request, temp)
                 if (cached != null) {
                     onProgress?.invoke(100)
                     val stored = store(request, cached, temp, tagsFor(request), context)
@@ -123,12 +135,12 @@ object TrackDownloader {
                     }
                 }
 
-                // A caller that handed over decoded audio asked for that recording to be saved, not
-                // for the song to be fetched from wherever else it can be found. If the encode fell
-                // over there is nothing equivalent to fall back to, so this fails instead.
-                if (request.capture != null) {
-                    LokiLogger.e(TAG, "could not encode the capture for '${request.title}'")
-                    return@withContext DownloadOutcome.Failed("could not encode the captured audio")
+                // Neither path could serve it. A local-only caller wanted the recording it already
+                // had, so there is nothing equivalent to fall back to: fetching would hand back a
+                // different upload of the song, which is not what was asked for.
+                if (request.localOnly) {
+                    LokiLogger.i(TAG, "nothing local to save for '${request.title}', not fetching")
+                    return@withContext DownloadOutcome.Failed("the played audio was not available to save")
                 }
 
                 val info = when (val resolved = resolve(request)) {
@@ -450,6 +462,14 @@ object TrackDownloader {
             TrackTags.Cover(body.bytes(), mime.substringBefore(';'))
         }
     }.getOrNull()
+
+    /**
+     * Whether saving [trackUri] would need the decoded capture, i.e. the playback cache cannot
+     * already serve it. Callers ask before claiming a capture, so a track the cache covers does not
+     * cost a buffer hand-over for audio that would lose to it anyway — see the ordering in
+     * [downloadInner], which this must agree with.
+     */
+    fun needsCapture(trackUri: String): Boolean = !PlaybackCache.isComplete(trackUri)
 
     /** Removes the local copy and its index row. */
     fun delete(trackUri: String) {

@@ -2711,16 +2711,21 @@ class PlaybackViewModel : ViewModel() {
     private fun autoSaveIfListenedThrough(track: TrackInfo?, positionMs: Long) {
         if (track == null || !worthAutoSaving(track, positionMs)) return
         val context = MusicPlaybackService.instance ?: return
-        val capture = context.detachCapture(track.uri, track.durationMs)
-        if (capture == null) {
-            // Never re-fetch here. The point of this setting is to keep the recording that was just
-            // played; downloading somebody else's upload of the song instead is not the same file,
-            // and it spends data to get something worse.
-            LokiLogger.i(TAG, "listened through '${track.name}' but it wasn't captured in full — not saving")
-            return
+        // The encoded bytes win when the playback cache has them, so don't claim a capture that
+        // would only be thrown away: detaching costs the tap a fresh buffer for the next track.
+        val capture = if (TrackDownloader.needsCapture(track.uri)) {
+            context.detachCapture(track.uri, track.durationMs) ?: run {
+                // Never re-fetch here. The point of this setting is to keep the recording that was
+                // just played; downloading somebody else's upload instead is a different file, and
+                // it spends data to get something worse.
+                LokiLogger.i(TAG, "listened through '${track.name}' but it wasn't captured in full — not saving")
+                return
+            }
+        } else {
+            null
         }
-        LokiLogger.i(TAG, "listened through '${track.name}', encoding what was decoded")
-        downloadTrack(track, context, capture)
+        LokiLogger.i(TAG, "listened through '${track.name}', saving from ${if (capture != null) "the capture" else "the playback cache"}")
+        downloadTrack(track, context, capture, localOnly = true)
     }
 
     /** The cheap checks: setting on, somewhere to put it, played far enough, not already saved. */
@@ -2737,6 +2742,7 @@ class PlaybackViewModel : ViewModel() {
         track: TrackInfo,
         context: android.content.Context,
         capture: MusicPlaybackService.Capture? = null,
+        localOnly: Boolean = false,
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             Downloads.startJob(track.name, "single", track.albumArt, total = 1)
@@ -2749,6 +2755,7 @@ class PlaybackViewModel : ViewModel() {
                     coverUrl = track.albumArt,
                     durationMs = track.durationMs,
                     capture = capture,
+                    localOnly = localOnly,
                 ),
                 context,
             )

@@ -53,6 +53,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         private const val TAG = "MusicService"
         private const val CHANNEL_ID = "music_playback"
 
+        /** How much of a track must be captured to count as a whole one; the tail can be clipped by
+         *  the decoder's last partial buffer, so an exact match never lands. */
+        private const val CAPTURE_COMPLETE_FRACTION = 0.99
+
         // Separate high-importance channel for error alerts so they pop up (heads-up) instead of
         // sitting silently like the ongoing playback notification.
         private const val ALERT_CHANNEL_ID = "snepilatch_alerts"
@@ -258,6 +262,8 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 .build()
         }
 
+        PlaybackCache.init(this)
+
         player = ExoPlayer.Builder(this, renderersFactory)
             .setAudioAttributes(audioAttributes, true)
             .setLoadControl(loadControl)
@@ -344,7 +350,13 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 // A real track change (skip / auto-advance / new queue) — not our own repeat loop —
                 // means the infiniPlay's captured song is no longer what's playing: tear it down.
-                if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) stopInfiniPlay()
+                if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
+                    stopInfiniPlay()
+                    // Drop whatever the outgoing track left in the buffer. The capture is armed back
+                    // in resolveAndPlay, while the old song is still audible, so without this the
+                    // new track's recording would open with the tail of the previous one.
+                    if (infiniPlayTap.recording) infiniPlayTap.resetCapture()
+                }
                 if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && metadataQueue.size > 1) {
                     // ExoPlayer auto-advanced to next track — swap metadata
                     metadataQueue.removeAt(0)
@@ -524,6 +536,11 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         }
     }
 
+    /**
+     * Loads a non-DRM stream. [cacheKey] is the track uri to keep the downloaded bytes under, so a
+     * track listened through can be saved without fetching it again; null for sources that must not
+     * be kept, since a local file is already on disk and Spfy CDN audio goes through playDrmUrl.
+     */
     fun playUrl(
         url: String,
         title: String,
@@ -531,7 +548,8 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         albumArtUrl: String?,
         startPlaying: Boolean = true,
         headers: Map<String, String> = emptyMap(),
-        startPositionMs: Long = 0L
+        startPositionMs: Long = 0L,
+        cacheKey: String? = null
     ) {
         LokiLogger.i(TAG, "Loading: $title by $artist -> ${url.take(80)} (play=$startPlaying, headers=${headers.keys}, pos=${startPositionMs}ms)")
         isAdSkipping = false  // a real track is loading — end the ad-skip buffering state
@@ -550,10 +568,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             // (the anandserver Qobuz mirror) need those headers on the HTTP data
             // source, so they go through a dedicated header-injecting MediaSource.
             // Both accept a start position so resume-from-idle seeks on load.
-            if (headers.isEmpty()) {
+            if (headers.isEmpty() && cacheKey == null) {
                 player.setMediaItem(buildMediaItem(url), startPositionMs)
             } else {
-                player.setMediaSource(buildHeaderedSource(url, headers), startPositionMs)
+                player.setMediaSource(buildHeaderedSource(url, headers, cacheKey), startPositionMs)
             }
 
             if (startPlaying) {
@@ -692,8 +710,66 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             infiniPlayTap.analyzing = true
         } else {
             infiniPlayTap.analyzing = false
-            infiniPlayTap.releaseBuffer()
+            // Only free it if the capture isn't also being kept for saving.
+            if (!infiniPlayTap.recording) infiniPlayTap.releaseBuffer()
         }
+    }
+
+    /**
+     * A decoded track held in memory, ready to be encoded and written out. [pcm] may be longer than
+     * the audio: only the first [count] samples are real.
+     */
+    class Capture(val pcm: ShortArray, val count: Int, val sampleRate: Int, val channels: Int)
+
+    @Volatile private var captureUri: String? = null
+
+    /**
+     * Keep the decoded PCM of [trackUri] as it plays, so saving it later needs no second fetch.
+     * Replaces any previous capture, so this is called on every track change while the setting is on.
+     */
+    fun startCapture(trackUri: String) {
+        captureUri = trackUri
+        infiniPlayTap.recording = true
+        infiniPlayTap.resetCapture()
+    }
+
+    fun stopCapture() {
+        captureUri = null
+        infiniPlayTap.recording = false
+        if (!infiniPlayTap.analyzing) infiniPlayTap.releaseBuffer()
+    }
+
+    /**
+     * The decoded audio for [trackUri], or null when that isn't the track being captured or it hasn't
+     * played through. Whole track or nothing: writing a partial capture would produce a file that
+     * stops early, which is worse than falling back to a download.
+     */
+    fun captureOf(trackUri: String, durationMs: Long): Capture? {
+        val (rate, channels) = completeCapture(trackUri, durationMs) ?: return null
+        val pcm = infiniPlayTap.snapshotInterleaved()
+        return Capture(pcm, pcm.size, rate, channels)
+    }
+
+    /**
+     * Like [captureOf], but takes the buffer rather than copying it: the next track captures into a
+     * fresh one. For the track-change path, where the finished track is handed to the encoder at the
+     * same moment the capture is re-armed for the incoming one.
+     */
+    fun detachCapture(trackUri: String, durationMs: Long): Capture? {
+        val (rate, channels) = completeCapture(trackUri, durationMs) ?: return null
+        val (pcm, count) = infiniPlayTap.detach()
+        return Capture(pcm, count, rate, channels)
+    }
+
+    /** The capture's format, when [trackUri] is the captured track and it played through. */
+    private fun completeCapture(trackUri: String, durationMs: Long): Pair<Int, Int>? {
+        if (captureUri != trackUri || durationMs <= 0) return null
+        val rate = infiniPlayTap.sampleRate()
+        val channels = infiniPlayTap.channelCount()
+        if (rate <= 0 || channels <= 0) return null
+        val expected = durationMs.toDouble() * rate / 1000
+        if (infiniPlayTap.capturedFrames() < expected * CAPTURE_COMPLETE_FRACTION) return null
+        return rate to channels
     }
 
     fun infiniPlaySampleRate(): Int = infiniPlayTap.sampleRate()
@@ -922,14 +998,22 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
      * because the relay can be slow to first byte.
      */
     @OptIn(UnstableApi::class)
-    private fun buildHeaderedSource(url: String, headers: Map<String, String>): MediaSource {
+    private fun buildHeaderedSource(
+        url: String,
+        headers: Map<String, String>,
+        cacheKey: String? = null,
+    ): MediaSource {
         val httpFactory = DefaultHttpDataSource.Factory()
             .setDefaultRequestProperties(headers)
             .setAllowCrossProtocolRedirects(true)
             .setConnectTimeoutMs(30_000)
             .setReadTimeoutMs(30_000)
-        return ProgressiveMediaSource.Factory(httpFactory)
-            .createMediaSource(buildMediaItem(url))
+        // Keyed by track uri, not url: a googlevideo url is single-use, so caching against it would
+        // never hit twice and would keep a fresh copy per resolve.
+        val base = buildMediaItem(url)
+        val item = cacheKey?.let { base.buildUpon().setCustomCacheKey(it).build() } ?: base
+        val factory = cacheKey?.let { PlaybackCache.wrap(httpFactory) } ?: httpFactory
+        return ProgressiveMediaSource.Factory(factory).createMediaSource(item)
     }
 
     fun buildDrmMediaItem(url: String, licenseUrl: String, licenseHeaders: Map<String, String>): MediaItem {

@@ -40,8 +40,9 @@ object AppSettings {
     // its stream is Widevine and the saved bytes would not play.
     val downloadSource = MutableStateFlow(SOURCE_YTM)
 
-    // Keep a track once it has actually been listened through. Off by default: it spends data and
-    // storage on its own.
+    // Keep a track once it has actually been listened through, by encoding the audio that was
+    // already decoded to play it rather than fetching the song again. Off by default: it holds the
+    // decoded track in memory while it plays, and spends storage on its own.
     val autoSaveListened = MutableStateFlow(false)
 
     // Lyrics animation direction for line-synced (non word-synced): "vertical" or "horizontal"

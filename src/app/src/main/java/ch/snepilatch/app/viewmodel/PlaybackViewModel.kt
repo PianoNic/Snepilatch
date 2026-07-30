@@ -1262,7 +1262,8 @@ class PlaybackViewModel : ViewModel() {
             } else {
                 svc?.playUrl(
                     info.url, title, artist, art,
-                    startPlaying = true, headers = info.headers, startPositionMs = startPositionMs
+                    startPlaying = true, headers = info.headers, startPositionMs = startPositionMs,
+                    cacheKey = track.uri,
                 )
             }
         }
@@ -1403,7 +1404,8 @@ class PlaybackViewModel : ViewModel() {
                         } else {
                             svc?.playUrl(
                                 info.url, title, artist, art,
-                                startPlaying = true, headers = info.headers, startPositionMs = savedPositionAtEntry
+                                startPlaying = true, headers = info.headers,
+                                startPositionMs = savedPositionAtEntry, cacheKey = trackUri,
                             )
                         }
                     }
@@ -2515,6 +2517,11 @@ class PlaybackViewModel : ViewModel() {
         }
         // The outgoing track is still in state here, which is the one moment we know how far it got.
         autoSaveIfListenedThrough(_playback.value.track, _playback.value.positionMs)
+        // Then hand the capture buffer to the incoming track. Ordered after the save above, which
+        // still needs the outgoing track's samples.
+        MusicPlaybackService.instance?.let {
+            if (AppSettings.autoSaveListened.value) it.startCapture(trackUri) else it.stopCapture()
+        }
 
         val art = normalizeSpfyImageUrl(current.imageLargeUrl ?: current.imageUrl)
 
@@ -2595,7 +2602,9 @@ class PlaybackViewModel : ViewModel() {
                         // Deezer: encrypted stream -> decrypt via the loopback proxy.
                         MusicPlaybackService.instance?.playDeezer(info.url, key, info.headers, title, artist, art)
                     } else {
-                        MusicPlaybackService.instance?.playUrl(info.url, title, artist, art, headers = info.headers)
+                        MusicPlaybackService.instance?.playUrl(
+                            info.url, title, artist, art, headers = info.headers, cacheKey = trackUri
+                        )
                     }
                     currentStreamUri = trackUri
                     isStreaming.value = true
@@ -2629,7 +2638,9 @@ class PlaybackViewModel : ViewModel() {
         LokiLogger.i(TAG, "Using pre-resolved stream for $trackUri")
         // Don't resume Spfy yet — onReady callback will sync after ExoPlayer buffers
         playUrlAt = System.currentTimeMillis()
-        MusicPlaybackService.instance?.playUrl(url, title, artist, art, headers = nextStreamHeaders)
+        MusicPlaybackService.instance?.playUrl(
+            url, title, artist, art, headers = nextStreamHeaders, cacheKey = trackUri
+        )
         currentStreamUri = trackUri
         isStreaming.value = true
         isStreamLoading.value = false
@@ -2692,23 +2703,41 @@ class PlaybackViewModel : ViewModel() {
     /**
      * Keeps a track the user listened through, when the setting is on.
      *
-     * Nothing is lifted out of memory: ExoPlayer buffers its own sample queues rather than the
-     * encoded file, and the only raw buffer we hold is decoded PCM for InfiniPlay. The track is
-     * re-fetched instead, which takes a couple of seconds and produces a tagged, remuxed file.
+     * A track played to the end has already been decoded in full, and the audio chain kept those
+     * samples, so this claims them and re-encodes rather than downloading the song a second time
+     * from somewhere else. The claim is synchronous because the buffer is about to be handed to the
+     * incoming track; only the encoding is deferred.
      */
     private fun autoSaveIfListenedThrough(track: TrackInfo?, positionMs: Long) {
-        if (!AppSettings.autoSaveListened.value) return
-        if (track == null || track.durationMs <= 0) return
-        if (!DownloadFolder.isConfigured) return
-        if (positionMs < track.durationMs * LISTENED_THROUGH_FRACTION) return
-        if (Downloads.find(track.uri) != null) return
+        if (track == null || !worthAutoSaving(track, positionMs)) return
         val context = MusicPlaybackService.instance ?: return
-        LokiLogger.i(TAG, "listened through '${track.name}', keeping it")
-        downloadTrack(track, context)
+        val capture = context.detachCapture(track.uri, track.durationMs)
+        if (capture == null) {
+            // Never re-fetch here. The point of this setting is to keep the recording that was just
+            // played; downloading somebody else's upload of the song instead is not the same file,
+            // and it spends data to get something worse.
+            LokiLogger.i(TAG, "listened through '${track.name}' but it wasn't captured in full — not saving")
+            return
+        }
+        LokiLogger.i(TAG, "listened through '${track.name}', encoding what was decoded")
+        downloadTrack(track, context, capture)
+    }
+
+    /** The cheap checks: setting on, somewhere to put it, played far enough, not already saved. */
+    private fun worthAutoSaving(track: TrackInfo, positionMs: Long): Boolean {
+        if (!AppSettings.autoSaveListened.value) return false
+        if (track.durationMs <= 0) return false
+        if (!DownloadFolder.isConfigured) return false
+        if (positionMs < track.durationMs * LISTENED_THROUGH_FRACTION) return false
+        return Downloads.find(track.uri) == null
     }
 
     /** Downloads one track, with its own progress notification. */
-    fun downloadTrack(track: TrackInfo, context: android.content.Context) {
+    fun downloadTrack(
+        track: TrackInfo,
+        context: android.content.Context,
+        capture: MusicPlaybackService.Capture? = null,
+    ) {
         viewModelScope.launch(Dispatchers.IO) {
             Downloads.startJob(track.name, "single", track.albumArt, total = 1)
             val outcome = TrackDownloader.download(
@@ -2719,6 +2748,7 @@ class PlaybackViewModel : ViewModel() {
                     album = track.albumName,
                     coverUrl = track.albumArt,
                     durationMs = track.durationMs,
+                    capture = capture,
                 ),
                 context,
             )

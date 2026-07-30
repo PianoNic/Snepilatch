@@ -3,6 +3,8 @@ package ch.snepilatch.app.download
 import android.content.Context
 import ch.snepilatch.app.playback.AudioSourceResolver
 import ch.snepilatch.app.playback.DeezerBlockCipher
+import ch.snepilatch.app.playback.MusicPlaybackService
+import ch.snepilatch.app.playback.PlaybackCache
 import ch.snepilatch.app.playback.YouTubeMusicSource
 import ch.snepilatch.app.util.LokiLogger
 import ch.snepilatch.app.viewmodel.AppSettings
@@ -28,6 +30,11 @@ data class DownloadRequest(
     val contextName: String? = null,
     val contextType: String? = null,
     val albumUri: String? = null,
+    /**
+     * Decoded audio already taken off the player, used instead of fetching anything. Set on the
+     * track-change path, where the capture has to be claimed before the next track overwrites it.
+     */
+    val capture: MusicPlaybackService.Capture? = null,
 )
 
 sealed interface DownloadOutcome {
@@ -98,13 +105,37 @@ object TrackDownloader {
                 Downloads.remove(request.trackUri)
             }
 
-            val info = when (val resolved = resolve(request)) {
-                is StreamResult.Success -> resolved.info
-                is StreamResult.Failure -> return@withContext DownloadOutcome.Failed(resolved.message)
-            }
-
             val temp = File.createTempFile("download", null, context.cacheDir)
             try {
+                // Bytes ExoPlayer already pulled while the track played. Saving one the user
+                // listened through then costs nothing: no second fetch, and the same encoded packets
+                // as a fresh download, so the file is identical.
+                val cached = fromCapturedPcm(request, temp) ?: fromPlaybackCache(request, temp)
+                if (cached != null) {
+                    onProgress?.invoke(100)
+                    val stored = store(request, cached, temp, tagsFor(request), context)
+                    return@withContext if (stored == null) {
+                        DownloadNotifier.failed(context, request.title, "could not write to the folder")
+                        DownloadOutcome.Failed("could not write into the download folder")
+                    } else {
+                        if (notify) DownloadNotifier.finished(context, request.title)
+                        DownloadOutcome.Done(stored)
+                    }
+                }
+
+                // A caller that handed over decoded audio asked for that recording to be saved, not
+                // for the song to be fetched from wherever else it can be found. If the encode fell
+                // over there is nothing equivalent to fall back to, so this fails instead.
+                if (request.capture != null) {
+                    LokiLogger.e(TAG, "could not encode the capture for '${request.title}'")
+                    return@withContext DownloadOutcome.Failed("could not encode the captured audio")
+                }
+
+                val info = when (val resolved = resolve(request)) {
+                    is StreamResult.Success -> resolved.info
+                    is StreamResult.Failure ->
+                        return@withContext DownloadOutcome.Failed(resolved.message)
+                }
                 val fetched = runCatching {
                     fetchTo(info, temp) { percent ->
                         onProgress?.invoke(percent)
@@ -145,6 +176,62 @@ object TrackDownloader {
                 temp.delete()
             }
         }
+
+    /**
+     * The track re-encoded from the decoded PCM the audio chain captured while it played, or null
+     * when this is not the captured track or it was not captured in full.
+     *
+     * Preferred over every other path because it is the only one that saves the recording the user
+     * actually listened to. Spfy's stream is Widevine, so its encoded bytes can never be written
+     * out; the decoded samples can. Everything else re-fetches a different upload of the same song.
+     */
+    private fun fromCapturedPcm(request: DownloadRequest, temp: File): StreamInfo? {
+        val capture = request.capture
+            ?: MusicPlaybackService.instance?.captureOf(request.trackUri, request.durationMs)
+            ?: return null
+        if (!PcmAacEncoder.encode(capture.pcm, capture.count, capture.sampleRate, capture.channels, temp)) {
+            return null
+        }
+        LokiLogger.i(TAG, "'${request.title}' encoded from the decoded capture (${temp.length()} bytes)")
+        return StreamInfo(url = "pcm-capture", provider = "Decoded audio", mimeType = "audio/mp4")
+    }
+
+    /**
+     * The played-through bytes for this track, written into [temp], or null when they are not all
+     * there. A track with a gap in it is never written out: a hole would produce a file that plays
+     * up to the gap and then stops, which is worse than not saving it at all.
+     *
+     * Only non-DRM playback fills this cache, so the bytes are the same encoded stream a fresh
+     * download would fetch and the result is byte-identical.
+     */
+    private fun fromPlaybackCache(request: DownloadRequest, temp: File): StreamInfo? {
+        if (!PlaybackCache.isComplete(request.trackUri)) return null
+        val complete = runCatching {
+            temp.outputStream().use { PlaybackCache.writeTo(request.trackUri, it) }
+        }.getOrDefault(false)
+        if (!complete || temp.length() <= 0L) {
+            temp.writeBytes(ByteArray(0))
+            return null
+        }
+        LokiLogger.i(TAG, "'${request.title}' came from the playback cache (${temp.length()} bytes)")
+        // The container is read off the bytes rather than remembered: nothing else about the stream
+        // needs to survive, and it keeps the cache from having to store metadata alongside.
+        return StreamInfo(
+            url = "playback-cache",
+            provider = "Playback cache",
+            mimeType = if (isWebm(temp)) "audio/webm" else null,
+        )
+    }
+
+    /** EBML magic — every WebM file starts with it. */
+    private fun isWebm(file: File): Boolean = runCatching {
+        file.inputStream().use { input ->
+            val head = ByteArray(4)
+            input.read(head) == 4 &&
+                head[0] == 0x1A.toByte() && head[1] == 0x45.toByte() &&
+                head[2] == 0xDF.toByte() && head[3] == 0xA3.toByte()
+        }
+    }.getOrDefault(false)
 
     private suspend fun resolve(request: DownloadRequest): StreamResult = AudioSourceResolver.byQuery(
         trackUri = request.trackUri,
@@ -187,16 +274,13 @@ object TrackDownloader {
             else -> extensionFor(info.mimeType)
         }
 
-        // FLAC keeps its own container, so tagging is a metadata rewrite rather than a remux. Same
-        // temp-file dance: a half-written file must never reach the folder.
-        val taggedTemp = if (finalExtension == "flac") {
-            File.createTempFile("flac", null, context.cacheDir).takeIf { candidate ->
-                payload.inputStream().use { source ->
-                    candidate.outputStream().use { sink -> FlacTagger.tag(source, sink, tags) }
-                }
-            }
-        } else {
-            null
+        // FLAC and MP4 keep their own containers, so tagging is a metadata rewrite rather than a
+        // remux. Same temp-file dance: a half-written file must never reach the folder, and a
+        // tagger that reports failure leaves the untagged payload in place.
+        val taggedTemp = when (finalExtension) {
+            "flac" -> tagInto("flac", context, payload) { source, sink -> FlacTagger.tag(source, sink, tags) }
+            "m4a" -> tagInto("m4a", context, payload) { source, sink -> Mp4Tagger.tag(source, sink, tags) }
+            else -> null
         }
         if (taggedTemp != null) payload = taggedTemp
 
@@ -214,6 +298,16 @@ object TrackDownloader {
             remuxTemp?.delete()
             taggedTemp?.delete()
         }
+    }
+
+    /** Runs a tagger into its own temp file, or null when it declines the input. */
+    private fun tagInto(
+        prefix: String,
+        context: Context,
+        payload: File,
+        write: (java.io.InputStream, java.io.OutputStream) -> Boolean,
+    ): File? = File.createTempFile(prefix, null, context.cacheDir).takeIf { candidate ->
+        payload.inputStream().use { source -> candidate.outputStream().use { sink -> write(source, sink) } }
     }
 
     private fun record(

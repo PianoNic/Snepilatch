@@ -331,7 +331,23 @@ object TrackDownloader {
         cover = request.coverUrl?.let { fetchCover(it) },
     )
 
-    private fun fetchCover(url: String): TrackTags.Cover? = runCatching {
+    /**
+     * Album art is the same image for every track on a release, so an album would otherwise fetch it
+     * once per track. Bounded because the only thing worth remembering is the release being
+     * downloaded right now.
+     */
+    private val coverCache = object : LinkedHashMap<String, TrackTags.Cover>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, TrackTags.Cover>) = size > 4
+    }
+
+    private fun fetchCover(url: String): TrackTags.Cover? {
+        synchronized(coverCache) { coverCache[url] }?.let { return it }
+        val fetched = downloadCover(url) ?: return null
+        synchronized(coverCache) { coverCache[url] = fetched }
+        return fetched
+    }
+
+    private fun downloadCover(url: String): TrackTags.Cover? = runCatching {
         http.newCall(Request.Builder().url(url).build()).execute().use { response ->
             if (!response.isSuccessful) return null
             val body = response.body ?: return null

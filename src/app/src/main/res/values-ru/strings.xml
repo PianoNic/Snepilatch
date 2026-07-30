@@ -321,4 +321,5 @@
     <string name="downloaded_indicator">Загружено</string>
     <string name="downloads_active">Активные</string>
     <string name="downloads_idle">Сейчас ничего не загружается</string>
+    <string name="remove_download_message">Удалить загруженные файлы %1$s? (%2$d треков)</string>
 </resources>

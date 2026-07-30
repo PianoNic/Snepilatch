@@ -185,6 +185,10 @@ object Downloads {
         val trackCount: Int,
     )
 
+    /** Every downloaded track belonging to one [Group], keyed by the same uri groups() reports. */
+    fun tracksInGroup(groupUri: String): List<DownloadedTrack> =
+        all().filter { (it.contextUri ?: it.albumUri ?: it.trackUri) == groupUri }
+
     fun groups(): List<Group> = all()
         .groupBy { it.contextUri ?: it.albumUri ?: it.trackUri }
         .map { (uri, tracks) ->

@@ -321,4 +321,5 @@
     <string name="downloaded_indicator">Heruntergeladen</string>
     <string name="downloads_active">Aktiv</string>
     <string name="downloads_idle">Gerade laufen keine Downloads</string>
+    <string name="remove_download_message">Heruntergeladene Dateien von %1$s löschen? (%2$d Titel)</string>
 </resources>

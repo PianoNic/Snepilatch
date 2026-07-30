@@ -66,6 +66,7 @@ import ch.snepilatch.app.R
 import ch.snepilatch.app.download.Downloads
 import ch.snepilatch.app.data.LIKED_SONGS_COVER_URL
 import ch.snepilatch.app.data.LibraryItem
+import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import ch.snepilatch.app.ui.components.SpfyImage
 import ch.snepilatch.app.ui.components.TightAlertDialog
 import ch.snepilatch.app.ui.theme.SpfyBlack
@@ -294,7 +295,7 @@ fun LibraryScreen() {
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 itemsIndexed(sortedLibrary, key = { _, item -> item.uri }) { index, item ->
-                    LibraryGridCard(item)
+                    LibraryGridCard(item, downloadedGroup = selectedFilter == "Downloaded")
                     // Key the near-end trigger on the VISIBLE (filtered/searched) list, not the raw
                     // library — otherwise a filter that shrinks the list below library.size - 10 never
                     // reaches the threshold and pagination silently stops.
@@ -352,12 +353,16 @@ fun libraryItemClick(item: LibraryItem, detailVm: DetailViewModel) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun LibraryGridCard(item: LibraryItem) {
+fun LibraryGridCard(item: LibraryItem, downloadedGroup: Boolean = false) {
     val detailVm: DetailViewModel = viewModel()
     val isArtist = item.type == "artist"
     var showRemove by remember { mutableStateOf(false) }
     if (showRemove && item.type != "collection") {
-        LibraryRemoveDialog(item, onDismiss = { showRemove = false })
+        if (downloadedGroup) {
+            DownloadRemoveDialog(item, onDismiss = { showRemove = false })
+        } else {
+            LibraryRemoveDialog(item, onDismiss = { showRemove = false })
+        }
     }
     Column(
         Modifier
@@ -398,12 +403,16 @@ fun LibraryGridCard(item: LibraryItem) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun LibraryListItem(item: LibraryItem) {
+fun LibraryListItem(item: LibraryItem, downloadedGroup: Boolean = false) {
     val detailVm: DetailViewModel = viewModel()
     val isArtist = item.type == "artist"
     var showRemove by remember { mutableStateOf(false) }
     if (showRemove && item.type != "collection") {
-        LibraryRemoveDialog(item, onDismiss = { showRemove = false })
+        if (downloadedGroup) {
+            DownloadRemoveDialog(item, onDismiss = { showRemove = false })
+        } else {
+            LibraryRemoveDialog(item, onDismiss = { showRemove = false })
+        }
     }
     Row(
         Modifier
@@ -478,6 +487,40 @@ fun CreatePlaylistDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel), color = SpfyLightGray) }
+        }
+    )
+}
+
+/**
+ * Long-pressing a downloaded group drops its files. The same gesture on a normal library entry
+ * removes it from the Spfy library, which is not what is wanted while browsing downloads.
+ */
+@Composable
+private fun DownloadRemoveDialog(item: LibraryItem, onDismiss: () -> Unit) {
+    val vm: PlaybackViewModel = viewModel()
+    val tracks = remember(item.uri) { Downloads.tracksInGroup(item.uri) }
+    TightAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.remove_download), color = SpfyWhite) },
+        text = {
+            Text(
+                stringResource(R.string.remove_download_message, item.name, tracks.size),
+                color = SpfyLightGray
+            )
+        },
+        containerColor = SpfyGray,
+        confirmButton = {
+            TextButton(onClick = {
+                tracks.forEach { vm.removeDownload(it.trackUri) }
+                onDismiss()
+            }) {
+                Text(stringResource(R.string.library_remove_button), color = Color.Red)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel), color = SpfyLightGray)
+            }
         }
     )
 }

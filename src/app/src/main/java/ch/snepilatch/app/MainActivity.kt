@@ -99,10 +99,15 @@ class MainActivity : ComponentActivity() {
             val context = this@MainActivity
             LaunchedEffect(Unit) {
                 AppSettings.load(context)
-                Downloads.init(context)
-                DownloadFolder.load(context)
-                // A restored backup, or files deleted from the folder, leave rows pointing nowhere.
-                Downloads.prune(DownloadFolder::exists)
+                // Off the main thread: opening the database and reading the index is disk work, and
+                // this effect runs on the UI dispatcher. Deliberately no prune here — validating every
+                // downloaded row costs one content-resolver round trip each, which would grow into a
+                // stall at startup. AudioSourceResolver.localOrNull already drops a row whose file has
+                // gone, at the moment it matters.
+                withContext(Dispatchers.IO) {
+                    Downloads.init(context)
+                    DownloadFolder.load(context)
+                }
                 if (!initialized && error == null && !needsLogin) {
                     val savedCookies = loadCookies(context)
                     if (savedCookies != null) {

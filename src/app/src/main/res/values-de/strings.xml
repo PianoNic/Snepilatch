@@ -296,4 +296,13 @@
     <string name="error_save_library">Konnte nicht zur Bibliothek hinzugefügt werden</string>
     <string name="error_add_playlist">Konnte nicht zur Playlist hinzugefügt werden</string>
     <string name="error_add_queue">Konnte nicht zur Warteschlange hinzugefügt werden</string>
+    <string name="downloads">Downloads</string>
+    <string name="downloading">Wird heruntergeladen</string>
+    <string name="download_complete">Download abgeschlossen</string>
+    <string name="download_failed">Download fehlgeschlagen</string>
+    <string name="download_folder">Download-Ordner</string>
+    <string name="download_folder_none">Nicht gesetzt, zum Wählen tippen</string>
+    <string name="download_track">Herunterladen</string>
+    <string name="remove_download">Download entfernen</string>
+    <string name="download_needs_folder">Wähle zuerst einen Download-Ordner</string>
 </resources>

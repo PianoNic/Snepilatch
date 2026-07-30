@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.TextUnit
 import ch.snepilatch.app.R
+import ch.snepilatch.app.download.Downloads
 import android.graphics.SurfaceTexture
 import android.net.Uri
 import android.view.TextureView
@@ -1170,6 +1171,14 @@ private fun NowPlayingMenu(
             val visitAlbumLabel = stringResource(R.string.visit_album)
             val devicesLabel = stringResource(R.string.devices)
             val shareLabel = stringResource(R.string.share)
+            val downloadCtx = androidx.compose.ui.platform.LocalContext.current
+            val downloadedUris by Downloads.downloaded.collectAsState()
+            val isDownloaded = track?.uri?.let { it in downloadedUris } == true
+            val downloadLabel = if (isDownloaded) {
+                stringResource(R.string.remove_download)
+            } else {
+                stringResource(R.string.download_track)
+            }
             val items = listOf(
                 Triple(Icons.Rounded.MusicNote, lyricsLabel) {
                     onShowMore(false); vm.openLyrics()
@@ -1185,6 +1194,18 @@ private fun NowPlayingMenu(
                 },
                 Triple(Icons.Rounded.Album, visitAlbumLabel) {
                     onShowMore(false); vm.openAlbumFromCurrentTrack()
+                },
+                Triple(
+                    if (isDownloaded) Icons.Rounded.DownloadDone else Icons.Rounded.Download,
+                    downloadLabel,
+                ) {
+                    onShowMore(false)
+                    val uri = track?.uri
+                    when {
+                        uri == null -> Unit
+                        isDownloaded -> vm.removeDownload(uri)
+                        else -> vm.downloadCurrentTrack(downloadCtx)
+                    }
                 },
                 Triple(Icons.Rounded.Devices, devicesLabel) {
                     onShowMore(false); vm.loadDevices(); vm.showDevices.value = true

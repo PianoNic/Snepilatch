@@ -15,6 +15,10 @@ import ch.snepilatch.app.playback.InfiniPlayViz
 import ch.snepilatch.app.playback.MusicPlaybackService
 import ch.snepilatch.app.playback.PositionInterpolator
 import ch.snepilatch.app.playback.SessionHolder
+import ch.snepilatch.app.download.DownloadNotifier
+import ch.snepilatch.app.download.DownloadOutcome
+import ch.snepilatch.app.download.DownloadRequest
+import ch.snepilatch.app.download.TrackDownloader
 import ch.snepilatch.app.playback.AudioSourceResolver
 import ch.snepilatch.app.playback.engine.SpfyCdnResolver
 import ch.snepilatch.app.playback.engine.SpfyStream
@@ -1311,7 +1315,7 @@ class PlaybackViewModel : ViewModel() {
                 val query = listOf(artist, title)
                     .filter { it.isNotBlank() && it != "Unknown" }
                     .joinToString(" ")
-                val result = AudioSourceResolver.byQuery(trackId, query, title, artist, track.durationMs)
+                val result = AudioSourceResolver.byQuery(trackUri, query, title, artist, track.durationMs)
                 if (result is StreamResult.Success) {
                     val info = result.info
                     playUrlAt = System.currentTimeMillis()
@@ -2444,23 +2448,8 @@ class PlaybackViewModel : ViewModel() {
             return
         }
 
-        // Check if we already pre-resolved this track
-        val preResolvedUrl = nextStreamUrl
-        val preResolvedProvider = nextStreamProvider
-        if (nextTrackInfo?.uri == trackUri && preResolvedUrl != null) {
-            LokiLogger.i(TAG, "Using pre-resolved stream for $trackUri")
-            // Don't resume Spfy yet — onReady callback will sync after ExoPlayer buffers
-            playUrlAt = System.currentTimeMillis()
-            MusicPlaybackService.instance?.playUrl(preResolvedUrl, title, artist, art, headers = nextStreamHeaders)
-            currentStreamUri = trackUri
-            isStreaming.value = true
-            isStreamLoading.value = false
-            streamProvider.value = preResolvedProvider
-            nextStreamUrl = null
-            nextTrackInfo = null
-            nextStreamProvider = null
-            nextStreamHeaders = emptyMap()
-            preResolveNextTrack()
+        // Both fast paths skip resolving entirely; sharing one exit keeps this function's returns down.
+        if (playPreResolved(trackUri, title, artist, art) || playDownloaded(trackUri, title, artist, art)) {
             return
         }
 
@@ -2505,7 +2494,7 @@ class PlaybackViewModel : ViewModel() {
         }
 
         try {
-            val result = AudioSourceResolver.fromTrack(event)
+            val result = AudioSourceResolver.fromTrack(event, trackUri)
             when (result) {
                 is StreamResult.Success -> {
                     // Don't resume Spfy yet — onReady callback will sync after ExoPlayer buffers
@@ -2542,6 +2531,75 @@ class PlaybackViewModel : ViewModel() {
         preResolveNextTrack()
     }
 
+
+    /** Plays the stream pre-resolved for this track, if there is one. */
+    private suspend fun playPreResolved(trackUri: String, title: String, artist: String, art: String?): Boolean {
+        val url = nextStreamUrl ?: return false
+        if (nextTrackInfo?.uri != trackUri) return false
+        LokiLogger.i(TAG, "Using pre-resolved stream for $trackUri")
+        // Don't resume Spfy yet — onReady callback will sync after ExoPlayer buffers
+        playUrlAt = System.currentTimeMillis()
+        MusicPlaybackService.instance?.playUrl(url, title, artist, art, headers = nextStreamHeaders)
+        currentStreamUri = trackUri
+        isStreaming.value = true
+        isStreamLoading.value = false
+        streamProvider.value = nextStreamProvider
+        nextStreamUrl = null
+        nextTrackInfo = null
+        nextStreamProvider = null
+        nextStreamHeaders = emptyMap()
+        preResolveNextTrack()
+        return true
+    }
+
+    /**
+     * Plays a downloaded copy. Runs before the Spfy branch, which returns without ever reaching the
+     * resolver, so a downloaded track plays from disk whatever the selected source is.
+     */
+    private suspend fun playDownloaded(trackUri: String, title: String, artist: String, art: String?): Boolean {
+        val local = AudioSourceResolver.localOrNull(trackUri) as? StreamResult.Success ?: return false
+        withContext(Dispatchers.Main) { MusicPlaybackService.instance?.stop() }
+        playUrlAt = System.currentTimeMillis()
+        val coldStart = coldStartPending
+        withContext(Dispatchers.Main) {
+            MusicPlaybackService.instance?.playUrl(local.info.url, title, artist, art, startPlaying = !coldStart)
+        }
+        commitStream(trackUri, "Downloaded")
+        isStreamLoading.value = false
+        LokiLogger.i(TAG, "Playing downloaded copy of $trackUri")
+        preResolveNextTrack()
+        return true
+    }
+
+    /**
+     * Downloads whatever is playing. Progress and the result are reported through the notification,
+     * since there is nowhere else to put them while the user is on another screen.
+     */
+    fun downloadCurrentTrack(context: android.content.Context) {
+        val track = _playback.value.track ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val outcome = TrackDownloader.download(
+                DownloadRequest(
+                    trackUri = track.uri,
+                    title = track.name,
+                    artist = track.artist,
+                    album = track.albumName,
+                    coverUrl = track.albumArt,
+                    durationMs = track.durationMs,
+                ),
+                context,
+            )
+            if (outcome is DownloadOutcome.NoFolder) {
+                DownloadNotifier.failed(
+                    context, track.name, context.getString(R.string.download_needs_folder)
+                )
+            }
+        }
+    }
+
+    fun removeDownload(trackUri: String) {
+        viewModelScope.launch(Dispatchers.IO) { TrackDownloader.delete(trackUri) }
+    }
 
     /**
      * Skip rather than sit in silence, bounded by the playback-error budget so a run of unmatched
@@ -2737,7 +2795,7 @@ class PlaybackViewModel : ViewModel() {
             try {
                 val art = normalizeSpfyImageUrl(track.imageLargeUrl ?: track.imageUrl)
 
-                val result = AudioSourceResolver.byQuery(trackId, searchQuery, title, artist, track.durationMs)
+                val result = AudioSourceResolver.byQuery(uri, searchQuery, title, artist, track.durationMs)
                 when (result) {
                     is StreamResult.Success -> {
                         playUrlAt = System.currentTimeMillis()
@@ -2784,7 +2842,6 @@ class PlaybackViewModel : ViewModel() {
                 LokiLogger.i(TAG, "[Ad] not pre-resolving ad URI in preResolveNextTrack: $nextUri")
                 return
             }
-            val nextId = nextUri.removePrefix("spotify:track:")
 
             val title = nextTrack.name ?: "Unknown"
             val artist = nextTrack.artistName ?: "Unknown"
@@ -2793,7 +2850,7 @@ class PlaybackViewModel : ViewModel() {
                 .joinToString(" ").takeIf { it.isNotBlank() }
 
             LokiLogger.i(TAG, "Pre-resolving next: $title by $artist")
-            val result = AudioSourceResolver.byQuery(nextId, searchQuery, title, artist, nextTrack.durationMs)
+            val result = AudioSourceResolver.byQuery(nextUri, searchQuery, title, artist, nextTrack.durationMs)
             if (result is StreamResult.Success) {
                 val info = result.info
                 val key = info.decryptionKey

@@ -302,4 +302,13 @@
     <string name="error_save_library">Could not save to library</string>
     <string name="error_add_playlist">Could not add to playlist</string>
     <string name="error_add_queue">Could not add to queue</string>
+    <string name="downloads">Downloads</string>
+    <string name="downloading">Downloading</string>
+    <string name="download_complete">Download complete</string>
+    <string name="download_failed">Download failed</string>
+    <string name="download_folder">Download folder</string>
+    <string name="download_folder_none">Not set, tap to choose</string>
+    <string name="download_track">Download</string>
+    <string name="remove_download">Remove download</string>
+    <string name="download_needs_folder">Choose a download folder first</string>
 </resources>

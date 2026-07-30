@@ -2,6 +2,8 @@
 
 package ch.snepilatch.app.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -28,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import ch.snepilatch.app.BuildConfig
 import ch.snepilatch.app.R
+import ch.snepilatch.app.download.DownloadFolder
 import ch.snepilatch.app.ui.components.ProfileInfoItem
 import ch.snepilatch.app.ui.components.TightAlertDialog
 import ch.snepilatch.app.ui.components.UpdateDialog
@@ -188,6 +191,26 @@ fun AccountScreen(vm: PlaybackViewModel) {
                 onDismiss = { showSourcePicker = false }
             )
         }
+
+        // Download folder. Downloading stays disabled until one is picked, so this is the entry point.
+        val downloadFolder by DownloadFolder.folder.collectAsState()
+        val folderPicker = rememberLauncherForActivityResult(
+            ActivityResultContracts.OpenDocumentTree()
+        ) { picked -> if (picked != null) DownloadFolder.setFolder(picked, audioContext) }
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.download_folder), color = SpfyWhite) },
+            supportingContent = {
+                Text(
+                    downloadFolder?.let { readableFolder(it) }
+                        ?: stringResource(R.string.download_folder_none),
+                    color = SpfyLightGray
+                )
+            },
+            leadingContent = { Icon(Icons.Rounded.Folder, null, tint = SpfyLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable { folderPicker.launch(null) }
+        )
 
         // Content region picker
         val currentRegion by AppSettings.contentRegion.collectAsState()
@@ -692,4 +715,10 @@ private fun RadioPickerDialog(
             }
         }
     )
+}
+
+/** Turns a SAF tree uri into something recognisable, e.g. "primary:Music/Snepilatch" -> "Music/Snepilatch". */
+private fun readableFolder(uri: android.net.Uri): String {
+    val id = runCatching { android.provider.DocumentsContract.getTreeDocumentId(uri) }.getOrNull()
+    return id?.substringAfter(':')?.takeIf { it.isNotBlank() } ?: uri.lastPathSegment.orEmpty()
 }

@@ -296,4 +296,13 @@
     <string name="error_save_library">Не удалось добавить в медиатеку</string>
     <string name="error_add_playlist">Не удалось добавить в плейлист</string>
     <string name="error_add_queue">Не удалось добавить в очередь</string>
+    <string name="downloads">Загрузки</string>
+    <string name="downloading">Загрузка</string>
+    <string name="download_complete">Загрузка завершена</string>
+    <string name="download_failed">Ошибка загрузки</string>
+    <string name="download_folder">Папка загрузок</string>
+    <string name="download_folder_none">Не задана, нажмите чтобы выбрать</string>
+    <string name="download_track">Скачать</string>
+    <string name="remove_download">Удалить загрузку</string>
+    <string name="download_needs_folder">Сначала выберите папку загрузок</string>
 </resources>

@@ -28,6 +28,8 @@ import ch.snepilatch.app.ui.theme.SpfyBlack
 import ch.snepilatch.app.util.UpdateInfo
 import ch.snepilatch.app.util.UpdateService
 import ch.snepilatch.app.util.loadCookies
+import ch.snepilatch.app.download.DownloadFolder
+import ch.snepilatch.app.download.Downloads
 import ch.snepilatch.app.viewmodel.AppSettings
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import kotlinx.coroutines.Dispatchers
@@ -96,6 +98,10 @@ class MainActivity : ComponentActivity() {
             val context = this@MainActivity
             LaunchedEffect(Unit) {
                 AppSettings.load(context)
+                Downloads.init(context)
+                DownloadFolder.load(context)
+                // A restored backup, or files deleted from the folder, leave rows pointing nowhere.
+                Downloads.prune(DownloadFolder::exists)
                 if (!initialized && error == null && !needsLogin) {
                     val savedCookies = loadCookies(context)
                     if (savedCookies != null) {

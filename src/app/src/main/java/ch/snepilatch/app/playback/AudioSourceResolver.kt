@@ -1,5 +1,7 @@
 package ch.snepilatch.app.playback
 
+import ch.snepilatch.app.download.DownloadFolder
+import ch.snepilatch.app.download.Downloads
 import ch.snepilatch.app.viewmodel.AppSettings
 import kotify.api.playerstatus.TrackChangeEvent
 import kotify.cdn.CdnPlayback
@@ -19,9 +21,10 @@ object AudioSourceResolver {
     private val cdn = CdnPlayback()
 
     /** Resolve from a track-change event, which already carries title, artist and duration. */
-    suspend fun fromTrack(event: TrackChangeEvent): StreamResult {
+    suspend fun fromTrack(event: TrackChangeEvent, trackUri: String): StreamResult {
         val current = event.current
-        return youTubeMusic(current?.name, current?.artistName, current?.durationMs ?: 0L)
+        return localOrNull(trackUri)
+            ?: youTubeMusic(current?.name, current?.artistName, current?.durationMs ?: 0L)
             ?: cdn.resolveFromTrack(
                 event,
                 region = AppSettings.effectiveRegion(),
@@ -31,18 +34,35 @@ object AudioSourceResolver {
 
     /** Resolve from metadata, for the cold-start, initial-track and pre-resolve paths. */
     suspend fun byQuery(
-        trackId: String,
+        trackUri: String,
         searchQuery: String?,
         title: String?,
         artist: String?,
         durationMs: Long,
-    ): StreamResult = youTubeMusic(title, artist, durationMs)
+    ): StreamResult = localOrNull(trackUri)
+        ?: youTubeMusic(title, artist, durationMs)
         ?: cdn.resolveStreamUrl(
-            trackId,
+            trackUri.substringAfterLast(':'),
             region = AppSettings.effectiveRegion(),
             searchQuery = searchQuery,
             preferredSource = AppSettings.preferredAudioSource.value,
         )
+
+    /**
+     * A downloaded copy wins over every source, including Spfy: the user asked for this track on
+     * disk, so it plays from disk wherever it turns up. A row whose file has since been deleted from
+     * the folder is dropped rather than played.
+     */
+    fun localOrNull(trackUri: String): StreamResult? {
+        val local = Downloads.find(trackUri) ?: return null
+        if (!DownloadFolder.exists(local.documentUri)) {
+            Downloads.remove(trackUri)
+            return null
+        }
+        return StreamResult.Success(
+            StreamInfo(url = local.documentUri, provider = "Downloaded", mimeType = local.mimeType)
+        )
+    }
 
     /**
      * Null unless YouTube Music is the selected source, so callers fall through to the chain. A miss

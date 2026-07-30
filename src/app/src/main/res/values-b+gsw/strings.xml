@@ -296,4 +296,13 @@
     <string name="error_save_library">Häts nöd i d Bibliothek gschafft</string>
     <string name="error_add_playlist">Häts nöd i d Playlist gschafft</string>
     <string name="error_add_queue">Häts nöd i d Warteschlange gschafft</string>
+    <string name="downloads">Downloads</string>
+    <string name="downloading">Am Abelade</string>
+    <string name="download_complete">Download fertig</string>
+    <string name="download_failed">Download gschiitered</string>
+    <string name="download_folder">Download-Ordner</string>
+    <string name="download_folder_none">Nöd gsetzt, tipp zum Wähle</string>
+    <string name="download_track">Abelade</string>
+    <string name="remove_download">Download entferne</string>
+    <string name="download_needs_folder">Wähl zerscht en Download-Ordner</string>
 </resources>

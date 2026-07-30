@@ -174,4 +174,77 @@ class YouTubeMusicSourceTest {
         val denied = """{"playabilityStatus":{"status":"LOGIN_REQUIRED","reason":"Sign in"}}"""
         assertNull(YouTubeMusicSource.pickAudio(denied))
     }
+
+    /**
+     * An instrumental cut carries the original's exact title and artist and runs to the same length,
+     * so neither the title check nor the duration filter can see it. The release it sits on is the
+     * only thing that says what it is, and rank breaks the rest.
+     */
+    /**
+     * The title scorer drops bracketed text so "Song (feat. X)" still matches "Song". That also
+     * erased "(Instrumental)", leaving a cut with the same title, artist and length as the real one.
+     */
+    @Test
+    fun anInstrumentalInBracketsIsRejected() {
+        val yt = listOf(
+            YouTubeMusicSource.Candidate("inst", "ファタール - Fatal (Instrumental)", "GEMN", 219),
+            YouTubeMusicSource.Candidate("real", "ファタール - Fatal", "GEMN", 219),
+        )
+        val match = YouTubeMusicSource.bestMatch(yt, "ファタール - Fatal", "GEMN", durationMs = 219_000)
+        assertEquals("real", match?.videoId)
+    }
+
+    /** Asking for one keeps working: the marker is then in the request too. */
+    @Test
+    fun anInstrumentalIsKeptWhenItIsWhatWasAskedFor() {
+        val yt = listOf(YouTubeMusicSource.Candidate("inst", "Sonne (Instrumental)", "Rammstein", 272))
+        val match = YouTubeMusicSource.bestMatch(yt, "Sonne (Instrumental)", "Rammstein", durationMs = 272_000)
+        assertEquals("inst", match?.videoId)
+    }
+
+    /** A bracketed "(feat. …)" is not a rework and must still match. */
+    @Test
+    fun aFeatureCreditIsNotARework() {
+        val yt = listOf(YouTubeMusicSource.Candidate("x", "Get Lucky (feat. Pharrell Williams)", "Daft Punk", 369))
+        val match = YouTubeMusicSource.bestMatch(yt, "Get Lucky", "Daft Punk", durationMs = 369_000)
+        assertEquals("x", match?.videoId)
+    }
+
+    @Test
+    fun anInstrumentalReleaseIsRejectedByItsAlbum() {
+        val yt = listOf(
+            YouTubeMusicSource.Candidate(
+                "inst", "ファタール - Fatal", "GEMN", 219,
+                details = "GEMN ファタール - Fatal (Instrumental) 3:39",
+            ),
+            YouTubeMusicSource.Candidate(
+                "real", "ファタール - Fatal", "GEMN", 220,
+                details = "GEMN ファタール - Fatal 3:40",
+            ),
+        )
+        val match = YouTubeMusicSource.bestMatch(yt, "ファタール - Fatal", "GEMN", durationMs = 219_000)
+        assertEquals("real", match?.videoId)
+    }
+
+    /** A duration a second closer must not outrank YouTube Music's own ordering. */
+    @Test
+    fun aMarginallyCloserDurationDoesNotOutrankTheTopResult() {
+        val yt = listOf(
+            YouTubeMusicSource.Candidate("top", "Get Lucky", "Daft Punk", 369),
+            YouTubeMusicSource.Candidate("other", "Get Lucky", "Daft Punk", 370),
+        )
+        val match = YouTubeMusicSource.bestMatch(yt, "Get Lucky", "Daft Punk", durationMs = 370_000)
+        assertEquals("top", match?.videoId)
+    }
+
+    /** A genuinely better fit still wins: this is a tiebreak, not a rank-only rule. */
+    @Test
+    fun aClearlyBetterDurationStillWins() {
+        val yt = listOf(
+            YouTubeMusicSource.Candidate("short", "Get Lucky", "Daft Punk", 350),
+            YouTubeMusicSource.Candidate("full", "Get Lucky", "Daft Punk", 369),
+        )
+        val match = YouTubeMusicSource.bestMatch(yt, "Get Lucky", "Daft Punk", durationMs = 369_000)
+        assertEquals("full", match?.videoId)
+    }
 }

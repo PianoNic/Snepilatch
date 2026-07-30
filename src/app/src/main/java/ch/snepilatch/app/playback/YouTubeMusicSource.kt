@@ -46,6 +46,9 @@ object YouTubeMusicSource {
     /** Wide because a music-video upload of the same track carries an intro or outro. */
     internal const val DURATION_TOLERANCE_SEC = 30L
 
+    /** Duration differences within this many seconds count as equally good, so rank decides. */
+    internal const val DURATION_BUCKET_SEC = 5L
+
     /** Share of the wanted title's words a candidate must carry. At 0.5 shared filler words matched. */
     internal const val MIN_TITLE_SCORE = 0.8
 
@@ -89,6 +92,8 @@ object YouTubeMusicSource {
         val title: String,
         val artist: String?,
         val durationSec: Long,
+        /** Artist, album and the rest of the row. An instrumental release often only says so here. */
+        val details: String = "",
     )
 
     /**
@@ -212,6 +217,7 @@ object YouTubeMusicSource {
             title = title,
             artist = texts.drop(1).firstOrNull { it.trim().length > 1 },
             durationSec = texts.firstNotNullOfOrNull { parseDuration(it) } ?: 0L,
+            details = texts.drop(1).joinToString(" "),
         )
     }
 
@@ -231,16 +237,28 @@ object YouTubeMusicSource {
     ): Candidate? {
         val want = words(wantTitle)
         val wantArtistWords = words(wantArtist)
+        // Read the request the same way as the candidate, brackets included: asking for "Sonne
+        // (Remix)" must keep the remix, and that marker only survives in the bracket-keeping split.
+        val asked = markerWords(wantTitle) + markerWords(wantArtist)
         val viable = candidates.filter { candidate ->
             (want.isEmpty() || titleScore(candidate.title, want) >= MIN_TITLE_SCORE) &&
-                !addsRework(candidate.title, want + wantArtistWords) &&
+                // Album and artist text too: an instrumental cut usually carries the original's exact
+                // title and artist, and only the release it sits on says what it is.
+                !addsRework("${candidate.title} ${candidate.details}", asked) &&
                 artistMatches(candidate.artist, wantArtistWords)
         }
         if (durationMs <= 0L) return viable.firstOrNull()
         val wantSec = durationMs / 1000
+        // YouTube Music ranks the canonical upload first. An instrumental runs to the same length as
+        // the vocal take, so picking purely by the smallest duration difference let a second or two of
+        // noise outrank that order; only a clearly better fit (a whole bucket) may.
         return viable
-            .filter { it.durationSec > 0 && abs(it.durationSec - wantSec) <= DURATION_TOLERANCE_SEC }
-            .minByOrNull { abs(it.durationSec - wantSec) }
+            .withIndex()
+            .filter { (_, c) -> c.durationSec > 0 && abs(c.durationSec - wantSec) <= DURATION_TOLERANCE_SEC }
+            .minWithOrNull(
+                compareBy({ abs(it.value.durationSec - wantSec) / DURATION_BUCKET_SEC }, { it.index })
+            )
+            ?.value
     }
 
     /**
@@ -248,7 +266,19 @@ object YouTubeMusicSource {
      * that genuinely is a remix keeps working, because the marker is then in [asked] too.
      */
     internal fun addsRework(candidateTitle: String, asked: Set<String>): Boolean =
-        words(candidateTitle).any { it in REWORK_MARKERS && it !in asked }
+        markerWords(candidateTitle).any { it in REWORK_MARKERS && it !in asked }
+
+    /**
+     * Like [words] but keeps bracketed text. Titles score with brackets dropped, so "Song (feat. X)"
+     * still matches "Song" — but that also erased the one thing marking a rework, and "(Instrumental)"
+     * became indistinguishable from the real recording: same title, same artist, same length.
+     */
+    private fun markerWords(s: String): Set<String> =
+        s.lowercase()
+            .replace(Regex("[^\\p{L}\\p{N} ]"), " ")
+            .split(' ')
+            .filter { it.isNotBlank() }
+            .toSet()
 
     /**
      * The strongest signal against a cover: a piano rendition is uploaded by whoever played it, not

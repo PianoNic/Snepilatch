@@ -64,7 +64,12 @@ object AudioSourceResolver {
      */
     @JvmOverloads
     fun localOrNull(trackUri: String, title: String? = null, artist: String? = null): StreamResult? {
+        // The uri is the reliable key; title/artist only stand in when it misses, because the same
+        // song is in the catalogue under more than one id (separate releases, or Spotify's per-market
+        // instances). Without it a downloaded track streams whenever it turns up under the other id.
         val local = Downloads.find(trackUri)
+            ?: title?.takeIf { it.isNotBlank() }?.let { Downloads.findByMetadata(it, artist.orEmpty()) }
+                ?.also { LokiLogger.i(TAG, "HIT  $trackUri via title/artist, downloaded as ${it.trackUri}") }
         if (local == null) {
             LokiLogger.i(TAG, "MISS $trackUri${relinkHint(trackUri, title, artist)}")
             return null
@@ -73,8 +78,9 @@ object AudioSourceResolver {
         // forgetting a download the user still has is far worse than trying to play it and failing.
         when (DownloadFolder.exists(local.documentUri)) {
             false -> {
+                // The row's own uri, not the requested one — a metadata match found it under another.
                 LokiLogger.w(TAG, "GONE $trackUri, file missing from the folder, dropping the row")
-                Downloads.remove(trackUri)
+                Downloads.remove(local.trackUri)
                 return null
             }
             null -> LokiLogger.w(TAG, "cannot check the folder yet, using the indexed copy anyway")

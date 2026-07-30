@@ -144,16 +144,31 @@ object Downloads {
     }
 
     /**
-     * A downloaded row matching by title and artist rather than uri. Only used to explain why a
-     * lookup missed: Spotify relinks recordings, so the same song can arrive under a different uri
-     * than the one it was downloaded under.
+     * A downloaded row matching by title and artist rather than uri, for when the same song sits in
+     * the catalogue under more than one id: separate releases, or the per-market instances Spotify
+     * relinks between. Title must match exactly (ignoring case and width); artists only have to
+     * overlap, because the credit list and its order differ between releases of the same recording.
      */
-    fun findByMetadata(title: String, artist: String): DownloadedTrack? {
-        if (title.isBlank()) return null
-        return all().firstOrNull {
-            it.title.equals(title, ignoreCase = true) && it.artist.equals(artist, ignoreCase = true)
+    fun findByMetadata(title: String, artist: String): DownloadedTrack? =
+        matchByMetadata(all(), title, artist)
+
+    /** The matching itself, separated from the database so it can be tested directly. */
+    internal fun matchByMetadata(rows: List<DownloadedTrack>, title: String, artist: String): DownloadedTrack? {
+        val wanted = normalize(title)
+        if (wanted.isBlank()) return null
+        val artists = artistSet(artist)
+        return rows.firstOrNull {
+            normalize(it.title) == wanted &&
+                (artists.isEmpty() || artistSet(it.artist).any(artists::contains))
         }
     }
+
+    /** Case- and width-insensitive: half- and full-width forms of a title are the same song. */
+    private fun normalize(value: String): String =
+        java.text.Normalizer.normalize(value.trim(), java.text.Normalizer.Form.NFKC).lowercase()
+
+    private fun artistSet(artist: String): Set<String> =
+        artist.split(',', '&', ';').map(::normalize).filter { it.isNotBlank() }.toSet()
 
     fun all(): List<DownloadedTrack> {
         val db = helper?.readableDatabase ?: return emptyList()

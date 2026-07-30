@@ -142,37 +142,52 @@ fun AccountScreen(vm: PlaybackViewModel) {
 
         val audioContext = androidx.compose.ui.platform.LocalContext.current
 
-        // Audio settings
+        // One choice of three: the sources exclude each other and a chosen one is never silently
+        // swapped (#480). The setting stores null for Spfy, so the dialog stands in SOURCE_SPOTIFY_UI.
         val audioSource by AppSettings.preferredAudioSource.collectAsState()
-        val isLossless = audioSource != null
-        val losslessSubtitle = if (isLossless) {
-            stringResource(R.string.lossless_on_flac)
-        } else {
-            stringResource(R.string.lossless_off_spfy)
+        var showSourcePicker by remember { mutableStateOf(false) }
+        val sourceLabel = when (audioSource) {
+            AppSettings.SOURCE_LOSSLESS -> stringResource(R.string.lossless_on_flac)
+            AppSettings.SOURCE_YTM -> stringResource(R.string.audio_source_ytm)
+            else -> stringResource(R.string.lossless_off_spfy)
         }
-
-        // Lossless toggle — when on, the resolver picks the best source
-        // (Qobuz, then Deezer) autonomously; no provider choice.
         ListItem(
-            headlineContent = { Text(stringResource(R.string.lossless_audio), color = SpfyWhite) },
-            supportingContent = { Text(losslessSubtitle, color = SpfyLightGray) },
+            headlineContent = { Text(stringResource(R.string.audio_source), color = SpfyWhite) },
+            supportingContent = { Text(sourceLabel, color = SpfyLightGray) },
             leadingContent = { Icon(Icons.Rounded.MusicNote, null, tint = SpfyLightGray) },
-            trailingContent = {
-                Switch(
-                    checked = isLossless,
-                    onCheckedChange = { enabled ->
-                        AppSettings.setPreferredAudioSource(if (enabled) "lossless" else null, audioContext)
-                    },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = animatedPrimary,
-                        checkedTrackColor = animatedPrimary.copy(alpha = 0.5f),
-                        uncheckedThumbColor = SpfyLightGray,
-                        uncheckedTrackColor = SpfyLightGray.copy(alpha = 0.3f)
-                    )
-                )
-            },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable { showSourcePicker = true }
         )
+        if (showSourcePicker) {
+            RadioPickerDialog(
+                title = stringResource(R.string.audio_source),
+                options = listOf(
+                    RadioOption(
+                        SOURCE_SPOTIFY_UI,
+                        stringResource(R.string.audio_source_spotify),
+                        stringResource(R.string.audio_source_spotify_desc)
+                    ),
+                    RadioOption(
+                        AppSettings.SOURCE_LOSSLESS,
+                        stringResource(R.string.lossless_audio),
+                        stringResource(R.string.audio_source_lossless_desc)
+                    ),
+                    RadioOption(
+                        AppSettings.SOURCE_YTM,
+                        stringResource(R.string.audio_source_ytm),
+                        stringResource(R.string.audio_source_ytm_desc)
+                    )
+                ),
+                selected = audioSource ?: SOURCE_SPOTIFY_UI,
+                selectedColor = animatedPrimary,
+                onSelect = { picked ->
+                    AppSettings.setPreferredAudioSource(picked.takeIf { it != SOURCE_SPOTIFY_UI }, audioContext)
+                    showSourcePicker = false
+                },
+                onDismiss = { showSourcePicker = false }
+            )
+        }
 
         // Content region picker
         val currentRegion by AppSettings.contentRegion.collectAsState()
@@ -614,6 +629,9 @@ private fun AccountSectionHeader(title: String) {
         modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp)
     )
 }
+
+/** Stands in for Spfy in the audio-source dialog, which selects on a String while the setting is null. */
+private const val SOURCE_SPOTIFY_UI = "spotify"
 
 private data class RadioOption(val value: String, val label: String, val supportingText: String? = null)
 

@@ -53,6 +53,12 @@
     <string name="log_out">Abmelde</string>
 
     <!-- Settings -->
+    <string name="audio_source">Audioquälle</string>
+    <string name="audio_source_spotify">Spotify</string>
+    <string name="audio_source_spotify_desc">Standardqualität, direkt vo Spotify</string>
+    <string name="audio_source_lossless_desc">FLAC, wänn en Drittaabieter de Track het</string>
+    <string name="audio_source_ytm">YouTube Music</string>
+    <string name="audio_source_ytm_desc">Zuegordnet über Titel und Längi. Bruucht kes Konto. Es paar Tracks git s nöd.</string>
     <string name="lossless_audio">Verlustfreii Audio (Beta)</string>
     <string name="lossless_on">FLAC über %s</string>
     <string name="lossless_off">Standardqualität</string>

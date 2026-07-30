@@ -55,6 +55,12 @@
     <string name="log_out">Log out</string>
 
     <!-- Settings -->
+    <string name="audio_source">Audio source</string>
+    <string name="audio_source_spotify">Spotify</string>
+    <string name="audio_source_spotify_desc">Standard quality, streamed from Spotify</string>
+    <string name="audio_source_lossless_desc">FLAC where a third party relay has the track</string>
+    <string name="audio_source_ytm">YouTube Music</string>
+    <string name="audio_source_ytm_desc">Matched by title and length. No account needed. Some tracks are unavailable.</string>
     <string name="lossless_audio">Lossless Audio (Beta)</string>
     <string name="lossless_on">FLAC via %s</string>
     <string name="lossless_on_flac">FLAC</string>

@@ -53,6 +53,12 @@
     <string name="log_out">Abmelden</string>
 
     <!-- Settings -->
+    <string name="audio_source">Audioquelle</string>
+    <string name="audio_source_spotify">Spotify</string>
+    <string name="audio_source_spotify_desc">Standardqualität, direkt von Spotify</string>
+    <string name="audio_source_lossless_desc">FLAC, wenn ein Drittanbieter den Titel hat</string>
+    <string name="audio_source_ytm">YouTube Music</string>
+    <string name="audio_source_ytm_desc">Zuordnung über Titel und Länge. Kein Konto nötig. Manche Titel sind nicht verfügbar.</string>
     <string name="lossless_audio">Verlustfreies Audio (Beta)</string>
     <string name="lossless_on">FLAC über %s</string>
     <string name="lossless_off">Standardqualität</string>

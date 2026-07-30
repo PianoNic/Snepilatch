@@ -322,4 +322,6 @@
     <string name="downloads_active">Aktiv</string>
     <string name="downloads_idle">Grad laufed kei Downloads</string>
     <string name="remove_download_message">Abegladeni Dateie vo %1$s lösche? (%2$d Titel)</string>
+    <string name="auto_save_listened">Ghörts behalte</string>
+    <string name="auto_save_listened_desc">Speicheret en Titel, sobald du ihn dureghört hesch</string>
 </resources>

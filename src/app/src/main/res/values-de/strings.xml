@@ -322,4 +322,6 @@
     <string name="downloads_active">Aktiv</string>
     <string name="downloads_idle">Gerade laufen keine Downloads</string>
     <string name="remove_download_message">Heruntergeladene Dateien von %1$s löschen? (%2$d Titel)</string>
+    <string name="auto_save_listened">Gehörtes behalten</string>
+    <string name="auto_save_listened_desc">Speichert einen Titel, sobald du ihn durchgehört hast</string>
 </resources>

@@ -15,6 +15,7 @@ import ch.snepilatch.app.playback.InfiniPlayViz
 import ch.snepilatch.app.playback.MusicPlaybackService
 import ch.snepilatch.app.playback.PositionInterpolator
 import ch.snepilatch.app.playback.SessionHolder
+import ch.snepilatch.app.download.DownloadFolder
 import ch.snepilatch.app.download.DownloadNotifier
 import ch.snepilatch.app.download.Downloads
 import ch.snepilatch.app.download.DownloadOutcome
@@ -2427,6 +2428,9 @@ class PlaybackViewModel : ViewModel() {
         if (AppSettings.preferredAudioSource.value != null) {
             try { player?.pause() } catch (_: Exception) {}
         }
+        // The outgoing track is still in state here, which is the one moment we know how far it got.
+        autoSaveIfListenedThrough(_playback.value.track, _playback.value.positionMs)
+
         val art = normalizeSpfyImageUrl(current.imageLargeUrl ?: current.imageUrl)
 
         // Update UI with new track info immediately — audio will follow in ~100ms
@@ -2597,6 +2601,24 @@ class PlaybackViewModel : ViewModel() {
                 )
             }
         }
+    }
+
+    /**
+     * Keeps a track the user listened through, when the setting is on.
+     *
+     * Nothing is lifted out of memory: ExoPlayer buffers its own sample queues rather than the
+     * encoded file, and the only raw buffer we hold is decoded PCM for InfiniPlay. The track is
+     * re-fetched instead, which takes a couple of seconds and produces a tagged, remuxed file.
+     */
+    private fun autoSaveIfListenedThrough(track: TrackInfo?, positionMs: Long) {
+        if (!AppSettings.autoSaveListened.value) return
+        if (track == null || track.durationMs <= 0) return
+        if (!DownloadFolder.isConfigured) return
+        if (positionMs < track.durationMs * LISTENED_THROUGH_FRACTION) return
+        if (Downloads.find(track.uri) != null) return
+        val context = MusicPlaybackService.instance ?: return
+        LokiLogger.i(TAG, "listened through '${track.name}', keeping it")
+        downloadTrack(track, context)
     }
 
     /** Downloads one track, with its own progress notification. */
@@ -3045,6 +3067,9 @@ class PlaybackViewModel : ViewModel() {
         /** How many times to auto-re-resolve + reload a track (rotating CDN mirrors) after a transient
          *  ExoPlayer/DRM error before skipping to the next track. See [recoverFromPlaybackError]. */
         private const val MAX_PLAYBACK_ERROR_RETRIES = 3
+
+        /** How much of a track counts as having listened to it, for the keep-what-I-played setting. */
+        private const val LISTENED_THROUGH_FRACTION = 0.9
 
         /** If skipPrevious is invoked after this many ms into the current track,
          *  restart the track instead of going to the previous one. Matches the

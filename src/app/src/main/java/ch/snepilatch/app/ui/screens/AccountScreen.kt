@@ -295,6 +295,28 @@ fun AccountScreen(vm: PlaybackViewModel) {
             )
         }
 
+        val autoSave by AppSettings.autoSaveListened.collectAsState()
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.auto_save_listened), color = SpfyWhite) },
+            supportingContent = {
+                Text(stringResource(R.string.auto_save_listened_desc), color = SpfyLightGray)
+            },
+            leadingContent = { Icon(Icons.Rounded.DownloadForOffline, null, tint = SpfyLightGray) },
+            trailingContent = {
+                Switch(
+                    checked = autoSave,
+                    onCheckedChange = { AppSettings.setAutoSaveListened(it, audioContext) },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = animatedPrimary,
+                        checkedTrackColor = animatedPrimary.copy(alpha = 0.5f),
+                        uncheckedThumbColor = SpfyLightGray,
+                        uncheckedTrackColor = SpfyLightGray.copy(alpha = 0.3f)
+                    )
+                )
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+        )
+
         ListItem(
             headlineContent = { Text(stringResource(R.string.manage_downloads), color = SpfyWhite) },
             supportingContent = {

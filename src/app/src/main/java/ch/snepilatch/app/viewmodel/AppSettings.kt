@@ -40,6 +40,10 @@ object AppSettings {
     // its stream is Widevine and the saved bytes would not play.
     val downloadSource = MutableStateFlow(SOURCE_YTM)
 
+    // Keep a track once it has actually been listened through. Off by default: it spends data and
+    // storage on its own.
+    val autoSaveListened = MutableStateFlow(false)
+
     // Lyrics animation direction for line-synced (non word-synced): "vertical" or "horizontal"
     val lyricsAnimDirection = MutableStateFlow("vertical")
 
@@ -89,6 +93,7 @@ object AppSettings {
             prefs.edit().remove("audio_source").apply()
         }
         downloadSource.value = prefs.getString("download_source", SOURCE_YTM) ?: SOURCE_YTM
+        autoSaveListened.value = prefs.getBoolean("auto_save_listened", false)
         lyricsAnimDirection.value = prefs.getString("lyrics_anim_direction", "vertical") ?: "vertical"
         appLanguage.value = prefs.getString("app_language", "system") ?: "system"
         // Apply saved language on startup
@@ -153,6 +158,11 @@ object AppSettings {
     fun setDownloadSource(source: String, context: Context) {
         downloadSource.value = source
         prefs(context).edit().putString("download_source", source).apply()
+    }
+
+    fun setAutoSaveListened(enabled: Boolean, context: Context) {
+        autoSaveListened.value = enabled
+        prefs(context).edit().putBoolean("auto_save_listened", enabled).apply()
     }
 
     fun setContentRegion(region: String, context: Context) {

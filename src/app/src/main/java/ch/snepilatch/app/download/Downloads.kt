@@ -148,6 +148,17 @@ object Downloads {
      * the catalogue under more than one id: separate releases, or the per-market instances Spotify
      * relinks between. Title must match exactly (ignoring case and width); artists only have to
      * overlap, because the credit list and its order differ between releases of the same recording.
+     *
+     * Known limitation, and the likely cause of any "this played the wrong version" report: two
+     * genuinely different recordings that share a title and an artist — a re-record, or an album cut
+     * and a single edit released under the same name — are indistinguishable here, so whichever was
+     * downloaded first wins. That is the accepted cost of matching on metadata at all; keying on the
+     * uri instead is what made a relinked track miss its own download.
+     *
+     * If it ever produces a real report, the cheap narrowing is duration: [DownloadedTrack] does not
+     * store it today, but the schema migrates additively (see [Helper.onUpgrade]) and the caller
+     * already has it. That separates an album cut from a single edit, though not a re-record of the
+     * same arrangement, so it narrows the collision rather than closing it.
      */
     fun findByMetadata(title: String, artist: String): DownloadedTrack? =
         matchByMetadata(all(), title, artist)

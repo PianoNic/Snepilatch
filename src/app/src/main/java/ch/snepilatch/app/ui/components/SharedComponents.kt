@@ -23,6 +23,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.DownloadDone
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.MusicNote
@@ -287,7 +288,19 @@ fun TrackRow(track: TrackInfo, vm: PlaybackViewModel, contextUri: String? = null
             val likeLabel = stringResource(R.string.like)
             val visitAlbumLabel = stringResource(R.string.visit_album)
             val visitArtistLabel = stringResource(R.string.visit_artist)
+            val downloadLabel = if (isDownloaded) {
+                stringResource(R.string.remove_download)
+            } else {
+                stringResource(R.string.download_track)
+            }
             val items = listOf(
+                Triple(
+                    if (isDownloaded) Icons.Rounded.DownloadDone else Icons.Rounded.Download,
+                    downloadLabel,
+                ) {
+                    if (isDownloaded) vm.removeDownload(track.uri) else vm.downloadTrack(track, context)
+                    showMenu = false
+                },
                 Triple(Icons.AutoMirrored.Rounded.QueueMusic, addToQueueLabel) {
                     vm.addToQueue(track.uri); showMenu = false
                 },

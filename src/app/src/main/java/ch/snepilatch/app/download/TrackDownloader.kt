@@ -23,6 +23,11 @@ data class DownloadRequest(
     val album: String? = null,
     val coverUrl: String? = null,
     val durationMs: Long = 0L,
+    /** The album or playlist this was queued from; absent for a one-off track. */
+    val contextUri: String? = null,
+    val contextName: String? = null,
+    val contextType: String? = null,
+    val albumUri: String? = null,
 )
 
 sealed interface DownloadOutcome {
@@ -211,6 +216,11 @@ object TrackDownloader {
             provider = info.provider,
             mimeType = mimeTypeFor(finalExtension),
             coverUrl = request.coverUrl,
+            contextUri = request.contextUri,
+            contextName = request.contextName,
+            contextType = request.contextType,
+            albumUri = request.albumUri,
+            albumName = request.album,
             sizeBytes = written,
             title = request.title,
             artist = request.artist,

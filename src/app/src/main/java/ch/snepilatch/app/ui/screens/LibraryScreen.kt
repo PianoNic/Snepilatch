@@ -64,7 +64,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
 import ch.snepilatch.app.download.Downloads
-import ch.snepilatch.app.viewmodel.Navigator
 import ch.snepilatch.app.data.LIKED_SONGS_COVER_URL
 import ch.snepilatch.app.data.LibraryItem
 import ch.snepilatch.app.ui.components.SpfyImage
@@ -99,12 +98,19 @@ fun LibraryScreen() {
 
     // Recompute the filter/search/sort pipeline only when an input actually changes, not on every
     // recomposition (e.g. a position tick or unrelated state update).
-    val sortedLibrary = remember(library, selectedFilter, searchQuery, sortMode) {
+    // Downloaded content is grouped by the album or playlist it came from, so it browses like the
+    // rest of the library rather than as a flat list of tracks.
+    val downloadedUris by Downloads.downloaded.collectAsState()
+    val downloadedItems = remember(downloadedUris) {
+        Downloads.groups().map { LibraryItem(it.uri, it.name, it.imageUrl, it.type) }
+    }
+    val sortedLibrary = remember(library, downloadedItems, selectedFilter, searchQuery, sortMode) {
+        val source = if (selectedFilter == "Downloaded") downloadedItems else library
         val filteredLibrary = when (selectedFilter) {
-            "Playlists" -> library.filter { it.type == "playlist" || it.type == "collection" }
-            "Artists" -> library.filter { it.type == "artist" }
+            "Playlists" -> source.filter { it.type == "playlist" || it.type == "collection" }
+            "Artists" -> source.filter { it.type == "artist" }
             "Albums" -> library.filter { it.type == "album" }
-            else -> library
+            else -> source
         }
         val searchedLibrary = if (searchQuery.isBlank()) filteredLibrary
         else filteredLibrary.filter {
@@ -186,14 +192,15 @@ fun LibraryScreen() {
             // The library lists playlists, artists and albums; downloads are individual tracks, so this
             // opens the downloads manager rather than filtering the list in place.
             item {
-                val downloadedCount by Downloads.downloaded.collectAsState()
-                if (downloadedCount.isNotEmpty()) {
+                if (downloadedItems.isNotEmpty()) {
                     FilterChip(
-                        selected = false,
-                        onClick = { Navigator.navigateTo(ch.snepilatch.app.data.Screen.DOWNLOADS) },
+                        selected = selectedFilter == "Downloaded",
+                        onClick = {
+                            selectedFilter = if (selectedFilter == "Downloaded") null else "Downloaded"
+                        },
                         label = {
                             Text(
-                                stringResource(R.string.library_filter_downloaded, downloadedCount.size),
+                                stringResource(R.string.library_filter_downloaded, downloadedItems.size),
                                 fontSize = 13.sp
                             )
                         },

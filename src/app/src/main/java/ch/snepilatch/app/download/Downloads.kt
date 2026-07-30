@@ -16,6 +16,12 @@ data class DownloadedTrack(
     val provider: String?,
     val mimeType: String?,
     val coverUrl: String?,
+    /** What it was downloaded from: an album, a playlist, or nothing for a one-off track. */
+    val contextUri: String?,
+    val contextName: String?,
+    val contextType: String?,
+    val albumUri: String?,
+    val albumName: String?,
     val sizeBytes: Long,
     val title: String,
     val artist: String,
@@ -32,7 +38,7 @@ data class DownloadedTrack(
 object Downloads {
 
     private const val DB_NAME = "downloads.db"
-    private const val DB_VERSION = 2
+    private const val DB_VERSION = 3
     private const val TABLE = "downloads"
 
     private var helper: Helper? = null
@@ -53,6 +59,11 @@ object Downloads {
                     provider TEXT,
                     mime_type TEXT,
                     cover_url TEXT,
+                    context_uri TEXT,
+                    context_name TEXT,
+                    context_type TEXT,
+                    album_uri TEXT,
+                    album_name TEXT,
                     size_bytes INTEGER NOT NULL,
                     title TEXT NOT NULL,
                     artist TEXT NOT NULL,
@@ -70,6 +81,11 @@ object Downloads {
         override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
             // v2 added the cover art url. Additive, so existing downloads keep working untagged.
             if (oldVersion < 2) db.execSQL("ALTER TABLE $TABLE ADD COLUMN cover_url TEXT")
+            if (oldVersion < 3) {
+                // v3 records where a download came from so the library can group them.
+                listOf("context_uri", "context_name", "context_type", "album_uri", "album_name")
+                    .forEach { db.execSQL("ALTER TABLE $TABLE ADD COLUMN $it TEXT") }
+            }
         }
 
         /** Sideloading an older build must not crash; the default implementation throws. */
@@ -119,6 +135,32 @@ object Downloads {
         refresh()
     }
 
+    /**
+     * Downloaded content grouped for the library: the album or playlist it came from, or the track
+     * itself when it was downloaded on its own.
+     */
+    data class Group(
+        val uri: String,
+        val name: String,
+        val type: String,
+        val imageUrl: String?,
+        val trackCount: Int,
+    )
+
+    fun groups(): List<Group> = all()
+        .groupBy { it.contextUri ?: it.albumUri ?: it.trackUri }
+        .map { (uri, tracks) ->
+            val first = tracks.first()
+            Group(
+                uri = uri,
+                name = first.contextName ?: first.albumName ?: first.title,
+                type = first.contextType ?: if (first.albumUri != null) "album" else "single",
+                imageUrl = first.coverUrl,
+                trackCount = tracks.size,
+            )
+        }
+        .sortedBy { it.name.lowercase() }
+
     private fun refresh() {
         _downloaded.value = all().map { it.trackUri }.toSet()
     }
@@ -130,6 +172,11 @@ object Downloads {
         put("provider", provider)
         put("mime_type", mimeType)
         put("cover_url", coverUrl)
+        put("context_uri", contextUri)
+        put("context_name", contextName)
+        put("context_type", contextType)
+        put("album_uri", albumUri)
+        put("album_name", albumName)
         put("size_bytes", sizeBytes)
         put("title", title)
         put("artist", artist)
@@ -143,6 +190,11 @@ object Downloads {
         provider = getStringOrNull("provider"),
         mimeType = getStringOrNull("mime_type"),
         coverUrl = getStringOrNull("cover_url"),
+        contextUri = getStringOrNull("context_uri"),
+        contextName = getStringOrNull("context_name"),
+        contextType = getStringOrNull("context_type"),
+        albumUri = getStringOrNull("album_uri"),
+        albumName = getStringOrNull("album_name"),
         sizeBytes = getLong(getColumnIndexOrThrow("size_bytes")),
         title = getString(getColumnIndexOrThrow("title")),
         artist = getString(getColumnIndexOrThrow("artist")),

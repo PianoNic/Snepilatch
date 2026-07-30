@@ -2597,11 +2597,39 @@ class PlaybackViewModel : ViewModel() {
         }
     }
 
+    /** Downloads one track, with its own progress notification. */
+    fun downloadTrack(track: TrackInfo, context: android.content.Context) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val outcome = TrackDownloader.download(
+                DownloadRequest(
+                    trackUri = track.uri,
+                    title = track.name,
+                    artist = track.artist,
+                    album = track.albumName,
+                    coverUrl = track.albumArt,
+                    durationMs = track.durationMs,
+                ),
+                context,
+            )
+            if (outcome is DownloadOutcome.NoFolder) {
+                DownloadNotifier.failed(
+                    context, track.name, context.getString(R.string.download_needs_folder)
+                )
+            }
+        }
+    }
+
     /**
      * Downloads a whole album or playlist, one track at a time so the per-track notifications are
      * replaced by a single count. Tracks already on disk are skipped by the downloader itself.
      */
-    fun downloadTracks(tracks: List<TrackInfo>, context: android.content.Context) {
+    fun downloadTracks(
+        tracks: List<TrackInfo>,
+        context: android.content.Context,
+        contextUri: String? = null,
+        contextName: String? = null,
+        contextType: String? = null,
+    ) {
         if (tracks.isEmpty()) return
         viewModelScope.launch(Dispatchers.IO) {
             var failed = 0
@@ -2615,6 +2643,9 @@ class PlaybackViewModel : ViewModel() {
                         album = track.albumName,
                         coverUrl = track.albumArt,
                         durationMs = track.durationMs,
+                        contextUri = contextUri,
+                        contextName = contextName,
+                        contextType = contextType,
                     ),
                     context,
                     notify = false,

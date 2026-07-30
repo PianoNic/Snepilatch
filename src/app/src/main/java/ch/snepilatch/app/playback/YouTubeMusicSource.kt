@@ -63,6 +63,15 @@ object YouTubeMusicSource {
 
     @Volatile private var visitorData: String? = null
 
+    /**
+     * Drops the cached visitor id so the next resolve mints a fresh one. A stale one still resolves
+     * happily but yields media urls googlevideo then refuses, which looks like every track failing
+     * at once for no reason.
+     */
+    fun invalidateVisitorData() {
+        visitorData = null
+    }
+
     data class Stream(val url: String, val mimeType: String?, val headers: Map<String, String>)
 
     internal data class Candidate(

@@ -3,6 +3,7 @@ package ch.snepilatch.app.download
 import android.content.Context
 import ch.snepilatch.app.playback.AudioSourceResolver
 import ch.snepilatch.app.playback.DeezerBlockCipher
+import ch.snepilatch.app.playback.YouTubeMusicSource
 import ch.snepilatch.app.util.LokiLogger
 import ch.snepilatch.app.viewmodel.AppSettings
 import kotify.cdn.StreamInfo
@@ -93,6 +94,15 @@ object TrackDownloader {
             try {
                 val fetched = runCatching {
                     fetchTo(info, temp) { if (notify) DownloadNotifier.progress(context, request.title, it) }
+                }.recoverCatching { failure ->
+                    // A refused media url usually means the cached visitor id went stale, so mint a
+                    // fresh one and resolve again before giving up.
+                    if (failure.message?.contains("HTTP 403") != true) throw failure
+                    LokiLogger.w(TAG, "403 for '${request.title}', retrying with a fresh visitor id")
+                    YouTubeMusicSource.invalidateVisitorData()
+                    val retry = resolve(request)
+                    if (retry !is StreamResult.Success) throw failure
+                    fetchTo(retry.info, temp) { if (notify) DownloadNotifier.progress(context, request.title, it) }
                 }.getOrElse {
                     LokiLogger.e(TAG, "fetch failed for ${request.title}: ${it.message}")
                     DownloadNotifier.failed(context, request.title, it.message ?: "failed")
@@ -266,8 +276,9 @@ object TrackDownloader {
         }.build()
         val response = http.newCall(request).execute()
         if (!response.isSuccessful) {
+            val code = response.code
             response.close()
-            error("HTTP ${response.code}")
+            error("HTTP $code from ${request.url.host} range=${range ?: "none"}")
         }
         return Body(response)
     }

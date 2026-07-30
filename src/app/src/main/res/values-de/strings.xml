@@ -318,4 +318,5 @@
     <string name="downloaded_count">%1$d von %2$d heruntergeladen</string>
     <string name="download_all">Alle herunterladen</string>
     <string name="library_filter_downloaded">Heruntergeladen (%1$d)</string>
+    <string name="downloaded_indicator">Heruntergeladen</string>
 </resources>

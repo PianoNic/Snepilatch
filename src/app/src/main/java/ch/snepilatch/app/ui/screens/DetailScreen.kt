@@ -267,8 +267,6 @@ fun DetailScreen(vm: PlaybackViewModel) {
                     )
                 }
 
-                Spacer(Modifier.weight(1f))
-
                 IconButton(
                     onClick = { vm.downloadTracks(detail.tracks, context) },
                     enabled = detail.tracks.isNotEmpty()
@@ -278,6 +276,8 @@ fun DetailScreen(vm: PlaybackViewModel) {
                         tint = SpfyWhite, modifier = Modifier.size(24.dp)
                     )
                 }
+
+                Spacer(Modifier.weight(1f))
 
                 IconButton(onClick = { vm.toggleShuffle() }) {
                     Icon(

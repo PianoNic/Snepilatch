@@ -324,4 +324,5 @@
     <string name="downloaded_count">%1$d of %2$d downloaded</string>
     <string name="download_all">Download all</string>
     <string name="library_filter_downloaded">Downloaded (%1$d)</string>
+    <string name="downloaded_indicator">Downloaded</string>
 </resources>

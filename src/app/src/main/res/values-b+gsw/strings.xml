@@ -318,4 +318,5 @@
     <string name="downloaded_count">%1$d vo %2$d abeglade</string>
     <string name="download_all">Alli abelade</string>
     <string name="library_filter_downloaded">Abeglade (%1$d)</string>
+    <string name="downloaded_indicator">Abeglade</string>
 </resources>

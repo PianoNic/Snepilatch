@@ -3191,7 +3191,15 @@ class PlaybackViewModel : ViewModel() {
          *  ExoPlayer/DRM error before skipping to the next track. See [recoverFromPlaybackError]. */
         private const val MAX_PLAYBACK_ERROR_RETRIES = 3
 
-        /** How much of a track counts as having listened to it, for the keep-what-I-played setting. */
+        /**
+         * How much of a track counts as having listened to it, for the keep-what-I-played setting.
+         *
+         * Deliberately below CAPTURE_COMPLETE_FRACTION in MusicPlaybackService (0.99), which answers
+         * a different question: this is intent, that is capability. Raising this to match would stop
+         * a non-DRM track played to 92% from being kept, which works today because the playback cache
+         * serves it whole and never needs the capture. The gap is only dead for DRM tracks, where the
+         * capture is the sole source — those log and skip rather than save something truncated.
+         */
         private const val LISTENED_THROUGH_FRACTION = 0.9
 
         /** If skipPrevious is invoked after this many ms into the current track,

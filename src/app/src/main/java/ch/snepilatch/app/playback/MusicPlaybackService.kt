@@ -53,8 +53,17 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         private const val TAG = "MusicService"
         private const val CHANNEL_ID = "music_playback"
 
-        /** How much of a track must be captured to count as a whole one; the tail can be clipped by
-         *  the decoder's last partial buffer, so an exact match never lands. */
+        /**
+         * How much of a track must be captured to count as a whole one; the tail can be clipped by
+         * the decoder's last partial buffer, so an exact match never lands.
+         *
+         * This is NOT the same threshold as LISTENED_THROUGH_FRACTION in PlaybackViewModel (0.9),
+         * and the two must not be reconciled even though they look like they should agree. That one
+         * asks whether the user heard enough of a track to want it kept; this one asks whether
+         * enough of it exists to write out. Lowering this to match would hand the encoder a partial
+         * capture, putting files that stop early into the user's download folder — with nothing
+         * failing and nothing logged, because from the writer's side a short buffer looks finished.
+         */
         private const val CAPTURE_COMPLETE_FRACTION = 0.99
 
         // Separate high-importance channel for error alerts so they pop up (heads-up) instead of

@@ -41,6 +41,9 @@ object TrackDownloader {
     private const val TAG = "TrackDownloader"
     private const val BUFFER = 64 * 1024
 
+    /** Range size for the chunked fetch; see [fetchChunked]. */
+    private const val CHUNK_BYTES = 4L * 1024 * 1024
+
     private val http: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
@@ -50,6 +53,21 @@ object TrackDownloader {
 
     suspend fun download(request: DownloadRequest, context: Context): DownloadOutcome =
         withContext(Dispatchers.IO) {
+            // Anything unexpected becomes a failed notification; a download must not crash the app.
+            runCatching { downloadInner(request, context) }.getOrElse {
+                LokiLogger.e(TAG, "download crashed for ${request.title}", it)
+                DownloadNotifier.failed(context, request.title, it.message ?: "unexpected error")
+                DownloadOutcome.Failed(it.message ?: "unexpected error")
+            }
+        }
+
+    private suspend fun downloadInner(request: DownloadRequest, context: Context): DownloadOutcome =
+        withContext(Dispatchers.IO) {
+            LokiLogger.i(
+                TAG,
+                "requested '${request.title}' via ${AppSettings.downloadSource.value}, " +
+                    "folder=${DownloadFolder.isConfigured}"
+            )
             if (!DownloadFolder.isConfigured) return@withContext DownloadOutcome.NoFolder
             Downloads.find(request.trackUri)?.let { existing ->
                 if (DownloadFolder.exists(existing.documentUri)) {
@@ -63,7 +81,7 @@ object TrackDownloader {
                 is StreamResult.Failure -> return@withContext DownloadOutcome.Failed(resolved.message)
             }
 
-            val temp = File.createTempFile("dl", null, context.cacheDir)
+            val temp = File.createTempFile("download", null, context.cacheDir)
             try {
                 val fetched = runCatching {
                     fetchTo(info, temp) { DownloadNotifier.progress(context, request.title, it) }
@@ -97,6 +115,7 @@ object TrackDownloader {
         title = request.title,
         artist = request.artist,
         durationMs = request.durationMs,
+        source = AppSettings.downloadSource.value,
     )
 
     /**
@@ -148,6 +167,7 @@ object TrackDownloader {
             val name = DownloadFolder.fileName(request.title, request.artist, finalExtension)
             val target = DownloadFolder.createFile(name, mimeTypeFor(finalExtension)) ?: return null
             val sink = DownloadFolder.openOutput(target) ?: run {
+                LokiLogger.e(TAG, "could not open $target for writing")
                 DownloadFolder.delete(target.toString())
                 return null
             }
@@ -169,7 +189,7 @@ object TrackDownloader {
         val record = DownloadedTrack(
             trackUri = request.trackUri,
             documentUri = documentUri,
-            source = AppSettings.preferredAudioSource.value.orEmpty(),
+            source = AppSettings.downloadSource.value,
             provider = info.provider,
             mimeType = mimeTypeFor(finalExtension),
             sizeBytes = written,
@@ -183,49 +203,69 @@ object TrackDownloader {
     }
 
     private fun fetchTo(info: StreamInfo, target: File, onProgress: (Int) -> Unit): Long {
-        val request = Request.Builder().url(info.url).apply {
-            info.headers.forEach { (k, v) -> header(k, v) }
-        }.build()
-        http.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) error("HTTP ${response.code}")
-            val body = response.body ?: error("empty body")
-            val total = body.contentLength()
-            target.outputStream().use { sink ->
-                val key = info.decryptionKey
-                if (key != null) {
-                    // Deezer decrypts block by block, so progress is reported once it lands.
-                    onProgress(-1)
+        val key = info.decryptionKey
+        if (key != null) {
+            // Deezer's cipher needs one contiguous stream from block zero, and its relay does not
+            // throttle, so it keeps the single request.
+            onProgress(-1)
+            open(info, range = null).use { body ->
+                target.outputStream().use { sink ->
                     DeezerBlockCipher.decryptInto(sink, body.byteStream(), DeezerBlockCipher.hexToBytes(key))
-                } else {
-                    body.byteStream().copyReporting(sink, total, onProgress)
                 }
             }
+            return target.length()
         }
+        fetchChunked(info, target, onProgress)
         return target.length()
     }
 
-    /** Copies while reporting percent complete, throttled so the notification is not spammed. */
-    private fun java.io.InputStream.copyReporting(
-        out: java.io.OutputStream,
-        total: Long,
-        onProgress: (Int) -> Unit,
-    ): Long {
-        val buffer = ByteArray(BUFFER)
-        var copied = 0L
-        var lastPercent = -1
-        while (true) {
-            val read = read(buffer)
-            if (read < 0) break
-            out.write(buffer, 0, read)
-            copied += read
-            val percent = if (total > 0) ((copied * 100) / total).toInt() else -1
-            if (percent != lastPercent) {
-                lastPercent = percent
-                onProgress(percent)
+    /**
+     * Downloads in [CHUNK_BYTES] ranges rather than one open-ended request.
+     *
+     * googlevideo throttles a whole-file GET to roughly playback speed, so a three minute track took
+     * about three minutes. Asking for explicit ranges sidesteps that and the same track lands in
+     * seconds. Ranges are sequential, so the file is written in order and nothing needs reassembling.
+     */
+    private fun fetchChunked(info: StreamInfo, target: File, onProgress: (Int) -> Unit) {
+        var position = 0L
+        var total = -1L
+        target.outputStream().use { sink ->
+            while (total < 0 || position < total) {
+                val end = position + CHUNK_BYTES - 1
+                open(info, range = "bytes=$position-$end").use { body ->
+                    if (total < 0) total = contentRangeTotal(body.contentRange) ?: body.contentLength()
+                    position += body.byteStream().copyTo(sink, BUFFER)
+                }
+                if (total > 0) onProgress(((position * 100) / total).toInt().coerceAtMost(100))
+                // A short final chunk means the server has nothing left, whatever the declared total.
+                if (total < 0) break
             }
         }
-        return copied
     }
+
+    private class Body(private val response: okhttp3.Response) : AutoCloseable {
+        val contentRange: String? = response.header("Content-Range")
+        fun contentLength(): Long = response.body?.contentLength() ?: -1
+        fun byteStream(): java.io.InputStream = response.body?.byteStream() ?: error("empty body")
+        override fun close() = response.close()
+    }
+
+    private fun open(info: StreamInfo, range: String?): Body {
+        val request = Request.Builder().url(info.url).apply {
+            info.headers.forEach { (k, v) -> header(k, v) }
+            if (range != null) header("Range", range)
+        }.build()
+        val response = http.newCall(request).execute()
+        if (!response.isSuccessful) {
+            response.close()
+            error("HTTP ${response.code}")
+        }
+        return Body(response)
+    }
+
+    /** "bytes 0-1048575/3277373" -> 3277373. */
+    private fun contentRangeTotal(header: String?): Long? =
+        header?.substringAfter('/', "")?.toLongOrNull()
 
     private fun tagsFor(request: DownloadRequest) = TrackTags(
         title = request.title,

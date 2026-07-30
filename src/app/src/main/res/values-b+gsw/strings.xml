@@ -305,4 +305,13 @@
     <string name="download_track">Abelade</string>
     <string name="remove_download">Download entferne</string>
     <string name="download_needs_folder">Wähl zerscht en Download-Ordner</string>
+    <string name="download_source">Download-Quälle</string>
+    <string name="download_source_ytm">YouTube Music</string>
+    <string name="download_source_lossless">Verlustfreii (FLAC)</string>
+    <string name="manage_downloads">Downloads verwalte</string>
+    <string name="downloads_empty">No nüt abeglade</string>
+    <string name="downloads_summary">%1$d Titel · %2$d MB</string>
+    <string name="remove_all">Alli entferne</string>
+    <string name="remove_all_confirm">Alli abegladene Dateie lösche? D Titel wärded wieder gstreamt.</string>
+    <string name="downloads_count">%1$d abeglade</string>
 </resources>

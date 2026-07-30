@@ -29,6 +29,7 @@ import ch.snepilatch.app.util.UpdateInfo
 import ch.snepilatch.app.util.UpdateService
 import ch.snepilatch.app.util.loadCookies
 import ch.snepilatch.app.download.DownloadFolder
+import ch.snepilatch.app.download.DownloadNotifier
 import ch.snepilatch.app.download.Downloads
 import ch.snepilatch.app.viewmodel.AppSettings
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
@@ -133,6 +134,14 @@ class MainActivity : ComponentActivity() {
             // fixed delay, then wire controls and — for a headphone cold-launch started by the
             // MediaButtonReceiver with an autoplay extra — start playback. Kept as ONE effect so wiring
             // is guaranteed to finish before autoplay reaches the cold-start onReady handoff.
+            // Tapping the download notification lands on the manager rather than the last screen.
+            LaunchedEffect(initialized) {
+                if (initialized && intent.getBooleanExtra(DownloadNotifier.EXTRA_OPEN_DOWNLOADS, false)) {
+                    intent.removeExtra(DownloadNotifier.EXTRA_OPEN_DOWNLOADS)
+                    vm.navigateTo(ch.snepilatch.app.data.Screen.DOWNLOADS)
+                }
+            }
+
             LaunchedEffect(initialized) {
                 if (initialized) {
                     MusicPlaybackService.serviceReady.first { it }

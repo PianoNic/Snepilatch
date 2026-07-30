@@ -311,4 +311,13 @@
     <string name="download_track">Download</string>
     <string name="remove_download">Remove download</string>
     <string name="download_needs_folder">Choose a download folder first</string>
+    <string name="download_source">Download source</string>
+    <string name="download_source_ytm">YouTube Music</string>
+    <string name="download_source_lossless">Lossless (FLAC)</string>
+    <string name="manage_downloads">Manage downloads</string>
+    <string name="downloads_empty">Nothing downloaded yet</string>
+    <string name="downloads_summary">%1$d tracks · %2$d MB</string>
+    <string name="remove_all">Remove all</string>
+    <string name="remove_all_confirm">Delete every downloaded file? The tracks will stream again.</string>
+    <string name="downloads_count">%1$d downloaded</string>
 </resources>

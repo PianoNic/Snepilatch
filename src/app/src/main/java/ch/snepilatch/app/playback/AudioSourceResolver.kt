@@ -24,7 +24,12 @@ object AudioSourceResolver {
     suspend fun fromTrack(event: TrackChangeEvent, trackUri: String): StreamResult {
         val current = event.current
         return localOrNull(trackUri)
-            ?: youTubeMusic(current?.name, current?.artistName, current?.durationMs ?: 0L)
+            ?: youTubeMusic(
+                title = current?.name,
+                artist = current?.artistName,
+                durationMs = current?.durationMs ?: 0L,
+                source = AppSettings.preferredAudioSource.value,
+            )
             ?: cdn.resolveFromTrack(
                 event,
                 region = AppSettings.effectiveRegion(),
@@ -39,13 +44,14 @@ object AudioSourceResolver {
         title: String?,
         artist: String?,
         durationMs: Long,
+        source: String? = AppSettings.preferredAudioSource.value,
     ): StreamResult = localOrNull(trackUri)
-        ?: youTubeMusic(title, artist, durationMs)
+        ?: youTubeMusic(title, artist, durationMs, source)
         ?: cdn.resolveStreamUrl(
             trackUri.substringAfterLast(':'),
             region = AppSettings.effectiveRegion(),
             searchQuery = searchQuery,
-            preferredSource = AppSettings.preferredAudioSource.value,
+            preferredSource = source,
         )
 
     /**
@@ -69,8 +75,13 @@ object AudioSourceResolver {
      * is a [StreamResult.Failure] rather than null: null would hand the track to Qobuz/Deezer, and
      * silently swapping the source the user picked is what #480 removed.
      */
-    private suspend fun youTubeMusic(title: String?, artist: String?, durationMs: Long): StreamResult? {
-        if (AppSettings.preferredAudioSource.value != AppSettings.SOURCE_YTM) return null
+    private suspend fun youTubeMusic(
+        title: String?,
+        artist: String?,
+        durationMs: Long,
+        source: String?,
+    ): StreamResult? {
+        if (source != AppSettings.SOURCE_YTM) return null
         val stream = YouTubeMusicSource.resolve(
             title = title.orEmpty(),
             artist = artist.orEmpty(),

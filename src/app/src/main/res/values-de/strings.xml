@@ -305,4 +305,13 @@
     <string name="download_track">Herunterladen</string>
     <string name="remove_download">Download entfernen</string>
     <string name="download_needs_folder">Wähle zuerst einen Download-Ordner</string>
+    <string name="download_source">Download-Quelle</string>
+    <string name="download_source_ytm">YouTube Music</string>
+    <string name="download_source_lossless">Verlustfrei (FLAC)</string>
+    <string name="manage_downloads">Downloads verwalten</string>
+    <string name="downloads_empty">Noch nichts heruntergeladen</string>
+    <string name="downloads_summary">%1$d Titel · %2$d MB</string>
+    <string name="remove_all">Alle entfernen</string>
+    <string name="remove_all_confirm">Alle heruntergeladenen Dateien löschen? Die Titel werden wieder gestreamt.</string>
+    <string name="downloads_count">%1$d heruntergeladen</string>
 </resources>

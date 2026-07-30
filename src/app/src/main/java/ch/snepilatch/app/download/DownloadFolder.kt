@@ -62,11 +62,14 @@ object DownloadFolder {
         val ctx = appContext ?: return null
         val tree = _folder.value ?: return null
         val parent = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+        // createDocument reports failure by returning null rather than throwing, so both paths log.
         return runCatching {
             DocumentsContract.createDocument(ctx.contentResolver, parent, mimeType, name)
         }.getOrElse {
-            LokiLogger.e(TAG, "createDocument failed for $name: ${it.message}")
+            LokiLogger.e(TAG, "createDocument threw for $name: ${it.message}")
             null
+        }.also { created ->
+            if (created == null) LokiLogger.e(TAG, "createDocument returned null for '$name' ($mimeType)")
         }
     }
 

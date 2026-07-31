@@ -7,9 +7,6 @@ data class TrackTags(
     val title: String,
     val artist: String,
     val album: String? = null,
-    val albumArtist: String? = null,
-    val trackNumber: Int? = null,
-    val year: String? = null,
     val cover: Cover? = null,
 ) {
     data class Cover(val bytes: ByteArray, val mimeType: String) {
@@ -68,9 +65,6 @@ internal object VorbisComments {
             add("TITLE" to tags.title)
             add("ARTIST" to tags.artist)
             tags.album?.let { add("ALBUM" to it) }
-            tags.albumArtist?.let { add("ALBUMARTIST" to it) }
-            tags.trackNumber?.let { add("TRACKNUMBER" to it.toString()) }
-            tags.year?.let { add("DATE" to it) }
             if (includeCover) tags.cover?.let { add("METADATA_BLOCK_PICTURE" to encodePicture(it)) }
         }.filter { it.second.isNotBlank() }
 

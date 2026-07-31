@@ -21,6 +21,12 @@ object AudioSourceResolver {
 
     private const val TAG = "AudioSource"
 
+    /**
+     * Marks a [StreamInfo] whose url is a SAF document rather than a network url. Callers check it to
+     * keep a local file off the HTTP data source and out of the playback cache.
+     */
+    const val LOCAL_PROVIDER = "Local"
+
     private val cdn = CdnPlayback()
 
     /** Resolve from a track-change event, which already carries title, artist and duration. */
@@ -62,8 +68,11 @@ object AudioSourceResolver {
      * disk, so it plays from disk wherever it turns up. A row whose file has since been deleted from
      * the folder is dropped rather than played.
      */
-    @JvmOverloads
     fun localOrNull(trackUri: String, title: String? = null, artist: String? = null): StreamResult? {
+        // Without a folder there is nothing to open. The grant can be revoked from system settings,
+        // and then exists() throws a SecurityException that reads back as "cannot tell" below — which
+        // would hand playback an unopenable document uri and burn a playback-error retry per track.
+        if (!DownloadFolder.isConfigured) return null
         // The uri is the reliable key; title/artist only stand in when it misses, because the same
         // song is in the catalogue under more than one id (separate releases, or Spotify's per-market
         // instances). Without it a downloaded track streams whenever it turns up under the other id.
@@ -71,7 +80,9 @@ object AudioSourceResolver {
             ?: title?.takeIf { it.isNotBlank() }?.let { Downloads.findByMetadata(it, artist.orEmpty()) }
                 ?.also { LokiLogger.i(TAG, "HIT  $trackUri via title/artist, downloaded as ${it.trackUri}") }
         if (local == null) {
-            LokiLogger.i(TAG, "MISS $trackUri${relinkHint(trackUri, title, artist)}")
+            // No relink hint here: the metadata lookup above already ran and missed, so asking again
+            // could only produce the same null while costing another walk of every indexed row.
+            LokiLogger.i(TAG, "MISS $trackUri (${Downloads.downloaded.value.size} downloaded)")
             return null
         }
         // Only a definite "not there" drops the row. An inconclusive check means we cannot tell, and
@@ -88,19 +99,8 @@ object AudioSourceResolver {
         }
         LokiLogger.i(TAG, "HIT  $trackUri -> ${local.documentUri.substringAfterLast("%2F")}")
         return StreamResult.Success(
-            StreamInfo(url = local.documentUri, provider = "Local", mimeType = local.mimeType)
+            StreamInfo(url = local.documentUri, provider = LOCAL_PROVIDER, mimeType = local.mimeType)
         )
-    }
-
-    /**
-     * Explains a miss. The interesting case is a track downloaded under a different uri, which is
-     * what Spotify relinking does and which a uri-keyed index cannot see.
-     */
-    private fun relinkHint(trackUri: String, title: String?, artist: String?): String {
-        if (title.isNullOrBlank()) return " (${Downloads.downloaded.value.size} downloaded)"
-        val other = Downloads.findByMetadata(title, artist.orEmpty())
-            ?: return " ('$title' is not downloaded)"
-        return " BUT '$title' is downloaded as ${other.trackUri} — relinked, so the uri lookup missed"
     }
 
     /**

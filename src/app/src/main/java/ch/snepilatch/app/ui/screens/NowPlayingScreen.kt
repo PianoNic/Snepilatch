@@ -1173,11 +1173,16 @@ private fun NowPlayingMenu(
             val shareLabel = stringResource(R.string.share)
             val downloadCtx = androidx.compose.ui.platform.LocalContext.current
             val downloadedUris by Downloads.downloaded.collectAsState()
+            // In-flight as well as downloaded, like every track row: isDownloaded is still false while
+            // the fetch runs, so without this the entry looked untouched and a second tap started a
+            // second download of the same track.
+            val inFlight by Downloads.inProgress.collectAsState()
             val isDownloaded = track?.uri?.let { it in downloadedUris } == true
-            val downloadLabel = if (isDownloaded) {
-                stringResource(R.string.remove_download)
-            } else {
-                stringResource(R.string.download_track)
+            val isDownloading = track?.uri?.let { it in inFlight } == true
+            val downloadLabel = when {
+                isDownloading -> stringResource(R.string.downloading)
+                isDownloaded -> stringResource(R.string.remove_download)
+                else -> stringResource(R.string.download_track)
             }
             val items = listOf(
                 Triple(Icons.Rounded.MusicNote, lyricsLabel) {
@@ -1195,14 +1200,16 @@ private fun NowPlayingMenu(
                 Triple(Icons.Rounded.Album, visitAlbumLabel) {
                     onShowMore(false); vm.openAlbumFromCurrentTrack()
                 },
+                // Same glyphs as the track rows in SharedComponents: the same track reached two ways
+                // showed two different icons for one state.
                 Triple(
-                    if (isDownloaded) Icons.Rounded.DownloadDone else Icons.Rounded.Download,
+                    if (isDownloaded) Icons.Rounded.OfflinePin else Icons.Rounded.DownloadForOffline,
                     downloadLabel,
                 ) {
                     onShowMore(false)
                     val uri = track?.uri
                     when {
-                        uri == null -> Unit
+                        uri == null || isDownloading -> Unit
                         isDownloaded -> vm.removeDownload(uri)
                         else -> vm.downloadCurrentTrack(downloadCtx)
                     }

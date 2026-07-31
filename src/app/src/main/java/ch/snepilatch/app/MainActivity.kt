@@ -42,6 +42,13 @@ import java.util.concurrent.atomic.AtomicBoolean
 class MainActivity : ComponentActivity() {
     private val pendingDeepLink = MutableStateFlow<Uri?>(null)
 
+    /**
+     * Set when the download notification is tapped. A flow rather than a read of `intent`: the
+     * notification's intent is SINGLE_TOP against a singleTop Activity, so with the app already open it
+     * arrives at [onNewIntent] and `getIntent()` still holds whatever launched the Activity.
+     */
+    private val pendingOpenDownloads = MutableStateFlow(false)
+
     companion object {
         // Process-scoped so the update check fires once per app start, not per Activity recreation.
         private val updateChecked = AtomicBoolean(false)
@@ -55,6 +62,12 @@ class MainActivity : ComponentActivity() {
     private fun handleDeepLinkIntent(intent: Intent) {
         if (intent.action == Intent.ACTION_VIEW) {
             pendingDeepLink.value = intent.data
+        }
+        // Outside the ACTION_VIEW branch: the notification launches the app's own launcher intent,
+        // which is ACTION_MAIN.
+        if (intent.getBooleanExtra(DownloadNotifier.EXTRA_OPEN_DOWNLOADS, false)) {
+            intent.removeExtra(DownloadNotifier.EXTRA_OPEN_DOWNLOADS)
+            pendingOpenDownloads.value = true
         }
     }
 
@@ -107,6 +120,9 @@ class MainActivity : ComponentActivity() {
                 withContext(Dispatchers.IO) {
                     Downloads.init(context)
                     DownloadFolder.load(context)
+                    // A download lives in viewModelScope, so one killed with the app never cleared its
+                    // own ongoing progress bar. Once per process, so a rotation mid-download keeps it.
+                    DownloadNotifier.clearStaleProgress(context)
                 }
                 if (!initialized && error == null && !needsLogin) {
                     val savedCookies = loadCookies(context)
@@ -134,19 +150,22 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            // Tapping the download notification lands on the manager rather than the last screen.
+            // Keyed on the flow, not on `initialized`: the notification usually arrives while the app is
+            // already open and initialized never changes again, so an effect keyed on it would not re-run.
+            val openDownloads by pendingOpenDownloads.collectAsState()
+            LaunchedEffect(initialized, openDownloads) {
+                if (initialized && openDownloads) {
+                    pendingOpenDownloads.value = false
+                    vm.navigateTo(ch.snepilatch.app.data.Screen.DOWNLOADS)
+                }
+            }
+
             // Wire service controls once initialized and service is ready
             // Wait for the service to actually be up (instance published) rather than guessing with a
             // fixed delay, then wire controls and — for a headphone cold-launch started by the
             // MediaButtonReceiver with an autoplay extra — start playback. Kept as ONE effect so wiring
             // is guaranteed to finish before autoplay reaches the cold-start onReady handoff.
-            // Tapping the download notification lands on the manager rather than the last screen.
-            LaunchedEffect(initialized) {
-                if (initialized && intent.getBooleanExtra(DownloadNotifier.EXTRA_OPEN_DOWNLOADS, false)) {
-                    intent.removeExtra(DownloadNotifier.EXTRA_OPEN_DOWNLOADS)
-                    vm.navigateTo(ch.snepilatch.app.data.Screen.DOWNLOADS)
-                }
-            }
-
             LaunchedEffect(initialized) {
                 if (initialized) {
                     MusicPlaybackService.serviceReady.first { it }

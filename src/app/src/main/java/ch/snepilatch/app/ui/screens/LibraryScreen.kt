@@ -103,8 +103,10 @@ fun LibraryScreen() {
     // recomposition (e.g. a position tick or unrelated state update).
     // Downloaded content is grouped by the album or playlist it came from, so it browses like the
     // rest of the library rather than as a flat list of tracks.
-    val downloadedUris by Downloads.downloaded.collectAsState()
-    val downloadedItems = remember(downloadedUris) {
+    // Keyed on the published rows rather than querying: groups() reads them out of memory, so this
+    // stays a grouping of a list the store already loaded off the main thread.
+    val downloadedRows by Downloads.rows.collectAsState()
+    val downloadedItems = remember(downloadedRows) {
         Downloads.groups().map { LibraryItem(it.uri, it.name, it.imageUrl, it.type) }
     }
     val sortedLibrary = remember(library, downloadedItems, selectedFilter, searchQuery, sortMode) {
@@ -366,8 +368,9 @@ fun LibraryGridCard(item: LibraryItem, downloadedGroup: Boolean = false) {
     val detailVm: DetailViewModel = viewModel()
     val playbackVm: PlaybackViewModel = viewModel()
     val isArtist = item.type == "artist"
+    val removable = item.type != "collection"
     var showRemove by remember { mutableStateOf(false) }
-    if (showRemove && item.type != "collection") {
+    if (showRemove && removable) {
         if (downloadedGroup) {
             DownloadRemoveDialog(item, onDismiss = { showRemove = false })
         } else {
@@ -379,7 +382,7 @@ fun LibraryGridCard(item: LibraryItem, downloadedGroup: Boolean = false) {
             .fillMaxWidth()
             .combinedClickable(
                 onClick = { libraryItemClick(item, detailVm, playbackVm) },
-                onLongClick = { if (item.type != "collection") showRemove = true }
+                onLongClick = { if (removable) showRemove = true }
             ),
         horizontalAlignment = if (isArtist) Alignment.CenterHorizontally else Alignment.Start
     ) {
@@ -417,8 +420,9 @@ fun LibraryListItem(item: LibraryItem, downloadedGroup: Boolean = false) {
     val detailVm: DetailViewModel = viewModel()
     val playbackVm: PlaybackViewModel = viewModel()
     val isArtist = item.type == "artist"
+    val removable = item.type != "collection"
     var showRemove by remember { mutableStateOf(false) }
-    if (showRemove && item.type != "collection") {
+    if (showRemove && removable) {
         if (downloadedGroup) {
             DownloadRemoveDialog(item, onDismiss = { showRemove = false })
         } else {
@@ -430,7 +434,7 @@ fun LibraryListItem(item: LibraryItem, downloadedGroup: Boolean = false) {
             .fillMaxWidth()
             .combinedClickable(
                 onClick = { libraryItemClick(item, detailVm, playbackVm) },
-                onLongClick = { if (item.type != "collection") showRemove = true }
+                onLongClick = { if (removable) showRemove = true }
             )
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically

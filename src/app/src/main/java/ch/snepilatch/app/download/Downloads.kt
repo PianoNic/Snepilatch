@@ -7,6 +7,7 @@ import android.database.sqlite.SQLiteOpenHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 /** One downloaded file. [documentUri] is a SAF document in the folder the user picked. */
 data class DownloadedTrack(
@@ -20,8 +21,6 @@ data class DownloadedTrack(
     val contextUri: String?,
     val contextName: String?,
     val contextType: String?,
-    val albumUri: String?,
-    val albumName: String?,
     val sizeBytes: Long,
     val title: String,
     val artist: String,
@@ -42,6 +41,15 @@ object Downloads {
     private const val TABLE = "downloads"
 
     private var helper: Helper? = null
+
+    private val _rows = MutableStateFlow<List<DownloadedTrack>>(emptyList())
+
+    /**
+     * Every indexed row, newest first. Published rather than re-queried because [refresh] already
+     * reads them all off the main thread on every write; the UI reading this instead of calling
+     * [all] keeps SQLite out of composition.
+     */
+    val rows: StateFlow<List<DownloadedTrack>> = _rows.asStateFlow()
 
     private val _downloaded = MutableStateFlow<Set<String>>(emptySet())
 
@@ -66,24 +74,38 @@ object Downloads {
     private val _activeJob = MutableStateFlow<ActiveJob?>(null)
     val activeJob: StateFlow<ActiveJob?> = _activeJob.asStateFlow()
 
-    fun startJob(name: String, type: String, imageUrl: String?, total: Int) {
+    /**
+     * Which job owns the card. There is one slot and several things can download at once — a batch, a
+     * tapped row, an auto-save — so an update or a clear has to prove it is the current owner. Without
+     * that, whichever finished first blanked the card while the others were still running.
+     */
+    private val jobOwner = java.util.concurrent.atomic.AtomicInteger(0)
+
+    /** @return the token to pass back to [updateJob] and [clearJob]. */
+    fun startJob(name: String, type: String, imageUrl: String?, total: Int): Int {
+        val token = jobOwner.incrementAndGet()
         _activeJob.value = ActiveJob(name, type, imageUrl, done = 1, total = total, trackPercent = 0)
+        return token
     }
 
-    fun updateJob(done: Int, trackPercent: Int) {
-        _activeJob.value = _activeJob.value?.copy(done = done, trackPercent = trackPercent)
+    fun updateJob(token: Int, done: Int, trackPercent: Int) {
+        if (token != jobOwner.get()) return
+        _activeJob.update { it?.copy(done = done, trackPercent = trackPercent) }
     }
 
-    fun clearJob() {
+    fun clearJob(token: Int) {
+        if (token != jobOwner.get()) return
         _activeJob.value = null
     }
 
+    // update {} rather than value = value + x: several downloads run on independent IO coroutines,
+    // and a lost remove would leave a row spinning for the rest of the process.
     fun markStarted(trackUri: String) {
-        _inProgress.value = _inProgress.value + trackUri
+        _inProgress.update { it + trackUri }
     }
 
     fun markFinished(trackUri: String) {
-        _inProgress.value = _inProgress.value - trackUri
+        _inProgress.update { it - trackUri }
     }
 
     private class Helper(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_VERSION) {
@@ -100,8 +122,6 @@ object Downloads {
                     context_uri TEXT,
                     context_name TEXT,
                     context_type TEXT,
-                    album_uri TEXT,
-                    album_name TEXT,
                     size_bytes INTEGER NOT NULL,
                     title TEXT NOT NULL,
                     artist TEXT NOT NULL,
@@ -121,7 +141,7 @@ object Downloads {
             if (oldVersion < 2) db.execSQL("ALTER TABLE $TABLE ADD COLUMN cover_url TEXT")
             if (oldVersion < 3) {
                 // v3 records where a download came from so the library can group them.
-                listOf("context_uri", "context_name", "context_type", "album_uri", "album_name")
+                listOf("context_uri", "context_name", "context_type")
                     .forEach { db.execSQL("ALTER TABLE $TABLE ADD COLUMN $it TEXT") }
             }
         }
@@ -161,7 +181,7 @@ object Downloads {
      * same arrangement, so it narrows the collision rather than closing it.
      */
     fun findByMetadata(title: String, artist: String): DownloadedTrack? =
-        matchByMetadata(all(), title, artist)
+        matchByMetadata(_rows.value, title, artist)
 
     /** The matching itself, separated from the database so it can be tested directly. */
     internal fun matchByMetadata(rows: List<DownloadedTrack>, title: String, artist: String): DownloadedTrack? {
@@ -181,7 +201,8 @@ object Downloads {
     private fun artistSet(artist: String): Set<String> =
         artist.split(',', '&', ';').map(::normalize).filter { it.isNotBlank() }.toSet()
 
-    fun all(): List<DownloadedTrack> {
+    /** The one place that reads the whole table. Callers want [rows], which this keeps fed. */
+    private fun all(): List<DownloadedTrack> {
         val db = helper?.readableDatabase ?: return emptyList()
         db.query(TABLE, null, null, null, null, null, "downloaded_at DESC").use { c ->
             val out = mutableListOf<DownloadedTrack>()
@@ -204,7 +225,7 @@ object Downloads {
 
     /** Drops rows whose file is gone, which happens when the user deletes from the folder. */
     fun prune(exists: (String) -> Boolean?) {
-        val stale = all().filter { exists(it.documentUri) == false }
+        val stale = _rows.value.filter { exists(it.documentUri) == false }
         if (stale.isEmpty()) return
         val db = helper?.writableDatabase ?: return
         stale.forEach { db.delete(TABLE, "track_uri = ?", arrayOf(it.trackUri)) }
@@ -225,16 +246,26 @@ object Downloads {
 
     /** Every downloaded track belonging to one [Group], keyed by the same uri groups() reports. */
     fun tracksInGroup(groupUri: String): List<DownloadedTrack> =
-        all().filter { (it.contextUri ?: it.albumUri ?: it.trackUri) == groupUri }
+        _rows.value.filter { groupUriOf(it) == groupUri }
 
-    fun groups(): List<Group> = all()
-        .groupBy { it.contextUri ?: it.albumUri ?: it.trackUri }
+    /**
+     * A one-off download groups under itself. It deliberately does not fall back to the album it
+     * happens to belong to: two singles off the same record would then present as two identical
+     * library entries, both named after the album and both holding one track.
+     */
+    private fun groupUriOf(row: DownloadedTrack): String = row.contextUri ?: row.trackUri
+
+    fun groups(): List<Group> = groupsOf(_rows.value)
+
+    /** The grouping itself, separated from the store so it can be tested directly. */
+    internal fun groupsOf(rows: List<DownloadedTrack>): List<Group> = rows
+        .groupBy(::groupUriOf)
         .map { (uri, tracks) ->
             val first = tracks.first()
             Group(
                 uri = uri,
-                name = first.contextName ?: first.albumName ?: first.title,
-                type = first.contextType ?: if (first.albumUri != null) "album" else "single",
+                name = first.contextName ?: first.title,
+                type = first.contextType ?: "single",
                 imageUrl = first.coverUrl,
                 trackCount = tracks.size,
             )
@@ -242,7 +273,9 @@ object Downloads {
         .sortedBy { it.name.lowercase() }
 
     private fun refresh() {
-        _downloaded.value = all().map { it.trackUri }.toSet()
+        val loaded = all()
+        _rows.value = loaded
+        _downloaded.value = loaded.mapTo(mutableSetOf()) { it.trackUri }
     }
 
     private fun DownloadedTrack.toValues() = ContentValues().apply {
@@ -255,8 +288,6 @@ object Downloads {
         put("context_uri", contextUri)
         put("context_name", contextName)
         put("context_type", contextType)
-        put("album_uri", albumUri)
-        put("album_name", albumName)
         put("size_bytes", sizeBytes)
         put("title", title)
         put("artist", artist)
@@ -273,8 +304,6 @@ object Downloads {
         contextUri = getStringOrNull("context_uri"),
         contextName = getStringOrNull("context_name"),
         contextType = getStringOrNull("context_type"),
-        albumUri = getStringOrNull("album_uri"),
-        albumName = getStringOrNull("album_name"),
         sizeBytes = getLong(getColumnIndexOrThrow("size_bytes")),
         title = getString(getColumnIndexOrThrow("title")),
         artist = getString(getColumnIndexOrThrow("artist")),

@@ -97,9 +97,11 @@ class InfiniPlayAudioTap : BaseAudioProcessor() {
         len = 0
     }
 
-    // Only participate in the audio chain while analyzing: when the infiniPlay is off ExoPlayer bypasses
-    // this processor entirely, so there is no per-buffer queueInput copy. isActive is re-read on a
-    // pipeline flush — the enable path sets analyzing before seeking, so the seek's flush activates it.
+    // Only participate in the audio chain while something wants the samples: with neither the
+    // infiniPlay nor a recording armed, ExoPlayer bypasses this processor entirely and there is no
+    // per-buffer queueInput copy. Which is why startCapture is armed as narrowly as possible — see
+    // MusicPlaybackService.startCapture. isActive is re-read on a pipeline flush; the enable path sets
+    // its flag before seeking, so the seek's flush activates it.
     override fun isActive(): Boolean = capturing
 
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
@@ -141,8 +143,11 @@ class InfiniPlayAudioTap : BaseAudioProcessor() {
         }
     }
 
-    private companion object {
-        const val TAG = "InfiniPlayTap"
-        const val MAX_MINUTES = 6
+    companion object {
+        private const val TAG = "InfiniPlayTap"
+        private const val MAX_MINUTES = 6
+
+        /** How much audio the capture buffer holds. Past this, capture() clamps and the tail is lost. */
+        const val MAX_CAPTURE_MS = MAX_MINUTES * 60 * 1000L
     }
 }

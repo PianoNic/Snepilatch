@@ -13,6 +13,7 @@ import kotify.session.Session
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -163,6 +164,53 @@ class DetailViewModel : SessionViewModel("DetailVM") {
                 LokiLogger.e(logTag, "loadMoreDetail", e)
             } finally {
                 _isLoadingMore.value = false
+            }
+        }
+    }
+
+    private val _isLoadingAll = MutableStateFlow(false)
+
+    /**
+     * True while [loadAllTracks] is paging. Lives here rather than in the screen because the button is
+     * inside a LazyColumn item, so `remember` state next to it is discarded the moment the header
+     * scrolls out of view — which would drop the only guard against starting a second run.
+     */
+    val isLoadingAll: StateFlow<Boolean> = _isLoadingAll
+
+    /**
+     * Loads every remaining page of [forUri], then hands over its complete track list.
+     *
+     * For "download all", which otherwise covers whichever page happened to be scrolled into view.
+     * Drives [loadMoreDetail] rather than repeating its per-type paging: it flips isLoadingMore
+     * synchronously, so awaiting that going false is enough to sequence the pages.
+     *
+     * [forUri] is checked every round and before handing over. Paging a long playlist takes several
+     * requests, and _detail is a single live slot — opening another album meanwhile would otherwise
+     * page *that* one and hand its tracks to a caller that asked about the first.
+     */
+    fun loadAllTracks(forUri: String, onComplete: (List<TrackInfo>) -> Unit) {
+        if (_isLoadingAll.value) return
+        _isLoadingAll.value = true
+        viewModelScope.launch {
+            try {
+                var more = true
+                while (more) {
+                    val current = _detail.value
+                    val before = current.tracks.size
+                    more = if (current.uri != forUri || current.totalCount in 0..before) {
+                        false
+                    } else {
+                        loadMoreDetail()
+                        _isLoadingMore.first { !it }
+                        // A page that added nothing is the end, or a failed request. Either way stop,
+                        // rather than re-asking for the same offset until the list happens to grow.
+                        _detail.value.tracks.size > before
+                    }
+                }
+                val loaded = _detail.value
+                if (loaded.uri == forUri) onComplete(loaded.tracks)
+            } finally {
+                _isLoadingAll.value = false
             }
         }
     }

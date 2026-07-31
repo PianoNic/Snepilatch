@@ -60,9 +60,14 @@ internal object Mp4Tagger {
     /** `meta` is a full box: a version byte and three flag bytes before its children. */
     private fun fullBoxVersion() = ByteArray(4)
 
+    /**
+     * HandlerBox: version+flags, then a `pre_defined` word before `handler_type`. Leaving the
+     * pre_defined word out shifted everything up one field, so a strict reader saw handler_type
+     * 'appl' instead of 'mdir' and a box four bytes shorter than the structure it declares.
+     */
     private fun hdlr(): ByteArray = box(
         "hdlr",
-        ByteArray(4) + "mdir".toByteArray(Charsets.US_ASCII) + "appl".toByteArray(Charsets.US_ASCII) + ByteArray(9)
+        ByteArray(8) + "mdir".toByteArray(Charsets.US_ASCII) + "appl".toByteArray(Charsets.US_ASCII) + ByteArray(9)
     )
 
     private fun ilst(tags: TrackTags): ByteArray {
@@ -71,11 +76,6 @@ internal object Mp4Tagger {
         text(out, "©nam", tags.title)
         text(out, "©ART", tags.artist)
         tags.album?.let { text(out, "©alb", it) }
-        tags.albumArtist?.let { text(out, "aART", it) }
-        tags.year?.let { text(out, "©day", it) }
-        tags.trackNumber?.let { number ->
-            out.write(box("trkn", data(TYPE_BINARY, byteArrayOf(0, 0) + beShort(number) + ByteArray(4))))
-        }
         tags.cover?.let { cover ->
             val type = if (cover.mimeType.contains("png")) TYPE_PNG else TYPE_JPEG
             out.write(box("covr", data(type, cover.bytes)))
@@ -83,7 +83,6 @@ internal object Mp4Tagger {
         return box("ilst", out.toByteArray())
     }
 
-    private const val TYPE_BINARY = 0
     private const val TYPE_UTF8 = 1
     private const val TYPE_JPEG = 13
     private const val TYPE_PNG = 14
@@ -103,8 +102,6 @@ internal object Mp4Tagger {
     }
 
     private fun beInt(value: Int) = ByteArray(4) { ((value ushr (8 * (3 - it))) and 0xFF).toByte() }
-
-    private fun beShort(value: Int) = ByteArray(2) { ((value ushr (8 * (1 - it))) and 0xFF).toByte() }
 
     private fun readBeInt(bytes: ByteArray, at: Int): Int {
         var value = 0

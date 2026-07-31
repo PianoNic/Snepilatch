@@ -21,8 +21,6 @@ class FindByMetadataTest {
         contextUri = null,
         contextName = null,
         contextType = null,
-        albumUri = null,
-        albumName = null,
         sizeBytes = 1,
         title = "ファタール - Fatal",
         artist = "GEMN, Kento Nakajima, Tatsuya Kitani",

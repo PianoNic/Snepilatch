@@ -266,7 +266,13 @@ fun DetailScreen(vm: PlaybackViewModel) {
                 val downloadedUris by Downloads.downloaded.collectAsState()
                 val inFlight by Downloads.inProgress.collectAsState()
                 val downloading = detail.tracks.any { it.uri in inFlight }
-                val allDownloaded = detail.tracks.isNotEmpty() &&
+                // detail.tracks is one loaded page. Downloading it would silently cover the first 50 of
+                // a long playlist, so the click loads the rest first. And the tick only means "all of
+                // it is on disk" once the whole list is in hand — otherwise it appeared as soon as page
+                // one had landed, turning the button into a delete that dropped exactly those 50 files
+                // with no confirmation while the rest stayed downloaded.
+                val loadingAll by detailVm.isLoadingAll.collectAsState()
+                val allDownloaded = !hasMore && detail.tracks.isNotEmpty() &&
                     detail.tracks.all { it.uri in downloadedUris }
                 if (downloadable) {
                     IconButton(
@@ -274,16 +280,21 @@ fun DetailScreen(vm: PlaybackViewModel) {
                             if (allDownloaded) {
                                 detail.tracks.forEach { vm.removeDownload(it.uri) }
                             } else {
-                                vm.downloadTracks(
-                                    detail.tracks, context, detail.uri, detail.name, detail.type
-                                )
+                                val uri = detail.uri
+                                val name = detail.name
+                                val type = detail.type
+                                detailVm.loadAllTracks(uri) { all ->
+                                    vm.downloadTracks(all, context, uri, name, type)
+                                }
                             }
                         },
-                        enabled = detail.tracks.isNotEmpty() && !downloading,
+                        enabled = detail.tracks.isNotEmpty() && !downloading && !loadingAll,
                         modifier = Modifier.size(HEADER_BUTTON)
                     ) {
                         when {
-                            downloading -> CircularProgressIndicator(
+                            // Also while the remaining pages load, so a long playlist does not look
+                            // like the tap did nothing.
+                            downloading || loadingAll -> CircularProgressIndicator(
                                 color = accentColor,
                                 strokeWidth = 2.dp,
                                 modifier = Modifier.size(HEADER_ICON)

@@ -1,8 +1,6 @@
 package ch.snepilatch.app.ui.screens
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.CloudDone
@@ -29,10 +27,11 @@ import ch.snepilatch.app.viewmodel.PlaybackViewModel
  */
 @Composable
 fun DownloadsScreen(vm: PlaybackViewModel) {
-    val inFlight by Downloads.inProgress.collectAsState()
-    val downloadedUris by Downloads.downloaded.collectAsState()
+    val job by Downloads.activeJob.collectAsState()
     val folder by DownloadFolder.folder.collectAsState()
-    val stored = remember(downloadedUris) { Downloads.all() }
+    // Downloads.rows, not a query: a remember{} body runs on the composition thread, and every
+    // finished track re-emits, so reading the table here put a full SELECT on the UI thread per track.
+    val stored by Downloads.rows.collectAsState()
     val totalMb = remember(stored) { (stored.sumOf { it.sizeBytes } / 1024 / 1024).toInt() }
     var confirmClearAll by remember { mutableStateOf(false) }
 
@@ -95,7 +94,8 @@ fun DownloadsScreen(vm: PlaybackViewModel) {
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
         )
 
-        if (inFlight.isEmpty()) {
+        val active = job
+        if (active == null) {
             Text(
                 stringResource(R.string.downloads_idle),
                 color = SpfyLightGray,
@@ -105,29 +105,39 @@ fun DownloadsScreen(vm: PlaybackViewModel) {
             return@Column
         }
 
-        ActiveDownloads(inFlight.toList())
+        ActiveDownload(active)
     }
 }
 
+/**
+ * What is downloading, named. The in-flight uri set cannot say more than "something is downloading":
+ * it carries no title, so this read the base62 id off the uri. The job knows the album or track the
+ * user asked for, how far through the list it is, and how far through the current track.
+ */
 @Composable
-private fun ActiveDownloads(trackUris: List<String>) {
-    LazyColumn(
-        contentPadding = PaddingValues(bottom = LocalBottomOverlayHeight.current.value + 16.dp)
-    ) {
-        items(trackUris, key = { it }) { trackUri ->
-            ListItem(
-                headlineContent = {
-                    Text(trackUri.substringAfterLast(':'), color = SpfyWhite, maxLines = 1)
+private fun ActiveDownload(job: Downloads.ActiveJob) {
+    ListItem(
+        headlineContent = { Text(job.name, color = SpfyWhite, maxLines = 1) },
+        supportingContent = {
+            Text(
+                if (job.total > 1) {
+                    stringResource(R.string.downloading_count, job.done, job.total)
+                } else {
+                    stringResource(R.string.downloading)
                 },
-                supportingContent = { Text(stringResource(R.string.downloading), color = SpfyLightGray) },
-                leadingContent = { Icon(Icons.Rounded.Downloading, null, tint = SpfyLightGray) },
-                trailingContent = {
-                    CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
-                },
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                color = SpfyLightGray
             )
-        }
-    }
+        },
+        leadingContent = { Icon(Icons.Rounded.Downloading, null, tint = SpfyLightGray) },
+        trailingContent = {
+            CircularProgressIndicator(
+                progress = { job.trackPercent.coerceIn(0, 100) / 100f },
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(18.dp),
+            )
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+    )
 }
 
 @Composable

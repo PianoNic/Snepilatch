@@ -30,6 +30,17 @@ object PlaybackCache {
 
     private var cache: SimpleCache? = null
 
+    /**
+     * The cache key for a track played from a given source. The source has to be part of it: the same
+     * track is Opus-in-WebM from YouTube Music and FLAC from Qobuz, and one key for both meant a
+     * download recorded as lossless could be written from cached YouTube bytes, or a part-cached
+     * WebM entry could be topped up with FLAC bytes mid-track.
+     *
+     * Not the url: a googlevideo url is single-use, so it would never hit twice and would keep a
+     * fresh copy per resolve.
+     */
+    fun keyFor(trackUri: String, source: String?): String = "${source ?: "spfy"}|$trackUri"
+
     fun init(context: Context) {
         if (cache != null) return
         cache = runCatching {
@@ -89,7 +100,14 @@ object PlaybackCache {
             val skip = position - span.position
             if (skip >= span.length) return@forEach
             file.inputStream().use { input ->
-                input.skip(skip)
+                // skip() is allowed to move less than asked. Ignoring that would copy the overlap
+                // twice and shift every following byte, so the file would decode as noise from there.
+                var remaining = skip
+                while (remaining > 0) {
+                    val moved = input.skip(remaining)
+                    if (moved <= 0) return false
+                    remaining -= moved
+                }
                 input.copyTo(out)
             }
             position = span.position + span.length

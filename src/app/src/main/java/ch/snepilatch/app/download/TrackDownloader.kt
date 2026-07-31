@@ -10,6 +10,7 @@ import ch.snepilatch.app.util.LokiLogger
 import ch.snepilatch.app.viewmodel.AppSettings
 import kotify.cdn.StreamInfo
 import kotify.cdn.StreamResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -29,7 +30,6 @@ data class DownloadRequest(
     val contextUri: String? = null,
     val contextName: String? = null,
     val contextType: String? = null,
-    val albumUri: String? = null,
     /**
      * Decoded audio already taken off the player, used instead of fetching anything. Set on the
      * track-change path, where the capture has to be claimed before the next track overwrites it.
@@ -77,14 +77,29 @@ object TrackDownloader {
         onProgress: ((percent: Int) -> Unit)? = null,
     ): DownloadOutcome =
         withContext(Dispatchers.IO) {
+            // One fetch per track. Guarded here rather than at each button because the batch and a
+            // tap can collide too: two runs would both write a file, and only the second's row
+            // survives CONFLICT_REPLACE, orphaning the first file where nothing can find it again.
+            if (request.trackUri in Downloads.inProgress.value) {
+                LokiLogger.i(TAG, "'${request.title}' is already downloading, not starting a second")
+                return@withContext Downloads.find(request.trackUri)
+                    ?.let { DownloadOutcome.Done(it) }
+                    ?: DownloadOutcome.Failed("already downloading")
+            }
             // Anything unexpected becomes a failed notification; a download must not crash the app.
             Downloads.markStarted(request.trackUri)
             try {
-                runCatching { downloadInner(request, context, notify, onProgress) }.getOrElse {
-                    LokiLogger.e(TAG, "download crashed for ${request.title}", it)
-                    DownloadNotifier.failed(context, request.title, it.message ?: "unexpected error")
-                    DownloadOutcome.Failed(it.message ?: "unexpected error")
-                }
+                downloadInner(request, context, notify, onProgress)
+            } catch (e: CancellationException) {
+                // Backing out of the app cancels the scope. The file may well have landed, so this is
+                // not a failure to report — but the ongoing progress bar has to go, or it sits there
+                // frozen at N% claiming to still be working.
+                if (notify) DownloadNotifier.clear(context)
+                throw e
+            } catch (e: Exception) {
+                LokiLogger.e(TAG, "download crashed for ${request.title}", e)
+                DownloadNotifier.failed(context, request.title, e.message ?: "unexpected error")
+                DownloadOutcome.Failed(e.message ?: "unexpected error")
             } finally {
                 Downloads.markFinished(request.trackUri)
             }
@@ -103,12 +118,31 @@ object TrackDownloader {
                     "folder=${DownloadFolder.isConfigured}"
             )
             if (!DownloadFolder.isConfigured) return@withContext DownloadOutcome.NoFolder
-            Downloads.find(request.trackUri)?.let { existing ->
+            // Metadata as well as uri, matching what the resolver does: the same recording sits in the
+            // catalogue under more than one id, and keying on the uri alone let a relinked track fall
+            // through to resolve(), which would then hand its own local document uri to OkHttp.
+            val existingRow = Downloads.find(request.trackUri)
+                ?: Downloads.findByMetadata(request.title, request.artist)
+            existingRow?.let { existing ->
                 // Only a definite "not there" re-downloads; an inconclusive check keeps the row.
                 if (DownloadFolder.exists(existing.documentUri) != false) {
                     return@withContext DownloadOutcome.Done(existing)
                 }
-                Downloads.remove(request.trackUri)
+                // The row's own uri, not the requested one: on a metadata match they differ, and
+                // removing the requested uri would delete nothing and leave the dead row forever.
+                Downloads.remove(existing.trackUri)
+            }
+
+            val report: (Int) -> Unit = { percent ->
+                onProgress?.invoke(percent)
+                if (notify) DownloadNotifier.progress(context, request.title, percent)
+            }
+            fun finish(stored: DownloadedTrack?): DownloadOutcome = if (stored == null) {
+                DownloadNotifier.failed(context, request.title, "could not write to the folder")
+                DownloadOutcome.Failed("could not write into the download folder")
+            } else {
+                if (notify) DownloadNotifier.finished(context, request.title)
+                DownloadOutcome.Done(stored)
             }
 
             val temp = File.createTempFile("download", null, context.cacheDir)
@@ -125,14 +159,7 @@ object TrackDownloader {
                 val cached = fromPlaybackCache(request, temp) ?: fromCapturedPcm(request, temp)
                 if (cached != null) {
                     onProgress?.invoke(100)
-                    val stored = store(request, cached, temp, tagsFor(request), context)
-                    return@withContext if (stored == null) {
-                        DownloadNotifier.failed(context, request.title, "could not write to the folder")
-                        DownloadOutcome.Failed("could not write into the download folder")
-                    } else {
-                        if (notify) DownloadNotifier.finished(context, request.title)
-                        DownloadOutcome.Done(stored)
-                    }
+                    return@withContext finish(store(request, cached, temp, tagsFor(request), context))
                 }
 
                 // Neither path could serve it. A local-only caller wanted the recording it already
@@ -148,42 +175,29 @@ object TrackDownloader {
                     is StreamResult.Failure ->
                         return@withContext DownloadOutcome.Failed(resolved.message)
                 }
-                val fetched = runCatching {
-                    fetchTo(info, temp) { percent ->
-                        onProgress?.invoke(percent)
-                        if (notify) DownloadNotifier.progress(context, request.title, percent)
+                val fetched = runCatching { fetchTo(info, temp, report) }
+                    .recoverCatching { failure ->
+                        // A refused media url usually means the cached visitor id went stale, so mint
+                        // a fresh one and resolve again before giving up.
+                        if (failure is CancellationException) throw failure
+                        if (failure.message?.contains("HTTP 403") != true) throw failure
+                        LokiLogger.w(TAG, "403 for '${request.title}', retrying with a fresh visitor id")
+                        YouTubeMusicSource.invalidateVisitorData()
+                        val retry = resolve(request)
+                        if (retry !is StreamResult.Success) throw failure
+                        fetchTo(retry.info, temp, report)
+                    }.getOrElse {
+                        if (it is CancellationException) throw it
+                        LokiLogger.e(TAG, "fetch failed for ${request.title}: ${it.message}")
+                        DownloadNotifier.failed(context, request.title, it.message ?: "failed")
+                        return@withContext DownloadOutcome.Failed(it.message ?: "fetch failed")
                     }
-                }.recoverCatching { failure ->
-                    // A refused media url usually means the cached visitor id went stale, so mint a
-                    // fresh one and resolve again before giving up.
-                    if (failure.message?.contains("HTTP 403") != true) throw failure
-                    LokiLogger.w(TAG, "403 for '${request.title}', retrying with a fresh visitor id")
-                    YouTubeMusicSource.invalidateVisitorData()
-                    val retry = resolve(request)
-                    if (retry !is StreamResult.Success) throw failure
-                    fetchTo(retry.info, temp) { percent ->
-                        onProgress?.invoke(percent)
-                        if (notify) DownloadNotifier.progress(context, request.title, percent)
-                    }
-                }.getOrElse {
-                    LokiLogger.e(TAG, "fetch failed for ${request.title}: ${it.message}")
-                    DownloadNotifier.failed(context, request.title, it.message ?: "failed")
-                    return@withContext DownloadOutcome.Failed(it.message ?: "fetch failed")
-                }
                 if (fetched <= 0L) {
                     DownloadNotifier.failed(context, request.title, "empty download")
                     return@withContext DownloadOutcome.Failed("empty download")
                 }
 
-                val tags = tagsFor(request)
-                val stored = store(request, info, temp, tags, context)
-                if (stored == null) {
-                    DownloadNotifier.failed(context, request.title, "could not write to the folder")
-                    DownloadOutcome.Failed("could not write into the download folder")
-                } else {
-                    if (notify) DownloadNotifier.finished(context, request.title)
-                    DownloadOutcome.Done(stored)
-                }
+                finish(store(request, info, temp, tagsFor(request), context))
             } finally {
                 temp.delete()
             }
@@ -217,9 +231,10 @@ object TrackDownloader {
      * download would fetch and the result is byte-identical.
      */
     private fun fromPlaybackCache(request: DownloadRequest, temp: File): StreamInfo? {
-        if (!PlaybackCache.isComplete(request.trackUri)) return null
+        val key = cacheKeyFor(request)
+        if (!PlaybackCache.isComplete(key)) return null
         val complete = runCatching {
-            temp.outputStream().use { PlaybackCache.writeTo(request.trackUri, it) }
+            temp.outputStream().use { PlaybackCache.writeTo(key, it) }
         }.getOrDefault(false)
         if (!complete || temp.length() <= 0L) {
             temp.writeBytes(ByteArray(0))
@@ -231,17 +246,30 @@ object TrackDownloader {
         return StreamInfo(
             url = "playback-cache",
             provider = "Playback cache",
-            mimeType = if (isWebm(temp)) "audio/webm" else null,
+            mimeType = when {
+                magicIs(temp, 0x1A, 0x45, 0xDF, 0xA3) -> "audio/webm"
+                magicIs(temp, 0x66, 0x4C, 0x61, 0x43) -> "audio/flac"
+                else -> null
+            },
         )
     }
 
-    /** EBML magic — every WebM file starts with it. */
-    private fun isWebm(file: File): Boolean = runCatching {
+    /**
+     * Which cache entry holds this track. A local-only save wants the bytes that were just played, so
+     * it looks under the source playback used; a fresh save wants the source the user picked to
+     * download in, and finding nothing there is correct — it then fetches rather than writing a file
+     * from a different source than the one it records.
+     */
+    private fun cacheKeyFor(request: DownloadRequest): String = PlaybackCache.keyFor(
+        request.trackUri,
+        if (request.localOnly) AppSettings.preferredAudioSource.value else AppSettings.downloadSource.value,
+    )
+
+    /** Container magic: EBML for WebM/Matroska, "fLaC" for FLAC. */
+    private fun magicIs(file: File, vararg bytes: Int): Boolean = runCatching {
         file.inputStream().use { input ->
-            val head = ByteArray(4)
-            input.read(head) == 4 &&
-                head[0] == 0x1A.toByte() && head[1] == 0x45.toByte() &&
-                head[2] == 0xDF.toByte() && head[3] == 0xA3.toByte()
+            val head = ByteArray(bytes.size)
+            input.read(head) == bytes.size && bytes.withIndex().all { (i, b) -> head[i] == b.toByte() }
         }
     }.getOrDefault(false)
 
@@ -304,7 +332,17 @@ object TrackDownloader {
                 DownloadFolder.delete(target.toString())
                 return null
             }
-            sink.use { payload.inputStream().use { source -> source.copyTo(it, BUFFER) } }
+            // A copy that dies partway leaves a truncated file in the user's folder with no index row,
+            // which nothing can then find or clean up: prune only drops rows whose file is gone, never
+            // files with no row. Delete it and report the same "could not write" outcome.
+            runCatching {
+                sink.use { payload.inputStream().use { source -> source.copyTo(it, BUFFER) } }
+            }.getOrElse {
+                LokiLogger.e(TAG, "writing '${request.title}' into the folder failed: ${it.message}")
+                DownloadFolder.delete(target.toString())
+                if (it is CancellationException) throw it
+                return null
+            }
             return record(request, info, target.toString(), finalExtension, payload.length())
         } finally {
             remuxTemp?.delete()
@@ -318,8 +356,17 @@ object TrackDownloader {
         context: Context,
         payload: File,
         write: (java.io.InputStream, java.io.OutputStream) -> Boolean,
-    ): File? = File.createTempFile(prefix, null, context.cacheDir).takeIf { candidate ->
-        payload.inputStream().use { source -> candidate.outputStream().use { sink -> write(source, sink) } }
+    ): File? {
+        val candidate = File.createTempFile(prefix, null, context.cacheDir)
+        val tagged = runCatching {
+            payload.inputStream().use { source ->
+                candidate.outputStream().use { sink -> write(source, sink) }
+            }
+        }.getOrDefault(false)
+        // Deleted here rather than by the caller's finally: that only ever sees a non-null result, so
+        // a declining tagger (Mp4Tagger turns down every faststart mp4) used to leak one temp per go.
+        if (!tagged) candidate.delete()
+        return candidate.takeIf { tagged }
     }
 
     private fun record(
@@ -339,8 +386,6 @@ object TrackDownloader {
             contextUri = request.contextUri,
             contextName = request.contextName,
             contextType = request.contextType,
-            albumUri = request.albumUri,
-            albumName = request.album,
             sizeBytes = written,
             title = request.title,
             artist = request.artist,
@@ -383,6 +428,7 @@ object TrackDownloader {
         target.outputStream().use { sink ->
             while (total < 0 || position < total) {
                 val end = position + CHUNK_BYTES - 1
+                var chunkBytes = 0L
                 open(info, range = "bytes=$position-$end").use { body ->
                     if (total < 0) total = contentRangeTotal(body.contentRange) ?: body.contentLength()
                     val stream = body.byteStream()
@@ -393,6 +439,7 @@ object TrackDownloader {
                         if (read < 0) break
                         sink.write(buffer, 0, read)
                         position += read
+                        chunkBytes += read
                         val percent = if (total > 0) ((position * 100) / total).toInt() else -1
                         if (percent != lastPercent) {
                             lastPercent = percent
@@ -400,8 +447,11 @@ object TrackDownloader {
                         }
                     }
                 }
-                // A short final chunk means the server has nothing left, whatever the declared total.
-                if (total < 0) break
+                // The loop normally ends because position reached total. An empty chunk ends it too:
+                // position would not have moved, so re-asking for the same range is a spin with no
+                // progress and nothing logged. A merely short chunk is fine and keeps going — CDNs cap
+                // how much of a range they serve at once.
+                if (total < 0 || chunkBytes == 0L) break
             }
         }
     }
@@ -469,7 +519,10 @@ object TrackDownloader {
      * cost a buffer hand-over for audio that would lose to it anyway — see the ordering in
      * [downloadInner], which this must agree with.
      */
-    fun needsCapture(trackUri: String): Boolean = !PlaybackCache.isComplete(trackUri)
+    fun needsCapture(trackUri: String): Boolean =
+        !PlaybackCache.isComplete(
+            PlaybackCache.keyFor(trackUri, AppSettings.preferredAudioSource.value)
+        )
 
     /** Removes the local copy and its index row. */
     fun delete(trackUri: String) {

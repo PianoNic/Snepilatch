@@ -110,4 +110,19 @@ object DownloadNotifier {
     }
 
     fun clear(context: Context) = manager(context).cancel(NOTIFICATION_ID)
+
+    private var staleCleared = false
+
+    /**
+     * Drops a progress notification left over from a previous process. A download lives in
+     * `viewModelScope`, so a batch killed with the app never runs its own clear and its
+     * `setOngoing(true)` bar is not user-swipeable below API 34 — it would sit there claiming to be
+     * downloading while the manager screen says nothing is. Once per process, so an Activity
+     * recreated mid-download (a rotation) does not cancel a live one.
+     */
+    fun clearStaleProgress(context: Context) {
+        if (staleCleared) return
+        staleCleared = true
+        clear(context)
+    }
 }

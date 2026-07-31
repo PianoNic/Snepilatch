@@ -64,6 +64,11 @@ object YouTubeMusicSource {
 
     private const val MAX_CANDIDATES = 10
 
+    /** What the UI shows when a track carries no artist name; never a real credit to match against. */
+    internal const val UNKNOWN_PLACEHOLDER = "Unknown"
+
+    private val BRACKETED = Regex("""[(\[]([^)\]]*)[)\]]""")
+
     private val json = Json { ignoreUnknownKeys = true }
     private val jsonMedia = "application/json".toMediaType()
 
@@ -107,6 +112,8 @@ object YouTubeMusicSource {
         region: String?,
         durationMs: Long,
     ): Stream? = withContext(Dispatchers.IO) {
+        // The display placeholder is not a search word. bestMatch drops it again as a match constraint.
+        val artist = realArtist(artist)
         val query = listOf(artist, title).filter { it.isNotBlank() }.joinToString(" ").trim()
         if (query.isBlank()) return@withContext null
 
@@ -236,15 +243,19 @@ object YouTubeMusicSource {
         durationMs: Long,
     ): Candidate? {
         val want = words(wantTitle)
-        val wantArtistWords = words(wantArtist)
+        val wantArtistWords = words(realArtist(wantArtist))
         // Read the request the same way as the candidate, brackets included: asking for "Sonne
         // (Remix)" must keep the remix, and that marker only survives in the bracket-keeping split.
         val asked = markerWords(wantTitle) + markerWords(wantArtist)
         val viable = candidates.filter { candidate ->
             (want.isEmpty() || titleScore(candidate.title, want) >= MIN_TITLE_SCORE) &&
-                // Album and artist text too: an instrumental cut usually carries the original's exact
-                // title and artist, and only the release it sits on says what it is.
-                !addsRework("${candidate.title} ${candidate.details}", asked) &&
+                // The release text too, not just the title: an instrumental cut usually carries the
+                // original's exact title and artist, and only the release it sits on says what it is.
+                // Bracketed only, though — an album is where a release declares itself, and scanning
+                // the whole run made a plain album name disqualify every candidate. REWORK_MARKERS
+                // holds bare instrument nouns, so "Guitar Songs" or "Piano Man" read as reworks and
+                // the track became unresolvable on this source.
+                !addsRework("${candidate.title} ${bracketedIn(candidate.details)}", asked) &&
                 artistMatches(candidate.artist, wantArtistWords)
         }
         if (durationMs <= 0L) return viable.firstOrNull()
@@ -267,6 +278,18 @@ object YouTubeMusicSource {
      */
     internal fun addsRework(candidateTitle: String, asked: Set<String>): Boolean =
         markerWords(candidateTitle).any { it in REWORK_MARKERS && it !in asked }
+
+    /** The bracketed parts of a run of release text — "Artist • Album (Instrumental) • 3:45" -> "Instrumental". */
+    internal fun bracketedIn(text: String): String =
+        BRACKETED.findAll(text).joinToString(" ") { it.groupValues[1] }
+
+    /**
+     * The artist to treat as asked for. Blanks the UI's placeholder, which reaches here whenever a
+     * queue push carried no artist name: it is not a credit, so requiring candidates to share a word
+     * with it rejects every real result and the track stops resolving at all.
+     */
+    internal fun realArtist(artist: String): String =
+        if (artist.equals(UNKNOWN_PLACEHOLDER, ignoreCase = true)) "" else artist
 
     /**
      * Like [words] but keeps bracketed text. Titles score with brackets dropped, so "Song (feat. X)"

@@ -309,7 +309,6 @@
     <string name="download_source_ytm">YouTube Music</string>
     <string name="download_source_lossless">Без потерь (FLAC)</string>
     <string name="manage_downloads">Управление загрузками</string>
-    <string name="downloads_empty">Пока ничего не загружено</string>
     <string name="downloads_summary">%1$d треков · %2$d МБ</string>
     <string name="remove_all">Удалить все</string>
     <string name="remove_all_confirm">Удалить все загруженные файлы? Треки снова будут воспроизводиться потоком.</string>

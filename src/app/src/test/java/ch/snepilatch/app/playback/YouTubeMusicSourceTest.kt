@@ -247,4 +247,58 @@ class YouTubeMusicSourceTest {
         val match = YouTubeMusicSource.bestMatch(yt, "Get Lucky", "Daft Punk", durationMs = 369_000)
         assertEquals("full", match?.videoId)
     }
+
+    /**
+     * The rework markers include bare instrument nouns, and a release is allowed to be called after
+     * one. Scanning the whole details run meant an EP named "Guitar Songs" read as a guitar cover, so
+     * every candidate was filtered and the track could not be resolved on this source at all. Only
+     * bracketed text is a release declaring itself.
+     */
+    @Test
+    fun anAlbumNamedAfterAnInstrumentIsNotARework() {
+        val yt = listOf(
+            YouTubeMusicSource.Candidate(
+                "real", "TV", "Billie Eilish", 293,
+                details = "Billie Eilish Guitar Songs 4:53",
+            )
+        )
+        val match = YouTubeMusicSource.bestMatch(yt, "TV", "Billie Eilish", durationMs = 293_000)
+        assertEquals("real", match?.videoId)
+    }
+
+    /** The bracketed form still disqualifies, which is what the album scan was added for. */
+    @Test
+    fun aBracketedInstrumentalInTheAlbumIsStillRejected() {
+        val yt = listOf(
+            YouTubeMusicSource.Candidate(
+                "inst", "TV", "Billie Eilish", 293,
+                details = "Billie Eilish Guitar Songs (Instrumental) 4:53",
+            )
+        )
+        assertNull(YouTubeMusicSource.bestMatch(yt, "TV", "Billie Eilish", durationMs = 293_000))
+    }
+
+    @Test
+    fun onlyBracketedPartsOfTheReleaseTextAreRead() {
+        assertEquals("Instrumental", YouTubeMusicSource.bracketedIn("GEMN Fatal (Instrumental) 3:39"))
+        assertEquals("", YouTubeMusicSource.bracketedIn("Billie Eilish Guitar Songs 4:53"))
+    }
+
+    /**
+     * A Spfy queue push often carries no artist name, and the UI's "Unknown" placeholder used to reach
+     * the matcher as if it were a credit — so every real candidate was rejected for not being by an
+     * artist called Unknown, and gapless pre-resolve degraded to a cold resolve at every transition.
+     */
+    @Test
+    fun theUnknownArtistPlaceholderIsNotTreatedAsACredit() {
+        val yt = listOf(YouTubeMusicSource.Candidate("real", "Get Lucky", "Daft Punk", 369))
+        val match = YouTubeMusicSource.bestMatch(yt, "Get Lucky", "Unknown", durationMs = 369_000)
+        assertEquals("real", match?.videoId)
+    }
+
+    @Test
+    fun arealArtistIsStillRequiredToMatchWhenOneWasGiven() {
+        val yt = listOf(YouTubeMusicSource.Candidate("x", "Creep", "Random Channel", 239))
+        assertNull(YouTubeMusicSource.bestMatch(yt, "Creep", "Radiohead", durationMs = 239_000))
+    }
 }

@@ -735,8 +735,27 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     /**
      * Keep the decoded PCM of [trackUri] as it plays, so saving it later needs no second fetch.
      * Replaces any previous capture, so this is called on every track change while the setting is on.
+     *
+     * Refuses a track the buffer cannot hold. Recording costs a ~69MB ShortArray plus a memcpy of
+     * every decoded buffer on the audio thread, and [InfiniPlayAudioTap.capture] stops at the cap, so
+     * a longer track can never reach [CAPTURE_COMPLETE_FRACTION] — it would pay the whole cost to
+     * produce something [completeCapture] then refuses. Callers that hit this fall back to the
+     * playback cache, which has no length limit; only Widevine playback has nowhere else to go.
      */
-    fun startCapture(trackUri: String) {
+    fun startCapture(trackUri: String, durationMs: Long) {
+        if (durationMs > InfiniPlayAudioTap.MAX_CAPTURE_MS) {
+            LokiLogger.i(
+                TAG,
+                "not capturing $trackUri: ${durationMs / 1000}s is past the " +
+                    "${InfiniPlayAudioTap.MAX_CAPTURE_MS / 1000}s the capture buffer holds"
+            )
+            stopCapture()
+            return
+        }
+        // Already recording this track: leave the buffer alone. resetCapture() zeroes the sample count,
+        // so re-arming mid-track (the user tapping the row that is already playing) would make a track
+        // that did play through look partial, and completeCapture would refuse to save it.
+        if (captureUri == trackUri && infiniPlayTap.recording) return
         captureUri = trackUri
         infiniPlayTap.recording = true
         infiniPlayTap.resetCapture()

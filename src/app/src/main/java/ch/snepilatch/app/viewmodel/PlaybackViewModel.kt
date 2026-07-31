@@ -2684,7 +2684,10 @@ class PlaybackViewModel : ViewModel() {
         trackUri = uri,
         title = name,
         artist = artist,
-        album = albumName,
+        // TrackInfo.albumName is only populated for podcast episodes, so for music the album the user
+        // downloaded from is the one thing that knows the name. Without this no download ever carried
+        // an ALBUM tag, even though both taggers write one.
+        album = albumName ?: contextName?.takeIf { contextType == "album" },
         coverUrl = albumArt,
         durationMs = durationMs,
         capture = capture,

@@ -31,6 +31,9 @@ internal object Mp4Tagger {
     }
 
     private const val HEADER = 8
+
+    /** Box header when the 32-bit size field is 1 and a 64-bit largesize follows the type. */
+    private const val WIDE_HEADER = 16
     private val MOOV = "moov".toByteArray(Charsets.US_ASCII)
 
     private class Box(val start: Int, val size: Int)
@@ -42,12 +45,26 @@ internal object Mp4Tagger {
     private fun findTrailingMoov(bytes: ByteArray): Box? {
         var offset = 0
         while (offset + HEADER <= bytes.size) {
-            val size = readBeInt(bytes, offset)
+            val declared = readBeInt(bytes, offset)
             val type = String(bytes, offset + 4, 4, Charsets.US_ASCII)
-            // Size 0 means "to end of file" and 1 means a 64-bit size follows; neither is a layout
-            // we rewrite, so both bail out rather than being guessed at.
-            if (size < HEADER) return null
+            // A declared size of 1 means the real size is a 64-bit largesize sitting after the type.
+            // Every mp4 YouTube serves writes its mdat that way, and treating it as unwalkable left
+            // all of those downloads with no title, artist or cover. Stepping over the box is all we
+            // need — mdat's bytes are copied through untouched, never rewritten. Size 0 means "runs
+            // to the end of the file", so nothing can follow it and there is no trailing moov.
+            val header = if (declared == 1) WIDE_HEADER else HEADER
+            val size = if (declared == 1) {
+                if (offset + WIDE_HEADER > bytes.size) return null
+                val wide = readBeLong(bytes, offset + HEADER)
+                if (wide < WIDE_HEADER || wide > Int.MAX_VALUE) return null
+                wide.toInt()
+            } else {
+                if (declared < HEADER) return null
+                declared
+            }
             if (type == "moov") {
+                // The rewrite in [tag] emits a 32-bit moov header, so a wide one is out of scope.
+                if (header != HEADER) return null
                 return if (offset + size == bytes.size) Box(offset, size) else null
             }
             offset += size
@@ -106,6 +123,12 @@ internal object Mp4Tagger {
     private fun readBeInt(bytes: ByteArray, at: Int): Int {
         var value = 0
         for (i in 0 until 4) value = (value shl 8) or (bytes[at + i].toInt() and 0xFF)
+        return value
+    }
+
+    private fun readBeLong(bytes: ByteArray, at: Int): Long {
+        var value = 0L
+        for (i in 0 until 8) value = (value shl 8) or (bytes[at + i].toLong() and 0xFF)
         return value
     }
 }

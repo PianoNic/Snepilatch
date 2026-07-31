@@ -76,6 +76,41 @@ class Mp4TaggerTest {
         assertFalse(tag("not an mp4 at all".toByteArray()).first)
     }
 
+    /**
+     * A 64-bit largesize on mdat, which is how every mp4 YouTube serves is written: the 32-bit size
+     * field holds 1 and the real length follows the type. Reading that 1 as the box length made the
+     * walk give up before it ever reached moov, so real .m4a downloads landed with no title, no
+     * artist and no cover — while the unit tests passed, because they only ever built 32-bit boxes.
+     */
+    @Test
+    fun `walks past an mdat that carries a 64-bit largesize`() {
+        val payload = ByteArray(64) { it.toByte() }
+        // size field == 1, then the type, then the 64-bit largesize.
+        val wideMdat = ByteArray(4) { if (it == 3) 1 else 0 } +
+            "mdat".toByteArray(Charsets.ISO_8859_1) +
+            beLong(16L + payload.size) +
+            payload
+        val original = box("ftyp", "isom".toByteArray()) + wideMdat + box("moov", box("mvhd", ByteArray(8)))
+        val moovStart = original.size - 24
+
+        val (ok, tagged) = tag(original)
+
+        assertTrue(ok)
+        assertArrayEquals(original.copyOfRange(0, moovStart), tagged.copyOfRange(0, moovStart))
+        assertTrue(String(tagged, Charsets.ISO_8859_1).contains("Song"))
+        assertTrue(String(tagged, Charsets.ISO_8859_1).contains("Band"))
+    }
+
+    /** A truncated largesize must not be guessed at. */
+    @Test
+    fun `declines a wide box whose largesize is cut off`() {
+        val truncated = box("ftyp", "isom".toByteArray()) +
+            ByteArray(4) { if (it == 3) 1 else 0 } + "mdat".toByteArray(Charsets.ISO_8859_1) + ByteArray(3)
+        assertFalse(tag(truncated).first)
+    }
+
+    private fun beLong(value: Long) = ByteArray(8) { ((value ushr (8 * (7 - it))) and 0xFF).toByte() }
+
     private fun readBeInt(bytes: ByteArray, at: Int): Int {
         var value = 0
         for (i in 0 until 4) value = (value shl 8) or (bytes[at + i].toInt() and 0xFF)

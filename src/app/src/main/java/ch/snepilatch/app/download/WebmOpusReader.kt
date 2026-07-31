@@ -39,26 +39,35 @@ internal object WebmOpusReader {
         var pendingHeader: ByteArray? = null
         var headerEmitted = false
 
-        while (true) {
-            val id = reader.readId() ?: break
-            val size = reader.readSize()
+        try {
+            while (true) {
+                val id = reader.readId() ?: break
+                val size = reader.readSize()
 
-            // Master elements have no payload of their own; falling through descends into them.
-            if (id !in DESCEND) {
-                when (id) {
-                    ID_TRACK_NUMBER -> opusTrack = reader.readUInt(size)
-                    ID_CODEC_ID -> codecId = reader.readString(size)
-                    ID_CODEC_PRIVATE -> pendingHeader = reader.readBytes(size.toInt())
-                    ID_SIMPLE_BLOCK, ID_BLOCK -> {
-                        if (!headerEmitted) {
-                            onHeader(opusHeader(pendingHeader, codecId))
-                            headerEmitted = true
+                // Master elements have no payload of their own; falling through descends into them.
+                if (id !in DESCEND) {
+                    when (id) {
+                        ID_TRACK_NUMBER -> opusTrack = reader.readUInt(size)
+                        ID_CODEC_ID -> codecId = reader.readString(size)
+                        ID_CODEC_PRIVATE -> pendingHeader = reader.readBytes(size.toInt())
+                        ID_SIMPLE_BLOCK, ID_BLOCK -> {
+                            if (!headerEmitted) {
+                                onHeader(opusHeader(pendingHeader, codecId))
+                                headerEmitted = true
+                            }
+                            readBlock(reader, size.toInt(), opusTrack, onPacket)
                         }
-                        readBlock(reader, size.toInt(), opusTrack, onPacket)
+                        else -> reader.skip(size)
                     }
-                    else -> reader.skip(size)
                 }
             }
+        } catch (e: EOFException) {
+            // Input that stops mid-element is a tail-truncated capture, not a broken file: every
+            // packet handed to onPacket was whole, so the caller can close a valid stream around them
+            // and the result is simply a little short. Reported only when nothing usable came out —
+            // without this, a track the playback cache held all but the last few kilobytes of failed
+            // the whole remux and fell back to keeping the untagged original container.
+            if (!headerEmitted) throw UnsupportedWebm("truncated before the first Opus block: ${e.message}")
         }
         if (!headerEmitted) throw UnsupportedWebm("no Opus track found")
     }

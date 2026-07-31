@@ -356,6 +356,35 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 }
             }
 
+            /**
+             * A seek invalidates the decoded capture, so stand it down.
+             *
+             * The tap only ever appends what the decoder hands it, and nothing re-anchors it on a
+             * seek: jumping forward leaves a hole, jumping back records a stretch twice. The
+             * completeness check counts frames rather than mapping coverage, so a backward seek can
+             * even reach its threshold with audio audibly repeated — the one way this could write a
+             * wrong file rather than simply refuse. Hooked here rather than at each seekTo so no
+             * caller can miss it: the media session, both Connect sync paths and the infiniPlay jumps
+             * all land on this. The playback cache is byte-exact and unaffected, so a non-DRM track
+             * still saves from there; only Widevine, which has no cache, loses the ability to save
+             * this track — correctly, since what was recorded is not the track.
+             */
+            override fun onPositionDiscontinuity(
+                oldPosition: Player.PositionInfo,
+                newPosition: Player.PositionInfo,
+                reason: Int,
+            ) {
+                // capturedFrames guard: loading a track with a start position is not a seek, but if a
+                // device ever reported one it would arrive before anything was recorded.
+                if (reason == Player.DISCONTINUITY_REASON_SEEK &&
+                    captureUri != null &&
+                    infiniPlayTap.capturedFrames() > 0
+                ) {
+                    LokiLogger.i(TAG, "seek during capture, dropping it for $captureUri")
+                    stopCapture()
+                }
+            }
+
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 // A real track change (skip / auto-advance / new queue) — not our own repeat loop —
                 // means the infiniPlay's captured song is no longer what's playing: tear it down.

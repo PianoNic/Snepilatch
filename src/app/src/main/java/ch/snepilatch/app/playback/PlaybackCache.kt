@@ -28,6 +28,13 @@ object PlaybackCache {
     private const val TAG = "PlaybackCache"
     private const val MAX_BYTES = 512L * 1024 * 1024
 
+    /**
+     * How much of the tail may be missing and still count as played through — about two seconds of a
+     * three-minute track. The last buffer of a stream is routinely never requested, so demanding the
+     * final byte meant a track that reached the end still failed to save.
+     */
+    private const val TAIL_TOLERANCE = 0.01
+
     private var cache: SimpleCache? = null
 
     /**
@@ -64,16 +71,29 @@ object PlaybackCache {
     }
 
     /**
-     * Whether every byte of [key] is on disk. The user's rule for auto-save is that a track with a
-     * hole in it must never be written out, so this is deliberately all-or-nothing: a gap anywhere,
-     * or an unknown total length, means no.
+     * Whether [key] is on disk from byte zero to within [TAIL_TOLERANCE] of the end.
+     *
+     * A **hole** still disqualifies it outright, which is the rule that matters: a gap in the middle
+     * writes a file that plays up to the gap and then stops. A missing **tail** is a different thing —
+     * the file simply ends a moment early — and refusing those meant a track the cache held all but
+     * the last few kilobytes of could not be saved at all. [covered] measures contiguous bytes from
+     * zero, so allowing a shortfall here can only ever forgive the end.
+     *
+     * An unknown total length still means no: without it there is nothing to be short of.
      */
     fun isComplete(key: String): Boolean {
         val c = cache ?: return false
         val length = ContentMetadata.getContentLength(c.getContentMetadata(key))
         if (length <= 0) return false
-        return covered(c, key) >= length
+        return covered(c, key) >= required(length)
     }
+
+    /**
+     * How much of [length] has to be present. Matches CAPTURE_COMPLETE_FRACTION in
+     * MusicPlaybackService so the two ways of keeping a played-through track agree on what "played
+     * through" means, rather than one saving a track the other would refuse.
+     */
+    private fun required(length: Long): Long = length - (length * TAIL_TOLERANCE).toLong()
 
     /** How many contiguous bytes from 0 are cached; stops at the first hole. */
     private fun covered(c: SimpleCache, key: String): Long {
@@ -87,7 +107,8 @@ object PlaybackCache {
 
     /**
      * Copies the cached bytes to [out]. Call [isComplete] first: this writes whatever it has and
-     * reports whether that was all of it, so an unchecked call can leave a truncated file behind.
+     * reports whether that was enough of it, so an unchecked call can leave a short file behind. It
+     * still refuses a hole outright — the same threshold as [isComplete], so the two cannot disagree.
      */
     fun writeTo(key: String, out: OutputStream): Boolean {
         val c = cache ?: return false
@@ -112,7 +133,7 @@ object PlaybackCache {
             }
             position = span.position + span.length
         }
-        return position >= length
+        return position >= required(length)
     }
 
     fun release() {

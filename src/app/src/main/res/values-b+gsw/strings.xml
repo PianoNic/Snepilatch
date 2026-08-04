@@ -36,7 +36,7 @@
     <!-- Player -->
     <string name="now_playing">Lauft grad</string>
     <string name="add_to_queue">I d Wartelischte</string>
-    <string name="add_to_playlist">I d Playlist dezuetue</string>
+    <string name="add_to_playlist">I d Playlist iifüege</string>
     <string name="like">Gfallt mer</string>
     <string name="unlike">Gfallt mer nüm</string>
     <string name="visit_album">Album aaluege</string>
@@ -308,6 +308,6 @@
     <string name="error_like">D Lieblingssongs händ nöd chöne aktualisiert werde</string>
     <string name="error_follow">Em Künschtler folge hät nöd funktioniert</string>
     <string name="error_save_library">I d Bibliothek spichere hät nöd funktioniert</string>
-    <string name="error_add_playlist">I d Playlist dezuetue hät nöd funktioniert</string>
+    <string name="error_add_playlist">I d Playlist iifüege hät nöd funktioniert</string>
     <string name="error_add_queue">I d Wartelischte dezuetue hät nöd funktioniert</string>
 </resources>

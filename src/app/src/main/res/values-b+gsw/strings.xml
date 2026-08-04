@@ -6,7 +6,7 @@
           -ig statt -ung: Iistellig, Verbindig, Wiederholig, Mäldig
           st wird zu scht, wo mer s au so seit: Künschtler, Taschte, Wartelischte, bescht
           wo als Relativpronome: "de Song, wo grad lauft"
-          Natel statt Händy, luege statt suche, wo s passt
+          Natel statt Händy · "um ... z'..." für de Zwäck-Satz
     -->
 
     <!-- Common -->
@@ -97,10 +97,10 @@
 
     <!-- About -->
     <string name="app_version">App-Version</string>
-    <string name="check_for_updates">Nach Updates luege</string>
-    <string name="checking">Am Luege…</string>
+    <string name="check_for_updates">Nach Updates sueche</string>
+    <string name="checking">Am Sueche…</string>
     <string name="up_to_date">Du häsch di nöischti Version</string>
-    <string name="tap_to_check">Tipp druf, zum nach neue Versione luege</string>
+    <string name="tap_to_check">Tipp, um nach neue Versione z\'sueche</string>
     <string name="release_notes">Versions-Notize</string>
     <string name="view_changelog">Änderige aaluege</string>
 
@@ -302,7 +302,7 @@
     <string name="auth_lost">D Spotify-Sitzig isch wäg. Mäld di nomal aa, zum wiitermache</string>
     <string name="connect_failed">Verbindig hät na 5 Versüech nöd funktioniert. Probier s spöter nomal.</string>
     <string name="notif_connection_lost_title">Snepilatch: Verbindig wäg</string>
-    <string name="notif_connection_lost_text">Tipp druf, zum nomal mit Spotify verbinde</string>
+    <string name="notif_connection_lost_text">Tipp, um wieder mit Spotify z\'verbinde</string>
 
     <!-- Action errors -->
     <string name="error_like">D Lieblingssongs händ nöd chöne aktualisiert werde</string>

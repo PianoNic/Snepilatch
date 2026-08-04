@@ -298,6 +298,7 @@
     <string name="error_add_queue">Не удалось добавить в очередь</string>
     <string name="downloads">Загрузки</string>
     <string name="downloading">Загрузка</string>
+    <string name="saving_listened">Сохраняем прослушанное</string>
     <string name="download_complete">Загрузка завершена</string>
     <string name="download_failed">Ошибка загрузки</string>
     <string name="download_folder">Папка загрузок</string>

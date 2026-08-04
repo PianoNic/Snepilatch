@@ -1,6 +1,7 @@
 package ch.snepilatch.app.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.CloudDone
@@ -17,6 +18,7 @@ import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
 import ch.snepilatch.app.download.DownloadFolder
 import ch.snepilatch.app.download.Downloads
+import ch.snepilatch.app.ui.components.SpfyImage
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 
@@ -110,31 +112,46 @@ fun DownloadsScreen(vm: PlaybackViewModel) {
 }
 
 /**
- * What is downloading, named. The in-flight uri set cannot say more than "something is downloading":
- * it carries no title, so this read the base62 id off the uri. The job knows the album or track the
- * user asked for, how far through the list it is, and how far through the current track.
+ * What is downloading, named and with its artwork. The in-flight uri set cannot say more than
+ * "something is downloading": it carries no title, so this read the base62 id off the uri. The job
+ * knows the album or track the user asked for, how far through the list it is, and how far through
+ * the current track.
  */
 @Composable
 private fun ActiveDownload(job: Downloads.ActiveJob) {
+    // A re-encode keeps the recording that was just played; there is nothing to fetch, so it has no
+    // percentage to report and spins rather than filling a ring stuck at zero.
+    val reencode = job.type == Downloads.TYPE_REENCODE
     ListItem(
         headlineContent = { Text(job.name, color = SpfyWhite, maxLines = 1) },
         supportingContent = {
             Text(
-                if (job.total > 1) {
-                    stringResource(R.string.downloading_count, job.done, job.total)
-                } else {
-                    stringResource(R.string.downloading)
+                when {
+                    reencode -> stringResource(R.string.saving_listened)
+                    job.total > 1 -> stringResource(R.string.downloading_count, job.done, job.total)
+                    else -> stringResource(R.string.downloading)
                 },
                 color = SpfyLightGray
             )
         },
-        leadingContent = { Icon(Icons.Rounded.Downloading, null, tint = SpfyLightGray) },
-        trailingContent = {
-            CircularProgressIndicator(
-                progress = { job.trackPercent.coerceIn(0, 100) / 100f },
-                strokeWidth = 2.dp,
-                modifier = Modifier.size(18.dp),
+        leadingContent = {
+            SpfyImage(
+                url = job.imageUrl,
+                modifier = Modifier.size(48.dp),
+                shape = RoundedCornerShape(4.dp),
+                icon = Icons.Rounded.Downloading,
             )
+        },
+        trailingContent = {
+            if (reencode) {
+                CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+            } else {
+                CircularProgressIndicator(
+                    progress = { job.trackPercent.coerceIn(0, 100) / 100f },
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     )

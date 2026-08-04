@@ -304,6 +304,7 @@
     <string name="error_add_queue">Could not add to queue</string>
     <string name="downloads">Downloads</string>
     <string name="downloading">Downloading</string>
+    <string name="saving_listened">Keeping what you listened to</string>
     <string name="download_complete">Download complete</string>
     <string name="download_failed">Download failed</string>
     <string name="download_folder">Download folder</string>

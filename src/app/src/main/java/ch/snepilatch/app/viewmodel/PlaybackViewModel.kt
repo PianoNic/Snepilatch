@@ -2792,9 +2792,16 @@ class PlaybackViewModel : ViewModel() {
         // whole Compose tree — for the minutes the download runs. Nothing here needs an Activity.
         val ctx = context.applicationContext
         viewModelScope.launch(Dispatchers.IO) {
-            // A localOnly save is the auto-save path: instant, unattended, and it must not touch the
-            // card at all — taking the slot mid-batch would blank an album's progress for no reason.
-            val token = if (localOnly) 0 else Downloads.startJob(track.name, "single", track.albumArt, 1)
+            // A localOnly save is the auto-save path: it re-encodes what was played rather than
+            // fetching, so it shows as its own kind of job. onlyIfIdle because taking the slot
+            // mid-batch would blank an album's progress for no reason.
+            val token = Downloads.startJob(
+                name = track.name,
+                type = if (localOnly) Downloads.TYPE_REENCODE else "single",
+                imageUrl = track.albumArt,
+                total = 1,
+                onlyIfIdle = localOnly,
+            )
             val progress: ((Int) -> Unit)? = if (localOnly) {
                 null
             } else {
@@ -2808,7 +2815,7 @@ class PlaybackViewModel : ViewModel() {
             } finally {
                 // In a finally because cancellation (backing out of the app) has to clear the card too;
                 // it used to be left set, so the manager claimed a download was running forever.
-                if (!localOnly) Downloads.clearJob(token)
+                Downloads.clearJob(token)
             }
         }
     }

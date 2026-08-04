@@ -298,6 +298,7 @@
     <string name="error_add_queue">Konnte nicht zur Warteschlange hinzugefügt werden</string>
     <string name="downloads">Downloads</string>
     <string name="downloading">Wird heruntergeladen</string>
+    <string name="saving_listened">Gehörtes wird behalten</string>
     <string name="download_complete">Download abgeschlossen</string>
     <string name="download_failed">Download fehlgeschlagen</string>
     <string name="download_folder">Download-Ordner</string>

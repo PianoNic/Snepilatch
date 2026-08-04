@@ -298,6 +298,7 @@
     <string name="error_add_queue">Häts nöd i d Warteschlange gschafft</string>
     <string name="downloads">Downloads</string>
     <string name="downloading">Am Abelade</string>
+    <string name="saving_listened">Ghörts wird bhalte</string>
     <string name="download_complete">Download fertig</string>
     <string name="download_failed">Download gschiitered</string>
     <string name="download_folder">Download-Ordner</string>

@@ -81,8 +81,19 @@ object Downloads {
      */
     private val jobOwner = java.util.concurrent.atomic.AtomicInteger(0)
 
-    /** @return the token to pass back to [updateJob] and [clearJob]. */
-    fun startJob(name: String, type: String, imageUrl: String?, total: Int): Int {
+    /** [ActiveJob.type] for a track kept from what was played rather than fetched. */
+    const val TYPE_REENCODE = "reencode"
+
+    /**
+     * @param onlyIfIdle leaves a running job's card alone and returns 0, which no update can match.
+     *   The auto-save uses it: it belongs on the list, but not at the price of blanking an album's
+     *   progress mid-batch.
+     * @return the token to pass back to [updateJob] and [clearJob].
+     */
+    fun startJob(name: String, type: String, imageUrl: String?, total: Int, onlyIfIdle: Boolean = false): Int {
+        // Safe to hand back 0: the card is only taken once jobOwner has passed 1, so a live job can
+        // never own that token.
+        if (onlyIfIdle && _activeJob.value != null) return 0
         val token = jobOwner.incrementAndGet()
         _activeJob.value = ActiveJob(name, type, imageUrl, done = 1, total = total, trackPercent = 0)
         return token

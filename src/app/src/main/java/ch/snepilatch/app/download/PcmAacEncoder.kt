@@ -59,7 +59,14 @@ internal object PcmAacEncoder {
             var inputDone = false
             while (true) {
                 if (!inputDone) {
-                    val index = codec.dequeueInputBuffer(TIMEOUT_US)
+                    // Non-blocking, unlike the output side. One 64KB input buffer is about 0.37s of
+                    // audio and comes back as ~16 AAC packets, so the input queue is full almost
+                    // immediately and only a drained packet frees a slot. Waiting here waited for
+                    // something only the drain below can cause: every packet cost a full timeout,
+                    // and a three minute track took 87 seconds to encode while the CPU sat idle.
+                    // The output dequeue keeps its timeout — that one waits on real work, and
+                    // dropping it too would turn an empty pipeline into a busy-wait.
+                    val index = codec.dequeueInputBuffer(0)
                     if (index >= 0) {
                         val buffer = codec.getInputBuffer(index)!!.also { it.clear() }
                         val shorts = minOf(buffer.remaining() / 2, count - fed)

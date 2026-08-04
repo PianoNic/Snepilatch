@@ -1,4 +1,14 @@
 <resources>
+    <!--
+        Aargauerdütsch. Eini Sproch dure, nöd es Gmisch us Züri- und Bärndütsch.
+        Regle wo im ganze File gälted:
+          nöd · gsi · isch · händ · chasch · muesch · wott
+          -ig statt -ung: Iistellig, Verbindig, Wiederholig, Mäldig
+          st wird zu scht, wo mer s au so seit: Künschtler, Taschte, Wartelischte, bescht
+          wo als Relativpronome: "de Song, wo grad lauft"
+          Natel statt Händy, luege statt suche, wo s passt
+    -->
+
     <!-- Common -->
     <string name="cancel">Abbräche</string>
     <string name="share">Teile</string>
@@ -7,7 +17,7 @@
 
     <!-- Bottom Nav -->
     <string name="nav_home">Dihei</string>
-    <string name="nav_search">Suechi</string>
+    <string name="nav_search">Sueche</string>
     <string name="nav_library">Bibliothek</string>
     <string name="nav_account">Konto</string>
 
@@ -15,18 +25,18 @@
     <string name="greeting_fallback">Guete Abig</string>
 
     <!-- Search -->
-    <string name="search_placeholder">Songs, Künstler, Albä…</string>
+    <string name="search_placeholder">Songs, Künschtler, Albe…</string>
 
     <!-- Library -->
-    <string name="library_search_placeholder">I de Bibliothek sueche</string>
+    <string name="library_search_placeholder">I dinere Bibliothek sueche</string>
     <string name="library_playlists">Playlists</string>
-    <string name="library_artists">Künstler</string>
-    <string name="library_albums">Albä</string>
+    <string name="library_artists">Künschtler</string>
+    <string name="library_albums">Albe</string>
 
     <!-- Player -->
     <string name="now_playing">Lauft grad</string>
-    <string name="add_to_queue">Id Wartelischte</string>
-    <string name="add_to_playlist">Zu Playlist dezue</string>
+    <string name="add_to_queue">I d Wartelischte</string>
+    <string name="add_to_playlist">I d Playlist dezuetue</string>
     <string name="like">Gfallt mer</string>
     <string name="unlike">Gfallt mer nüm</string>
     <string name="visit_album">Album aaluege</string>
@@ -41,75 +51,74 @@
 
     <!-- Account -->
     <string name="account">Konto</string>
-    <string name="settings">Istellige</string>
-    <string name="about">Über</string>
-    <string name="special_thanks">Speziell Dank</string>
+    <string name="settings">Iistellige</string>
+    <string name="about">Über d App</string>
+    <string name="special_thanks">Bsundere Dank</string>
     <string name="premium">Premium</string>
     <string name="username">Benutzername</string>
     <string name="user_id">Benutzer-ID</string>
     <string name="plan">Abo</string>
     <string name="plan_free">Gratis</string>
     <string name="followers_playlists">%1$d Follower · %2$d Playlists</string>
-    <string name="log_out">Abmelde</string>
+    <string name="log_out">Abmälde</string>
 
     <!-- Settings -->
-    <string name="audio_source">Audioquälle</string>
+    <string name="audio_source">Tonquälle</string>
     <string name="audio_source_spotify">Spotify</string>
-    <string name="audio_source_spotify_desc">Standardqualität, direkt vo Spotify</string>
+    <string name="audio_source_spotify_desc">Normali Qualität, direkt vo Spotify</string>
     <string name="audio_source_lossless_desc">FLAC, wänn en Drittaabieter de Track het</string>
     <string name="audio_source_ytm">YouTube Music (Beta)</string>
-    <string name="audio_source_ytm_desc">Es paar Tracks sind nöd verfüegbar</string>
-    <string name="lossless_audio">Verlustfreii Audio (Beta)</string>
+    <string name="audio_source_ytm_desc">Es paar Tracks gits nöd</string>
+    <string name="lossless_audio">Verluschtfreie Ton (Beta)</string>
     <string name="lossless_on">FLAC über %s</string>
-    <string name="lossless_off">Standardqualität</string>
-    <string name="lossless_provider">Verlustfreii Quelle</string>
-    <string name="canvas_background">Canvas-Hintergrund</string>
-    <string name="canvas_on">Video hinterm Albumcover</string>
+    <string name="lossless_on_flac">FLAC</string>
+    <string name="lossless_off">Normali Qualität</string>
+    <string name="lossless_provider">Verluschtfreii Quälle</string>
+    <string name="tidal_desc">Tidal · FLAC bis 1411 kbps</string>
+    <string name="qobuz_desc">Qobuz · FLAC bis 9216 kbps</string>
+    <string name="canvas_background">Canvas-Hindergrund</string>
+    <string name="canvas_on">Video hinderem Albumcover</string>
     <string name="canvas_off">Uus</string>
     <string name="lyrics_animation">Lyrics-Animation</string>
-    <string name="lyrics_anim_desc">Wähl d Animation für ziilesyncti Lyrics.</string>
-    <string name="lyrics_vertical">Vo obe na une</string>
-    <string name="lyrics_horizontal">Vo links na rächts</string>
-    <string name="notification_left_button">Benachrichtigung links</string>
-    <string name="notification_right_button">Benachrichtigung rächts</string>
-    <string name="notif_like">Gfallt mer</string>
-    <string name="notif_like_desc">Gfallt-mer umschalte</string>
+    <string name="lyrics_anim_desc">Wähl, wie ziilewiisi Lyrics animiert wärded.</string>
+    <string name="lyrics_vertical">Vo obe abe</string>
+    <string name="lyrics_horizontal">Vo links uf rächts</string>
+    <string name="notification_left_button">Linki Taschte i de Mäldig</string>
+    <string name="notification_right_button">Rächti Taschte i de Mäldig</string>
+    <string name="notif_like">Gfallt mer / Gfallt mer nüm</string>
+    <string name="notif_like_desc">Gfallt-mer für de Song, wo grad lauft, umschalte</string>
     <string name="notif_shuffle">Zuefallswiedergab</string>
     <string name="notif_shuffle_desc">Zuefallswiedergab umschalte</string>
     <string name="notif_repeat">Wiederhole</string>
-    <string name="notif_repeat_desc">Wiederholig wächsle (us → alli → eis)</string>
-    <string name="connect_to_device">Mit Grät verbinde</string>
-    <string name="content_region">Inhaltsregion</string>
-    <string name="content_region_desc">Beeiflusst Suechergebnis und Empfählige</string>
+    <string name="notif_repeat_desc">Wiederholig wächsle (us → alli → eine)</string>
+    <string name="connect_to_device">Mit eme Grät verbinde</string>
+    <string name="content_region">Region vom Inhalt</string>
+    <string name="content_region_desc">Beiiflusst d Suechergäbnis und d Empfählige</string>
 
     <!-- About -->
     <string name="app_version">App-Version</string>
-    <string name="check_for_updates">Nach Updates sueche</string>
-    <string name="checking">Am Prüefe…</string>
-    <string name="up_to_date">Du hesch di nöischti Version</string>
-    <string name="tap_to_check">Tipp zum nach Updates sueche</string>
-    <string name="release_notes">Versionshinwiis</string>
+    <string name="check_for_updates">Nach Updates luege</string>
+    <string name="checking">Am Luege…</string>
+    <string name="up_to_date">Du häsch di nöischti Version</string>
+    <string name="tap_to_check">Tipp druf, zum nach neue Versione luege</string>
+    <string name="release_notes">Versions-Notize</string>
     <string name="view_changelog">Änderige aaluege</string>
 
     <!-- Update Dialog -->
-    <string name="update_available">Update verfüegbar</string>
+    <string name="update_available">Es Update isch da</string>
     <string name="current_version">Aktuell</string>
     <string name="new_version">Neu</string>
     <string name="whats_new">Was isch neu:</string>
-    <string name="update_now">Jetzt aktualisiere</string>
+    <string name="update_now">Jetz aktualisiere</string>
     <string name="later">Spöter</string>
 
     <!-- Devices -->
-    <string name="searching_devices">Am Grät sueche…</string>
+    <string name="searching_devices">Am Gräte sueche…</string>
 
     <!-- Notification -->
 
     <!-- Playback -->
-    <string name="playback_ended">Wiedergab fertig</string>
-
-    <!-- Backfill -->
-    <string name="tidal_desc">Tidal · FLAC bis 1411 kbps</string>
-    <string name="qobuz_desc">Qobuz · FLAC bis 9216 kbps</string>
+    <string name="playback_ended">Fertig gspilt</string>
 
     <!-- Common (added) -->
     <string name="close">Zuetue</string>
@@ -123,19 +132,20 @@
 
     <!-- Language -->
     <string name="language">Sproch</string>
-    <string name="language_system_default">Systemstandard</string>
+    <string name="language_system_default">Wie s System</string>
 
     <!-- Settings (added) -->
-    <string name="lossless_off_spfy">Standardqualität (Spotify)</string>
+    <string name="lossless_off_spfy">Normali Qualität (Spotify)</string>
     <string name="tidal">Tidal</string>
     <string name="qobuz">Qobuz</string>
     <string name="tidal_short_desc">FLAC bis 1411 kbps</string>
     <string name="qobuz_short_desc">FLAC bis 9216 kbps</string>
-    <string name="notification_button_left">Linki Taste</string>
-    <string name="notification_button_right">Rächti Taste</string>
+    <string name="notification_button_left">Linki Taschte</string>
+    <string name="notification_button_right">Rächti Taschte</string>
     <string name="notif_like_short_desc">Gfallt-mer umschalte</string>
 
     <!-- Regions -->
+    <string name="region_nearest">Am nöchschte (automatisch)</string>
     <string name="region_us">Vereinigti Staate</string>
     <string name="region_gb">Vereinigts Königriich</string>
     <string name="region_de">Dütschland</string>
@@ -149,25 +159,25 @@
     <string name="region_se">Schwede</string>
 
     <!-- Release Notes (added) -->
-    <string name="release_load_failed">Versionshinwiis chönd nöd glade werde</string>
-    <string name="release_load_failed_short">Lade gschiitered: %s</string>
-    <string name="release_load_generic_error">Lade gschiitered</string>
+    <string name="release_load_failed">D Versions-Notize händ nöd chöne glade werde</string>
+    <string name="release_load_failed_short">Lade gschiiteret: %s</string>
+    <string name="release_load_generic_error">Lade gschiiteret</string>
     <string name="release_latest_badge">NÖISCHT</string>
     <string name="release_fallback_title">Version %s</string>
 
     <!-- Loading / Connection -->
-    <string name="rate_limited">Z viel Aafrage</string>
+    <string name="rate_limited">Z vill Aafrage</string>
     <string name="retrying_in">Nomal i %ds</string>
-    <string name="login_different_account">Mit anderem Konto aamälde</string>
-    <string name="connection_failed">Verbindig gschiitered</string>
-    <string name="connecting_to_spfy">Am Spotify verbinde…</string>
+    <string name="login_different_account">Mit emene andere Konto aamälde</string>
+    <string name="connection_failed">Verbindig het nöd klappet</string>
+    <string name="connecting_to_spfy">Am Verbinde mit Spotify…</string>
 
     <!-- Update Dialog (added) -->
-    <string name="update_download_failed">Download gschiitered. Probier nomal.</string>
+    <string name="update_download_failed">Abelade het nöd klappet. Probier s nomal.</string>
 
     <!-- Devices (added) -->
     <string name="connect">Verbinde</string>
-    <string name="this_smartphone">Das Händy</string>
+    <string name="this_smartphone">Das Natel</string>
 
     <!-- Common Actions -->
     <string name="search">Sueche</string>
@@ -182,29 +192,30 @@
     <string name="shuffle">Zuefallswiedergab</string>
     <string name="repeat">Wiederhole</string>
     <string name="queue">Wartelischte</string>
-    <string name="audio_output">Audio-Uusgab</string>
+    <string name="audio_output">Ton-Uusgab</string>
     <string name="equalizer">Equalizer</string>
     <string name="lyrics">Lyrics</string>
+    <string name="infiniplay">InfiniPlay</string>
     <string name="view_queue">Wartelischte aaluege</string>
-    <string name="visit_artist">Künstler aaluege</string>
+    <string name="visit_artist">Künschtler aaluege</string>
     <string name="devices">Gräti</string>
     <string name="share_track_chooser">Song teile</string>
 
     <!-- Library Screen -->
     <string name="library_title">Dini Bibliothek</string>
     <string name="library_create">Mache</string>
-    <string name="library_toggle_view">Asicht wächsle</string>
+    <string name="library_toggle_view">Aasicht wächsle</string>
     <string name="library_filter_playlists">Playlists</string>
-    <string name="library_filter_artists">Künstler</string>
-    <string name="library_filter_albums">Albä</string>
+    <string name="library_filter_artists">Künschtler</string>
+    <string name="library_filter_albums">Albe</string>
     <string name="library_sort">Sortiere</string>
     <string name="library_sort_recent">Nöischti</string>
     <string name="library_sort_alpha">Alphabetisch</string>
     <string name="library_sort_by_type">Nach Typ</string>
     <string name="library_create_playlist">Playlist mache</string>
-    <string name="library_playlist_name_hint">Playlist-Name</string>
+    <string name="library_playlist_name_hint">Name vo de Playlist</string>
     <string name="library_create_button">Mache</string>
-    <string name="library_remove_title">Us Bibliothek näh</string>
+    <string name="library_remove_title">Us de Bibliothek näh</string>
     <string name="library_remove_message">\"%s\" us dinere Bibliothek näh?</string>
     <string name="library_remove_button">Näh</string>
 
@@ -212,88 +223,91 @@
     <string name="detail_likes">%s Likes</string>
     <string name="detail_songs">%d Songs</string>
     <string name="detail_minutes">%d Min</string>
-    <string name="detail_monthly_listeners">%s monatlichi Lostere</string>
+    <string name="detail_monthly_listeners">%s Lostere im Monet</string>
 
     <!-- Queue Screen -->
     <string name="queue_next_up">Als Nächschts</string>
-    <string name="queue_empty">Wartelischte isch leer</string>
+    <string name="queue_empty">D Wartelischte isch leer</string>
 
     <!-- Lyrics Screen -->
-    <string name="lyrics_not_available">Kei Lyrics verfüegbar</string>
+    <string name="lyrics_not_available">Kei Lyrics do</string>
 
     <!-- Now Playing -->
     <string name="now_playing_playing_from">Lauft vo %s</string>
-    <string name="now_playing_not_playing">Nüt lauft</string>
-    <string name="now_playing_skipping_ad">Werbig wird übersprunge…</string>
+    <string name="now_playing_not_playing">Es lauft nüüt</string>
+    <string name="now_playing_skipping_ad">D Wärbig wird übersprunge…</string>
 
     <!-- Search (added) -->
-    <string name="search_title">Suechi</string>
+    <string name="search_title">Sueche</string>
     <string name="search_field_placeholder">Sueche</string>
     <string name="search_clear">Lösche</string>
     <string name="search_browse_all">Alles aaluege</string>
     <string name="search_subtitle_song">Song · %s</string>
-    <string name="search_subtitle_artist">Künstler</string>
+    <string name="search_subtitle_artist">Künschtler</string>
     <string name="search_subtitle_playlist">Playlist</string>
     <string name="search_subtitle_podcast">Podcast</string>
     <string name="search_subtitle_profile">Profil</string>
     <string name="search_filter_all">Alli</string>
-    <string name="search_filter_artists">Künstler</string>
-    <string name="search_filter_albums">Albä</string>
+    <string name="search_filter_artists">Künschtler</string>
+    <string name="search_filter_albums">Albe</string>
     <string name="search_filter_songs">Songs</string>
     <string name="search_filter_playlists">Playlists</string>
     <string name="search_filter_podcasts">Podcasts</string>
     <string name="search_filter_profiles">Profil</string>
-    <string name="search_top_result">Top-Ergäbnis</string>
-    <string name="search_show_all">Alli azeige</string>
+    <string name="search_top_result">Bescht Träffer</string>
+    <string name="search_show_all">Alli zeige</string>
 
     <!-- Login -->
-    <string name="login_title">Bi Spotify aamelde</string>
+    <string name="login_title">Bi Spotify aamälde</string>
 
     <!-- Account section headers -->
     <string name="account_section_profile">Profil &amp; Konto</string>
-    <string name="account_section_playback">Abspilig</string>
+    <string name="account_section_playback">Abspile</string>
     <string name="account_section_appearance">Usgsee</string>
-    <string name="account_section_notifications">Benachrichtigunge</string>
+    <string name="account_section_notifications">Mäldige</string>
+    <string name="account_section_sound">Ton</string>
 
     <!-- Equalizer -->
     <string name="state_on">Ii</string>
     <string name="state_off">Uus</string>
-    <string name="eq_in_app">App-Equalizer</string>
+    <string name="eq_in_app">Equalizer i de App</string>
     <string name="eq_in_app_desc">Übernimmt vo externe Equalizer wie Wavelet</string>
     <string name="eq_requires_p">Bruucht Android 9 oder nöier.</string>
     <string name="eq_preamp">Vorverstärkig %1$s dB</string>
     <string name="eq_preamp_auto">Automatisch</string>
     <string name="eq_flat">Neutral</string>
+    <string name="eq_mode_off_desc">Kein Equalizer, kei Absänkig</string>
+    <string name="eq_mode_in_app_desc">10 Bänder, Headroom automatisch</string>
+    <string name="eq_mode_external">Externe Equalizer</string>
+    <string name="eq_mode_external_desc">D Wiedergab absänke, dass e App wie Wavelet cha aahebe</string>
+    <string name="eq_mode_external_at">Extern, um %1$d dB abgsänkt</string>
     <string name="eq_headroom">EQ-Headroom</string>
-    <string name="eq_headroom_handled">Macht de App-Equalizer</string>
-    <string name="eq_headroom_on">Wiedergab um %1$d dB abgsenkt. Uf dini grössti EQ-Aahebig istelle</string>
-    <string name="eq_headroom_off">Uus. Ischalte, wenn du en externe Equalizer wie Wavelet bruuchsch</string>
-    <string name="gradient_background">Farbverlauf-Hintergrund</string>
-    <string name="gradient_bg_on">Albumfarbe-Verlauf</string>
+    <string name="eq_headroom_handled">Macht de Equalizer i de App</string>
+    <string name="eq_headroom_on">Wiedergab um %1$d dB abgsänkt. Stell s uf dini grössti EQ-Aahebig ii</string>
+    <string name="eq_headroom_off">Uus. Schalt s ii, wänn du en externe Equalizer wie Wavelet bruuchsch</string>
+    <string name="gradient_background">Farbverlauf im Hindergrund</string>
+    <string name="gradient_bg_on">Farbverlauf vom Album</string>
     <string name="gradient_bg_off">Fliessends Albumcover</string>
-    <string name="lossless_on_flac">FLAC</string>
-    <string name="region_nearest">Am nöchste (automatisch)</string>
-    <string name="infiniplay">InfiniPlay</string>
 
     <!-- Snackbars -->
-    <string name="save_to_library">Zur Bibliothek dezuetue</string>
+    <string name="save_to_library">I d Bibliothek dezuetue</string>
 
     <!-- Notification channels -->
-    <string name="notif_channel_playback">Musigwiedergab</string>
-    <string name="notif_channel_playback_desc">Zeigt de Song wo grad lauft</string>
+    <string name="notif_channel_playback">Musig abspile</string>
+    <string name="notif_channel_playback_desc">Zeigt de Song, wo grad lauft</string>
     <string name="notif_channel_alerts">Warnige</string>
-    <string name="notif_channel_alerts_desc">Verbindigs- und Aamäldigsproblem wo dini Ufmerksamkeit bruuched</string>
+    <string name="notif_channel_alerts_desc">Problem mit de Verbindig und em Aamälde, wo du aaluege muesch</string>
 
     <!-- Connection errors -->
-    <string name="auth_lost">Spotify-Sitzig verlore. Mäld di nomal aa, zum wiitermache</string>
-    <string name="connect_failed">Verbindig na 5 Versüech fehlgschlage. Bitte spöter nomal probiere.</string>
-    <string name="notif_connection_lost_title">Snepilatch: Verbindig verlore</string>
-    <string name="notif_connection_lost_text">Tippe, zum Spotify neu verbinde</string>
+    <string name="auth_lost">D Spotify-Sitzig isch wäg. Mäld di nomal aa, zum wiitermache</string>
+    <string name="connect_failed">Verbindig het na 5 Versüech nöd klappet. Probier s spöter nomal.</string>
+    <string name="notif_connection_lost_title">Snepilatch: Verbindig wäg</string>
+    <string name="notif_connection_lost_text">Tipp druf, zum nomal mit Spotify verbinde</string>
 
     <!-- Action errors -->
-    <string name="error_like">Lieblingssongs händ nöd chöne aktualisiert werde</string>
-    <string name="error_follow">Em Künstler häsch nöd chöne folge</string>
-    <string name="error_save_library">Häts nöd i d Bibliothek gschafft</string>
-    <string name="error_add_playlist">Häts nöd i d Playlist gschafft</string>
-    <string name="error_add_queue">Häts nöd i d Warteschlange gschafft</string>
+    <string name="error_like">D Lieblingssongs händ nöd chöne aktualisiert werde</string>
+    <string name="error_follow">Em Künschtler folge het nöd klappet</string>
+    <string name="error_save_library">I d Bibliothek spichere het nöd klappet</string>
+    <string name="error_add_playlist">I d Playlist dezuetue het nöd klappet</string>
+    <string name="error_add_queue">I d Wartelischte dezuetue het nöd klappet</string>
 </resources>

@@ -230,7 +230,7 @@
     <string name="queue_empty">D Wartelischte isch leer</string>
 
     <!-- Lyrics Screen -->
-    <string name="lyrics_not_available">Kei Lyrics do</string>
+    <string name="lyrics_not_available">Kei Lyrics verfüegbar</string>
 
     <!-- Now Playing -->
     <string name="now_playing_playing_from">Lauft vo %s</string>

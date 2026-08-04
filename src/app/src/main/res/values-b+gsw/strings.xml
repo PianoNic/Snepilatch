@@ -65,14 +65,14 @@
     <!-- Settings -->
     <string name="audio_source">Tonquälle</string>
     <string name="audio_source_spotify">Spotify</string>
-    <string name="audio_source_spotify_desc">Normali Qualität, direkt vo Spotify</string>
+    <string name="audio_source_spotify_desc">Standardqualität, direkt vo Spotify</string>
     <string name="audio_source_lossless_desc">FLAC, wänn en Drittaabieter de Track hät</string>
     <string name="audio_source_ytm">YouTube Music (Beta)</string>
     <string name="audio_source_ytm_desc">Es paar Tracks gits nöd</string>
     <string name="lossless_audio">Verluschtfreie Ton (Beta)</string>
     <string name="lossless_on">FLAC über %s</string>
     <string name="lossless_on_flac">FLAC</string>
-    <string name="lossless_off">Normali Qualität</string>
+    <string name="lossless_off">Standardqualität</string>
     <string name="lossless_provider">Verluschtfreii Quälle</string>
     <string name="tidal_desc">Tidal · FLAC bis 1411 kbps</string>
     <string name="qobuz_desc">Qobuz · FLAC bis 9216 kbps</string>
@@ -135,7 +135,7 @@
     <string name="language_system_default">Wie s System</string>
 
     <!-- Settings (added) -->
-    <string name="lossless_off_spfy">Normali Qualität (Spotify)</string>
+    <string name="lossless_off_spfy">Standardqualität (Spotify)</string>
     <string name="tidal">Tidal</string>
     <string name="qobuz">Qobuz</string>
     <string name="tidal_short_desc">FLAC bis 1411 kbps</string>

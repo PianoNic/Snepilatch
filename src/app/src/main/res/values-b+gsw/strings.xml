@@ -2,7 +2,7 @@
     <!--
         Aargauerdütsch. Eini Sproch dure, nöd es Gmisch us Züri- und Bärndütsch.
         Regle wo im ganze File gälted:
-          nöd · gsi · isch · händ · chasch · muesch · wott
+          nöd · gsi · isch · hät · händ · chasch · muesch · wott
           -ig statt -ung: Iistellig, Verbindig, Wiederholig, Mäldig
           st wird zu scht, wo mer s au so seit: Künschtler, Taschte, Wartelischte, bescht
           wo als Relativpronome: "de Song, wo grad lauft"
@@ -66,7 +66,7 @@
     <string name="audio_source">Tonquälle</string>
     <string name="audio_source_spotify">Spotify</string>
     <string name="audio_source_spotify_desc">Normali Qualität, direkt vo Spotify</string>
-    <string name="audio_source_lossless_desc">FLAC, wänn en Drittaabieter de Track het</string>
+    <string name="audio_source_lossless_desc">FLAC, wänn en Drittaabieter de Track hät</string>
     <string name="audio_source_ytm">YouTube Music (Beta)</string>
     <string name="audio_source_ytm_desc">Es paar Tracks gits nöd</string>
     <string name="lossless_audio">Verluschtfreie Ton (Beta)</string>
@@ -169,11 +169,11 @@
     <string name="rate_limited">Z vill Aafrage</string>
     <string name="retrying_in">Nomal i %ds</string>
     <string name="login_different_account">Mit emene andere Konto aamälde</string>
-    <string name="connection_failed">Verbindig het nöd klappet</string>
+    <string name="connection_failed">Verbindig hät nöd funktioniert</string>
     <string name="connecting_to_spfy">Am Verbinde mit Spotify…</string>
 
     <!-- Update Dialog (added) -->
-    <string name="update_download_failed">Abelade het nöd klappet. Probier s nomal.</string>
+    <string name="update_download_failed">Abelade hät nöd funktioniert. Probier s nomal.</string>
 
     <!-- Devices (added) -->
     <string name="connect">Verbinde</string>
@@ -300,14 +300,14 @@
 
     <!-- Connection errors -->
     <string name="auth_lost">D Spotify-Sitzig isch wäg. Mäld di nomal aa, zum wiitermache</string>
-    <string name="connect_failed">Verbindig het na 5 Versüech nöd klappet. Probier s spöter nomal.</string>
+    <string name="connect_failed">Verbindig hät na 5 Versüech nöd funktioniert. Probier s spöter nomal.</string>
     <string name="notif_connection_lost_title">Snepilatch: Verbindig wäg</string>
     <string name="notif_connection_lost_text">Tipp druf, zum nomal mit Spotify verbinde</string>
 
     <!-- Action errors -->
     <string name="error_like">D Lieblingssongs händ nöd chöne aktualisiert werde</string>
-    <string name="error_follow">Em Künschtler folge het nöd klappet</string>
-    <string name="error_save_library">I d Bibliothek spichere het nöd klappet</string>
-    <string name="error_add_playlist">I d Playlist dezuetue het nöd klappet</string>
-    <string name="error_add_queue">I d Wartelischte dezuetue het nöd klappet</string>
+    <string name="error_follow">Em Künschtler folge hät nöd funktioniert</string>
+    <string name="error_save_library">I d Bibliothek spichere hät nöd funktioniert</string>
+    <string name="error_add_playlist">I d Playlist dezuetue hät nöd funktioniert</string>
+    <string name="error_add_queue">I d Wartelischte dezuetue hät nöd funktioniert</string>
 </resources>

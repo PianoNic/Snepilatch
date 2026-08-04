@@ -22,11 +22,11 @@
 
 | Playback | Sound |
 | --- | --- |
-| Plays locally on your phone as its own Connect device, so transport actions are never skip-capped<br>Ad-free listening<br>Choose your audio source: the standard stream, optional lossless, or YouTube Music<br>Full Connect control: transfer to and from other devices | Ten-band in-app equalizer with a drag-and-drop curve editor<br>Automatic gain staging so boosted bands cannot clip<br>EQ headroom for anyone running an external equalizer such as Wavelet |
+| <ul><li>Plays locally on your phone as its own Connect device, so transport actions are never skip-capped</li><li>Ad-free listening</li><li>Choose your audio source: the standard stream, optional lossless, or YouTube Music</li><li>Full Connect control: transfer to and from other devices</li></ul> | <ul><li>Ten-band in-app equalizer with a drag-and-drop curve editor</li><li>Automatic gain staging so boosted bands cannot clip</li><li>EQ headroom for anyone running an external equalizer such as Wavelet</li></ul> |
 | **InfiniPlay** | **Library and browsing** |
-| Turns any track into a never-ending remix, beat-matched and crossfaded in the audio chain<br>Builds a beat graph from the waveform itself, with no per-track analysis API | Liked songs, playlists, albums, artists and podcasts<br>Search, home feed, and queue management in a bottom drawer<br>Word-level synced lyrics |
+| <ul><li>Turns any track into a never-ending remix, beat-matched and crossfaded in the audio chain</li><li>Builds a beat graph from the waveform itself, with no per-track analysis API</li></ul> | <ul><li>Liked songs, playlists, albums, artists and podcasts</li><li>Search, home feed, and queue management in a bottom drawer</li><li>Word-level synced lyrics</li></ul> |
 | **Interface** | **Languages and updates** |
-| Fully native UI built with Jetpack Compose and Material 3<br>Dynamic color theming from album art<br>Gesture-based player with swipe navigation<br>Canvas background animations | English, German, Russian and Swiss German<br>Automatic in-app updates |
+| <ul><li>Fully native UI built with Jetpack Compose and Material 3</li><li>Dynamic color theming from album art</li><li>Gesture-based player with swipe navigation</li><li>Canvas background animations</li></ul> | <ul><li>English, German, Russian and Swiss German</li><li>Automatic in-app updates</li></ul> |
 
 ## Installation
 

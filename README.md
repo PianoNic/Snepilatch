@@ -20,38 +20,13 @@
 
 ## Features
 
-**Playback**
-
-- Plays locally on your phone as its own Connect device, so transport actions are never skip-capped
-- Ad-free listening
-- Choose your audio source: the standard stream, optional lossless, or YouTube Music
-- Full Connect control: transfer to and from other devices
-
-**Sound**
-
-- Ten-band in-app equalizer with a drag-and-drop curve editor
-- Automatic gain staging so boosted bands cannot clip
-- EQ headroom for anyone running an external equalizer such as Wavelet
-
-**InfiniPlay**
-
-- Turns any track into a never-ending remix, beat-matched and crossfaded in the audio chain
-- Builds a beat graph from the waveform itself, with no per-track analysis API
-
-**Library and browsing**
-
-- Liked songs, playlists, albums, artists and podcasts
-- Search, home feed, and queue management in a bottom drawer
-- Word-level synced lyrics
-
-**Interface**
-
-- Fully native UI built with Jetpack Compose and Material 3
-- Dynamic color theming from album art
-- Gesture-based player with swipe navigation
-- Canvas background animations
-- English, German, Russian and Swiss German
-- Automatic in-app updates
+| | |
+| --- | --- |
+| **Playback** | Plays locally on your phone as its own Connect device, so transport actions are never skip-capped<br>Ad-free listening<br>Choose your audio source: the standard stream, optional lossless, or YouTube Music<br>Full Connect control: transfer to and from other devices |
+| **Sound** | Ten-band in-app equalizer with a drag-and-drop curve editor<br>Automatic gain staging so boosted bands cannot clip<br>EQ headroom for anyone running an external equalizer such as Wavelet |
+| **InfiniPlay** | Turns any track into a never-ending remix, beat-matched and crossfaded in the audio chain<br>Builds a beat graph from the waveform itself, with no per-track analysis API |
+| **Library and browsing** | Liked songs, playlists, albums, artists and podcasts<br>Search, home feed, and queue management in a bottom drawer<br>Word-level synced lyrics |
+| **Interface** | Fully native UI built with Jetpack Compose and Material 3<br>Dynamic color theming from album art<br>Gesture-based player with swipe navigation<br>Canvas background animations<br>English, German, Russian and Swiss German<br>Automatic in-app updates |
 
 ## Installation
 

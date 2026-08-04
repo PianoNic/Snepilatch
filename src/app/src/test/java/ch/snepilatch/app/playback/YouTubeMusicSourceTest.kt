@@ -301,4 +301,63 @@ class YouTubeMusicSourceTest {
         val yt = listOf(YouTubeMusicSource.Candidate("x", "Creep", "Random Channel", 239))
         assertNull(YouTubeMusicSource.bestMatch(yt, "Creep", "Radiohead", durationMs = 239_000))
     }
+
+    /**
+     * The rows below are live captures for the KAIHEN -tsumi- release, taken after every track of
+     * it failed to resolve on a device.
+     */
+    @Test
+    fun matchesAnArtistSpotifyRomanisesAndYouTubeMusicLeavesInJapanese() {
+        // Spotify credits TSUMITOBATSU, YouTube Music credits 罪十罰. Word overlap between the two
+        // scripts is empty by construction, so the artist filter rejected the band's own upload.
+        val yt = listOf(
+            YouTubeMusicSource.Candidate("QLhTcG7tZ7M", "RAVEN", "罪十罰", 197, details = "罪十罰 KAIHEN -tsumi- 3:17"),
+            YouTubeMusicSource.Candidate("cgfLdqXyZ8w", "Seventh Heaven", "The Raven Age", 331),
+            YouTubeMusicSource.Candidate("DIat_1r73iM", "RAVEN", "Phonkha", 147),
+        )
+        val match = YouTubeMusicSource.bestMatch(yt, "RAVEN", "TSUMITOBATSU", durationMs = 196_000)
+        assertEquals("QLhTcG7tZ7M", match?.videoId)
+    }
+
+    /** A Latin-script artist that genuinely differs is still rejected; the skip is script-only. */
+    @Test
+    fun aDifferentArtistInTheSameScriptIsStillRejected() {
+        val yt = listOf(YouTubeMusicSource.Candidate("wrong", "RAVEN", "Phonkha", 196))
+        assertNull(YouTubeMusicSource.bestMatch(yt, "RAVEN", "TSUMITOBATSU", durationMs = 196_000))
+    }
+
+    @Test
+    fun matchesWhenYouTubeMusicCreditsTheCollectiveAndSpotifyTheMembers() {
+        // Real rows for "DIGGER": YouTube Music files it under GIRLS REVOLUTION PROJECT, Spotify
+        // under TSUMITOBATSU, biz, ZERA. Both Latin, so the script rule does not save it, and no
+        // candidate carries the wanted name at all. Rejecting on the artist left nothing.
+        val yt = listOf(
+            YouTubeMusicSource.Candidate("1jWHBQJhEcw", "BETTALATION", "biz", 153),
+            YouTubeMusicSource.Candidate("Mdu8yROvtwI", "DIGGER", "GIRLS REVOLUTION PROJECT", 184),
+        )
+        val match = YouTubeMusicSource.bestMatch(
+            yt, "DIGGER", "TSUMITOBATSU, biz, ZERA", durationMs = 183_000, officialShelf = true,
+        )
+        assertEquals("Mdu8yROvtwI", match?.videoId)
+    }
+
+    /** The same shutout on the videos shelf stays a miss: that is where anyone can upload. */
+    @Test
+    fun anUnknownCreditOnTheVideosShelfIsStillRejected() {
+        val yt = listOf(YouTubeMusicSource.Candidate("x", "DIGGER", "Some Random Channel", 184))
+        assertNull(
+            YouTubeMusicSource.bestMatch(yt, "DIGGER", "TSUMITOBATSU", durationMs = 183_000, officialShelf = false),
+        )
+    }
+
+    /** When one candidate IS the artist, the others still lose: the fallback only runs on a shutout. */
+    @Test
+    fun theArtistStillDecidesWhenACandidateCarriesIt() {
+        val yt = listOf(
+            YouTubeMusicSource.Candidate("resing", "Get Lucky", "Some Guy", 369),
+            YouTubeMusicSource.Candidate("real", "Get Lucky", "Daft Punk", 369),
+        )
+        val match = YouTubeMusicSource.bestMatch(yt, "Get Lucky", "Daft Punk", durationMs = 369_000, officialShelf = true)
+        assertEquals("real", match?.videoId)
+    }
 }

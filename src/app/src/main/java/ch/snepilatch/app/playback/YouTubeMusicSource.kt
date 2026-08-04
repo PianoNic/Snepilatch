@@ -128,7 +128,7 @@ object YouTubeMusicSource {
             val body = post(SEARCH_URL, searchBody(query, region, visitor, params), WEB_UA, visitor)
             val candidates = body?.let { runCatching { parseCandidates(it) }.getOrNull() }.orEmpty()
             seen += candidates.size
-            bestMatch(candidates, title, artist, durationMs)
+            bestMatch(candidates, title, artist, durationMs, officialShelf = params == SONGS_PARAMS)
         }
         if (match == null) {
             LokiLogger.i(TAG, "no match for '$query' ($seen candidates, ${durationMs / 1000}s)")
@@ -241,13 +241,14 @@ object YouTubeMusicSource {
         wantTitle: String,
         wantArtist: String,
         durationMs: Long,
+        officialShelf: Boolean = false,
     ): Candidate? {
         val want = words(wantTitle)
         val wantArtistWords = words(realArtist(wantArtist))
         // Read the request the same way as the candidate, brackets included: asking for "Sonne
         // (Remix)" must keep the remix, and that marker only survives in the bracket-keeping split.
         val asked = markerWords(wantTitle) + markerWords(wantArtist)
-        val viable = candidates.filter { candidate ->
+        val titled = candidates.filter { candidate ->
             (want.isEmpty() || titleScore(candidate.title, want) >= MIN_TITLE_SCORE) &&
                 // The release text too, not just the title: an instrumental cut usually carries the
                 // original's exact title and artist, and only the release it sits on says what it is.
@@ -255,9 +256,19 @@ object YouTubeMusicSource {
                 // the whole run made a plain album name disqualify every candidate. REWORK_MARKERS
                 // holds bare instrument nouns, so "Guitar Songs" or "Piano Man" read as reworks and
                 // the track became unresolvable on this source.
-                !addsRework("${candidate.title} ${bracketedIn(candidate.details)}", asked) &&
-                artistMatches(candidate.artist, wantArtistWords)
+                !addsRework("${candidate.title} ${bracketedIn(candidate.details)}", asked)
         }
+        // The songs shelf is YouTube Music's own catalogue, so a row on it is a release rather than
+        // somebody's upload, and a credit that does not match ours is usually the same recording
+        // filed under a different name: it lists "DIGGER" under GIRLS REVOLUTION PROJECT where
+        // Spotify credits TSUMITOBATSU, biz, ZERA. When no candidate carries the wanted name at all
+        // the credit is telling us nothing, and rejecting on it throws the release away for good.
+        //
+        // The videos shelf is where anyone can upload, which is what the artist check is for, so
+        // there a miss stays a miss. Same on any shelf as soon as one candidate does carry the name:
+        // the credit discriminates again, and the ones that lack it lose.
+        val byArtist = titled.filter { artistMatches(it.artist, wantArtistWords) }
+        val viable = if (officialShelf) byArtist.ifEmpty { titled } else byArtist
         if (durationMs <= 0L) return viable.firstOrNull()
         val wantSec = durationMs / 1000
         // YouTube Music ranks the canonical upload first. An instrumental runs to the same length as
@@ -312,8 +323,17 @@ object YouTubeMusicSource {
         if (wantArtist.isEmpty()) return true
         val have = words(candidateArtist.orEmpty())
         if (have.isEmpty()) return true
+        // Two scripts cannot be compared by word overlap at all. Spotify romanises names YouTube
+        // Music leaves in the original, so the same band is TSUMITOBATSU on one side and 罪十罰 on
+        // the other, they share nothing, and every real candidate was thrown away. Skipping the
+        // check costs nothing the other filters do not already cover: an upload in a different
+        // script from the artist we asked for is not what a cover or a karaoke channel looks like.
+        if (hasLatin(have) != hasLatin(wantArtist)) return true
         return have.any { h -> wantArtist.any { nearlyEqual(h, it) } }
     }
+
+    /** normalize() has already lowercased, so a Latin letter is enough to tell the scripts apart. */
+    private fun hasLatin(words: Set<String>): Boolean = words.any { word -> word.any { it in 'a'..'z' } }
 
     /** Share of the wanted title's words the candidate carries. */
     internal fun titleScore(candidateTitle: String, want: Set<String>): Double {

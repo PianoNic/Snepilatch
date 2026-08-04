@@ -3,7 +3,7 @@
         Aargauerdütsch. Eini Sproch dure, nöd es Gmisch us Züri- und Bärndütsch.
         Regle wo im ganze File gälted:
           nöd · gsi · isch · hät · händ · chasch · muesch · wott
-          -ig statt -ung: Iistellig, Verbindig, Wiederholig, Mäldig
+          -ig statt -ung: Iistellig, Verbindig, Wiederholig, Warnig
           st wird zu scht, wo mer s au so seit: Künschtler, Taschte, Wartelischte, bescht
           wo als Relativpronome: "de Song, wo grad lauft"
           Natel statt Händy · "um ... z ..." für de Zwäck-Satz
@@ -83,8 +83,8 @@
     <string name="lyrics_anim_desc">Wähl, wie ziilewiisi Lyrics animiert wärded.</string>
     <string name="lyrics_vertical">Vo obe abe</string>
     <string name="lyrics_horizontal">Vo links uf rächts</string>
-    <string name="notification_left_button">Linki Taschte i de Mäldig</string>
-    <string name="notification_right_button">Rächti Taschte i de Mäldig</string>
+    <string name="notification_left_button">Linki Taschte i de Benachrichtigunge</string>
+    <string name="notification_right_button">Rächti Taschte i de Benachrichtigunge</string>
     <string name="notif_like">Gfallt mer / Gfallt mer nüm</string>
     <string name="notif_like_desc">Gfallt-mer für de Song, wo grad lauft, umschalte</string>
     <string name="notif_shuffle">Zuefallswiedergab</string>
@@ -264,7 +264,7 @@
     <string name="account_section_profile">Profil &amp; Konto</string>
     <string name="account_section_playback">Abspile</string>
     <string name="account_section_appearance">Usgsee</string>
-    <string name="account_section_notifications">Mäldige</string>
+    <string name="account_section_notifications">Benachrichtigunge</string>
     <string name="account_section_sound">Ton</string>
 
     <!-- Equalizer -->

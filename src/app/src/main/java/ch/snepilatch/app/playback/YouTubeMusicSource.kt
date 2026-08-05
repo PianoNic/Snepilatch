@@ -83,7 +83,7 @@ object YouTubeMusicSource {
         region: String?,
         durationMs: Long,
     ): Stream? = withContext(Dispatchers.IO) {
-        val query = listOf(artist, title).filter { it.isNotBlank() }.joinToString(" ").trim()
+        val query = searchQuery(artist, title)
         if (query.isBlank()) return@withContext null
 
         val visitor = visitorData ?: fetchVisitorData(region)?.also { visitorData = it }
@@ -205,7 +205,7 @@ object YouTubeMusicSource {
 
     /** Null rather than a guess: the wrong recording is worse than none, and the caller skips. */
     internal fun bestMatch(candidates: List<Candidate>, wantTitle: String, durationMs: Long): Candidate? {
-        val want = words(wantTitle)
+        val want = titleWords(wantTitle)
         val titled = candidates.filter { want.isEmpty() || titleScore(it.title, want) >= MIN_TITLE_SCORE }
         if (durationMs <= 0L) return titled.firstOrNull()
         val wantSec = durationMs / 1000
@@ -241,6 +241,32 @@ object YouTubeMusicSource {
         }
         return edits + (long.length - i) + (short.length - j) <= 1
     }
+
+    /**
+     * What to search for, with the operator meaning taken out of a leading hyphen.
+     *
+     * YouTube reads "-word" as "exclude everything containing word". A track called "改変 -罪-"
+     * therefore asked search to drop every result carrying 罪, which is the artist and the whole
+     * release, and the shelf came back empty. Only a hyphen that opens a word is an operator, so a
+     * name like Spider-Man keeps its own.
+     */
+    internal fun searchQuery(artist: String, title: String): String =
+        listOf(artist, title).filter { it.isNotBlank() }.joinToString(" ")
+            .replace(Regex("(^|\\s)-+"), "$1")
+            .trim()
+
+    /**
+     * The words of the wanted title a candidate has to carry, which stops at the feature credit.
+     *
+     * Spotify writes the guest into the track name, YouTube Music puts it in brackets that
+     * [normalize] then strips off the candidate. So "弔花 feat. 他人事" was scored against a
+     * candidate reading "弔花", matched one word of three, and never came near [MIN_TITLE_SCORE].
+     * Only the part before the credit is required; a candidate that does spell the guest out still
+     * matches, because the score measures how much of the wanted title the candidate carries and
+     * never penalises extra words.
+     */
+    internal fun titleWords(title: String): Set<String> =
+        words(normalize(title).split(" feat ", " ft ", limit = 2).first()).ifEmpty { words(title) }
 
     private fun words(s: String): Set<String> =
         normalize(s).split(' ').filter { it.isNotBlank() }.toSet()

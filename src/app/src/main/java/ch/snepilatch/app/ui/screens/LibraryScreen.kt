@@ -57,14 +57,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
+import ch.snepilatch.app.download.Downloads
 import ch.snepilatch.app.data.LIKED_SONGS_COVER_URL
 import ch.snepilatch.app.data.LibraryItem
+import ch.snepilatch.app.data.TrackInfo
+import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import ch.snepilatch.app.ui.components.SpfyImage
 import ch.snepilatch.app.ui.components.TightAlertDialog
 import ch.snepilatch.app.ui.theme.SpfyBlack
@@ -97,12 +101,21 @@ fun LibraryScreen() {
 
     // Recompute the filter/search/sort pipeline only when an input actually changes, not on every
     // recomposition (e.g. a position tick or unrelated state update).
-    val sortedLibrary = remember(library, selectedFilter, searchQuery, sortMode) {
+    // Downloaded content is grouped by the album or playlist it came from, so it browses like the
+    // rest of the library rather than as a flat list of tracks.
+    // Keyed on the published rows rather than querying: groups() reads them out of memory, so this
+    // stays a grouping of a list the store already loaded off the main thread.
+    val downloadedRows by Downloads.rows.collectAsState()
+    val downloadedItems = remember(downloadedRows) {
+        Downloads.groups().map { LibraryItem(it.uri, it.name, it.imageUrl, it.type) }
+    }
+    val sortedLibrary = remember(library, downloadedItems, selectedFilter, searchQuery, sortMode) {
+        val source = if (selectedFilter == "Downloaded") downloadedItems else library
         val filteredLibrary = when (selectedFilter) {
-            "Playlists" -> library.filter { it.type == "playlist" || it.type == "collection" }
-            "Artists" -> library.filter { it.type == "artist" }
+            "Playlists" -> source.filter { it.type == "playlist" || it.type == "collection" }
+            "Artists" -> source.filter { it.type == "artist" }
             "Albums" -> library.filter { it.type == "album" }
-            else -> library
+            else -> source
         }
         val searchedLibrary = if (searchQuery.isBlank()) filteredLibrary
         else filteredLibrary.filter {
@@ -181,6 +194,31 @@ fun LibraryScreen() {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(vertical = 8.dp)
         ) {
+            // The library lists playlists, artists and albums; downloads are individual tracks, so this
+            // opens the downloads manager rather than filtering the list in place.
+            item {
+                if (downloadedItems.isNotEmpty()) {
+                    FilterChip(
+                        selected = selectedFilter == "Downloaded",
+                        onClick = {
+                            selectedFilter = if (selectedFilter == "Downloaded") null else "Downloaded"
+                        },
+                        label = {
+                            Text(
+                                stringResource(R.string.library_filter_downloaded, downloadedItems.size),
+                                fontSize = 13.sp
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = SpfyWhite,
+                            selectedLabelColor = SpfyBlack,
+                            containerColor = SpfyGray,
+                            labelColor = SpfyWhite
+                        ),
+                        border = null
+                    )
+                }
+            }
             items(filters.size) { i ->
                 FilterChip(
                     selected = selectedFilter == filters[i].first,
@@ -261,7 +299,7 @@ fun LibraryScreen() {
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 itemsIndexed(sortedLibrary, key = { _, item -> item.uri }) { index, item ->
-                    LibraryGridCard(item)
+                    LibraryGridCard(item, downloadedGroup = selectedFilter == "Downloaded")
                     // Key the near-end trigger on the VISIBLE (filtered/searched) list, not the raw
                     // library — otherwise a filter that shrinks the list below library.size - 10 never
                     // reaches the threshold and pagination silently stops.
@@ -276,7 +314,7 @@ fun LibraryScreen() {
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
                 itemsIndexed(sortedLibrary, key = { _, item -> item.uri }) { index, item ->
-                    LibraryListItem(item)
+                    LibraryListItem(item, downloadedGroup = selectedFilter == "Downloaded")
                     // See the grid branch: trigger on the visible list size, not the raw library, so
                     // pagination still fires when a filter/search shrinks the list.
                     if (libraryHasMore && index >= sortedLibrary.size - 10) {
@@ -295,8 +333,15 @@ fun LibraryScreen() {
     }
 }
 
-fun libraryItemClick(item: LibraryItem, detailVm: DetailViewModel) {
+fun libraryItemClick(item: LibraryItem, detailVm: DetailViewModel, vm: PlaybackViewModel? = null) {
     when (item.type) {
+        // A one-off download has no album or playlist to open, so it is the track itself: play it.
+        "single" -> {
+            val row = Downloads.find(item.uri) ?: return
+            vm?.playTrack(
+                TrackInfo(uri = item.uri, name = row.title, artist = row.artist, albumArt = row.coverUrl)
+            )
+        }
         "collection" -> detailVm.openLikedSongs()
         "playlist" -> {
             val id = item.uri.split(":").lastOrNull() ?: return
@@ -319,19 +364,25 @@ fun libraryItemClick(item: LibraryItem, detailVm: DetailViewModel) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun LibraryGridCard(item: LibraryItem) {
+fun LibraryGridCard(item: LibraryItem, downloadedGroup: Boolean = false) {
     val detailVm: DetailViewModel = viewModel()
+    val playbackVm: PlaybackViewModel = viewModel()
     val isArtist = item.type == "artist"
+    val removable = item.type != "collection"
     var showRemove by remember { mutableStateOf(false) }
-    if (showRemove && item.type != "collection") {
-        LibraryRemoveDialog(item, onDismiss = { showRemove = false })
+    if (showRemove && removable) {
+        if (downloadedGroup) {
+            DownloadRemoveDialog(item, onDismiss = { showRemove = false })
+        } else {
+            LibraryRemoveDialog(item, onDismiss = { showRemove = false })
+        }
     }
     Column(
         Modifier
             .fillMaxWidth()
             .combinedClickable(
-                onClick = { libraryItemClick(item, detailVm) },
-                onLongClick = { if (item.type != "collection") showRemove = true }
+                onClick = { libraryItemClick(item, detailVm, playbackVm) },
+                onLongClick = { if (removable) showRemove = true }
             ),
         horizontalAlignment = if (isArtist) Alignment.CenterHorizontally else Alignment.Start
     ) {
@@ -365,19 +416,25 @@ fun LibraryGridCard(item: LibraryItem) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun LibraryListItem(item: LibraryItem) {
+fun LibraryListItem(item: LibraryItem, downloadedGroup: Boolean = false) {
     val detailVm: DetailViewModel = viewModel()
+    val playbackVm: PlaybackViewModel = viewModel()
     val isArtist = item.type == "artist"
+    val removable = item.type != "collection"
     var showRemove by remember { mutableStateOf(false) }
-    if (showRemove && item.type != "collection") {
-        LibraryRemoveDialog(item, onDismiss = { showRemove = false })
+    if (showRemove && removable) {
+        if (downloadedGroup) {
+            DownloadRemoveDialog(item, onDismiss = { showRemove = false })
+        } else {
+            LibraryRemoveDialog(item, onDismiss = { showRemove = false })
+        }
     }
     Row(
         Modifier
             .fillMaxWidth()
             .combinedClickable(
-                onClick = { libraryItemClick(item, detailVm) },
-                onLongClick = { if (item.type != "collection") showRemove = true }
+                onClick = { libraryItemClick(item, detailVm, playbackVm) },
+                onLongClick = { if (removable) showRemove = true }
             )
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -445,6 +502,40 @@ fun CreatePlaylistDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel), color = SpfyLightGray) }
+        }
+    )
+}
+
+/**
+ * Long-pressing a downloaded group drops its files. The same gesture on a normal library entry
+ * removes it from the Spfy library, which is not what is wanted while browsing downloads.
+ */
+@Composable
+private fun DownloadRemoveDialog(item: LibraryItem, onDismiss: () -> Unit) {
+    val vm: PlaybackViewModel = viewModel()
+    val tracks = remember(item.uri) { Downloads.tracksInGroup(item.uri) }
+    TightAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.remove_download), color = SpfyWhite) },
+        text = {
+            Text(
+                pluralStringResource(R.plurals.remove_download_message, tracks.size, item.name, tracks.size),
+                color = SpfyLightGray
+            )
+        },
+        containerColor = SpfyGray,
+        confirmButton = {
+            TextButton(onClick = {
+                tracks.forEach { vm.removeDownload(it.trackUri) }
+                onDismiss()
+            }) {
+                Text(stringResource(R.string.library_remove_button), color = Color.Red)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel), color = SpfyLightGray)
+            }
         }
     )
 }

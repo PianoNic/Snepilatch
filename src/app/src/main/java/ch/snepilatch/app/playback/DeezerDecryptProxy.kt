@@ -13,9 +13,6 @@ import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
-import javax.crypto.Cipher
-import javax.crypto.spec.IvParameterSpec
-import javax.crypto.spec.SecretKeySpec
 
 /**
  * Local loopback HTTP proxy that lets ExoPlayer stream Blowfish-encrypted Deezer
@@ -35,8 +32,7 @@ class DeezerDecryptProxy {
 
     companion object {
         private const val TAG = "DeezerProxy"
-        private const val BLOCK = 2048
-        private val IV = byteArrayOf(0, 1, 2, 3, 4, 5, 6, 7)
+        private const val BLOCK = DeezerBlockCipher.BLOCK
     }
 
     private class Entry(val url: String, val key: ByteArray, val headers: Map<String, String>)
@@ -80,7 +76,7 @@ class DeezerDecryptProxy {
     fun register(url: String, keyHex: String, headers: Map<String, String>): String {
         if (server == null) start()
         val id = ids.incrementAndGet().toString()
-        registry[id] = Entry(url, hexToBytes(keyHex), headers)
+        registry[id] = Entry(url, DeezerBlockCipher.hexToBytes(keyHex), headers)
         return "http://127.0.0.1:$port/$id"
     }
 
@@ -135,7 +131,7 @@ class DeezerDecryptProxy {
 
         val out = BufferedOutputStream(rawOut)
         writeResponseHeader(out, rangeStart, total)
-        decryptInto(out, upstream, entry.key, (alignedStart / BLOCK).toInt(), rangeStart - alignedStart)
+        DeezerBlockCipher.decryptInto(out, upstream, entry.key, (alignedStart / BLOCK).toInt(), rangeStart - alignedStart)
         out.flush()
         try { conn.disconnect() } catch (_: Exception) {}
     }
@@ -173,30 +169,6 @@ class DeezerDecryptProxy {
         out.write(sb.toString().toByteArray(Charsets.US_ASCII))
     }
 
-    /** Decrypt the upstream stream block-by-block, skipping [skip] leading bytes. */
-    private fun decryptInto(out: OutputStream, upstream: InputStream, key: ByteArray, startBlock: Int, skip: Long) {
-        // One Cipher per stream instead of one per decrypted block. decryptInto runs on a single
-        // per-request proxy thread (Cipher is not thread-safe, but it never leaves this call), and
-        // doFinal resets a CBC cipher to its post-init state — i.e. back to the fixed IV — so every
-        // block still decrypts against the same IV the block-positional (no-chaining) scheme needs.
-        // This collapses ~5000 Blowfish key expansions per track down to one.
-        val cipher = Cipher.getInstance("Blowfish/CBC/NoPadding").apply {
-            init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "Blowfish"), IvParameterSpec(IV))
-        }
-        var blockIndex = startBlock
-        var toSkip = skip
-        val buf = ByteArray(BLOCK)
-        while (true) {
-            val n = readBlock(upstream, buf)
-            if (n <= 0) break
-            val decoded = if (blockIndex % 3 == 0 && n == BLOCK) cipher.doFinal(buf) else buf.copyOf(n)
-            val off = if (toSkip > 0) minOf(toSkip, decoded.size.toLong()).toInt() else 0
-            toSkip -= off
-            if (off < decoded.size) out.write(decoded, off, decoded.size - off)
-            blockIndex++
-        }
-    }
-
     private fun skipBytes(input: InputStream, count: Long) {
         var remaining = count
         val buf = ByteArray(8192)
@@ -207,31 +179,8 @@ class DeezerDecryptProxy {
         }
     }
 
-    /** Read exactly [buf].size bytes unless EOF; returns bytes read. */
-    private fun readBlock(input: InputStream, buf: ByteArray): Int {
-        var read = 0
-        while (read < buf.size) {
-            val n = input.read(buf, read, buf.size - read)
-            if (n == -1) break
-            read += n
-        }
-        return read
-    }
-
     private fun writeStatus(out: OutputStream, code: Int, msg: String) {
         out.write("HTTP/1.1 $code $msg\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".toByteArray(Charsets.US_ASCII))
         out.flush()
-    }
-
-    private fun hexToBytes(s: String): ByteArray {
-        val clean = s.trim()
-        val isHex = clean.length % 2 == 0 && clean.isNotEmpty() && clean.all { it in "0123456789abcdefABCDEF" }
-        return if (isHex) {
-            ByteArray(clean.length / 2) {
-                ((Character.digit(clean[it * 2], 16) shl 4) + Character.digit(clean[it * 2 + 1], 16)).toByte()
-            }
-        } else {
-            clean.toByteArray(Charsets.UTF_8)
-        }
     }
 }

@@ -296,4 +296,37 @@
     <string name="error_save_library">Не удалось добавить в медиатеку</string>
     <string name="error_add_playlist">Не удалось добавить в плейлист</string>
     <string name="error_add_queue">Не удалось добавить в очередь</string>
+    <string name="downloads">Загрузки</string>
+    <string name="downloading">Загрузка</string>
+    <string name="saving_listened">Сохраняем прослушанное</string>
+    <string name="download_complete">Загрузка завершена</string>
+    <string name="download_failed">Ошибка загрузки</string>
+    <string name="download_folder">Папка загрузок</string>
+    <string name="download_folder_none">Не задана, нажмите чтобы выбрать</string>
+    <string name="download_track">Скачать</string>
+    <string name="remove_download">Удалить загрузку</string>
+    <string name="download_needs_folder">Сначала выберите папку загрузок</string>
+    <string name="download_source">Источник загрузок</string>
+    <string name="download_source_ytm">YouTube Music</string>
+    <string name="download_source_lossless">Без потерь (FLAC)</string>
+    <string name="manage_downloads">Управление загрузками</string>
+    <string name="downloads_summary">%1$d треков · %2$d МБ</string>
+    <string name="remove_all">Удалить все</string>
+    <string name="remove_all_confirm">Удалить все загруженные файлы? Треки снова будут воспроизводиться потоком.</string>
+    <string name="downloads_count">Загружено: %1$d</string>
+    <string name="downloading_count">Загрузка %1$d из %2$d</string>
+    <string name="downloaded_count">Загружено %1$d из %2$d</string>
+    <string name="download_all">Скачать все</string>
+    <string name="library_filter_downloaded">Загружено (%1$d)</string>
+    <string name="downloaded_indicator">Загружено</string>
+    <string name="downloads_active">Активные</string>
+    <string name="downloads_idle">Сейчас ничего не загружается</string>
+    <plurals name="remove_download_message">
+        <item quantity="one">Удалить загруженный файл %1$s? (%2$d трек)</item>
+        <item quantity="few">Удалить загруженные файлы %1$s? (%2$d трека)</item>
+        <item quantity="many">Удалить загруженные файлы %1$s? (%2$d треков)</item>
+        <item quantity="other">Удалить загруженные файлы %1$s? (%2$d трека)</item>
+    </plurals>
+    <string name="auto_save_listened">Сохранять прослушанное</string>
+    <string name="auto_save_listened_desc">Сохраняет трек после полного прослушивания</string>
 </resources>

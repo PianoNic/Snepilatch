@@ -17,6 +17,15 @@ class InfiniPlayAudioTap : BaseAudioProcessor() {
 
     @Volatile var analyzing: Boolean = false
 
+    /**
+     * Second, independent reason to capture: keeping the decoded track so it can be encoded and
+     * saved. Shares the one buffer with [analyzing] — it is the same capture, wanted by two callers —
+     * so the buffer is only freed once neither wants it.
+     */
+    @Volatile var recording: Boolean = false
+
+    private val capturing: Boolean get() = analyzing || recording
+
     private var sampleRate = 0
     private var channels = 0
     private var pcm16 = false
@@ -36,6 +45,20 @@ class InfiniPlayAudioTap : BaseAudioProcessor() {
     /** Interleaved stereo (or mono) PCM captured so far — for the playback engine. */
     @Synchronized
     fun snapshotInterleaved(): ShortArray = pcm.copyOf(len)
+
+    /**
+     * Hands the capture buffer itself to the caller and starts the next one fresh, returning the
+     * samples and how many of them are real. Unlike [snapshotInterleaved] this copies nothing, so a
+     * finished track can be handed to the encoder on a track change without a ~63MB memcpy and
+     * without racing the reset that arms the next track.
+     */
+    @Synchronized
+    fun detach(): Pair<ShortArray, Int> {
+        val detached = pcm to len
+        pcm = ShortArray(0) // the next ensureBuffer() allocates rather than overwriting theirs
+        len = 0
+        return detached
+    }
 
     /** Mono downmix of the capture — for the analyzer. */
     @Synchronized
@@ -74,10 +97,12 @@ class InfiniPlayAudioTap : BaseAudioProcessor() {
         len = 0
     }
 
-    // Only participate in the audio chain while analyzing: when the infiniPlay is off ExoPlayer bypasses
-    // this processor entirely, so there is no per-buffer queueInput copy. isActive is re-read on a
-    // pipeline flush — the enable path sets analyzing before seeking, so the seek's flush activates it.
-    override fun isActive(): Boolean = analyzing
+    // Only participate in the audio chain while something wants the samples: with neither the
+    // infiniPlay nor a recording armed, ExoPlayer bypasses this processor entirely and there is no
+    // per-buffer queueInput copy. Which is why startCapture is armed as narrowly as possible — see
+    // MusicPlaybackService.startCapture. isActive is re-read on a pipeline flush; the enable path sets
+    // its flag before seeking, so the seek's flush activates it.
+    override fun isActive(): Boolean = capturing
 
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
         sampleRate = inputAudioFormat.sampleRate
@@ -87,7 +112,7 @@ class InfiniPlayAudioTap : BaseAudioProcessor() {
         capturedChannels = channels
         // Allocate only if analysis is already running (e.g. capturing across a format change);
         // otherwise stay unallocated until resetCapture() on the next enable.
-        if (analyzing) ensureBuffer()
+        if (capturing) ensureBuffer()
         LokiLogger.i(TAG, "tap configured: ${sampleRate}Hz ch=$channels enc=${inputAudioFormat.encoding} pcm16=$pcm16")
         return inputAudioFormat
     }
@@ -96,7 +121,7 @@ class InfiniPlayAudioTap : BaseAudioProcessor() {
         val remaining = inputBuffer.remaining()
         if (remaining == 0) return
 
-        val canCapture = analyzing && pcm16
+        val canCapture = capturing && pcm16
         if (canCapture && pcm.isNotEmpty()) {
             capture(inputBuffer.duplicate().order(ByteOrder.LITTLE_ENDIAN))
         }
@@ -118,8 +143,11 @@ class InfiniPlayAudioTap : BaseAudioProcessor() {
         }
     }
 
-    private companion object {
-        const val TAG = "InfiniPlayTap"
-        const val MAX_MINUTES = 6
+    companion object {
+        private const val TAG = "InfiniPlayTap"
+        private const val MAX_MINUTES = 6
+
+        /** How much audio the capture buffer holds. Past this, capture() clamps and the tail is lost. */
+        const val MAX_CAPTURE_MS = MAX_MINUTES * 60 * 1000L
     }
 }

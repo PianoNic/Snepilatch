@@ -310,4 +310,37 @@
     <string name="error_save_library">I d Bibliothek spichere hät nöd funktioniert</string>
     <string name="error_add_playlist">I d Playlist iifüege hät nöd funktioniert</string>
     <string name="error_add_queue">I d Wartelischte dezuetue hät nöd funktioniert</string>
+
+    <!-- Downloads -->
+    <string name="downloads">Downloads</string>
+    <string name="downloading">Am Abelade</string>
+    <string name="saving_listened">Ghörts wird bhalte</string>
+    <string name="download_complete">Download fertig</string>
+    <string name="download_failed">Download hät nöd funktioniert</string>
+    <string name="download_folder">Download-Ordner</string>
+    <string name="download_folder_none">Nöd gsetzt, tipp zum Uuswähle</string>
+    <string name="download_track">Abelade</string>
+    <string name="remove_download">Download lösche</string>
+    <string name="download_needs_folder">Wähl zerscht en Download-Ordner uus</string>
+    <string name="download_source">Download-Quälle</string>
+    <string name="download_source_ytm">YouTube Music</string>
+    <string name="download_source_lossless">Verluschtfreii (FLAC)</string>
+    <string name="manage_downloads">Downloads verwalte</string>
+    <string name="downloads_summary">%1$d Songs · %2$d MB</string>
+    <string name="remove_all">Alli lösche</string>
+    <string name="remove_all_confirm">Alli abegladene Dateie lösche? D Songs wärded denn wieder gstreamt.</string>
+    <string name="downloads_count">%1$d abeglade</string>
+    <string name="downloading_count">Lade %1$d vo %2$d</string>
+    <string name="downloaded_count">%1$d vo %2$d abeglade</string>
+    <string name="download_all">Alli abelade</string>
+    <string name="library_filter_downloaded">Abeglade (%1$d)</string>
+    <string name="downloaded_indicator">Abeglade</string>
+    <string name="downloads_active">Aktiv</string>
+    <string name="downloads_idle">Grad lauft kei Download</string>
+    <plurals name="remove_download_message">
+        <item quantity="one">Abegladeni Datei vo %1$s lösche? (%2$d Song)</item>
+        <item quantity="other">Abegladeni Dateie vo %1$s lösche? (%2$d Songs)</item>
+    </plurals>
+    <string name="auto_save_listened">Bhalte, was i lose</string>
+    <string name="auto_save_listened_desc">Spicheret en Song, sobald du ne dureghört häsch</string>
 </resources>

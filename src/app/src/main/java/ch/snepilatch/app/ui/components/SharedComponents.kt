@@ -3,6 +3,7 @@
 package ch.snepilatch.app.ui.components
 
 import ch.snepilatch.app.R
+import ch.snepilatch.app.download.Downloads
 import ch.snepilatch.app.ui.theme.SpfyWhite
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -22,6 +23,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.DownloadForOffline
+import androidx.compose.material.icons.rounded.OfflinePin
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material3.*
@@ -218,6 +221,11 @@ fun TrackRow(track: TrackInfo, vm: PlaybackViewModel, contextUri: String? = null
     val isPlaying = currentUri == track.uri && playing
     val theme by ThemeController.themeColors.collectAsState()
     val accent = theme.primary
+    // One set for the whole list, so a row costs a lookup rather than a query.
+    val downloadedUris by Downloads.downloaded.collectAsState()
+    val inFlight by Downloads.inProgress.collectAsState()
+    val isDownloaded = track.uri in downloadedUris
+    val isDownloading = track.uri in inFlight
 
     Row(
         Modifier
@@ -237,6 +245,18 @@ fun TrackRow(track: TrackInfo, vm: PlaybackViewModel, contextUri: String? = null
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(track.artist, color = SpfyLightGray, fontSize = 13.sp,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        if (isDownloading) {
+            CircularProgressIndicator(color = accent, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(6.dp))
+        } else if (isDownloaded) {
+            Icon(
+                Icons.Rounded.OfflinePin,
+                stringResource(R.string.downloaded_indicator),
+                tint = accent,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(Modifier.width(6.dp))
         }
         if (track.durationMs > 0) {
             Text(formatTime(track.durationMs), color = SpfyLightGray, fontSize = 12.sp)
@@ -289,7 +309,23 @@ fun TrackRow(track: TrackInfo, vm: PlaybackViewModel, contextUri: String? = null
             val likeLabel = stringResource(R.string.like)
             val visitAlbumLabel = stringResource(R.string.visit_album)
             val visitArtistLabel = stringResource(R.string.visit_artist)
+            val downloadLabel = if (isDownloaded) {
+                stringResource(R.string.remove_download)
+            } else {
+                stringResource(R.string.download_track)
+            }
             val items = listOf(
+                Triple(
+                    if (isDownloaded) Icons.Rounded.OfflinePin else Icons.Rounded.DownloadForOffline,
+                    downloadLabel,
+                ) {
+                    when {
+                        isDownloading -> Unit
+                        isDownloaded -> vm.removeDownload(track.uri)
+                        else -> vm.downloadTrack(track, context)
+                    }
+                    showMenu = false
+                },
                 Triple(Icons.AutoMirrored.Rounded.QueueMusic, addToQueueLabel) {
                     vm.addToQueue(track.uri); showMenu = false
                 },

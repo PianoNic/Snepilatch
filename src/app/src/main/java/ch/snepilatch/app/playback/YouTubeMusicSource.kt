@@ -46,10 +46,28 @@ object YouTubeMusicSource {
     /** Wide because a music-video upload of the same track carries an intro or outro. */
     internal const val DURATION_TOLERANCE_SEC = 30L
 
+    /** Duration differences within this many seconds count as equally good, so rank decides. */
+    internal const val DURATION_BUCKET_SEC = 5L
+
     /** Share of the wanted title's words a candidate must carry. At 0.5 shared filler words matched. */
     internal const val MIN_TITLE_SCORE = 0.8
 
+    /**
+     * Words that mark a re-recording. A candidate carrying one the request did not ask for is a
+     * cover, a karaoke track or an edit, not the recording the user has in their library.
+     */
+    private val REWORK_MARKERS = setOf(
+        "cover", "covers", "karaoke", "instrumental", "remix", "nightcore", "sped", "slowed",
+        "reverb", "piano", "acoustic", "tribute", "parody", "mashup", "rendition", "remake",
+        "unplugged", "orchestral", "lofi", "8d", "guitar", "violin", "flute",
+    )
+
     private const val MAX_CANDIDATES = 10
+
+    /** What the UI shows when a track carries no artist name; never a real credit to match against. */
+    internal const val UNKNOWN_PLACEHOLDER = "Unknown"
+
+    private val BRACKETED = Regex("""[(\[]([^)\]]*)[)\]]""")
 
     private val json = Json { ignoreUnknownKeys = true }
     private val jsonMedia = "application/json".toMediaType()
@@ -63,6 +81,15 @@ object YouTubeMusicSource {
 
     @Volatile private var visitorData: String? = null
 
+    /**
+     * Drops the cached visitor id so the next resolve mints a fresh one. A stale one still resolves
+     * happily but yields media urls googlevideo then refuses, which looks like every track failing
+     * at once for no reason.
+     */
+    fun invalidateVisitorData() {
+        visitorData = null
+    }
+
     data class Stream(val url: String, val mimeType: String?, val headers: Map<String, String>)
 
     internal data class Candidate(
@@ -70,6 +97,8 @@ object YouTubeMusicSource {
         val title: String,
         val artist: String?,
         val durationSec: Long,
+        /** Artist, album and the rest of the row. An instrumental release often only says so here. */
+        val details: String = "",
     )
 
     /**
@@ -83,6 +112,8 @@ object YouTubeMusicSource {
         region: String?,
         durationMs: Long,
     ): Stream? = withContext(Dispatchers.IO) {
+        // The display placeholder is not a search word. bestMatch drops it again as a match constraint.
+        val artist = realArtist(artist)
         val query = searchQuery(artist, title)
         if (query.isBlank()) return@withContext null
 
@@ -97,7 +128,7 @@ object YouTubeMusicSource {
             val body = post(SEARCH_URL, searchBody(query, region, visitor, params), WEB_UA, visitor)
             val candidates = body?.let { runCatching { parseCandidates(it) }.getOrNull() }.orEmpty()
             seen += candidates.size
-            bestMatch(candidates, title, durationMs)
+            bestMatch(candidates, title, artist, durationMs, officialShelf = params == SONGS_PARAMS)
         }
         if (match == null) {
             LokiLogger.i(TAG, "no match for '$query' ($seen candidates, ${durationMs / 1000}s)")
@@ -193,6 +224,7 @@ object YouTubeMusicSource {
             title = title,
             artist = texts.drop(1).firstOrNull { it.trim().length > 1 },
             durationSec = texts.firstNotNullOfOrNull { parseDuration(it) } ?: 0L,
+            details = texts.drop(1).joinToString(" "),
         )
     }
 
@@ -204,15 +236,104 @@ object YouTubeMusicSource {
     }
 
     /** Null rather than a guess: the wrong recording is worse than none, and the caller skips. */
-    internal fun bestMatch(candidates: List<Candidate>, wantTitle: String, durationMs: Long): Candidate? {
+    internal fun bestMatch(
+        candidates: List<Candidate>,
+        wantTitle: String,
+        wantArtist: String,
+        durationMs: Long,
+        officialShelf: Boolean = false,
+    ): Candidate? {
         val want = titleWords(wantTitle)
-        val titled = candidates.filter { want.isEmpty() || titleScore(it.title, want) >= MIN_TITLE_SCORE }
-        if (durationMs <= 0L) return titled.firstOrNull()
+        val wantArtistWords = words(realArtist(wantArtist))
+        // Read the request the same way as the candidate, brackets included: asking for "Sonne
+        // (Remix)" must keep the remix, and that marker only survives in the bracket-keeping split.
+        val asked = markerWords(wantTitle) + markerWords(wantArtist)
+        val titled = candidates.filter { candidate ->
+            (want.isEmpty() || titleScore(candidate.title, want) >= MIN_TITLE_SCORE) &&
+                // The release text too, not just the title: an instrumental cut usually carries the
+                // original's exact title and artist, and only the release it sits on says what it is.
+                // Bracketed only, though — an album is where a release declares itself, and scanning
+                // the whole run made a plain album name disqualify every candidate. REWORK_MARKERS
+                // holds bare instrument nouns, so "Guitar Songs" or "Piano Man" read as reworks and
+                // the track became unresolvable on this source.
+                !addsRework("${candidate.title} ${bracketedIn(candidate.details)}", asked)
+        }
+        // The songs shelf is YouTube Music's own catalogue, so a row on it is a release rather than
+        // somebody's upload, and a credit that does not match ours is usually the same recording
+        // filed under a different name: it lists "DIGGER" under GIRLS REVOLUTION PROJECT where
+        // Spotify credits TSUMITOBATSU, biz, ZERA. When no candidate carries the wanted name at all
+        // the credit is telling us nothing, and rejecting on it throws the release away for good.
+        //
+        // The videos shelf is where anyone can upload, which is what the artist check is for, so
+        // there a miss stays a miss. Same on any shelf as soon as one candidate does carry the name:
+        // the credit discriminates again, and the ones that lack it lose.
+        val byArtist = titled.filter { artistMatches(it.artist, wantArtistWords) }
+        val viable = if (officialShelf) byArtist.ifEmpty { titled } else byArtist
+        if (durationMs <= 0L) return viable.firstOrNull()
         val wantSec = durationMs / 1000
-        return titled
-            .filter { it.durationSec > 0 && abs(it.durationSec - wantSec) <= DURATION_TOLERANCE_SEC }
-            .minByOrNull { abs(it.durationSec - wantSec) }
+        // YouTube Music ranks the canonical upload first. An instrumental runs to the same length as
+        // the vocal take, so picking purely by the smallest duration difference let a second or two of
+        // noise outrank that order; only a clearly better fit (a whole bucket) may.
+        return viable
+            .withIndex()
+            .filter { (_, c) -> c.durationSec > 0 && abs(c.durationSec - wantSec) <= DURATION_TOLERANCE_SEC }
+            .minWithOrNull(
+                compareBy({ abs(it.value.durationSec - wantSec) / DURATION_BUCKET_SEC }, { it.index })
+            )
+            ?.value
     }
+
+    /**
+     * True when the candidate advertises a rework the request never asked for. Asking for a track
+     * that genuinely is a remix keeps working, because the marker is then in [asked] too.
+     */
+    internal fun addsRework(candidateTitle: String, asked: Set<String>): Boolean =
+        markerWords(candidateTitle).any { it in REWORK_MARKERS && it !in asked }
+
+    /** The bracketed parts of a run of release text — "Artist • Album (Instrumental) • 3:45" -> "Instrumental". */
+    internal fun bracketedIn(text: String): String =
+        BRACKETED.findAll(text).joinToString(" ") { it.groupValues[1] }
+
+    /**
+     * The artist to treat as asked for. Blanks the UI's placeholder, which reaches here whenever a
+     * queue push carried no artist name: it is not a credit, so requiring candidates to share a word
+     * with it rejects every real result and the track stops resolving at all.
+     */
+    internal fun realArtist(artist: String): String =
+        if (artist.equals(UNKNOWN_PLACEHOLDER, ignoreCase = true)) "" else artist
+
+    /**
+     * Like [words] but keeps bracketed text. Titles score with brackets dropped, so "Song (feat. X)"
+     * still matches "Song" — but that also erased the one thing marking a rework, and "(Instrumental)"
+     * became indistinguishable from the real recording: same title, same artist, same length.
+     */
+    private fun markerWords(s: String): Set<String> =
+        s.lowercase()
+            .replace(Regex("[^\\p{L}\\p{N} ]"), " ")
+            .split(' ')
+            .filter { it.isNotBlank() }
+            .toSet()
+
+    /**
+     * The strongest signal against a cover: a piano rendition is uploaded by whoever played it, not
+     * by the artist. Spotify may credit several artists where YouTube credits one, so sharing a
+     * single name is enough. An unknown artist on either side cannot rule anything out.
+     */
+    internal fun artistMatches(candidateArtist: String?, wantArtist: Set<String>): Boolean {
+        if (wantArtist.isEmpty()) return true
+        val have = words(candidateArtist.orEmpty())
+        if (have.isEmpty()) return true
+        // Two scripts cannot be compared by word overlap at all. Spotify romanises names YouTube
+        // Music leaves in the original, so the same band is TSUMITOBATSU on one side and 罪十罰 on
+        // the other, they share nothing, and every real candidate was thrown away. Skipping the
+        // check costs nothing the other filters do not already cover: an upload in a different
+        // script from the artist we asked for is not what a cover or a karaoke channel looks like.
+        if (hasLatin(have) != hasLatin(wantArtist)) return true
+        return have.any { h -> wantArtist.any { nearlyEqual(h, it) } }
+    }
+
+    /** normalize() has already lowercased, so a Latin letter is enough to tell the scripts apart. */
+    private fun hasLatin(words: Set<String>): Boolean = words.any { word -> word.any { it in 'a'..'z' } }
 
     /** Share of the wanted title's words the candidate carries. */
     internal fun titleScore(candidateTitle: String, want: Set<String>): Double {

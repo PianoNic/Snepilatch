@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.TextUnit
 import ch.snepilatch.app.R
+import ch.snepilatch.app.download.Downloads
 import android.graphics.SurfaceTexture
 import android.net.Uri
 import android.view.TextureView
@@ -1170,6 +1171,19 @@ private fun NowPlayingMenu(
             val visitAlbumLabel = stringResource(R.string.visit_album)
             val devicesLabel = stringResource(R.string.devices)
             val shareLabel = stringResource(R.string.share)
+            val downloadCtx = androidx.compose.ui.platform.LocalContext.current
+            val downloadedUris by Downloads.downloaded.collectAsState()
+            // In-flight as well as downloaded, like every track row: isDownloaded is still false while
+            // the fetch runs, so without this the entry looked untouched and a second tap started a
+            // second download of the same track.
+            val inFlight by Downloads.inProgress.collectAsState()
+            val isDownloaded = track?.uri?.let { it in downloadedUris } == true
+            val isDownloading = track?.uri?.let { it in inFlight } == true
+            val downloadLabel = when {
+                isDownloading -> stringResource(R.string.downloading)
+                isDownloaded -> stringResource(R.string.remove_download)
+                else -> stringResource(R.string.download_track)
+            }
             val items = listOf(
                 Triple(Icons.Rounded.MusicNote, lyricsLabel) {
                     onShowMore(false); vm.openLyrics()
@@ -1185,6 +1199,20 @@ private fun NowPlayingMenu(
                 },
                 Triple(Icons.Rounded.Album, visitAlbumLabel) {
                     onShowMore(false); vm.openAlbumFromCurrentTrack()
+                },
+                // Same glyphs as the track rows in SharedComponents: the same track reached two ways
+                // showed two different icons for one state.
+                Triple(
+                    if (isDownloaded) Icons.Rounded.OfflinePin else Icons.Rounded.DownloadForOffline,
+                    downloadLabel,
+                ) {
+                    onShowMore(false)
+                    val uri = track?.uri
+                    when {
+                        uri == null || isDownloading -> Unit
+                        isDownloaded -> vm.removeDownload(uri)
+                        else -> vm.downloadCurrentTrack(downloadCtx)
+                    }
                 },
                 Triple(Icons.Rounded.Devices, devicesLabel) {
                     onShowMore(false); vm.loadDevices(); vm.showDevices.value = true

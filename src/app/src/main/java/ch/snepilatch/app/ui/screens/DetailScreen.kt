@@ -10,6 +10,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.rounded.DownloadForOffline
+import androidx.compose.material.icons.rounded.OfflinePin
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.rounded.MoreVert
@@ -38,6 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
+import ch.snepilatch.app.download.Downloads
 import ch.snepilatch.app.ui.components.SpfyImage
 import ch.snepilatch.app.ui.components.TrackRow
 import ch.snepilatch.app.ui.theme.*
@@ -47,6 +50,10 @@ import ch.snepilatch.app.viewmodel.ThemeController
 import ch.snepilatch.app.viewmodel.DetailRoutes
 import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
+
+/** Header actions share a footprint so save, download and the overflow menu line up. */
+private val HEADER_BUTTON = 40.dp
+private val HEADER_ICON = 24.dp
 
 @Composable
 fun DetailScreen(vm: PlaybackViewModel) {
@@ -241,11 +248,70 @@ fun DetailScreen(vm: PlaybackViewModel) {
                                 contentColor = SpfyWhite,
                                 checkedContentColor = accentColor,
                             ),
+                            modifier = Modifier.size(HEADER_BUTTON),
                         ) {
                             Icon(
                                 if (saved) Icons.Rounded.Favorite else Icons.Filled.FavoriteBorder,
                                 stringResource(R.string.save),
-                                modifier = Modifier.size(28.dp)
+                                modifier = Modifier.size(HEADER_ICON)
+                            )
+                        }
+                    }
+                }
+
+                // Albums and playlists are a fixed set of tracks worth keeping; an artist page just
+                // lists their popular songs, so downloading "an artist" means nothing.
+                val downloadable = detail.type in setOf("album", "playlist", "collection")
+                // Flips to a tick once every track is on disk, and then removes them instead.
+                val downloadedUris by Downloads.downloaded.collectAsState()
+                val inFlight by Downloads.inProgress.collectAsState()
+                val downloading = detail.tracks.any { it.uri in inFlight }
+                // detail.tracks is one loaded page. Downloading it would silently cover the first 50 of
+                // a long playlist, so the click loads the rest first. And the tick only means "all of
+                // it is on disk" once the whole list is in hand — otherwise it appeared as soon as page
+                // one had landed, turning the button into a delete that dropped exactly those 50 files
+                // with no confirmation while the rest stayed downloaded.
+                val loadingAll by detailVm.isLoadingAll.collectAsState()
+                val allDownloaded = !hasMore && detail.tracks.isNotEmpty() &&
+                    detail.tracks.all { it.uri in downloadedUris }
+                if (downloadable) {
+                    IconButton(
+                        onClick = {
+                            if (allDownloaded) {
+                                detail.tracks.forEach { vm.removeDownload(it.uri) }
+                            } else {
+                                val uri = detail.uri
+                                val name = detail.name
+                                val type = detail.type
+                                detailVm.loadAllTracks(uri) { all ->
+                                    vm.downloadTracks(all, context, uri, name, type)
+                                }
+                            }
+                        },
+                        enabled = detail.tracks.isNotEmpty() && !downloading && !loadingAll,
+                        modifier = Modifier.size(HEADER_BUTTON)
+                    ) {
+                        when {
+                            // Also while the remaining pages load, so a long playlist does not look
+                            // like the tap did nothing.
+                            downloading || loadingAll -> CircularProgressIndicator(
+                                color = accentColor,
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(HEADER_ICON)
+                            )
+                            // A distinct glyph, not the same one recoloured: colour alone is easy to
+                            // miss and says nothing on its own.
+                            allDownloaded -> Icon(
+                                Icons.Rounded.OfflinePin,
+                                stringResource(R.string.remove_download),
+                                tint = accentColor,
+                                modifier = Modifier.size(HEADER_ICON)
+                            )
+                            else -> Icon(
+                                Icons.Rounded.DownloadForOffline,
+                                stringResource(R.string.download_all),
+                                tint = SpfyLightGray,
+                                modifier = Modifier.size(HEADER_ICON)
                             )
                         }
                     }
@@ -254,8 +320,14 @@ fun DetailScreen(vm: PlaybackViewModel) {
                 // 3-dot menu — opens a bottom sheet with every action
                 // KotifyClient supports for the current detail type.
                 var showHeaderMenu by remember { mutableStateOf(false) }
-                IconButton(onClick = { showHeaderMenu = true }) {
-                    Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SpfyLightGray, modifier = Modifier.size(24.dp))
+                IconButton(
+                    onClick = { showHeaderMenu = true },
+                    modifier = Modifier.width(32.dp).height(HEADER_BUTTON)
+                ) {
+                    Icon(
+                        Icons.Rounded.MoreVert, stringResource(R.string.more),
+                        tint = SpfyLightGray, modifier = Modifier.size(HEADER_ICON)
+                    )
                 }
                 if (showHeaderMenu) {
                     DetailHeaderMenu(
@@ -297,7 +369,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                         if (isPlayingThis) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                         stringResource(R.string.play),
                         tint = Color.Black,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(36.dp)
                     )
                 }
             }

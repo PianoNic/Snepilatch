@@ -296,4 +296,35 @@
     <string name="error_save_library">Konnte nicht zur Bibliothek hinzugefügt werden</string>
     <string name="error_add_playlist">Konnte nicht zur Playlist hinzugefügt werden</string>
     <string name="error_add_queue">Konnte nicht zur Warteschlange hinzugefügt werden</string>
+    <string name="downloads">Downloads</string>
+    <string name="downloading">Wird heruntergeladen</string>
+    <string name="saving_listened">Gehörtes wird behalten</string>
+    <string name="download_complete">Download abgeschlossen</string>
+    <string name="download_failed">Download fehlgeschlagen</string>
+    <string name="download_folder">Download-Ordner</string>
+    <string name="download_folder_none">Nicht gesetzt, zum Wählen tippen</string>
+    <string name="download_track">Herunterladen</string>
+    <string name="remove_download">Download entfernen</string>
+    <string name="download_needs_folder">Wähle zuerst einen Download-Ordner</string>
+    <string name="download_source">Download-Quelle</string>
+    <string name="download_source_ytm">YouTube Music</string>
+    <string name="download_source_lossless">Verlustfrei (FLAC)</string>
+    <string name="manage_downloads">Downloads verwalten</string>
+    <string name="downloads_summary">%1$d Titel · %2$d MB</string>
+    <string name="remove_all">Alle entfernen</string>
+    <string name="remove_all_confirm">Alle heruntergeladenen Dateien löschen? Die Titel werden wieder gestreamt.</string>
+    <string name="downloads_count">%1$d heruntergeladen</string>
+    <string name="downloading_count">Lade %1$d von %2$d</string>
+    <string name="downloaded_count">%1$d von %2$d heruntergeladen</string>
+    <string name="download_all">Alle herunterladen</string>
+    <string name="library_filter_downloaded">Heruntergeladen (%1$d)</string>
+    <string name="downloaded_indicator">Heruntergeladen</string>
+    <string name="downloads_active">Aktiv</string>
+    <string name="downloads_idle">Gerade laufen keine Downloads</string>
+    <plurals name="remove_download_message">
+        <item quantity="one">Heruntergeladene Datei von %1$s löschen? (%2$d Titel)</item>
+        <item quantity="other">Heruntergeladene Dateien von %1$s löschen? (%2$d Titel)</item>
+    </plurals>
+    <string name="auto_save_listened">Gehörtes behalten</string>
+    <string name="auto_save_listened_desc">Speichert einen Titel, sobald du ihn durchgehört hast</string>
 </resources>

@@ -304,7 +304,7 @@ class YouTubeMusicSourceTest {
 
     /**
      * The rows below are live captures for the KAIHEN -tsumi- release, taken after every track of
-     * it failed to resolve on a device.
+     * it failed to resolve on a device. Five pin the artist filter, five the title scoring.
      */
     @Test
     fun matchesAnArtistSpotifyRomanisesAndYouTubeMusicLeavesInJapanese() {
@@ -359,5 +359,61 @@ class YouTubeMusicSourceTest {
         )
         val match = YouTubeMusicSource.bestMatch(yt, "Get Lucky", "Daft Punk", durationMs = 369_000, officialShelf = true)
         assertEquals("real", match?.videoId)
+    }
+
+    @Test
+    fun matchesWhenSpotifyPutsTheGuestInTheTitleAndYouTubeMusicDoesNot() {
+        // Spotify: "弔花 feat. 他人事". YouTube Music: "弔花 - funeral flower". Scoring the credit as
+        // required words gave one match of three, so the track could not be resolved at all.
+        val yt = listOf(
+            YouTubeMusicSource.Candidate("Lxy94QBt1uY", "synchronicity", "Yui Makino", 323),
+            YouTubeMusicSource.Candidate("HIciS5SevlU", "弔花 - funeral flower", "TSUMITOBATSU", 195),
+        )
+        val match = YouTubeMusicSource.bestMatch(yt, "弔花 feat. 他人事", "TSUMITOBATSU, hitogoto", durationMs = 194_000)
+        assertEquals("HIciS5SevlU", match?.videoId)
+    }
+
+    /** The same shape in Latin script, with the guest in the brackets normalize() strips. */
+    @Test
+    fun matchesWhenTheGuestIsBracketedOnTheCandidate() {
+        val yt = listOf(YouTubeMusicSource.Candidate("Fb-UkMZzjj8", "Brrrrrreak It (feat. 平田義久)", "罪十罰", 225))
+        val match = YouTubeMusicSource.bestMatch(
+            yt, "Brrrrrreak It feat. 平田義久", "TSUMITOBATSU, 平田義久", durationMs = 224_000,
+        )
+        assertEquals("Fb-UkMZzjj8", match?.videoId)
+    }
+
+    /** Dropping the credit must not empty the requirement and let anything through. */
+    @Test
+    fun aTitleThatIsOnlyACreditKeepsItsWords() {
+        val yt = listOf(YouTubeMusicSource.Candidate("any", "Something Else Entirely", "Daft Punk", 369))
+        assertNull(YouTubeMusicSource.bestMatch(yt, "feat", "Daft Punk", durationMs = 369_000))
+    }
+
+    @Test
+    fun aLeadingHyphenIsNotSentToSearchAsAnExclusion() {
+        // "改変 -罪-" asked YouTube to exclude every result containing 罪, which is the artist and
+        // the whole release, so the shelf came back empty. A hyphen inside a name has to survive.
+        assertEquals(
+            "TSUMITOBATSU 改変 罪- feat. たなか,LLLL",
+            YouTubeMusicSource.searchQuery("TSUMITOBATSU", "改変 -罪- feat. たなか,LLLL"),
+        )
+        assertEquals("AJR Spider-Man", YouTubeMusicSource.searchQuery("AJR", "Spider-Man"))
+    }
+
+    @Test
+    fun matchesTheRowTheDehyphenatedQueryBringsBack() {
+        // The real top row once the query keeps its results, and the last of the eleven tracks.
+        val yt = listOf(
+            YouTubeMusicSource.Candidate(
+                "cm-jH642_-U", "改変 -罪- - KAIHEN -tsumi- (feat. たなか & LLLL)", "罪十罰", 228,
+                details = "罪十罰 KAIHEN -tsumi- 3:48",
+            ),
+        )
+        val match = YouTubeMusicSource.bestMatch(
+            yt, "改変 -罪- feat. たなか,LLLL", "TSUMITOBATSU, Tanaka, LLLL",
+            durationMs = 227_000, officialShelf = true,
+        )
+        assertEquals("cm-jH642_-U", match?.videoId)
     }
 }

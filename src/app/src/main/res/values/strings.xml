@@ -89,6 +89,11 @@
 
     <!-- About -->
     <string name="app_version">App Version</string>
+    <string name="update_channel">Update Channel</string>
+    <string name="update_channel_stable">Stable</string>
+    <string name="update_channel_stable_desc">Only full, reviewed releases.</string>
+    <string name="update_channel_nightly">Nightly</string>
+    <string name="update_channel_nightly_desc">Unreviewed prerelease builds. Install at your own risk.</string>
     <string name="check_for_updates">Check for Updates</string>
     <string name="checking">Checking…</string>
     <string name="up_to_date">You\'re on the latest version</string>
@@ -103,6 +108,7 @@
     <string name="whats_new">What\'s new:</string>
     <string name="update_now">Update Now</string>
     <string name="later">Later</string>
+    <string name="nightly_build_warning">This is a nightly build — unreviewed and may be unstable. Install at your own risk.</string>
 
     <!-- Devices -->
     <string name="searching_devices">Searching for devices…</string>

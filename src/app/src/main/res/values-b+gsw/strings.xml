@@ -97,6 +97,11 @@
 
     <!-- About -->
     <string name="app_version">App-Version</string>
+    <string name="update_channel">Update-Kanal</string>
+    <string name="update_channel_stable">Stabil</string>
+    <string name="update_channel_stable_desc">Nur vollständigi, gprüefti Releases.</string>
+    <string name="update_channel_nightly">Nightly</string>
+    <string name="update_channel_nightly_desc">Ungprüefti Vorabversione. Nutzig uf eigeni Gfahr.</string>
     <string name="check_for_updates">Nach Updates sueche</string>
     <string name="checking">Am Sueche…</string>
     <string name="up_to_date">Du häsch di nöischti Version</string>
@@ -111,6 +116,7 @@
     <string name="whats_new">Was isch neu:</string>
     <string name="update_now">Jetz aktualisiere</string>
     <string name="later">Spöter</string>
+    <string name="nightly_build_warning">Das isch en Nightly-Build — ungprüeft und chönnt instabil si. Nutzig uf eigeni Gfahr.</string>
 
     <!-- Devices -->
     <string name="searching_devices">Am Gräte sueche…</string>

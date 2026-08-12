@@ -29,6 +29,21 @@ There are two product flavors on the `environment` dimension: **prod** (`ch.snep
 
 Variant task names are flavor-qualified: `assembleProdDebug` / `assembleDevDebug`, `testProdDebugUnitTest` / `testDevDebugUnitTest`. The umbrella `assembleDebug` still builds both; there is no `testDebugUnitTest` anymore; use `:app:testProdDebugUnitTest` or `:app:test`. The dev `app_name` override lives in `app/src/dev/res/values/strings.xml`. The release pipeline builds `assembleProdRelease`.
 
+## Versioning & releases
+
+**The git tag is the source of truth for a release's version, not `build.gradle.kts`.** `versionCode`/`versionName` in `src/app/build.gradle.kts` read from `-PappVersionCode`/`-PappVersionName` Gradle properties and fall back to the checked-in literals only when those aren't passed — that fallback is what local/dev builds get, and what `nightly.yml` reads as the current base version. `build-and-release.yml`'s "Determine app version from the release tag" step derives both from the tag whenever the workflow runs off a tag ref (i.e. a published release):
+
+- **`versionName`** = the tag with its leading `v` stripped (`v2.9.80` → `2.9.80`, `v2.9.80-nightly.3` → `2.9.80-nightly.3`).
+- **`versionCode`** = `major*1e8 + minor*1e5 + patch*100 + ordinal`, where `ordinal` is `99` for a full release or the nightly number (capped at 98) for a `-nightly.N` tag. This keeps a full release always outranking every nightly of the same core version, and later nightlies outranking earlier ones — required since Android's `versionCode` must strictly increase for an update to install over what's there.
+
+**To cut a stable release:** bump `versionName`/`versionCode` in `build.gradle.kts` as usual (a manual `"Bump version to X.Y.Z"` commit, same as always — this keeps the local/dev fallback and the nightly base current even though it's no longer what a *tagged* release actually ships with), then publish a GitHub Release tagged `vX.Y.Z`. That publish event triggers `build-and-release.yml`, which overrides the version from the tag and uploads the APK to the release.
+
+**To cut a nightly:** run the **"Cut a Nightly Build"** workflow (`nightly.yml`) via `workflow_dispatch` — manual only, no automatic trigger. It reads the current `versionName` out of `build.gradle.kts` as the base, finds the next free `-nightly.N` suffix for that base (scanning existing tags), tags and pushes it, then publishes it as a GitHub **prerelease**. That publish event triggers `build-and-release.yml` the same way a stable tag does.
+
+**In-app update channel:** `AppSettings.updateChannel` (`Account` → About) is `stable` (default, only surfaces full releases) or `nightly` (also surfaces prereleases, with an explicit "install at your own risk" warning in `UpdateDialog`). `UpdateService` queries the `/releases` list endpoint (not `/releases/latest`, which never returns a prerelease) and picks the first non-draft entry matching the channel filter — GitHub returns that list newest-first. Version comparison (`UpdateService.isNewerVersion`) is semver-prerelease-aware: `2.9.80-nightly.3` ranks *below* `2.9.80`, not above it — a naive positional dot-parts comparison would get this backwards.
+
+**Caveat:** `release-drafter.yml`/`.github/release-drafter.yml` maintain their own draft-release version lineage (`vX.Y.Z` starting from old `v0.x` tags) that has drifted completely out of sync with the real `versionName` line (currently sitting on a stale, long-unpublished `v0.7.0` draft) — it predates this tag-driven scheme and isn't wired to it. Don't trust its suggested version number when cutting a release; pick the tag by hand.
+
 ## Test rig
 
 `PlaybackTestRig` (`app/src/test/.../viewmodel/PlaybackTestRig.kt`) lets you exercise extracted handler methods without a real `PlayerConnect`. It mocks `MusicPlaybackService.instance` via mockk and swaps `Dispatchers.Main` for an unconfined test dispatcher.

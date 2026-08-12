@@ -25,6 +25,7 @@ import ch.snepilatch.app.ui.screens.LoadingScreen
 import ch.snepilatch.app.ui.screens.SpfyApp
 import ch.snepilatch.app.ui.screens.SpfyLoginScreen
 import ch.snepilatch.app.ui.theme.SpfyBlack
+import ch.snepilatch.app.util.UpdateChannel
 import ch.snepilatch.app.util.UpdateInfo
 import ch.snepilatch.app.util.UpdateService
 import ch.snepilatch.app.util.loadCookies
@@ -139,7 +140,12 @@ class MainActivity : ComponentActivity() {
                 // network + TLS update check each time.
                 if (updateChecked.compareAndSet(false, true)) {
                     withContext(Dispatchers.IO) {
-                        val info = UpdateService.checkForUpdates(context)
+                        val channel = if (AppSettings.updateChannel.value == AppSettings.CHANNEL_NIGHTLY) {
+                            UpdateChannel.NIGHTLY
+                        } else {
+                            UpdateChannel.STABLE
+                        }
+                        val info = UpdateService.checkForUpdates(context, channel)
                         if (info != null) {
                             val dismissed = UpdateService.getDismissedVersion(context)
                             if (dismissed != info.latestVersion) {

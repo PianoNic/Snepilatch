@@ -80,6 +80,31 @@ fun UpdateDialog(
                     }
                 }
 
+                // Nightly builds are unreviewed and opted into at the user's own risk.
+                if (updateInfo.isPrerelease) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                Icons.Rounded.ErrorOutline,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Text(
+                                stringResource(R.string.nightly_build_warning),
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+
                 // Download progress
                 if (isDownloading) {
                     LinearProgressIndicator(

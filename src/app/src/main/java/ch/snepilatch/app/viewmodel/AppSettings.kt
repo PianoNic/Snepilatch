@@ -58,6 +58,13 @@ object AppSettings {
     // Content region for CDN resolution
     val contentRegion = MutableStateFlow("nearest")
 
+    // Update channel: [CHANNEL_STABLE] (default) only surfaces full releases; [CHANNEL_NIGHTLY]
+    // also surfaces GitHub prereleases (nightly builds), which are unreviewed and opt-in at the
+    // user's own risk. See UpdateService.UpdateChannel.
+    const val CHANNEL_STABLE = "stable"
+    const val CHANNEL_NIGHTLY = "nightly"
+    val updateChannel = MutableStateFlow(CHANNEL_STABLE)
+
     // Player background style: true = album-colour gradient (Spfy/YTM style), false = blurred art.
     val playerGradientBg = MutableStateFlow(true)
 
@@ -112,6 +119,7 @@ object AppSettings {
         eqBands.value = parseBands(prefs.getString("eq_bands", null))
         playerGradientBg.value = prefs.getBoolean("player_gradient_bg", true)
         contentRegion.value = prefs.getString("content_region", "nearest") ?: "nearest"
+        updateChannel.value = prefs.getString("update_channel", CHANNEL_STABLE) ?: CHANNEL_STABLE
         notificationLeftButton.value = prefs.getString("notification_left_button", "repeat") ?: "repeat"
         notificationRightButton.value = prefs.getString("notification_right_button", "like") ?: "like"
     }
@@ -170,6 +178,12 @@ object AppSettings {
         contentRegion.value = region
         prefs(context)
             .edit().putString("content_region", region).apply()
+    }
+
+    fun setUpdateChannel(channel: String, context: Context) {
+        updateChannel.value = channel
+        prefs(context)
+            .edit().putString("update_channel", channel).apply()
     }
 
     fun setLyricsAnimDirection(direction: String, context: Context) {

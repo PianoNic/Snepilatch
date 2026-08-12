@@ -84,6 +84,11 @@
 
     <!-- About -->
     <string name="app_version">Версия приложения</string>
+    <string name="update_channel">Канал обновлений</string>
+    <string name="update_channel_stable">Стабильный</string>
+    <string name="update_channel_stable_desc">Только полные, проверенные релизы.</string>
+    <string name="update_channel_nightly">Ночной</string>
+    <string name="update_channel_nightly_desc">Непроверенные предварительные сборки. Используйте на свой риск.</string>
     <string name="check_for_updates">Проверить обновления</string>
     <string name="checking">Проверка…</string>
     <string name="up_to_date">У вас последняя версия</string>
@@ -98,6 +103,7 @@
     <string name="whats_new">Что нового:</string>
     <string name="update_now">Обновить</string>
     <string name="later">Позже</string>
+    <string name="nightly_build_warning">Это ночная сборка — непроверенная и может быть нестабильной. Используйте на свой риск.</string>
 
     <!-- Devices -->
     <string name="searching_devices">Поиск устройств…</string>

@@ -611,6 +611,47 @@ fun AccountScreen(vm: PlaybackViewModel) {
             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
         )
 
+        // Update channel
+        val updateChannelPref by AppSettings.updateChannel.collectAsState()
+        var showUpdateChannelPicker by remember { mutableStateOf(false) }
+        val updateChannelLabel = if (updateChannelPref == AppSettings.CHANNEL_NIGHTLY) {
+            stringResource(R.string.update_channel_nightly)
+        } else {
+            stringResource(R.string.update_channel_stable)
+        }
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.update_channel), color = SpfyWhite) },
+            supportingContent = { Text(updateChannelLabel, color = SpfyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.SystemUpdate, null, tint = SpfyLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable { showUpdateChannelPicker = true }
+        )
+        if (showUpdateChannelPicker) {
+            RadioPickerDialog(
+                title = stringResource(R.string.update_channel),
+                options = listOf(
+                    RadioOption(
+                        AppSettings.CHANNEL_STABLE,
+                        stringResource(R.string.update_channel_stable),
+                        stringResource(R.string.update_channel_stable_desc)
+                    ),
+                    RadioOption(
+                        AppSettings.CHANNEL_NIGHTLY,
+                        stringResource(R.string.update_channel_nightly),
+                        stringResource(R.string.update_channel_nightly_desc)
+                    )
+                ),
+                selected = updateChannelPref,
+                selectedColor = animatedPrimary,
+                onSelect = {
+                    AppSettings.setUpdateChannel(it, audioContext)
+                    showUpdateChannelPicker = false
+                },
+                onDismiss = { showUpdateChannelPicker = false }
+            )
+        }
+
         // Check for Updates
         val scope = rememberCoroutineScope()
         val updateContext = androidx.compose.ui.platform.LocalContext.current
@@ -645,7 +686,12 @@ fun AccountScreen(vm: PlaybackViewModel) {
                 upToDate = false
                 scope.launch {
                     val info = withContext(Dispatchers.IO) {
-                        UpdateService.checkForUpdates(updateContext)
+                        val channel = if (updateChannelPref == AppSettings.CHANNEL_NIGHTLY) {
+                            ch.snepilatch.app.util.UpdateChannel.NIGHTLY
+                        } else {
+                            ch.snepilatch.app.util.UpdateChannel.STABLE
+                        }
+                        UpdateService.checkForUpdates(updateContext, channel)
                     }
                     isChecking = false
                     if (info != null) {

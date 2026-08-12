@@ -80,6 +80,30 @@ fun UpdateDialog(
                     }
                 }
 
+                if (updateInfo.isPrerelease) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                Icons.Rounded.ErrorOutline,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Text(
+                                stringResource(R.string.nightly_build_warning),
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+
                 // Download progress
                 if (isDownloading) {
                     LinearProgressIndicator(
@@ -144,7 +168,10 @@ fun UpdateDialog(
                             progress = p
                         }
                         if (file != null) {
-                            UpdateService.installApk(context, file)
+                            isDownloading = false
+                            if (!UpdateService.installApk(context, file)) {
+                                error = context.getString(R.string.enable_unknown_apps)
+                            }
                         } else {
                             isDownloading = false
                             error = context.getString(R.string.update_download_failed)

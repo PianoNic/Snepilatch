@@ -18,6 +18,36 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
+      - name: Determine app version from the release tag
+        id: app_version
+        run: |
+          # Release builds (triggered by `release: published`) run on a tag ref, e.g.
+          # refs/tags/v2.9.80 -> versionName "2.9.80", or refs/tags/v2.9.80-nightly.3 for a
+          # nightly (see nightly.yml). versionCode must be a strictly increasing integer, so
+          # derive it from the semver core (major*1e8 + minor*1e5 + patch*100) plus a 2-digit
+          # ordinal: 99 for a full release, or the nightly number (capped at 98) for a nightly
+          # — so a full release always outranks every nightly of the same core version, and
+          # later nightlies of the same core version outrank earlier ones.
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            TAG="${GITHUB_REF#refs/tags/v}"
+            CORE="${TAG%%-*}"
+            IFS='.' read -r MAJOR MINOR PATCH _ <<< "$CORE"
+            if [[ "$TAG" == *-nightly.* ]]; then
+              NIGHTLY_N="${TAG##*-nightly.}"
+              ORDINAL=$(( 10#$NIGHTLY_N > 98 ? 98 : 10#$NIGHTLY_N ))
+            else
+              ORDINAL=99
+            fi
+            VERSION_CODE=$(( (10#${MAJOR:-0}) * 100000000 + (10#${MINOR:-0}) * 100000 + (10#${PATCH:-0}) * 100 + ORDINAL ))
+            echo "name=$TAG" >> "$GITHUB_OUTPUT"
+            echo "code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+            echo "Building version $TAG (versionCode $VERSION_CODE) from tag $GITHUB_REF"
+          else
+            echo "name=" >> "$GITHUB_OUTPUT"
+            echo "code=" >> "$GITHUB_OUTPUT"
+            echo "Not building from a tag ($GITHUB_REF) — keeping the versionCode/versionName checked into build.gradle.kts"
+          fi
+
       - name: Download KotifyClient JAR
         env:
           GH_TOKEN: ${{ secrets.KOTIFY_PAT }}
@@ -100,7 +130,11 @@ jobs:
         working-directory: ./src
         run: |
           chmod +x ./gradlew
-          ./gradlew assembleProdRelease
+          VERSION_ARGS=""
+          if [ -n "${{ steps.app_version.outputs.name }}" ]; then
+            VERSION_ARGS="-PappVersionName=${{ steps.app_version.outputs.name }} -PappVersionCode=${{ steps.app_version.outputs.code }}"
+          fi
+          ./gradlew assembleProdRelease $VERSION_ARGS
 
       - name: Prepare artifacts
         run: |

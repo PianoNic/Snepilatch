@@ -97,12 +97,20 @@
 
     <!-- About -->
     <string name="app_version">App-Version</string>
+    <string name="update_channel">Update-Kanal</string>
+    <string name="update_channel_stable">Stabil</string>
+    <string name="update_channel_stable_desc">Nur vollständigi, gprüefti Releases.</string>
+    <string name="update_channel_nightly">Nightly</string>
+    <string name="update_channel_nightly_desc">Ungprüefti Vorabversione. Nutzig uf eigeni Gfahr.</string>
     <string name="check_for_updates">Nach Updates sueche</string>
     <string name="checking">Am Sueche…</string>
     <string name="up_to_date">Du häsch di nöischti Version</string>
     <string name="tap_to_check">Tipp, um nach neue Versione z sueche</string>
     <string name="release_notes">Versions-Notize</string>
     <string name="view_changelog">Änderige aaluege</string>
+    <string name="debug_logging">Debug-Logging</string>
+    <string name="debug_logging_desc">Gib e Loki-Endpunkt-URL i, zum d Logs mit emene Entwickler teile. Leer laa zum deaktiviere.</string>
+    <string name="debug_logging_off">Us</string>
 
     <!-- Update Dialog -->
     <string name="update_available">Es Update isch da</string>
@@ -111,6 +119,8 @@
     <string name="whats_new">Was isch neu:</string>
     <string name="update_now">Jetz aktualisiere</string>
     <string name="later">Spöter</string>
+    <string name="nightly_build_warning">Das isch en Nightly-Build — ungprüeft und chönnt instabil si. Nutzig uf eigeni Gfahr.</string>
+    <string name="enable_unknown_apps">Erlaub Snepilatch i de aktuelle Iistellige s Installiere vo Apps und tipp de wieder uf Jetz aktualisiere.</string>
 
     <!-- Devices -->
     <string name="searching_devices">Am Gräte sueche…</string>
@@ -319,6 +329,16 @@
     <string name="download_failed">Download hät nöd funktioniert</string>
     <string name="download_folder">Download-Ordner</string>
     <string name="download_folder_none">Nöd gsetzt, tipp zum Uuswähle</string>
+    <string name="storage_limit">Speicherlimit</string>
+    <string name="storage_limit_desc">Begränzt wieviel Platz dini Downloads bruuche dörfed. Leer oder 0 für kes Limit.</string>
+    <string name="storage_limit_placeholder">z. B. 5</string>
+    <string name="storage_limit_value">%.1f GB</string>
+    <string name="storage_limit_unlimited">Kes Limit</string>
+    <string name="storage_policy">Wenn voll</string>
+    <string name="storage_policy_stop">Downloads stoppe</string>
+    <string name="storage_policy_stop_desc">Neui Downloads ablehne sobald s Limit erreicht isch</string>
+    <string name="storage_policy_evict">Ältesti lösche</string>
+    <string name="storage_policy_evict_desc">Die zersch derzuegfüegte Downloads entferne für Platz z schaffe</string>
     <string name="download_track">Abelade</string>
     <string name="remove_download">Download lösche</string>
     <string name="download_needs_folder">Wähl zerscht en Download-Ordner uus</string>

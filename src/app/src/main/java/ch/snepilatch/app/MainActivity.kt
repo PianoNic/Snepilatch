@@ -139,7 +139,7 @@ class MainActivity : ComponentActivity() {
                 // network + TLS update check each time.
                 if (updateChecked.compareAndSet(false, true)) {
                     withContext(Dispatchers.IO) {
-                        val info = UpdateService.checkForUpdates(context)
+                        val info = UpdateService.checkForUpdates(context, AppSettings.updateChannelEnum())
                         if (info != null) {
                             val dismissed = UpdateService.getDismissedVersion(context)
                             if (dismissed != info.latestVersion) {

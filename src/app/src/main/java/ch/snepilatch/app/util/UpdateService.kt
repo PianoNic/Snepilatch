@@ -2,13 +2,15 @@ package ch.snepilatch.app.util
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import android.util.Log
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.json.JSONObject
+import org.json.JSONArray
 import java.io.File
 
 data class UpdateInfo(
@@ -16,19 +18,33 @@ data class UpdateInfo(
     val latestVersion: String,
     val downloadUrl: String,
     val releaseNotes: String,
-    val htmlUrl: String
+    val htmlUrl: String,
+    val isPrerelease: Boolean
 )
+
+/**
+ * [STABLE] only surfaces full GitHub releases. [NIGHTLY] also surfaces prereleases (nightly
+ * builds tagged `vX.Y.Z-nightly.N`), which are unreviewed and opt-in at the user's own risk —
+ * see [ch.snepilatch.app.viewmodel.AppSettings.updateChannel].
+ */
+enum class UpdateChannel { STABLE, NIGHTLY }
 
 object UpdateService {
 
     private const val TAG = "UpdateService"
+
+    // The list endpoint (not /releases/latest, which never returns a prerelease) so the
+    // nightly channel can see prereleases too. GitHub returns it newest-first.
     private const val GITHUB_API_URL =
-        "https://api.github.com/repos/PianoNic/snepilatch/releases/latest"
+        "https://api.github.com/repos/PianoNic/Snepilatch/releases"
     private const val DISMISSED_KEY = "dismissed_update_version"
 
     internal val client = OkHttpClient()
 
-    suspend fun checkForUpdates(context: Context): UpdateInfo? = withContext(Dispatchers.IO) {
+    suspend fun checkForUpdates(
+        context: Context,
+        channel: UpdateChannel = UpdateChannel.STABLE
+    ): UpdateInfo? = withContext(Dispatchers.IO) {
         try {
             val currentVersion = context.packageManager
                 .getPackageInfo(context.packageName, 0).versionName ?: return@withContext null
@@ -41,7 +57,14 @@ object UpdateService {
             val response = client.newCall(request).execute()
             if (!response.isSuccessful) return@withContext null
 
-            val json = JSONObject(response.body?.string() ?: return@withContext null)
+            val releases = JSONArray(response.body?.string() ?: return@withContext null)
+            val json = (0 until releases.length())
+                .map { releases.getJSONObject(it) }
+                .firstOrNull { release ->
+                    !release.optBoolean("draft", false) &&
+                        (channel == UpdateChannel.NIGHTLY || !release.optBoolean("prerelease", false))
+                } ?: return@withContext null
+
             val latestVersion = json.optString("tag_name", "").removePrefix("v")
 
             if (!isNewerVersion(currentVersion, latestVersion)) return@withContext null
@@ -64,7 +87,8 @@ object UpdateService {
                 latestVersion = latestVersion,
                 downloadUrl = downloadUrl,
                 releaseNotes = json.optString("body", ""),
-                htmlUrl = json.optString("html_url", "")
+                htmlUrl = json.optString("html_url", ""),
+                isPrerelease = json.optBoolean("prerelease", false)
             )
         } catch (e: Exception) {
             Log.w(TAG, "Update check failed: ${e.message}")
@@ -72,16 +96,43 @@ object UpdateService {
         }
     }
 
+    /** A version's dot-separated numeric core, plus its nightly ordinal if it's a `-nightly.N` build. */
+    private data class ParsedVersion(val core: List<Int>, val nightly: Int?)
+
+    private fun parseVersion(version: String): ParsedVersion {
+        val core = version.substringBefore("-")
+            .replace(Regex("[^0-9.]"), "")
+            .split(".")
+            .map { it.toIntOrNull() ?: 0 }
+        val nightly = if (version.contains("-nightly.")) {
+            version.substringAfterLast("-nightly.").toIntOrNull()
+        } else {
+            null
+        }
+        return ParsedVersion(core, nightly)
+    }
+
+    /**
+     * Semver-correct ordering: a nightly build ranks below the full release of the same core
+     * version (e.g. 2.9.80-nightly.3 < 2.9.80), and among nightlies of the same core version the
+     * higher ordinal wins. A naive positional-parts comparison would get this backwards, since a
+     * longer dot-list otherwise reads as "more precise" rather than "prerelease of".
+     */
     private fun isNewerVersion(current: String, latest: String): Boolean {
         try {
-            val currentParts = current.replace(Regex("[^0-9.]"), "").split(".").map { it.toIntOrNull() ?: 0 }
-            val latestParts = latest.replace(Regex("[^0-9.]"), "").split(".").map { it.toIntOrNull() ?: 0 }
+            val c = parseVersion(current)
+            val l = parseVersion(latest)
 
-            for (i in 0 until maxOf(currentParts.size, latestParts.size)) {
-                val c = currentParts.getOrElse(i) { 0 }
-                val l = latestParts.getOrElse(i) { 0 }
-                if (l > c) return true
-                if (l < c) return false
+            for (i in 0 until maxOf(c.core.size, l.core.size)) {
+                val cv = c.core.getOrElse(i) { 0 }
+                val lv = l.core.getOrElse(i) { 0 }
+                if (lv != cv) return lv > cv
+            }
+
+            return when {
+                c.nightly == null -> false
+                l.nightly == null -> true
+                else -> l.nightly > c.nightly
             }
         } catch (e: Exception) {
             Log.w(TAG, "Version comparison failed: $e")
@@ -136,7 +187,21 @@ object UpdateService {
         }
     }
 
-    fun installApk(context: Context, file: File) {
+    /**
+     * Returns false (and sends the user to the "install unknown apps" setting instead of
+     * installing) when the permission isn't granted yet — without this check the install
+     * intent still opens, but the system installer silently blocks it instead.
+     */
+    fun installApk(context: Context, file: File): Boolean {
+        if (!context.packageManager.canRequestPackageInstalls()) {
+            context.startActivity(
+                Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                    data = Uri.parse("package:${context.packageName}")
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+            )
+            return false
+        }
         val uri = FileProvider.getUriForFile(
             context,
             "${context.packageName}.fileprovider",
@@ -147,6 +212,7 @@ object UpdateService {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
         }
         context.startActivity(intent)
+        return true
     }
 
     fun getDismissedVersion(context: Context): String? {

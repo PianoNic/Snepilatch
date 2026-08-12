@@ -89,12 +89,20 @@
 
     <!-- About -->
     <string name="app_version">App Version</string>
+    <string name="update_channel">Update Channel</string>
+    <string name="update_channel_stable">Stable</string>
+    <string name="update_channel_stable_desc">Only full, reviewed releases.</string>
+    <string name="update_channel_nightly">Nightly</string>
+    <string name="update_channel_nightly_desc">Unreviewed prerelease builds. Install at your own risk.</string>
     <string name="check_for_updates">Check for Updates</string>
     <string name="checking">Checking…</string>
     <string name="up_to_date">You\'re on the latest version</string>
     <string name="tap_to_check">Tap to check for new versions</string>
     <string name="release_notes">Release Notes</string>
     <string name="view_changelog">View changelog</string>
+    <string name="debug_logging">Debug Logging</string>
+    <string name="debug_logging_desc">Enter a Loki endpoint URL to share logs with a developer. Leave empty to disable.</string>
+    <string name="debug_logging_off">Off</string>
 
     <!-- Update Dialog -->
     <string name="update_available">Update Available</string>
@@ -103,6 +111,8 @@
     <string name="whats_new">What\'s new:</string>
     <string name="update_now">Update Now</string>
     <string name="later">Later</string>
+    <string name="nightly_build_warning">This is a nightly build — unreviewed and may be unstable. Install at your own risk.</string>
+    <string name="enable_unknown_apps">Allow Snepilatch to install apps in the settings that just opened, then tap Update Now again.</string>
 
     <!-- Devices -->
     <string name="searching_devices">Searching for devices…</string>
@@ -309,6 +319,16 @@
     <string name="download_failed">Download failed</string>
     <string name="download_folder">Download folder</string>
     <string name="download_folder_none">Not set, tap to choose</string>
+    <string name="storage_limit">Storage Limit</string>
+    <string name="storage_limit_desc">Cap how much space your downloads can use. Leave empty or 0 for no limit.</string>
+    <string name="storage_limit_placeholder">e.g. 5</string>
+    <string name="storage_limit_value">%.1f GB</string>
+    <string name="storage_limit_unlimited">No limit</string>
+    <string name="storage_policy">When Full</string>
+    <string name="storage_policy_stop">Stop downloading</string>
+    <string name="storage_policy_stop_desc">Refuse new downloads once the limit is reached</string>
+    <string name="storage_policy_evict">Delete oldest</string>
+    <string name="storage_policy_evict_desc">Remove the oldest-added downloads to make room</string>
     <string name="download_track">Download</string>
     <string name="remove_download">Remove download</string>
     <string name="download_needs_folder">Choose a download folder first</string>

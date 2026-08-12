@@ -27,24 +27,18 @@ android {
         keystoreProperties.load(FileInputStream(keystorePropertiesFile))
     }
 
-    // Load local properties (gitignored) for dev-only config like Loki endpoint
-    val localPropertiesFile = rootProject.file("local.properties")
-    val localProperties = Properties()
-    if (localPropertiesFile.exists()) {
-        localProperties.load(FileInputStream(localPropertiesFile))
-    }
-
     defaultConfig {
         applicationId = "ch.snepilatch.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 115
-        versionName = "2.9.79"
+        // The release pipeline overrides these with -PappVersionCode/-PappVersionName
+        // derived from the release tag, so a release build's version always matches
+        // the tag it was built from. These checked-in values are only what local/dev
+        // builds (and workflow_dispatch dry runs) get, since there's no tag for those.
+        versionCode = (project.findProperty("appVersionCode") as String?)?.toIntOrNull() ?: 116
+        versionName = project.findProperty("appVersionName") as String? ?: "3.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        // Loki endpoint: set in local.properties (gitignored), empty in production
-        buildConfigField("String", "LOKI_ENDPOINT", "\"${localProperties.getProperty("loki.endpoint", "")}\"")
     }
 
     signingConfigs {

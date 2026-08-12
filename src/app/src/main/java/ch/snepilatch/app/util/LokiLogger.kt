@@ -23,11 +23,13 @@ object LokiLogger {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var flushJob: Job? = null
 
-    // Only buffer once init() has wired up the flush loop. Production ships with LOKI_ENDPOINT empty,
-    // so init() is never called, no flush job ever drains the queue — without this gate the buffer
-    // would grow unbounded for the whole app lifetime.
+    // Only buffer once init() has wired up the flush loop — without this gate, logging before the
+    // user sets an endpoint (or after they clear it) would grow the buffer unbounded.
     @Volatile
     private var started = false
+
+    @Volatile
+    private var handlerInstalled = false
 
     private const val FLUSH_INTERVAL_MS = 10_000L
     private const val MAX_BATCH_SIZE = 100
@@ -40,18 +42,26 @@ object LokiLogger {
         val message: String
     )
 
+    /** Safe to call again with a new endpoint — e.g. the user changes it in Settings mid-session. */
     fun init(endpoint: String, appName: String, deviceId: String, appVersion: String = "unknown") {
+        flushJob?.cancel()
+
         this.endpoint = endpoint.trimEnd('/')
         this.appName = appName
         this.deviceId = deviceId
         this.appVersion = appVersion
         this.sessionId = UUID.randomUUID().toString().take(8)
 
-        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
-        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-            e("CRASH", "Uncaught exception in ${thread.name}", throwable)
-            flushSync()
-            defaultHandler?.uncaughtException(thread, throwable)
+        // Only wrap once — re-wrapping on every init() (the endpoint can change at runtime via
+        // Settings) would nest another handler around the previous one instead of replacing it.
+        if (!handlerInstalled) {
+            handlerInstalled = true
+            val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+            Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+                e("CRASH", "Uncaught exception in ${thread.name}", throwable)
+                flushSync()
+                defaultHandler?.uncaughtException(thread, throwable)
+            }
         }
 
         flushJob = scope.launch {
@@ -63,6 +73,14 @@ object LokiLogger {
         started = true
 
         i("LokiLogger", "Session started | version=$appVersion | device=${Build.MODEL} | Android ${Build.VERSION.RELEASE}")
+    }
+
+    /** Stops pushing to Loki (the user cleared the endpoint) without losing console logging. */
+    fun stop() {
+        flushJob?.cancel()
+        flushJob = null
+        started = false
+        buffer.clear()
     }
 
     fun d(tag: String, message: String) = log("DEBUG", tag, message)
@@ -84,7 +102,7 @@ object LokiLogger {
         }
 
         // Console logging above always runs; only queue for the Loki push when a flush loop exists
-        // to drain it (dev builds with loki.endpoint set). Otherwise the queue would never empty.
+        // to drain it (the user has set an endpoint). Otherwise the queue would never empty.
         if (!started) return
 
         buffer.add(

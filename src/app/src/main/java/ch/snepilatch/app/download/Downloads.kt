@@ -268,6 +268,9 @@ object Downloads {
 
     fun groups(): List<Group> = groupsOf(_rows.value)
 
+    /** Bytes on disk across every downloaded track, for enforcing AppSettings.downloadCapGb. */
+    fun totalSizeBytes(): Long = _rows.value.sumOf { it.sizeBytes }
+
     /** The grouping itself, separated from the store so it can be tested directly. */
     internal fun groupsOf(rows: List<DownloadedTrack>): List<Group> = rows
         .groupBy(::groupUriOf)

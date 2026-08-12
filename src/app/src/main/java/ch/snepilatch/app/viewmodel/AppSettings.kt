@@ -3,6 +3,7 @@ package ch.snepilatch.app.viewmodel
 import android.content.Context
 import ch.snepilatch.app.playback.MusicPlaybackService
 import ch.snepilatch.app.util.LokiLogger
+import ch.snepilatch.app.util.UpdateChannel
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
@@ -58,6 +59,35 @@ object AppSettings {
     // Content region for CDN resolution
     val contentRegion = MutableStateFlow("nearest")
 
+    // Update channel: [CHANNEL_STABLE] (default) only surfaces full releases; [CHANNEL_NIGHTLY]
+    // also surfaces GitHub prereleases (nightly builds), which are unreviewed and opt-in at the
+    // user's own risk. See UpdateService.UpdateChannel.
+    const val CHANNEL_STABLE = "stable"
+    const val CHANNEL_NIGHTLY = "nightly"
+    val updateChannel = MutableStateFlow(CHANNEL_STABLE)
+
+    fun updateChannelEnum(): UpdateChannel =
+        if (updateChannel.value == CHANNEL_NIGHTLY) UpdateChannel.NIGHTLY else UpdateChannel.STABLE
+
+    // Loki push API base URL for sharing debug logs; set by the user (Account > About > Debug
+    // Logging). Empty = disabled. See LokiLogger; KotifyApp reads this directly at boot via
+    // [savedLokiEndpoint] since it runs before [load].
+    val lokiEndpoint = MutableStateFlow("")
+
+    // Download storage cap: 0 = unlimited. What happens on a new download once the cap is hit is
+    // [downloadCapPolicy] — [CAP_POLICY_STOP] refuses it, [CAP_POLICY_EVICT_OLDEST] deletes the
+    // oldest-added downloads first to make room. See TrackDownloader.
+    const val CAP_POLICY_STOP = "stop"
+    const val CAP_POLICY_EVICT_OLDEST = "evict_oldest"
+    val downloadCapGb = MutableStateFlow(0f)
+    val downloadCapPolicy = MutableStateFlow(CAP_POLICY_STOP)
+
+    /** Null means unlimited. */
+    fun downloadCapBytes(): Long? {
+        val gb = downloadCapGb.value
+        return if (gb <= 0f) null else (gb * 1_000_000_000L).toLong()
+    }
+
     // Player background style: true = album-colour gradient (Spfy/YTM style), false = blurred art.
     val playerGradientBg = MutableStateFlow(true)
 
@@ -112,6 +142,10 @@ object AppSettings {
         eqBands.value = parseBands(prefs.getString("eq_bands", null))
         playerGradientBg.value = prefs.getBoolean("player_gradient_bg", true)
         contentRegion.value = prefs.getString("content_region", "nearest") ?: "nearest"
+        updateChannel.value = prefs.getString("update_channel", CHANNEL_STABLE) ?: CHANNEL_STABLE
+        lokiEndpoint.value = prefs.getString("loki_endpoint", "") ?: ""
+        downloadCapGb.value = prefs.getFloat("download_cap_gb", 0f)
+        downloadCapPolicy.value = prefs.getString("download_cap_policy", CAP_POLICY_STOP) ?: CAP_POLICY_STOP
         notificationLeftButton.value = prefs.getString("notification_left_button", "repeat") ?: "repeat"
         notificationRightButton.value = prefs.getString("notification_right_button", "like") ?: "like"
     }
@@ -148,6 +182,9 @@ object AppSettings {
             (prefs.getString("notification_right_button", "like") ?: "like")
     }
 
+    /** Direct-from-prefs read for KotifyApp.onCreate, which runs before [load]. */
+    fun savedLokiEndpoint(ctx: Context): String = prefs(ctx).getString("loki_endpoint", "") ?: ""
+
     fun setPreferredAudioSource(source: String?, context: Context) {
         preferredAudioSource.value = source
         prefs(context)
@@ -170,6 +207,42 @@ object AppSettings {
         contentRegion.value = region
         prefs(context)
             .edit().putString("content_region", region).apply()
+    }
+
+    fun setUpdateChannel(channel: String, context: Context) {
+        updateChannel.value = channel
+        prefs(context)
+            .edit().putString("update_channel", channel).apply()
+    }
+
+    fun setDownloadCapGb(gb: Float, context: Context) {
+        downloadCapGb.value = gb
+        prefs(context).edit().putFloat("download_cap_gb", gb).apply()
+    }
+
+    fun setDownloadCapPolicy(policy: String, context: Context) {
+        downloadCapPolicy.value = policy
+        prefs(context).edit().putString("download_cap_policy", policy).apply()
+    }
+
+    /** Applies immediately: starts/restarts LokiLogger with the new endpoint, or stops it when blank. */
+    fun setLokiEndpoint(endpoint: String, context: Context) {
+        val trimmed = endpoint.trim()
+        lokiEndpoint.value = trimmed
+        prefs(context).edit().putString("loki_endpoint", trimmed).apply()
+        if (trimmed.isBlank()) {
+            LokiLogger.stop()
+        } else {
+            LokiLogger.init(
+                endpoint = trimmed,
+                appName = "snepilatch",
+                deviceId = android.provider.Settings.Secure.getString(
+                    context.contentResolver,
+                    android.provider.Settings.Secure.ANDROID_ID
+                ),
+                appVersion = ch.snepilatch.app.BuildConfig.VERSION_NAME
+            )
+        }
     }
 
     fun setLyricsAnimDirection(direction: String, context: Context) {

@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -349,6 +350,82 @@ fun AccountScreen(vm: PlaybackViewModel) {
             modifier = Modifier.clickable { folderPicker.launch(null) }
         )
 
+        // Storage limit: 0 = unlimited.
+        val downloadCapGb by AppSettings.downloadCapGb.collectAsState()
+        var showCapDialog by remember { mutableStateOf(false) }
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.storage_limit), color = SpfyWhite) },
+            supportingContent = {
+                Text(
+                    if (downloadCapGb > 0f) {
+                        stringResource(R.string.storage_limit_value, downloadCapGb)
+                    } else {
+                        stringResource(R.string.storage_limit_unlimited)
+                    },
+                    color = SpfyLightGray
+                )
+            },
+            leadingContent = { Icon(Icons.Rounded.Storage, null, tint = SpfyLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable { showCapDialog = true }
+        )
+        if (showCapDialog) {
+            TextInputDialog(
+                title = stringResource(R.string.storage_limit),
+                description = stringResource(R.string.storage_limit_desc),
+                initialValue = if (downloadCapGb > 0f) downloadCapGb.toString() else "",
+                placeholder = stringResource(R.string.storage_limit_placeholder),
+                keyboardType = KeyboardType.Decimal,
+                onConfirm = {
+                    AppSettings.setDownloadCapGb(it.toFloatOrNull()?.coerceAtLeast(0f) ?: 0f, audioContext)
+                    showCapDialog = false
+                },
+                onDismiss = { showCapDialog = false }
+            )
+        }
+
+        // What to do once the storage limit is hit — only takes effect while a limit is set above.
+        val capPolicy by AppSettings.downloadCapPolicy.collectAsState()
+        var showCapPolicyPicker by remember { mutableStateOf(false) }
+        val capPolicyLabel = if (capPolicy == AppSettings.CAP_POLICY_EVICT_OLDEST) {
+            stringResource(R.string.storage_policy_evict)
+        } else {
+            stringResource(R.string.storage_policy_stop)
+        }
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.storage_policy), color = SpfyWhite) },
+            supportingContent = { Text(capPolicyLabel, color = SpfyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.DeleteSweep, null, tint = SpfyLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable { showCapPolicyPicker = true }
+        )
+        if (showCapPolicyPicker) {
+            RadioPickerDialog(
+                title = stringResource(R.string.storage_policy),
+                options = listOf(
+                    RadioOption(
+                        AppSettings.CAP_POLICY_STOP,
+                        stringResource(R.string.storage_policy_stop),
+                        stringResource(R.string.storage_policy_stop_desc)
+                    ),
+                    RadioOption(
+                        AppSettings.CAP_POLICY_EVICT_OLDEST,
+                        stringResource(R.string.storage_policy_evict),
+                        stringResource(R.string.storage_policy_evict_desc)
+                    )
+                ),
+                selected = capPolicy,
+                selectedColor = animatedPrimary,
+                onSelect = {
+                    AppSettings.setDownloadCapPolicy(it, audioContext)
+                    showCapPolicyPicker = false
+                },
+                onDismiss = { showCapPolicyPicker = false }
+            )
+        }
+
         Spacer(Modifier.height(24.dp))
         AccountSectionHeader(stringResource(R.string.account_section_sound))
 
@@ -611,6 +688,47 @@ fun AccountScreen(vm: PlaybackViewModel) {
             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
         )
 
+        // Update channel
+        val updateChannelPref by AppSettings.updateChannel.collectAsState()
+        var showUpdateChannelPicker by remember { mutableStateOf(false) }
+        val updateChannelLabel = if (updateChannelPref == AppSettings.CHANNEL_NIGHTLY) {
+            stringResource(R.string.update_channel_nightly)
+        } else {
+            stringResource(R.string.update_channel_stable)
+        }
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.update_channel), color = SpfyWhite) },
+            supportingContent = { Text(updateChannelLabel, color = SpfyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.SystemUpdate, null, tint = SpfyLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable { showUpdateChannelPicker = true }
+        )
+        if (showUpdateChannelPicker) {
+            RadioPickerDialog(
+                title = stringResource(R.string.update_channel),
+                options = listOf(
+                    RadioOption(
+                        AppSettings.CHANNEL_STABLE,
+                        stringResource(R.string.update_channel_stable),
+                        stringResource(R.string.update_channel_stable_desc)
+                    ),
+                    RadioOption(
+                        AppSettings.CHANNEL_NIGHTLY,
+                        stringResource(R.string.update_channel_nightly),
+                        stringResource(R.string.update_channel_nightly_desc)
+                    )
+                ),
+                selected = updateChannelPref,
+                selectedColor = animatedPrimary,
+                onSelect = {
+                    AppSettings.setUpdateChannel(it, audioContext)
+                    showUpdateChannelPicker = false
+                },
+                onDismiss = { showUpdateChannelPicker = false }
+            )
+        }
+
         // Check for Updates
         val scope = rememberCoroutineScope()
         val updateContext = androidx.compose.ui.platform.LocalContext.current
@@ -645,7 +763,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
                 upToDate = false
                 scope.launch {
                     val info = withContext(Dispatchers.IO) {
-                        UpdateService.checkForUpdates(updateContext)
+                        UpdateService.checkForUpdates(updateContext, AppSettings.updateChannelEnum())
                     }
                     isChecking = false
                     if (info != null) {
@@ -678,6 +796,37 @@ fun AccountScreen(vm: PlaybackViewModel) {
 
         if (showReleaseNotes) {
             ReleaseNotesDialog(onDismiss = { showReleaseNotes = false })
+        }
+
+        // Debug logging: lets the user point the app at a Loki endpoint to share logs on request,
+        // without anything baked into the build. Empty = disabled (the default).
+        val lokiEndpoint by AppSettings.lokiEndpoint.collectAsState()
+        var showLokiDialog by remember { mutableStateOf(false) }
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.debug_logging), color = SpfyWhite) },
+            supportingContent = {
+                Text(
+                    lokiEndpoint.ifBlank { stringResource(R.string.debug_logging_off) },
+                    color = SpfyLightGray
+                )
+            },
+            leadingContent = { Icon(Icons.Rounded.BugReport, null, tint = SpfyLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable { showLokiDialog = true }
+        )
+        if (showLokiDialog) {
+            TextInputDialog(
+                title = stringResource(R.string.debug_logging),
+                description = stringResource(R.string.debug_logging_desc),
+                initialValue = lokiEndpoint,
+                placeholder = "https://loki.example.com",
+                onConfirm = {
+                    AppSettings.setLokiEndpoint(it, audioContext)
+                    showLokiDialog = false
+                },
+                onDismiss = { showLokiDialog = false }
+            )
         }
 
         Spacer(Modifier.height(24.dp))
@@ -734,6 +883,58 @@ private fun AccountSectionHeader(title: String) {
         fontSize = 16.sp,
         fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp)
+    )
+}
+
+/** Free-text settings dialog, e.g. the Loki debug-logging endpoint. Empty input clears the setting. */
+@Composable
+private fun TextInputDialog(
+    title: String,
+    description: String? = null,
+    initialValue: String,
+    placeholder: String,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var value by remember { mutableStateOf(initialValue) }
+    val confirmColor = MaterialTheme.colorScheme.primary
+    TightAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title, color = SpfyWhite) },
+        text = {
+            Column {
+                if (description != null) {
+                    Text(description, color = SpfyLightGray, fontSize = 13.sp)
+                    Spacer(Modifier.height(12.dp))
+                }
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { value = it },
+                    placeholder = { Text(placeholder, color = SpfyLightGray.copy(alpha = 0.7f)) },
+                    singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = keyboardType),
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = SpfyWhite,
+                        unfocusedTextColor = SpfyWhite,
+                        cursorColor = confirmColor,
+                        focusedBorderColor = confirmColor,
+                        unfocusedBorderColor = SpfyLightGray
+                    )
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(value) }) {
+                Text(stringResource(R.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
     )
 }
 

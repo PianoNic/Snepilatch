@@ -34,7 +34,7 @@ Download the latest APK from the [Releases](https://github.com/PianoNic/Snepilat
 
 ## Building from Source
 
-> This project depends on a private library not included in the repository. It will not compile without it.
+> This project depends on a private library not included in the repository. It will not compile without it. Contact me for permission to access the source code via Discord
 
 ## Community
 

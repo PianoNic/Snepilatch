@@ -3,10 +3,7 @@ name: Cut a Nightly Build
 # Twice a day (see the cron below — times are UTC; adjust if you want a specific local time), plus
 # workflow_dispatch for a manual cut. Skips entirely if main hasn't moved since the last nightly.
 # Tags and publishes a prerelease (vX.Y.Z-nightly.N, N scoped to the current base version), then
-# explicitly dispatches build-and-release.yml at that tag — a release published via GITHUB_TOKEN
-# does NOT fire the release: published event (GitHub's anti-recursion safeguard), unlike a human
-# publishing one through the UI, so this can't just rely on that trigger the way a stable release
-# does. See CLAUDE.md "Versioning".
+# calls build-apk.yml directly to build and upload the APK. See CLAUDE.md "Versioning".
 on:
   schedule:
     - cron: "0 0 * * *"
@@ -15,7 +12,6 @@ on:
 
 permissions:
   contents: write
-  actions: write # needed to dispatch build-and-release.yml from "Trigger the release build"
 
 concurrency:
   # A manual dispatch landing close to a scheduled run must not race it computing the same
@@ -26,6 +22,9 @@ concurrency:
 jobs:
   cut-nightly:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      skip: ${{ steps.tag.outputs.skip }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -70,11 +69,10 @@ jobs:
             --generate-notes \
             --notes "⚠️ **Nightly build** — unreviewed and may be unstable. Only visible to users on the Nightly update channel. Install at your own risk."
 
-      - name: Trigger the release build
-        if: steps.tag.outputs.skip != 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # workflow_dispatch IS exempt from the GITHUB_TOKEN anti-recursion restriction that
-          # blocks the release: published event above, so this is what actually builds the APK.
-          gh workflow run build-and-release.yml --repo "${{ github.repository }}" --ref "${{ steps.tag.outputs.tag }}"
+  build:
+    needs: cut-nightly
+    if: needs.cut-nightly.outputs.skip != 'true'
+    uses: ./.github/workflows/build-apk.yml
+    with:
+      tag: ${{ needs.cut-nightly.outputs.tag }}
+    secrets: inherit

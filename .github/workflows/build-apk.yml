@@ -1,0 +1,263 @@
+name: Build APK
+
+# Reusable: builds the signed prod APK for a given tag and uploads it to that tag's (already
+# existing) GitHub release. Called by build-and-release.yml (a human-published release) and
+# nightly.yml (a scheduled nightly) — being called at all means "build and upload", so unlike the
+# old single-workflow setup there's no event-type or ref-shape guessing about whether to do so.
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Release tag to build and upload to, e.g. v2.9.80 or v2.9.80-nightly.3'
+        required: true
+        type: string
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Determine app version from the tag
+        id: app_version
+        run: |
+          # versionCode must be a strictly increasing integer, so derive it from the semver core
+          # (major*1e8 + minor*1e5 + patch*100) plus a 2-digit ordinal: 99 for a full release, or
+          # the nightly number (capped at 98) for a nightly — so a full release always outranks
+          # every nightly of the same core version, and later nightlies outrank earlier ones.
+          TAG="${{ inputs.tag }}"
+          TAG="${TAG#v}"
+          CORE="${TAG%%-*}"
+          IFS='.' read -r MAJOR MINOR PATCH _ <<< "$CORE"
+          if [[ "$TAG" == *-nightly.* ]]; then
+            NIGHTLY_N="${TAG##*-nightly.}"
+            ORDINAL=$(( 10#$NIGHTLY_N > 98 ? 98 : 10#$NIGHTLY_N ))
+          else
+            ORDINAL=99
+          fi
+          VERSION_CODE=$(( (10#${MAJOR:-0}) * 100000000 + (10#${MINOR:-0}) * 100000 + (10#${PATCH:-0}) * 100 + ORDINAL ))
+          echo "name=$TAG" >> "$GITHUB_OUTPUT"
+          echo "code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "Building version $TAG (versionCode $VERSION_CODE)"
+
+      - name: Download KotifyClient JAR
+        env:
+          GH_TOKEN: ${{ secrets.KOTIFY_PAT }}
+        run: |
+          mkdir -p src/app/libs
+          gh release download --repo PianoNic/KotifyClient --pattern "KotifyClient-obfuscated.jar" --dir src/app/libs
+          mv src/app/libs/KotifyClient-obfuscated.jar src/app/libs/KotifyClient.jar
+          echo "Downloaded KotifyClient JAR ($(du -h src/app/libs/KotifyClient.jar | cut -f1))"
+
+      - name: Setup release keystore
+        working-directory: ./src/app
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          echo "Setting up release keystore from secrets..."
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "Using existing keystore from secrets"
+            echo "$KEYSTORE_BASE64" | base64 -d > snepilatch-release.keystore
+          else
+            echo "::error::KEYSTORE_BASE64 secret is not set"
+            exit 1
+          fi
+
+      - name: Create key.properties
+        working-directory: ./src
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          cat > key.properties << EOF
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=snepilatch
+          storeFile=snepilatch-release.keystore
+          EOF
+
+      - name: Refresh kotlin-tls-client native binaries (latest)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Always pull the latest release of PianoNic/kotlin-tls-client-natives
+          # so the bundled .so stays in lock-step with whatever KotifyClient was
+          # compiled against. Each ABI ships as android-<abi>.zip containing
+          # libtls_client_go.so + a header; we only need the .so.
+          set -e
+          mkdir -p /tmp/tls-natives
+          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
+            zip="/tmp/tls-natives/android-${abi}.zip"
+            gh release download \
+              --repo PianoNic/kotlin-tls-client-natives \
+              --pattern "android-${abi}.zip" \
+              --output "$zip"
+            target="src/app/src/main/jniLibs/${abi}"
+            mkdir -p "$target"
+            unzip -o "$zip" "libtls_client_go.so" -d "$target"
+          done
+          echo "Natives in place:"
+          ls -lh src/app/src/main/jniLibs/*/libtls_client_go.so
+
+      - name: Refresh JNA jnidispatch native (latest)
+        run: |
+          # KotifyClient's shadow jar bundles JNA's Java classes, but Android
+          # can't extract JNA's per-ABI libjnidispatch.so from inside the jar at
+          # runtime (W^X). Pull the latest JNA AAR from Maven Central and drop
+          # the four Android .so files into jniLibs/ alongside libtls_client_go.so.
+          set -e
+          JNA_META=$(curl -fsSL https://repo1.maven.org/maven2/net/java/dev/jna/jna/maven-metadata.xml)
+          JNA_VERSION=$(echo "$JNA_META" | grep -oP '(?<=<release>)[^<]+' | head -1)
+          echo "Using JNA $JNA_VERSION"
+          curl -fsSL -o /tmp/jna.aar "https://repo1.maven.org/maven2/net/java/dev/jna/jna/${JNA_VERSION}/jna-${JNA_VERSION}.aar"
+          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
+            target="src/app/src/main/jniLibs/${abi}"
+            mkdir -p "$target"
+            unzip -j -o /tmp/jna.aar "jni/${abi}/libjnidispatch.so" -d "$target"
+          done
+          echo "jnidispatch in place:"
+          ls -lh src/app/src/main/jniLibs/*/libjnidispatch.so
+
+      - name: Build Android APK
+        working-directory: ./src
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleProdRelease -PappVersionName=${{ steps.app_version.outputs.name }} -PappVersionCode=${{ steps.app_version.outputs.code }}
+
+      - name: Upload Assets to Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ inputs.tag }}
+          files: src/app/build/outputs/apk/prod/release/app-prod-release.apk
+          append_body: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Send Discord Notification
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO_NAME: ${{ github.repository }}
+        run: |
+          # Skip if webhook URL is not configured
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "::warning::DISCORD_WEBHOOK_URL not set, skipping Discord notification"
+            exit 0
+          fi
+
+          # Fetch release data from GitHub API
+          RELEASE_DATA=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/$REPO_NAME/releases/tags/$RELEASE_TAG")
+
+          # Validate release data was fetched successfully
+          if [ "$(echo "$RELEASE_DATA" | jq -r '.message // empty')" = "Not Found" ]; then
+            echo "::error::Could not fetch release data for tag $RELEASE_TAG"
+            exit 1
+          fi
+
+          # Export release info for Python script
+          export RELEASE_BODY=$(echo "$RELEASE_DATA" | jq -r '.body // ""')
+          export RELEASE_URL=$(echo "$RELEASE_DATA" | jq -r '.html_url // ""')
+          export RELEASE_PUBLISHED=$(echo "$RELEASE_DATA" | jq -r '.published_at // ""')
+
+          # Extract direct APK download URL from release assets
+          export APK_URL=$(echo "$RELEASE_DATA" | jq -r '.assets[] | select(.name | endswith(".apk")) | .browser_download_url // empty')
+
+          # Build Discord embed payload
+          python3 << 'PYTHON_SCRIPT'
+          import json
+          import os
+          import re
+          from datetime import datetime
+
+          release_body = os.environ.get('RELEASE_BODY', '')
+          release_tag = os.environ.get('RELEASE_TAG', '')
+          release_url = os.environ.get('RELEASE_URL', '')
+          release_published = os.environ.get('RELEASE_PUBLISHED', '')
+          apk_url = os.environ.get('APK_URL', '')
+          repo_name = os.environ.get('REPO_NAME', '')
+
+          description = release_body
+          description = description.replace('\r\n', '\n')
+          description = re.sub(r"^## What's Changed\n*", '', description, flags=re.MULTILINE)
+          description = re.sub(r'\*\*Full Changelog[:\*].*', '', description, flags=re.DOTALL)
+          description = re.sub(r'📝 \*\*Note:\*\*.*\n*', '', description)
+          description = description.strip()
+
+          if not description:
+              description = 'See release notes for details.'
+
+          if len(description) > 4000:
+              description = description[:3997] + '...'
+
+          fields = []
+
+          if apk_url:
+              fields.append({
+                  "name": "📥 Download APK",
+                  "value": f"[snepilatch-{release_tag}.apk]({apk_url})",
+                  "inline": True
+              })
+
+          fields.append({
+              "name": "📋 Release Notes",
+              "value": f"[View on GitHub]({release_url})",
+              "inline": True
+          })
+
+          icon_url = f"https://raw.githubusercontent.com/{repo_name}/main/assets/snepilatch_Logo.png"
+          banner_url = "https://repository-images.githubusercontent.com/1048941028/0f6a518b-1c90-492c-be39-3eba2a3cab99"
+
+          timestamp = release_published if release_published else datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+
+          payload = {
+              "content": "||@everyone||",
+              "allowed_mentions": {
+                  "parse": ["everyone"]
+              },
+              "embeds": [{
+                  "title": f"📱 New Release — {release_tag}",
+                  "description": description,
+                  "url": release_url,
+                  "color": 0x1DB954,
+                  "fields": fields,
+                  "thumbnail": {
+                      "url": icon_url
+                  },
+                  "image": {
+                      "url": banner_url
+                  },
+                  "footer": {
+                      "text": "Thanks for your support! 🎵"
+                  },
+                  "timestamp": timestamp
+              }]
+          }
+
+          with open('discord_payload.json', 'w') as f:
+              json.dump(payload, f)
+          PYTHON_SCRIPT
+
+          # Send to Discord and check response
+          HTTP_CODE=$(curl -s -o discord_response.txt -w "%{http_code}" \
+               -H "Content-Type: application/json" \
+               -d @discord_payload.json \
+               "$DISCORD_WEBHOOK_URL")
+
+          if [ "$HTTP_CODE" -ne 204 ] && [ "$HTTP_CODE" -ne 200 ]; then
+            echo "::warning::Discord webhook returned HTTP $HTTP_CODE"
+            cat discord_response.txt
+            exit 1
+          fi
+
+          echo "Discord notification sent successfully (HTTP $HTTP_CODE)"

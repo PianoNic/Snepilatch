@@ -53,5 +53,5 @@ jobs:
             --repo "${{ github.repository }}" \
             --title "Snepilatch ${{ steps.tag.outputs.tag }} (nightly)" \
             --prerelease \
-            --generate-release-notes \
+            --generate-notes \
             --notes "⚠️ **Nightly build** — unreviewed and may be unstable. Only visible to users on the Nightly update channel. Install at your own risk."

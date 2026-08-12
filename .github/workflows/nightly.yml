@@ -1,13 +1,22 @@
 name: Cut a Nightly Build
 
-# Manual only — see CLAUDE.md "Versioning" for when to use this vs. a stable release.
-# Tags and publishes a prerelease (vX.Y.Z-nightly.N, N scoped to the current base version);
-# publishing triggers build-and-release.yml via `release: published`, same as a stable tag.
+# Runs on every merge to main, plus workflow_dispatch for a manual cut. Tags and publishes a
+# prerelease (vX.Y.Z-nightly.N, N scoped to the current base version); publishing triggers
+# build-and-release.yml via `release: published`, same as a stable tag. See CLAUDE.md "Versioning".
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch: {}
 
 permissions:
   contents: write
+
+concurrency:
+  # Two merges landing close together must not both read the same "last nightly" tag number —
+  # queue them (not cancel-in-progress) so each sees the previous run's tag before computing the next.
+  group: nightly-tag
+  cancel-in-progress: false
 
 jobs:
   cut-nightly:

@@ -11,7 +11,6 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
-import org.json.JSONObject
 import java.io.File
 
 data class UpdateInfo(
@@ -33,6 +32,7 @@ enum class UpdateChannel { STABLE, NIGHTLY }
 object UpdateService {
 
     private const val TAG = "UpdateService"
+
     // The list endpoint (not /releases/latest, which never returns a prerelease) so the
     // nightly channel can see prereleases too. GitHub returns it newest-first.
     private const val GITHUB_API_URL =
@@ -58,15 +58,12 @@ object UpdateService {
             if (!response.isSuccessful) return@withContext null
 
             val releases = JSONArray(response.body?.string() ?: return@withContext null)
-            var json: JSONObject? = null
-            for (i in 0 until releases.length()) {
-                val release = releases.getJSONObject(i)
-                if (release.optBoolean("draft", false)) continue
-                if (channel == UpdateChannel.STABLE && release.optBoolean("prerelease", false)) continue
-                json = release
-                break
-            }
-            if (json == null) return@withContext null
+            val json = (0 until releases.length())
+                .map { releases.getJSONObject(it) }
+                .firstOrNull { release ->
+                    !release.optBoolean("draft", false) &&
+                        (channel == UpdateChannel.NIGHTLY || !release.optBoolean("prerelease", false))
+                } ?: return@withContext null
 
             val latestVersion = json.optString("tag_name", "").removePrefix("v")
 

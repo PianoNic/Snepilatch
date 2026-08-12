@@ -133,6 +133,17 @@ object TrackDownloader {
                 Downloads.remove(existing.trackUri)
             }
 
+            val capBytes = AppSettings.downloadCapBytes()
+            if (capBytes != null) {
+                if (AppSettings.downloadCapPolicy.value == AppSettings.CAP_POLICY_EVICT_OLDEST) {
+                    evictToFit(capBytes)
+                } else if (Downloads.totalSizeBytes() >= capBytes) {
+                    LokiLogger.i(TAG, "storage cap reached, refusing '${request.title}'")
+                    DownloadNotifier.failed(context, request.title, "storage cap reached")
+                    return@withContext DownloadOutcome.Failed("storage cap reached")
+                }
+            }
+
             val report: (Int) -> Unit = { percent ->
                 onProgress?.invoke(percent)
                 if (notify) DownloadNotifier.progress(context, request.title, percent)
@@ -528,6 +539,23 @@ object TrackDownloader {
     fun delete(trackUri: String) {
         Downloads.find(trackUri)?.let { DownloadFolder.delete(it.documentUri) }
         Downloads.remove(trackUri)
+    }
+
+    /**
+     * Deletes oldest-added downloads until the total is back under [capBytes]. Run before a new
+     * download starts, not after: the new file's own size isn't known until it's fetched, so this
+     * only guarantees room for what's already there — a download that itself exceeds the cap pushes
+     * back over it, which the next call corrects.
+     */
+    private fun evictToFit(capBytes: Long) {
+        var total = Downloads.totalSizeBytes()
+        if (total <= capBytes) return
+        for (track in Downloads.rows.value.sortedBy { it.downloadedAt }) {
+            if (total <= capBytes) break
+            delete(track.trackUri)
+            total -= track.sizeBytes
+            LokiLogger.i(TAG, "evicted '${track.title}' to stay under the storage cap")
+        }
     }
 
     private fun extensionFor(mimeType: String?): String = when {

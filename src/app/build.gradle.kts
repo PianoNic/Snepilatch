@@ -27,13 +27,6 @@ android {
         keystoreProperties.load(FileInputStream(keystorePropertiesFile))
     }
 
-    // Load local properties (gitignored) for dev-only config like Loki endpoint
-    val localPropertiesFile = rootProject.file("local.properties")
-    val localProperties = Properties()
-    if (localPropertiesFile.exists()) {
-        localProperties.load(FileInputStream(localPropertiesFile))
-    }
-
     defaultConfig {
         applicationId = "ch.snepilatch.app"
         minSdk = 26
@@ -46,9 +39,6 @@ android {
         versionName = project.findProperty("appVersionName") as String? ?: "3.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        // Loki endpoint: set in local.properties (gitignored), empty in production
-        buildConfigField("String", "LOKI_ENDPOINT", "\"${localProperties.getProperty("loki.endpoint", "")}\"")
     }
 
     signingConfigs {

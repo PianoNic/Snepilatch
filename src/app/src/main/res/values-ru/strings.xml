@@ -95,6 +95,9 @@
     <string name="tap_to_check">Нажмите для проверки обновлений</string>
     <string name="release_notes">Примечания к выпуску</string>
     <string name="view_changelog">Просмотр изменений</string>
+    <string name="debug_logging">Отладочное логирование</string>
+    <string name="debug_logging_desc">Введите URL конечной точки Loki, чтобы поделиться логами с разработчиком. Оставьте пустым, чтобы отключить.</string>
+    <string name="debug_logging_off">Выкл</string>
 
     <!-- Update Dialog -->
     <string name="update_available">Доступно обновление</string>
@@ -310,6 +313,16 @@
     <string name="download_failed">Ошибка загрузки</string>
     <string name="download_folder">Папка загрузок</string>
     <string name="download_folder_none">Не задана, нажмите чтобы выбрать</string>
+    <string name="storage_limit">Лимит хранилища</string>
+    <string name="storage_limit_desc">Ограничьте объём места для загрузок. Оставьте пустым или 0 без ограничения.</string>
+    <string name="storage_limit_placeholder">напр. 5</string>
+    <string name="storage_limit_value">%.1f ГБ</string>
+    <string name="storage_limit_unlimited">Без ограничения</string>
+    <string name="storage_policy">При заполнении</string>
+    <string name="storage_policy_stop">Остановить загрузки</string>
+    <string name="storage_policy_stop_desc">Отклонять новые загрузки по достижении лимита</string>
+    <string name="storage_policy_evict">Удалить старые</string>
+    <string name="storage_policy_evict_desc">Удалять самые старые загрузки, чтобы освободить место</string>
     <string name="download_track">Скачать</string>
     <string name="remove_download">Удалить загрузку</string>
     <string name="download_needs_folder">Сначала выберите папку загрузок</string>

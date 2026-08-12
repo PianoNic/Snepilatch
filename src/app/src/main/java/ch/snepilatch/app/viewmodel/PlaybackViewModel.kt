@@ -13,8 +13,15 @@ import ch.snepilatch.app.util.normalizeSpfyImageUrl
 import ch.snepilatch.app.playback.InfiniPlayController
 import ch.snepilatch.app.playback.InfiniPlayViz
 import ch.snepilatch.app.playback.MusicPlaybackService
+import ch.snepilatch.app.playback.PlaybackCache
 import ch.snepilatch.app.playback.PositionInterpolator
 import ch.snepilatch.app.playback.SessionHolder
+import ch.snepilatch.app.download.DownloadFolder
+import ch.snepilatch.app.download.DownloadNotifier
+import ch.snepilatch.app.download.Downloads
+import ch.snepilatch.app.download.DownloadOutcome
+import ch.snepilatch.app.download.DownloadRequest
+import ch.snepilatch.app.download.TrackDownloader
 import ch.snepilatch.app.playback.AudioSourceResolver
 import ch.snepilatch.app.playback.engine.SpfyCdnResolver
 import ch.snepilatch.app.playback.engine.SpfyStream
@@ -29,6 +36,7 @@ import kotify.api.song.Song
 import kotify.api.user.User
 import kotify.api.canvas.Canvas
 import kotify.cdn.SpfyPlayback
+import kotify.cdn.StreamInfo
 import kotify.cdn.StreamResult
 import kotify.session.Session
 import kotify.session.SessionConfig
@@ -1206,6 +1214,66 @@ class PlaybackViewModel : ViewModel() {
         }
     }
 
+    /** Cold-start play of a downloaded copy, resuming where the user left off. */
+    private suspend fun coldStartLocal(
+        track: TrackInfo,
+        title: String,
+        artist: String,
+        art: String?,
+        startPositionMs: Long,
+    ): Boolean {
+        val local = AudioSourceResolver.localOrNull(track.uri, title, artist) as? StreamResult.Success
+            ?: return false
+        playUrlAt = System.currentTimeMillis()
+        withContext(Dispatchers.Main) {
+            MusicPlaybackService.instance?.playUrl(
+                local.info.url, title, artist, art,
+                startPlaying = true, startPositionMs = startPositionMs
+            )
+        }
+        commitStream(track.uri, AudioSourceResolver.LOCAL_PROVIDER)
+        LokiLogger.i(TAG, "[ColdStart] playing the downloaded copy at ${startPositionMs}ms")
+        return true
+    }
+
+    /**
+     * Cold-start play through the third-party chain, so resume-from-idle behaves like the rest of
+     * the lossless flow rather than dropping to Spfy's Widevine CDN.
+     */
+    private suspend fun coldStartThirdParty(
+        track: TrackInfo,
+        title: String,
+        artist: String,
+        art: String?,
+        startPositionMs: Long,
+    ): Boolean {
+        if (AppSettings.preferredAudioSource.value == null) return false
+        val query = listOf(artist, title).filter { it.isNotBlank() && it != "Unknown" }.joinToString(" ")
+        val result = AudioSourceResolver.byQuery(track.uri, query, title, artist, track.durationMs)
+        if (result !is StreamResult.Success) {
+            LokiLogger.w(TAG, "[ColdStart] lossless resolve failed, falling back to Spfy CDN")
+            return false
+        }
+        val info = result.info
+        playUrlAt = System.currentTimeMillis()
+        withContext(Dispatchers.Main) {
+            val svc = MusicPlaybackService.instance
+            val key = info.decryptionKey
+            if (key != null) {
+                svc?.playDeezer(info.url, key, info.headers, title, artist, art, startPositionMs = startPositionMs)
+            } else {
+                svc?.playUrl(
+                    info.url, title, artist, art,
+                    startPlaying = true, headers = info.headers, startPositionMs = startPositionMs,
+                    cacheKey = cacheKeyFor(track.uri, info),
+                )
+            }
+        }
+        commitStream(track.uri, info.provider)
+        LokiLogger.i(TAG, "[ColdStart] lossless (${info.provider}) loading at ${startPositionMs}ms")
+        return true
+    }
+
     /**
      * Cold-start playback that mirrors the Spfy web player's protocol.
      *
@@ -1303,40 +1371,14 @@ class PlaybackViewModel : ViewModel() {
         try {
             val resolver = cdnResolver ?: throw IllegalStateException("CdnResolver not initialized")
 
-            // Lossless mode: resolve via the third-party chain (Qobuz → Deezer →
-            // Deezer) and play locally instead of Spfy's Widevine CDN, so
-            // resume-from-idle stays consistent with the rest of the lossless flow.
-            if (AppSettings.preferredAudioSource.value != null) {
-                val trackId = trackUri.removePrefix("spotify:track:")
-                val query = listOf(artist, title)
-                    .filter { it.isNotBlank() && it != "Unknown" }
-                    .joinToString(" ")
-                val result = AudioSourceResolver.byQuery(trackId, query, title, artist, track.durationMs)
-                if (result is StreamResult.Success) {
-                    val info = result.info
-                    playUrlAt = System.currentTimeMillis()
-                    withContext(Dispatchers.Main) {
-                        val svc = MusicPlaybackService.instance
-                        val key = info.decryptionKey
-                        if (key != null) {
-                            svc?.playDeezer(
-                                info.url, key, info.headers, title, artist, art,
-                                startPositionMs = savedPositionAtEntry
-                            )
-                        } else {
-                            svc?.playUrl(
-                                info.url, title, artist, art,
-                                startPlaying = true, headers = info.headers, startPositionMs = savedPositionAtEntry
-                            )
-                        }
-                    }
-                    currentStreamUri = trackUri
-                    isStreaming.value = true
-                    streamProvider.value = info.provider
-                    LokiLogger.i(TAG, "[ColdStart] lossless (${info.provider}) loading at ${savedPositionAtEntry}ms")
-                    return
-                }
-                LokiLogger.w(TAG, "[ColdStart] lossless resolve failed, falling back to Spfy CDN")
+            // A downloaded copy plays from disk whatever the source, and this is the path the first
+            // track after opening the app takes. The Spfy branch below goes straight to the CDN, so
+            // without this a downloaded track streamed on launch and only played locally once it had
+            // been skipped to.
+            if (coldStartLocal(track, title, artist, art, savedPositionAtEntry) ||
+                coldStartThirdParty(track, title, artist, art, savedPositionAtEntry)
+            ) {
+                return
             }
 
             val stream = resolver.resolveForFileId(fileId)
@@ -1368,6 +1410,16 @@ class PlaybackViewModel : ViewModel() {
             fallbackResume()
         }
     }
+
+    /**
+     * Whether a ready stream should hand Spfy Connect a resume. Only when we loaded audio without
+     * issuing a transport command: playTrack already starts Connect by itself, and a downloaded copy
+     * reaches STATE_READY in ~250ms, well before the cluster has switched tracks. Resuming into that
+     * window restarts whatever was playing before, which then runs on and advances — on the web
+     * player too — and drags this device onto the next track a moment later.
+     */
+    internal fun shouldResumeConnectOnReady(): Boolean =
+        AppSettings.preferredAudioSource.value == null && !pendingUserPlay
 
     /** Reset the transient cold-start handoff flags. Variant fields (file id, stream state) stay inline. */
     private fun resetColdStart() {
@@ -1502,10 +1554,27 @@ class PlaybackViewModel : ViewModel() {
         return true
     }
 
-    private fun commitStream(uri: String, provider: String) {
+    private fun commitStream(uri: String, provider: String?) {
         currentStreamUri = uri
         isStreaming.value = true
         streamProvider.value = provider
+    }
+
+    /**
+     * Which playback-cache entry to fill while this stream plays, or null to cache nothing.
+     *
+     * Keyed by source as well as uri: the same track is Opus from YouTube Music and FLAC from Qobuz,
+     * and one key for both let a download recorded as one source be written from the other's cached
+     * bytes. A local copy caches nothing at all — it is already a file on disk, and the caching data
+     * source is HTTP-only, so handing it a content:// uri fails to open rather than fails to cache.
+     */
+    private fun cacheKeyFor(trackUri: String, info: StreamInfo): String? =
+        cacheKeyFor(trackUri, info.provider)
+
+    private fun cacheKeyFor(trackUri: String, provider: String?): String? {
+        if (provider == AudioSourceResolver.LOCAL_PROVIDER) return null
+        standDownCapture()
+        return PlaybackCache.keyFor(trackUri, AppSettings.preferredAudioSource.value)
     }
 
     fun skipNext() {
@@ -1676,8 +1745,30 @@ class PlaybackViewModel : ViewModel() {
     private suspend fun optimisticTapPlay(track: TrackInfo) {
         val t0 = System.currentTimeMillis()
         try {
-            val resolver = cdnResolver ?: return
             val trackUri = track.uri
+            val title = track.name.ifBlank { "Unknown" }
+            val artist = track.artist.ifBlank { "Unknown" }
+            val art = normalizeSpfyImageUrl(track.albumArt)
+            // Hand the capture over here as well as in resolveAndPlay: the echo for a tapped track
+            // short-circuits on currentStreamUri, which this path has already committed, so
+            // resolveAndPlay's own hand-over never runs and the outgoing track would go unsaved while
+            // the buffer filled with the new one under the old track's uri. Save before the state
+            // overwrite below, which is what still knows how far the outgoing track got.
+            autoSaveIfListenedThrough(_playback.value.track, _playback.value.positionMs)
+            // Reflect the tapped track in the UI immediately (echo's onState corrects any stale metadata).
+            _playback.value = _playback.value.copy(track = track.copy(albumArt = art), positionMs = 0)
+            armCapture(trackUri, track.durationMs)
+            ThemeController.updateFromArt(art)
+            checkLikedState(trackUri)
+            fetchCanvasForTrack(trackUri)
+            // A downloaded copy wins here too. This path plays a full second before the echo reaches
+            // resolveAndPlay, so leaving the check to the echo means the CDN always gets there first
+            // and a downloaded track streams anyway.
+            if (playDownloaded(trackUri, title, artist, art)) {
+                LokiLogger.i(TAG, "[InstantTap] downloaded copy started in ${System.currentTimeMillis() - t0}ms")
+                return
+            }
+            val resolver = cdnResolver ?: return
             val fileId = safeMediaFileId(trackUri) ?: run {
                 LokiLogger.i(TAG, "[InstantTap] no licensable media file id for $trackUri, deferring to echo")
                 return
@@ -1685,14 +1776,6 @@ class PlaybackViewModel : ViewModel() {
             val stream = resolver.resolveForFileId(fileId)
             // The echo may have already loaded this exact track while we were resolving — don't double-load.
             if (currentStreamUri == trackUri) return
-            val title = track.name.ifBlank { "Unknown" }
-            val artist = track.artist.ifBlank { "Unknown" }
-            val art = normalizeSpfyImageUrl(track.albumArt)
-            // Reflect the tapped track in the UI immediately (echo's onState corrects any stale metadata).
-            _playback.value = _playback.value.copy(track = track.copy(albumArt = art), positionMs = 0)
-            ThemeController.updateFromArt(art)
-            checkLikedState(trackUri)
-            fetchCanvasForTrack(trackUri)
             // DRM: stop the old player to close its Widevine session, then load the new track.
             withContext(Dispatchers.Main) { MusicPlaybackService.instance?.stop() }
             playUrlAt = System.currentTimeMillis()
@@ -2251,10 +2334,7 @@ class PlaybackViewModel : ViewModel() {
                 startPositionTicker()
                 viewModelScope.launch(Dispatchers.IO) {
                     try {
-                        // For Spfy CDN: resume Spfy so other clients show us as playing
-                        if (AppSettings.preferredAudioSource.value == null) {
-                            player?.resume()
-                        }
+                        if (shouldResumeConnectOnReady()) player?.resume()
                     } catch (_: Exception) {}
                 }
             }
@@ -2399,6 +2479,11 @@ class PlaybackViewModel : ViewModel() {
         }
         if (trackUri == currentStreamUri) {
             isStreamLoading.value = false
+            // The instant-tap path already loaded this track and armed its capture from the tapped row,
+            // which carries no duration on the Search and home-feed paths. This echo is the first thing
+            // that knows the real length, and armCapture stands a too-long capture down rather than
+            // letting it fill a 69MB buffer it can never complete. It leaves a valid one armed.
+            armCapture(trackUri, current.durationMs)
             return
         }
         // NOTE: do NOT set currentStreamUri here. We commit to it on success only,
@@ -2422,6 +2507,9 @@ class PlaybackViewModel : ViewModel() {
         if (AppSettings.preferredAudioSource.value != null) {
             try { player?.pause() } catch (_: Exception) {}
         }
+        // The outgoing track is still in state here, which is the one moment we know how far it got.
+        autoSaveIfListenedThrough(_playback.value.track, _playback.value.positionMs)
+
         val art = normalizeSpfyImageUrl(current.imageLargeUrl ?: current.imageUrl)
 
         // Update UI with new track info immediately — audio will follow in ~100ms
@@ -2431,6 +2519,10 @@ class PlaybackViewModel : ViewModel() {
             durationMs = if (current.durationMs > 0) current.durationMs else _playback.value.durationMs
         )
         _playback.value = _playback.value.copy(track = newTrack, positionMs = 0)
+        // Then hand the capture buffer to the incoming track. Ordered after the save above, which
+        // still needs the outgoing track's samples, and after newTrack, whose duration decides
+        // whether the buffer can hold it at all.
+        armCapture(trackUri, newTrack.durationMs)
         ThemeController.updateFromArt(art)
         checkLikedState(trackUri)
         fetchCanvasForTrack(trackUri)
@@ -2444,23 +2536,8 @@ class PlaybackViewModel : ViewModel() {
             return
         }
 
-        // Check if we already pre-resolved this track
-        val preResolvedUrl = nextStreamUrl
-        val preResolvedProvider = nextStreamProvider
-        if (nextTrackInfo?.uri == trackUri && preResolvedUrl != null) {
-            LokiLogger.i(TAG, "Using pre-resolved stream for $trackUri")
-            // Don't resume Spfy yet — onReady callback will sync after ExoPlayer buffers
-            playUrlAt = System.currentTimeMillis()
-            MusicPlaybackService.instance?.playUrl(preResolvedUrl, title, artist, art, headers = nextStreamHeaders)
-            currentStreamUri = trackUri
-            isStreaming.value = true
-            isStreamLoading.value = false
-            streamProvider.value = preResolvedProvider
-            nextStreamUrl = null
-            nextTrackInfo = null
-            nextStreamProvider = null
-            nextStreamHeaders = emptyMap()
-            preResolveNextTrack()
+        // Both fast paths skip resolving entirely; sharing one exit keeps this function's returns down.
+        if (playDownloaded(trackUri, title, artist, art) || playPreResolved(trackUri, title, artist, art)) {
             return
         }
 
@@ -2505,7 +2582,7 @@ class PlaybackViewModel : ViewModel() {
         }
 
         try {
-            val result = AudioSourceResolver.fromTrack(event)
+            val result = AudioSourceResolver.fromTrack(event, trackUri)
             when (result) {
                 is StreamResult.Success -> {
                     // Don't resume Spfy yet — onReady callback will sync after ExoPlayer buffers
@@ -2516,12 +2593,13 @@ class PlaybackViewModel : ViewModel() {
                         // Deezer: encrypted stream -> decrypt via the loopback proxy.
                         MusicPlaybackService.instance?.playDeezer(info.url, key, info.headers, title, artist, art)
                     } else {
-                        MusicPlaybackService.instance?.playUrl(info.url, title, artist, art, headers = info.headers)
+                        MusicPlaybackService.instance?.playUrl(
+                            info.url, title, artist, art, headers = info.headers,
+                            cacheKey = cacheKeyFor(trackUri, info)
+                        )
                     }
-                    currentStreamUri = trackUri
-                    isStreaming.value = true
-                    streamProvider.value = result.info.provider
-                    LokiLogger.i(TAG, "Streaming: ${result.info.provider} -> ${result.info.url.take(80)}")
+                    commitStream(trackUri, info.provider)
+                    LokiLogger.i(TAG, "Streaming: ${info.provider} -> ${info.url.take(80)}")
                 }
                 is StreamResult.Failure -> {
                     LokiLogger.e(TAG, "Stream resolve failed: ${result.message}")
@@ -2542,6 +2620,265 @@ class PlaybackViewModel : ViewModel() {
         preResolveNextTrack()
     }
 
+
+    /** Plays the stream pre-resolved for this track, if there is one. */
+    private suspend fun playPreResolved(trackUri: String, title: String, artist: String, art: String?): Boolean {
+        val url = nextStreamUrl ?: return false
+        if (nextTrackInfo?.uri != trackUri) return false
+        LokiLogger.i(TAG, "Using pre-resolved stream for $trackUri")
+        // Don't resume Spfy yet — onReady callback will sync after ExoPlayer buffers
+        playUrlAt = System.currentTimeMillis()
+        MusicPlaybackService.instance?.playUrl(
+            url, title, artist, art, headers = nextStreamHeaders,
+            cacheKey = cacheKeyFor(trackUri, nextStreamProvider)
+        )
+        commitStream(trackUri, nextStreamProvider)
+        isStreamLoading.value = false
+        nextStreamUrl = null
+        nextTrackInfo = null
+        nextStreamProvider = null
+        nextStreamHeaders = emptyMap()
+        preResolveNextTrack()
+        return true
+    }
+
+    /**
+     * Plays a downloaded copy. Runs before the Spfy branch, which returns without ever reaching the
+     * resolver, so a downloaded track plays from disk whatever the selected source is.
+     */
+    private suspend fun playDownloaded(trackUri: String, title: String, artist: String, art: String?): Boolean {
+        val local = AudioSourceResolver.localOrNull(trackUri, title, artist) as? StreamResult.Success
+            ?: return false
+        withContext(Dispatchers.Main) { MusicPlaybackService.instance?.stop() }
+        playUrlAt = System.currentTimeMillis()
+        val coldStart = coldStartPending
+        withContext(Dispatchers.Main) {
+            // Nothing to record: the file is already on disk, so recording it would pay a ~69MB buffer
+            // and a memcpy of every decoded buffer to re-derive what we are playing from.
+            MusicPlaybackService.instance?.stopCapture()
+            MusicPlaybackService.instance?.playUrl(local.info.url, title, artist, art, startPlaying = !coldStart)
+        }
+        commitStream(trackUri, AudioSourceResolver.LOCAL_PROVIDER)
+        isStreamLoading.value = false
+        LokiLogger.i(TAG, "Playing downloaded copy of $trackUri")
+        preResolveNextTrack()
+        return true
+    }
+
+    /**
+     * Downloads whatever is playing. Progress and the result are reported through the notification,
+     * since there is nowhere else to put them while the user is on another screen.
+     */
+    fun downloadCurrentTrack(context: android.content.Context) {
+        downloadTrack(_playback.value.track ?: return, context)
+    }
+
+    /** The download request for a track, so the three entry points cannot drift in what they send. */
+    private fun TrackInfo.toRequest(
+        capture: MusicPlaybackService.Capture? = null,
+        localOnly: Boolean = false,
+        contextUri: String? = null,
+        contextName: String? = null,
+        contextType: String? = null,
+    ) = DownloadRequest(
+        trackUri = uri,
+        title = name,
+        artist = artist,
+        // TrackInfo.albumName is only populated for podcast episodes, so for music the album the user
+        // downloaded from is the one thing that knows the name. Without this no download ever carried
+        // an ALBUM tag, even though both taggers write one.
+        album = albumName ?: contextName?.takeIf { contextType == "album" },
+        coverUrl = albumArt,
+        durationMs = durationMs,
+        capture = capture,
+        localOnly = localOnly,
+        contextUri = contextUri,
+        contextName = contextName,
+        contextType = contextType,
+    )
+
+    /** Tells the user a download went nowhere because there is still no folder to put it in. */
+    private fun warnNoFolder(context: android.content.Context, outcome: DownloadOutcome, title: String) {
+        if (outcome is DownloadOutcome.NoFolder) {
+            DownloadNotifier.failed(context, title, context.getString(R.string.download_needs_folder))
+        }
+    }
+
+    /**
+     * Keeps a track the user listened through, when the setting is on.
+     *
+     * A track played to the end has already been decoded in full, and the audio chain kept those
+     * samples, so this claims them and re-encodes rather than downloading the song a second time
+     * from somewhere else. The claim is synchronous because the buffer is about to be handed to the
+     * incoming track; only the encoding is deferred.
+     */
+    private fun autoSaveIfListenedThrough(track: TrackInfo?, positionMs: Long) {
+        if (track == null || !worthAutoSaving(track, positionMs)) return
+        val context = MusicPlaybackService.instance ?: return
+        // The encoded bytes win when the playback cache has them, so don't claim a capture that
+        // would only be thrown away: detaching costs the tap a fresh buffer for the next track.
+        val capture = if (TrackDownloader.needsCapture(track.uri)) {
+            context.detachCapture(track.uri, track.durationMs) ?: run {
+                // Never re-fetch here. The point of this setting is to keep the recording that was
+                // just played; downloading somebody else's upload instead is a different file, and
+                // it spends data to get something worse.
+                LokiLogger.i(TAG, "listened through '${track.name}' but it wasn't captured in full — not saving")
+                return
+            }
+        } else {
+            null
+        }
+        LokiLogger.i(TAG, "listened through '${track.name}', saving from ${if (capture != null) "the capture" else "the playback cache"}")
+        downloadTrack(track, context, capture, localOnly = true)
+    }
+
+    /**
+     * Arms the decoded-PCM capture for the track now loading, or stands it down when the setting is off.
+     *
+     * Armed for every source, not just Widevine, because whether the playback cache will hold this
+     * stream is not known yet: a selected source is no guarantee, since Deezer is encrypted and plays
+     * through the loopback proxy with no cache key, so those tracks do need the capture.
+     * [standDownCapture] drops it again at the point that turns out otherwise. That costs an allocate
+     * and free of the ~69MB buffer per track on the sources that do cache — the price of not guessing.
+     *
+     * Must run on every track change: the instant-tap path returns before resolveAndPlay's own call,
+     * and without its own the captured uri stayed on the previous track while the buffer filled with
+     * the new one, so neither could be saved.
+     *
+     * Safe to call twice for one track: [MusicPlaybackService.startCapture] leaves an armed capture
+     * alone, so a second call can only stand a stale one down.
+     */
+    private fun armCapture(trackUri: String, durationMs: Long) {
+        val service = MusicPlaybackService.instance ?: return
+        if (AppSettings.autoSaveListened.value) {
+            service.startCapture(trackUri, durationMs)
+        } else {
+            service.stopCapture()
+        }
+    }
+
+    /**
+     * Drops the decoded capture once we know the playback cache is taking these bytes. The cached
+     * encoded stream remuxes out byte-identical, while the capture is a re-encode of the decoded
+     * samples, so [autoSaveIfListenedThrough] would take the cache and discard the capture anyway —
+     * after paying a memcpy of every decoded buffer on the audio thread for the whole track.
+     */
+    private fun standDownCapture() {
+        MusicPlaybackService.instance?.stopCapture()
+    }
+
+    /** The cheap checks: setting on, somewhere to put it, played far enough, not already saved. */
+    private fun worthAutoSaving(track: TrackInfo, positionMs: Long): Boolean {
+        if (!AppSettings.autoSaveListened.value) return false
+        if (track.durationMs <= 0) return false
+        if (!DownloadFolder.isConfigured) return false
+        if (positionMs < track.durationMs * LISTENED_THROUGH_FRACTION) return false
+        return Downloads.find(track.uri) == null
+    }
+
+    /**
+     * Downloads one track, with its own progress notification.
+     *
+     * [localOnly] saves are the auto-save path: they never touch the network and finish in the time
+     * it takes to encode, so they stay off the manager's active list rather than flashing a card.
+     */
+    fun downloadTrack(
+        track: TrackInfo,
+        context: android.content.Context,
+        capture: MusicPlaybackService.Capture? = null,
+        localOnly: Boolean = false,
+    ) {
+        // applicationContext, or a batch outlives the Activity that started it and pins it — and its
+        // whole Compose tree — for the minutes the download runs. Nothing here needs an Activity.
+        val ctx = context.applicationContext
+        viewModelScope.launch(Dispatchers.IO) {
+            // A localOnly save is the auto-save path: it re-encodes what was played rather than
+            // fetching, so it shows as its own kind of job. onlyIfIdle because taking the slot
+            // mid-batch would blank an album's progress for no reason.
+            val token = Downloads.startJob(
+                name = track.name,
+                type = if (localOnly) Downloads.TYPE_REENCODE else "single",
+                imageUrl = track.albumArt,
+                total = 1,
+                onlyIfIdle = localOnly,
+            )
+            val progress: ((Int) -> Unit)? = if (localOnly) {
+                null
+            } else {
+                { percent -> Downloads.updateJob(token, done = 1, trackPercent = percent) }
+            }
+            try {
+                val outcome = TrackDownloader.download(
+                    track.toRequest(capture, localOnly), ctx, onProgress = progress
+                )
+                warnNoFolder(ctx, outcome, track.name)
+            } finally {
+                // In a finally because cancellation (backing out of the app) has to clear the card too;
+                // it used to be left set, so the manager claimed a download was running forever.
+                Downloads.clearJob(token)
+            }
+        }
+    }
+
+    /**
+     * Downloads a whole album or playlist, one track at a time so the per-track notifications are
+     * replaced by a single count. Tracks already on disk are skipped by the downloader itself.
+     */
+    fun downloadTracks(
+        tracks: List<TrackInfo>,
+        context: android.content.Context,
+        contextUri: String? = null,
+        contextName: String? = null,
+        contextType: String? = null,
+    ) {
+        if (tracks.isEmpty()) return
+        val ctx = context.applicationContext
+        viewModelScope.launch(Dispatchers.IO) {
+            val token = Downloads.startJob(
+                name = contextName ?: tracks.first().name,
+                type = contextType ?: "single",
+                imageUrl = tracks.first().albumArt,
+                total = tracks.size,
+            )
+            var failed = 0
+            try {
+                tracks.forEachIndexed { index, track ->
+                    DownloadNotifier.batch(ctx, track.name, index + 1, tracks.size)
+                    val outcome = TrackDownloader.download(
+                        track.toRequest(
+                            contextUri = contextUri,
+                            contextName = contextName,
+                            contextType = contextType,
+                        ),
+                        ctx,
+                        notify = false,
+                    ) { percent ->
+                        Downloads.updateJob(token, index + 1, percent)
+                        DownloadNotifier.batch(ctx, track.name, index + 1, tracks.size, percent)
+                    }
+                    if (outcome !is DownloadOutcome.Done) failed++
+                    if (outcome is DownloadOutcome.NoFolder) {
+                        warnNoFolder(ctx, outcome, track.name)
+                        return@launch
+                    }
+                }
+                DownloadNotifier.batchFinished(ctx, tracks.size, failed)
+            } catch (e: CancellationException) {
+                // The batch posts its own ongoing notification, so notify=false keeps TrackDownloader
+                // from clearing it. Below API 34 an ongoing bar is not user-swipeable, so a batch
+                // cancelled with the Activity would leave "Downloading 7 of 30" posted for a download
+                // that is not running.
+                DownloadNotifier.clear(ctx)
+                throw e
+            } finally {
+                Downloads.clearJob(token)
+            }
+        }
+    }
+
+    fun removeDownload(trackUri: String) {
+        viewModelScope.launch(Dispatchers.IO) { TrackDownloader.delete(trackUri) }
+    }
 
     /**
      * Skip rather than sit in silence, bounded by the playback-error budget so a run of unmatched
@@ -2737,7 +3074,7 @@ class PlaybackViewModel : ViewModel() {
             try {
                 val art = normalizeSpfyImageUrl(track.imageLargeUrl ?: track.imageUrl)
 
-                val result = AudioSourceResolver.byQuery(trackId, searchQuery, title, artist, track.durationMs)
+                val result = AudioSourceResolver.byQuery(uri, searchQuery, title, artist, track.durationMs)
                 when (result) {
                     is StreamResult.Success -> {
                         playUrlAt = System.currentTimeMillis()
@@ -2784,7 +3121,6 @@ class PlaybackViewModel : ViewModel() {
                 LokiLogger.i(TAG, "[Ad] not pre-resolving ad URI in preResolveNextTrack: $nextUri")
                 return
             }
-            val nextId = nextUri.removePrefix("spotify:track:")
 
             val title = nextTrack.name ?: "Unknown"
             val artist = nextTrack.artistName ?: "Unknown"
@@ -2793,7 +3129,7 @@ class PlaybackViewModel : ViewModel() {
                 .joinToString(" ").takeIf { it.isNotBlank() }
 
             LokiLogger.i(TAG, "Pre-resolving next: $title by $artist")
-            val result = AudioSourceResolver.byQuery(nextId, searchQuery, title, artist, nextTrack.durationMs)
+            val result = AudioSourceResolver.byQuery(nextUri, searchQuery, title, artist, nextTrack.durationMs)
             if (result is StreamResult.Success) {
                 val info = result.info
                 val key = info.decryptionKey
@@ -2909,6 +3245,17 @@ class PlaybackViewModel : ViewModel() {
         /** How many times to auto-re-resolve + reload a track (rotating CDN mirrors) after a transient
          *  ExoPlayer/DRM error before skipping to the next track. See [recoverFromPlaybackError]. */
         private const val MAX_PLAYBACK_ERROR_RETRIES = 3
+
+        /**
+         * How much of a track counts as having listened to it, for the keep-what-I-played setting.
+         *
+         * Deliberately below CAPTURE_COMPLETE_FRACTION in MusicPlaybackService (0.99), which answers
+         * a different question: this is intent, that is capability. Raising this to match would stop
+         * a non-DRM track played to 92% from being kept, which works today because the playback cache
+         * serves it whole and never needs the capture. The gap is only dead for DRM tracks, where the
+         * capture is the sole source — those log and skip rather than save something truncated.
+         */
+        private const val LISTENED_THROUGH_FRACTION = 0.9
 
         /** If skipPrevious is invoked after this many ms into the current track,
          *  restart the track instead of going to the previous one. Matches the

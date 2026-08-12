@@ -3,6 +3,7 @@
 package ch.snepilatch.app.ui.screens
 
 import android.content.Context
+import ch.snepilatch.app.data.toTrackInfo
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -310,7 +311,10 @@ private fun SearchTrack.toUnified(vm: PlaybackViewModel, ctx: Context) = Unified
     subtitle = ctx.getString(R.string.search_subtitle_song, artists.joinToString(", ") { it.name }),
     imageUrl = album.coverArtUrl,
     circular = false,
-    onClick = { vm.playTrack(uri) },
+    // Full metadata, not just the uri: the resolver falls back to title/artist to find a downloaded
+    // copy when the same song is in the catalogue under more than one id, and the duration decides
+    // whether the auto-save capture buffer can hold the track. toTrackInfo() carries both.
+    onClick = { vm.playTrack(toTrackInfo()) },
     menu = listOf(
         OverflowAction(Icons.AutoMirrored.Rounded.QueueMusic, ctx.getString(R.string.add_to_queue)) {
             vm.addToQueue(uri)

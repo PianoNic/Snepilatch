@@ -302,4 +302,35 @@
     <string name="error_save_library">Could not save to library</string>
     <string name="error_add_playlist">Could not add to playlist</string>
     <string name="error_add_queue">Could not add to queue</string>
+    <string name="downloads">Downloads</string>
+    <string name="downloading">Downloading</string>
+    <string name="saving_listened">Keeping what you listened to</string>
+    <string name="download_complete">Download complete</string>
+    <string name="download_failed">Download failed</string>
+    <string name="download_folder">Download folder</string>
+    <string name="download_folder_none">Not set, tap to choose</string>
+    <string name="download_track">Download</string>
+    <string name="remove_download">Remove download</string>
+    <string name="download_needs_folder">Choose a download folder first</string>
+    <string name="download_source">Download source</string>
+    <string name="download_source_ytm">YouTube Music</string>
+    <string name="download_source_lossless">Lossless (FLAC)</string>
+    <string name="manage_downloads">Manage downloads</string>
+    <string name="downloads_summary">%1$d tracks · %2$d MB</string>
+    <string name="remove_all">Remove all</string>
+    <string name="remove_all_confirm">Delete every downloaded file? The tracks will stream again.</string>
+    <string name="downloads_count">%1$d downloaded</string>
+    <string name="downloading_count">Downloading %1$d of %2$d</string>
+    <string name="downloaded_count">%1$d of %2$d downloaded</string>
+    <string name="download_all">Download all</string>
+    <string name="library_filter_downloaded">Downloaded (%1$d)</string>
+    <string name="downloaded_indicator">Downloaded</string>
+    <string name="downloads_active">Active</string>
+    <string name="downloads_idle">Nothing downloading right now</string>
+    <plurals name="remove_download_message">
+        <item quantity="one">Delete the downloaded file for %1$s? (%2$d track)</item>
+        <item quantity="other">Delete the downloaded files for %1$s? (%2$d tracks)</item>
+    </plurals>
+    <string name="auto_save_listened">Keep what I listen to</string>
+    <string name="auto_save_listened_desc">Save a track once you have played it through</string>
 </resources>

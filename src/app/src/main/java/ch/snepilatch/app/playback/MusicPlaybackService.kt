@@ -53,6 +53,19 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         private const val TAG = "MusicService"
         private const val CHANNEL_ID = "music_playback"
 
+        /**
+         * How much of a track must be captured to count as a whole one; the tail can be clipped by
+         * the decoder's last partial buffer, so an exact match never lands.
+         *
+         * This is NOT the same threshold as LISTENED_THROUGH_FRACTION in PlaybackViewModel (0.9),
+         * and the two must not be reconciled even though they look like they should agree. That one
+         * asks whether the user heard enough of a track to want it kept; this one asks whether
+         * enough of it exists to write out. Lowering this to match would hand the encoder a partial
+         * capture, putting files that stop early into the user's download folder — with nothing
+         * failing and nothing logged, because from the writer's side a short buffer looks finished.
+         */
+        private const val CAPTURE_COMPLETE_FRACTION = 0.99
+
         // Separate high-importance channel for error alerts so they pop up (heads-up) instead of
         // sitting silently like the ongoing playback notification.
         private const val ALERT_CHANNEL_ID = "snepilatch_alerts"
@@ -258,6 +271,8 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 .build()
         }
 
+        PlaybackCache.init(this)
+
         player = ExoPlayer.Builder(this, renderersFactory)
             .setAudioAttributes(audioAttributes, true)
             .setLoadControl(loadControl)
@@ -341,10 +356,45 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 }
             }
 
+            /**
+             * A seek invalidates the decoded capture, so stand it down.
+             *
+             * The tap only ever appends what the decoder hands it, and nothing re-anchors it on a
+             * seek: jumping forward leaves a hole, jumping back records a stretch twice. The
+             * completeness check counts frames rather than mapping coverage, so a backward seek can
+             * even reach its threshold with audio audibly repeated — the one way this could write a
+             * wrong file rather than simply refuse. Hooked here rather than at each seekTo so no
+             * caller can miss it: the media session, both Connect sync paths and the infiniPlay jumps
+             * all land on this. The playback cache is byte-exact and unaffected, so a non-DRM track
+             * still saves from there; only Widevine, which has no cache, loses the ability to save
+             * this track — correctly, since what was recorded is not the track.
+             */
+            override fun onPositionDiscontinuity(
+                oldPosition: Player.PositionInfo,
+                newPosition: Player.PositionInfo,
+                reason: Int,
+            ) {
+                // capturedFrames guard: loading a track with a start position is not a seek, but if a
+                // device ever reported one it would arrive before anything was recorded.
+                if (reason == Player.DISCONTINUITY_REASON_SEEK &&
+                    captureUri != null &&
+                    infiniPlayTap.capturedFrames() > 0
+                ) {
+                    LokiLogger.i(TAG, "seek during capture, dropping it for $captureUri")
+                    stopCapture()
+                }
+            }
+
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 // A real track change (skip / auto-advance / new queue) — not our own repeat loop —
                 // means the infiniPlay's captured song is no longer what's playing: tear it down.
-                if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) stopInfiniPlay()
+                if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
+                    stopInfiniPlay()
+                    // Drop whatever the outgoing track left in the buffer. The capture is armed back
+                    // in resolveAndPlay, while the old song is still audible, so without this the
+                    // new track's recording would open with the tail of the previous one.
+                    if (infiniPlayTap.recording) infiniPlayTap.resetCapture()
+                }
                 if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && metadataQueue.size > 1) {
                     // ExoPlayer auto-advanced to next track — swap metadata
                     metadataQueue.removeAt(0)
@@ -524,6 +574,11 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         }
     }
 
+    /**
+     * Loads a non-DRM stream. [cacheKey] is the track uri to keep the downloaded bytes under, so a
+     * track listened through can be saved without fetching it again; null for sources that must not
+     * be kept, since a local file is already on disk and Spfy CDN audio goes through playDrmUrl.
+     */
     fun playUrl(
         url: String,
         title: String,
@@ -531,7 +586,8 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         albumArtUrl: String?,
         startPlaying: Boolean = true,
         headers: Map<String, String> = emptyMap(),
-        startPositionMs: Long = 0L
+        startPositionMs: Long = 0L,
+        cacheKey: String? = null
     ) {
         LokiLogger.i(TAG, "Loading: $title by $artist -> ${url.take(80)} (play=$startPlaying, headers=${headers.keys}, pos=${startPositionMs}ms)")
         isAdSkipping = false  // a real track is loading — end the ad-skip buffering state
@@ -550,10 +606,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             // (the anandserver Qobuz mirror) need those headers on the HTTP data
             // source, so they go through a dedicated header-injecting MediaSource.
             // Both accept a start position so resume-from-idle seeks on load.
-            if (headers.isEmpty()) {
+            if (headers.isEmpty() && cacheKey == null) {
                 player.setMediaItem(buildMediaItem(url), startPositionMs)
             } else {
-                player.setMediaSource(buildHeaderedSource(url, headers), startPositionMs)
+                player.setMediaSource(buildHeaderedSource(url, headers, cacheKey), startPositionMs)
             }
 
             if (startPlaying) {
@@ -692,8 +748,85 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             infiniPlayTap.analyzing = true
         } else {
             infiniPlayTap.analyzing = false
-            infiniPlayTap.releaseBuffer()
+            // Only free it if the capture isn't also being kept for saving.
+            if (!infiniPlayTap.recording) infiniPlayTap.releaseBuffer()
         }
+    }
+
+    /**
+     * A decoded track held in memory, ready to be encoded and written out. [pcm] may be longer than
+     * the audio: only the first [count] samples are real.
+     */
+    class Capture(val pcm: ShortArray, val count: Int, val sampleRate: Int, val channels: Int)
+
+    @Volatile private var captureUri: String? = null
+
+    /**
+     * Keep the decoded PCM of [trackUri] as it plays, so saving it later needs no second fetch.
+     * Replaces any previous capture, so this is called on every track change while the setting is on.
+     *
+     * Refuses a track the buffer cannot hold. Recording costs a ~69MB ShortArray plus a memcpy of
+     * every decoded buffer on the audio thread, and [InfiniPlayAudioTap.capture] stops at the cap, so
+     * a longer track can never reach [CAPTURE_COMPLETE_FRACTION] — it would pay the whole cost to
+     * produce something [completeCapture] then refuses. Callers that hit this fall back to the
+     * playback cache, which has no length limit; only Widevine playback has nowhere else to go.
+     */
+    fun startCapture(trackUri: String, durationMs: Long) {
+        if (durationMs > InfiniPlayAudioTap.MAX_CAPTURE_MS) {
+            LokiLogger.i(
+                TAG,
+                "not capturing $trackUri: ${durationMs / 1000}s is past the " +
+                    "${InfiniPlayAudioTap.MAX_CAPTURE_MS / 1000}s the capture buffer holds"
+            )
+            stopCapture()
+            return
+        }
+        // Already recording this track: leave the buffer alone. resetCapture() zeroes the sample count,
+        // so re-arming mid-track (the user tapping the row that is already playing) would make a track
+        // that did play through look partial, and completeCapture would refuse to save it.
+        if (captureUri == trackUri && infiniPlayTap.recording) return
+        captureUri = trackUri
+        infiniPlayTap.recording = true
+        infiniPlayTap.resetCapture()
+    }
+
+    fun stopCapture() {
+        captureUri = null
+        infiniPlayTap.recording = false
+        if (!infiniPlayTap.analyzing) infiniPlayTap.releaseBuffer()
+    }
+
+    /**
+     * The decoded audio for [trackUri], or null when that isn't the track being captured or it hasn't
+     * played through. Whole track or nothing: writing a partial capture would produce a file that
+     * stops early, which is worse than falling back to a download.
+     */
+    fun captureOf(trackUri: String, durationMs: Long): Capture? {
+        val (rate, channels) = completeCapture(trackUri, durationMs) ?: return null
+        val pcm = infiniPlayTap.snapshotInterleaved()
+        return Capture(pcm, pcm.size, rate, channels)
+    }
+
+    /**
+     * Like [captureOf], but takes the buffer rather than copying it: the next track captures into a
+     * fresh one. For the track-change path, where the finished track is handed to the encoder at the
+     * same moment the capture is re-armed for the incoming one.
+     */
+    fun detachCapture(trackUri: String, durationMs: Long): Capture? {
+        val (rate, channels) = completeCapture(trackUri, durationMs) ?: return null
+        val (pcm, count) = infiniPlayTap.detach()
+        return Capture(pcm, count, rate, channels)
+    }
+
+    /** The capture's format, when [trackUri] is the captured track and it played through. */
+    private fun completeCapture(trackUri: String, durationMs: Long): Pair<Int, Int>? {
+        if (captureUri != trackUri || durationMs <= 0) return null
+        val rate = infiniPlayTap.sampleRate()
+        val channels = infiniPlayTap.channelCount()
+        if (rate <= 0 || channels <= 0) return null
+        val expected = durationMs.toDouble() * rate / 1000
+        if (infiniPlayTap.capturedFrames() < expected * CAPTURE_COMPLETE_FRACTION) return null
+        return rate to channels
     }
 
     fun infiniPlaySampleRate(): Int = infiniPlayTap.sampleRate()
@@ -922,14 +1055,22 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
      * because the relay can be slow to first byte.
      */
     @OptIn(UnstableApi::class)
-    private fun buildHeaderedSource(url: String, headers: Map<String, String>): MediaSource {
+    private fun buildHeaderedSource(
+        url: String,
+        headers: Map<String, String>,
+        cacheKey: String? = null,
+    ): MediaSource {
         val httpFactory = DefaultHttpDataSource.Factory()
             .setDefaultRequestProperties(headers)
             .setAllowCrossProtocolRedirects(true)
             .setConnectTimeoutMs(30_000)
             .setReadTimeoutMs(30_000)
-        return ProgressiveMediaSource.Factory(httpFactory)
-            .createMediaSource(buildMediaItem(url))
+        // Keyed by track uri, not url: a googlevideo url is single-use, so caching against it would
+        // never hit twice and would keep a fresh copy per resolve.
+        val base = buildMediaItem(url)
+        val item = cacheKey?.let { base.buildUpon().setCustomCacheKey(it).build() } ?: base
+        val factory = cacheKey?.let { PlaybackCache.wrap(httpFactory) } ?: httpFactory
+        return ProgressiveMediaSource.Factory(factory).createMediaSource(item)
     }
 
     fun buildDrmMediaItem(url: String, licenseUrl: String, licenseHeaders: Map<String, String>): MediaItem {

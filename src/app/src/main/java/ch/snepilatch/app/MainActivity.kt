@@ -28,6 +28,9 @@ import ch.snepilatch.app.ui.theme.SpfyBlack
 import ch.snepilatch.app.util.UpdateInfo
 import ch.snepilatch.app.util.UpdateService
 import ch.snepilatch.app.util.loadCookies
+import ch.snepilatch.app.download.DownloadFolder
+import ch.snepilatch.app.download.DownloadNotifier
+import ch.snepilatch.app.download.Downloads
 import ch.snepilatch.app.viewmodel.AppSettings
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import kotlinx.coroutines.Dispatchers
@@ -38,6 +41,13 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : ComponentActivity() {
     private val pendingDeepLink = MutableStateFlow<Uri?>(null)
+
+    /**
+     * Set when the download notification is tapped. A flow rather than a read of `intent`: the
+     * notification's intent is SINGLE_TOP against a singleTop Activity, so with the app already open it
+     * arrives at [onNewIntent] and `getIntent()` still holds whatever launched the Activity.
+     */
+    private val pendingOpenDownloads = MutableStateFlow(false)
 
     companion object {
         // Process-scoped so the update check fires once per app start, not per Activity recreation.
@@ -52,6 +62,12 @@ class MainActivity : ComponentActivity() {
     private fun handleDeepLinkIntent(intent: Intent) {
         if (intent.action == Intent.ACTION_VIEW) {
             pendingDeepLink.value = intent.data
+        }
+        // Outside the ACTION_VIEW branch: the notification launches the app's own launcher intent,
+        // which is ACTION_MAIN.
+        if (intent.getBooleanExtra(DownloadNotifier.EXTRA_OPEN_DOWNLOADS, false)) {
+            intent.removeExtra(DownloadNotifier.EXTRA_OPEN_DOWNLOADS)
+            pendingOpenDownloads.value = true
         }
     }
 
@@ -96,6 +112,18 @@ class MainActivity : ComponentActivity() {
             val context = this@MainActivity
             LaunchedEffect(Unit) {
                 AppSettings.load(context)
+                // Off the main thread: opening the database and reading the index is disk work, and
+                // this effect runs on the UI dispatcher. Deliberately no prune here — validating every
+                // downloaded row costs one content-resolver round trip each, which would grow into a
+                // stall at startup. AudioSourceResolver.localOrNull already drops a row whose file has
+                // gone, at the moment it matters.
+                withContext(Dispatchers.IO) {
+                    Downloads.init(context)
+                    DownloadFolder.load(context)
+                    // A download lives in viewModelScope, so one killed with the app never cleared its
+                    // own ongoing progress bar. Once per process, so a rotation mid-download keeps it.
+                    DownloadNotifier.clearStaleProgress(context)
+                }
                 if (!initialized && error == null && !needsLogin) {
                     val savedCookies = loadCookies(context)
                     if (savedCookies != null) {
@@ -119,6 +147,17 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
+                }
+            }
+
+            // Tapping the download notification lands on the manager rather than the last screen.
+            // Keyed on the flow, not on `initialized`: the notification usually arrives while the app is
+            // already open and initialized never changes again, so an effect keyed on it would not re-run.
+            val openDownloads by pendingOpenDownloads.collectAsState()
+            LaunchedEffect(initialized, openDownloads) {
+                if (initialized && openDownloads) {
+                    pendingOpenDownloads.value = false
+                    vm.navigateTo(ch.snepilatch.app.data.Screen.DOWNLOADS)
                 }
             }
 

@@ -2,7 +2,10 @@ package ch.snepilatch.app.data
 
 import androidx.compose.ui.graphics.Color
 
-enum class Screen { LOGIN, HOME, SEARCH, LIBRARY, NOW_PLAYING, PLAYLIST_DETAIL, ALBUM_DETAIL, ARTIST_DETAIL, SHOW_DETAIL, ACCOUNT, LYRICS, EQUALIZER }
+enum class Screen {
+    LOGIN, HOME, SEARCH, LIBRARY, NOW_PLAYING, PLAYLIST_DETAIL, ALBUM_DETAIL,
+    ARTIST_DETAIL, SHOW_DETAIL, ACCOUNT, LYRICS, EQUALIZER, DOWNLOADS
+}
 
 data class TrackInfo(
     val uri: String,

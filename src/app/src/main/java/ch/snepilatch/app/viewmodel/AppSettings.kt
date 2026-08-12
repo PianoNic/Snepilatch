@@ -35,6 +35,16 @@ object AppSettings {
     // [SOURCE_YTM] = YouTube Music (ch.snepilatch.app.playback.YouTubeMusicSource).
     val preferredAudioSource = MutableStateFlow<String?>(null)
 
+    // Which source downloads fetch from, kept apart from [preferredAudioSource] so the files can be
+    // FLAC while streaming stays on YouTube Music, or the other way round. Spfy is not an option:
+    // its stream is Widevine and the saved bytes would not play.
+    val downloadSource = MutableStateFlow(SOURCE_YTM)
+
+    // Keep a track once it has actually been listened through, by encoding the audio that was
+    // already decoded to play it rather than fetching the song again. Off by default: it holds the
+    // decoded track in memory while it plays, and spends storage on its own.
+    val autoSaveListened = MutableStateFlow(false)
+
     // Lyrics animation direction for line-synced (non word-synced): "vertical" or "horizontal"
     val lyricsAnimDirection = MutableStateFlow("vertical")
 
@@ -83,6 +93,8 @@ object AppSettings {
         if (savedSource == "spotify") {
             prefs.edit().remove("audio_source").apply()
         }
+        downloadSource.value = prefs.getString("download_source", SOURCE_YTM) ?: SOURCE_YTM
+        autoSaveListened.value = prefs.getBoolean("auto_save_listened", false)
         lyricsAnimDirection.value = prefs.getString("lyrics_anim_direction", "vertical") ?: "vertical"
         appLanguage.value = prefs.getString("app_language", "system") ?: "system"
         // Apply saved language on startup
@@ -142,6 +154,16 @@ object AppSettings {
             .edit().apply {
                 if (source == null) remove("audio_source") else putString("audio_source", source)
             }.apply()
+    }
+
+    fun setDownloadSource(source: String, context: Context) {
+        downloadSource.value = source
+        prefs(context).edit().putString("download_source", source).apply()
+    }
+
+    fun setAutoSaveListened(enabled: Boolean, context: Context) {
+        autoSaveListened.value = enabled
+        prefs(context).edit().putBoolean("auto_save_listened", enabled).apply()
     }
 
     fun setContentRegion(region: String, context: Context) {

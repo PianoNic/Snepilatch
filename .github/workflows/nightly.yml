@@ -1,15 +1,16 @@
 name: Cut a Nightly Build
 
-# Runs on every merge to main, plus workflow_dispatch for a manual cut. Tags and publishes a
-# prerelease (vX.Y.Z-nightly.N, N scoped to the current base version), then explicitly dispatches
-# build-and-release.yml at that tag — a release published via GITHUB_TOKEN does NOT fire the
-# release: published event (GitHub's anti-recursion safeguard), unlike a human publishing one
-# through the UI, so this can't just rely on that trigger the way a stable release does. See
-# CLAUDE.md "Versioning".
+# Twice a day (see the cron below — times are UTC; adjust if you want a specific local time), plus
+# workflow_dispatch for a manual cut. Skips entirely if main hasn't moved since the last nightly.
+# Tags and publishes a prerelease (vX.Y.Z-nightly.N, N scoped to the current base version), then
+# explicitly dispatches build-and-release.yml at that tag — a release published via GITHUB_TOKEN
+# does NOT fire the release: published event (GitHub's anti-recursion safeguard), unlike a human
+# publishing one through the UI, so this can't just rely on that trigger the way a stable release
+# does. See CLAUDE.md "Versioning".
 on:
-  push:
-    branches:
-      - main
+  schedule:
+    - cron: "0 0 * * *"
+    - cron: "0 12 * * *"
   workflow_dispatch: {}
 
 permissions:
@@ -17,8 +18,8 @@ permissions:
   actions: write # needed to dispatch build-and-release.yml from "Trigger the release build"
 
 concurrency:
-  # Two merges landing close together must not both read the same "last nightly" tag number —
-  # queue them (not cancel-in-progress) so each sees the previous run's tag before computing the next.
+  # A manual dispatch landing close to a scheduled run must not race it computing the same
+  # "last nightly" tag number — queue them (not cancel-in-progress) so each sees the other's tag.
   group: nightly-tag
   cancel-in-progress: false
 
@@ -36,6 +37,13 @@ jobs:
         run: |
           set -e
           BASE=$(grep -m1 'versionName = ' src/app/build.gradle.kts | sed -E 's/.*"([^"]+)".*/\1/')
+          LAST_TAG=$(git tag -l 'v*-nightly.*' --sort=-creatordate | head -1)
+          if [ -n "$LAST_TAG" ] && [ "$(git rev-list -n1 "$LAST_TAG")" = "$(git rev-parse HEAD)" ]; then
+            echo "No commits on main since $LAST_TAG — skipping this cut."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
           LAST_N=$(git tag -l "v${BASE}-nightly.*" | sed -E "s/.*-nightly\.([0-9]+)\$/\1/" | sort -n | tail -1)
           NEXT_N=$(( ${LAST_N:-0} + 1 ))
           TAG="v${BASE}-nightly.${NEXT_N}"
@@ -43,6 +51,7 @@ jobs:
           echo "Cutting $TAG (base version $BASE, from build.gradle.kts)"
 
       - name: Create and push the tag
+        if: steps.tag.outputs.skip != 'true'
         run: |
           git config user.email "79938743+PianoNic@users.noreply.github.com"
           git config user.name "PianoNic"
@@ -50,6 +59,7 @@ jobs:
           git push origin "${{ steps.tag.outputs.tag }}"
 
       - name: Publish as a GitHub prerelease
+        if: steps.tag.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -61,6 +71,7 @@ jobs:
             --notes "⚠️ **Nightly build** — unreviewed and may be unstable. Only visible to users on the Nightly update channel. Install at your own risk."
 
       - name: Trigger the release build
+        if: steps.tag.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

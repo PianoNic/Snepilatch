@@ -1,8 +1,11 @@
 name: Cut a Nightly Build
 
 # Runs on every merge to main, plus workflow_dispatch for a manual cut. Tags and publishes a
-# prerelease (vX.Y.Z-nightly.N, N scoped to the current base version); publishing triggers
-# build-and-release.yml via `release: published`, same as a stable tag. See CLAUDE.md "Versioning".
+# prerelease (vX.Y.Z-nightly.N, N scoped to the current base version), then explicitly dispatches
+# build-and-release.yml at that tag — a release published via GITHUB_TOKEN does NOT fire the
+# release: published event (GitHub's anti-recursion safeguard), unlike a human publishing one
+# through the UI, so this can't just rely on that trigger the way a stable release does. See
+# CLAUDE.md "Versioning".
 on:
   push:
     branches:
@@ -11,6 +14,7 @@ on:
 
 permissions:
   contents: write
+  actions: write # needed to dispatch build-and-release.yml from "Trigger the release build"
 
 concurrency:
   # Two merges landing close together must not both read the same "last nightly" tag number —
@@ -55,3 +59,11 @@ jobs:
             --prerelease \
             --generate-notes \
             --notes "⚠️ **Nightly build** — unreviewed and may be unstable. Only visible to users on the Nightly update channel. Install at your own risk."
+
+      - name: Trigger the release build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # workflow_dispatch IS exempt from the GITHUB_TOKEN anti-recursion restriction that
+          # blocks the release: published event above, so this is what actually builds the APK.
+          gh workflow run build-and-release.yml --repo "${{ github.repository }}" --ref "${{ steps.tag.outputs.tag }}"

@@ -104,6 +104,7 @@
     <string name="update_now">Jetzt aktualisieren</string>
     <string name="later">Später</string>
     <string name="nightly_build_warning">Dies ist ein Nightly-Build — ungeprüft und möglicherweise instabil. Nutzung auf eigenes Risiko.</string>
+    <string name="enable_unknown_apps">Erlaube Snepilatch in den geöffneten Einstellungen das Installieren von Apps und tippe dann erneut auf Jetzt aktualisieren.</string>
 
     <!-- Devices -->
     <string name="searching_devices">Suche nach Geräten…</string>

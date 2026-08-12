@@ -2,6 +2,8 @@ package ch.snepilatch.app.util
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import android.util.Log
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
@@ -188,7 +190,21 @@ object UpdateService {
         }
     }
 
-    fun installApk(context: Context, file: File) {
+    /**
+     * Returns false (and sends the user to the "install unknown apps" setting instead of
+     * installing) when the permission isn't granted yet — without this check the install
+     * intent still opens, but the system installer silently blocks it instead.
+     */
+    fun installApk(context: Context, file: File): Boolean {
+        if (!context.packageManager.canRequestPackageInstalls()) {
+            context.startActivity(
+                Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                    data = Uri.parse("package:${context.packageName}")
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+            )
+            return false
+        }
         val uri = FileProvider.getUriForFile(
             context,
             "${context.packageName}.fileprovider",
@@ -199,6 +215,7 @@ object UpdateService {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
         }
         context.startActivity(intent)
+        return true
     }
 
     fun getDismissedVersion(context: Context): String? {

@@ -80,7 +80,6 @@ fun UpdateDialog(
                     }
                 }
 
-                // Nightly builds are unreviewed and opted into at the user's own risk.
                 if (updateInfo.isPrerelease) {
                     Card(
                         colors = CardDefaults.cardColors(
@@ -169,7 +168,10 @@ fun UpdateDialog(
                             progress = p
                         }
                         if (file != null) {
-                            UpdateService.installApk(context, file)
+                            isDownloading = false
+                            if (!UpdateService.installApk(context, file)) {
+                                error = context.getString(R.string.enable_unknown_apps)
+                            }
                         } else {
                             isDownloading = false
                             error = context.getString(R.string.update_download_failed)

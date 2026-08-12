@@ -133,11 +133,16 @@ jobs:
           chmod +x ./gradlew
           ./gradlew assembleProdRelease -PappVersionName=${{ steps.app_version.outputs.name }} -PappVersionCode=${{ steps.app_version.outputs.code }}
 
+      - name: Rename the APK for upload
+        run: |
+          mkdir -p artifacts
+          cp src/app/build/outputs/apk/prod/release/app-prod-release.apk "artifacts/snepilatch-${{ inputs.tag }}.apk"
+
       - name: Upload Assets to Release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ inputs.tag }}
-          files: src/app/build/outputs/apk/prod/release/app-prod-release.apk
+          files: artifacts/snepilatch-${{ inputs.tag }}.apk
           append_body: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

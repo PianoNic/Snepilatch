@@ -32,7 +32,6 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
-import androidx.media3.datasource.RawResourceDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -655,7 +654,13 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         // Keep the previous track's metadata frozen on the card (no "Skipping ad…"); the isAdSkipping
         // flag makes updatePlaybackState report BUFFERING so the notification shows a loading spinner.
         isAdSkipping = true
-        val uri = RawResourceDataSource.buildRawResourceUri(ch.snepilatch.app.R.raw.silent_ad)
+        // Replaces media3's deprecated `rawresource://` builder. The package must be spelled out:
+        // an authority-less "android.resource:123" re-parses as opaque and loses its path.
+        val uri = android.net.Uri.Builder()
+            .scheme(android.content.ContentResolver.SCHEME_ANDROID_RESOURCE)
+            .authority(packageName)
+            .path(ch.snepilatch.app.R.raw.silent_ad.toString())
+            .build()
         mainHandler.post {
             val source = ProgressiveMediaSource.Factory(DefaultDataSource.Factory(this))
                 .createMediaSource(MediaItem.fromUri(uri))

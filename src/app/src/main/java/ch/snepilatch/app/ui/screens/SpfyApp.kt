@@ -138,6 +138,8 @@ fun SpfyApp(vm: PlaybackViewModel) {
         if (screen != Screen.NOW_PLAYING && screen != Screen.LYRICS) contentScreen = screen
     }
 
+    val isOffline by vm.isOffline.collectAsState()
+
     val toastContext = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(Unit) {
         vm.errorMessage.collect { message ->
@@ -234,7 +236,18 @@ fun SpfyApp(vm: PlaybackViewModel) {
                     translationY = expand.value * size.height
                 }
             ) {
-                BottomNav(screen, vm, hazeState)
+                Column {
+                    if (isOffline) {
+                        Text(
+                            stringResource(R.string.offline_banner),
+                            color = SpfyLightGray,
+                            fontSize = 12.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                        )
+                    }
+                    BottomNav(screen, vm, hazeState)
+                }
             }
         }
 
@@ -341,6 +354,7 @@ fun SpfyApp(vm: PlaybackViewModel) {
 @Composable
 private fun MainContent(screen: Screen, vm: PlaybackViewModel, hazeState: HazeState) {
     val libraryVm: LibraryViewModel = viewModel()
+    val isOffline by vm.isOffline.collectAsState()
     Box(
         Modifier
             .fillMaxSize()
@@ -348,7 +362,7 @@ private fun MainContent(screen: Screen, vm: PlaybackViewModel, hazeState: HazeSt
             .hazeSource(hazeState)
     ) {
         when (screen) {
-            Screen.HOME -> HomeScreen(vm)
+            Screen.HOME -> if (isOffline) OfflineHomeScreen(vm) else HomeScreen(vm)
             Screen.SEARCH -> SearchScreen(vm)
             Screen.LIBRARY -> { LaunchedEffect(Unit) { libraryVm.loadLibrary() }; LibraryScreen() }
             Screen.ACCOUNT -> AccountScreen(vm)

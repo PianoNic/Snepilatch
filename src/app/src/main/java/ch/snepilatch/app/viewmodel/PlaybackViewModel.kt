@@ -9,6 +9,7 @@ import ch.snepilatch.app.R
 import ch.snepilatch.app.data.UiMessage
 import ch.snepilatch.app.util.LokiLogger
 import ch.snepilatch.app.util.detectActiveAudioOutput
+import ch.snepilatch.app.util.hasInternet
 import ch.snepilatch.app.util.normalizeSpfyImageUrl
 import ch.snepilatch.app.playback.InfiniPlayController
 import ch.snepilatch.app.playback.InfiniPlayViz
@@ -79,6 +80,9 @@ class PlaybackViewModel : ViewModel() {
         set(value) { SessionHolder.player = value }
     private var username: String = ""
     val isInitialized = MutableStateFlow(false)
+
+    /** Set instead of [initError] so the UI still renders; only downloaded tracks play. */
+    val isOffline = MutableStateFlow(false)
     val initError = MutableStateFlow<UiMessage?>(null)
     val rateLimitCooldown = MutableStateFlow(false)
     val cooldownSeconds = MutableStateFlow(0)
@@ -457,6 +461,13 @@ class PlaybackViewModel : ViewModel() {
             } catch (e: Exception) {
                 LokiLogger.e(TAG, "Init failed", e)
                 val msg = e.message ?: "Unknown error"
+                val ctx = MusicPlaybackService.instance as? android.content.Context
+                if (ctx != null && !hasInternet(ctx)) {
+                    LokiLogger.w(TAG, "No internet — starting offline, downloads only")
+                    isOffline.value = true
+                    isInitialized.value = true
+                    return@launch
+                }
                 if (msg.contains("Unauthorized") || msg.contains("401") || msg.contains("code\":400")) {
                     initRetryCount++
                     if (initRetryCount > 5) {
@@ -1698,6 +1709,10 @@ class PlaybackViewModel : ViewModel() {
     internal suspend fun startUserPlayback(track: TrackInfo, contextUri: String?, trackIndex: Int? = null) {
         // Honor the resulting onTrackChange even if we're starting from idle (no local audio yet).
         pendingUserPlay = true
+        if (isOffline.value) {
+            playDownloaded(track.uri, track.name, track.artist, track.albumArt)
+            return
+        }
         val pc = player ?: return
         coroutineScope {
             // Instant tap-to-play (always on): self-resolve the tapped track's audio and start

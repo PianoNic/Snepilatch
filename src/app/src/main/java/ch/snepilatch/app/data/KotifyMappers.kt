@@ -162,6 +162,7 @@ fun PlaylistInfo.toDetailData(playlistId: String) = DetailData(
     totalCount = if (totalTracks <= 0 && tracks.size >= PLAYLIST_PAGE_SIZE) -1 else totalTracks,
     loadedOffset = tracks.size,
     ownerName = owner.name,
+    ownerUri = owner.uri,
     followers = followers,
     tracks = tracks.map { it.toTrackInfo() },
 )

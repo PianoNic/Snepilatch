@@ -10,6 +10,7 @@ import kotify.api.playlist.Playlist
 import kotify.api.podcast.Podcast
 import kotify.api.song.Song
 import kotify.session.Session
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -237,6 +238,42 @@ class DetailViewModel : SessionViewModel("DetailVM") {
             }
             detailSaved.value = !currentlySaved
         }
+    }
+
+    /**
+     * Remove [track] from the open playlist. Keyed on the item's `uid`, not its uri — a playlist may
+     * hold the same song twice and only the tapped row should go. The row drops before the request
+     * lands and comes back if it fails, which is the only feedback there is.
+     */
+    fun removeFromPlaylist(track: TrackInfo) {
+        val before = _detail.value
+        val uid = track.uid ?: return
+        val sess = SessionHolder.session ?: return
+        if (!before.isPlaylistOwnedBy(SessionHolder.username)) return
+        val playlistId = before.uri.removePrefix("spotify:playlist:")
+        val remaining = before.tracks.filterNot { it.uid == uid }
+        if (remaining.size == before.tracks.size) return
+        _detail.value = before.copy(
+            tracks = remaining,
+            totalCount = if (before.totalCount > 0) before.totalCount - 1 else before.totalCount,
+            loadedOffset = remaining.size
+        )
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                Playlist(sess).removeFromPlaylist(playlistId, listOf(uid))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                LokiLogger.e(logTag, "removeFromPlaylist", e)
+                // _detail is a single live slot; don't stomp a playlist the user has since opened.
+                if (_detail.value.uri == before.uri) _detail.value = before
+            }
+        }
+    }
+
+    /** Test seam: seed the open detail so the mutations on it can be exercised without a network load. */
+    internal fun setDetailForTest(data: DetailData) {
+        _detail.value = data
     }
 
     companion object {

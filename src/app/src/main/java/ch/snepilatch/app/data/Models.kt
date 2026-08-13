@@ -55,8 +55,10 @@ data class DetailData(
     val releaseDate: String? = null,
     val copyright: String? = null,
     val moreByArtist: List<RelatedAlbum> = emptyList(),
-    // Playlist-specific
+    // Playlist-specific. Ownership checks use [ownerUri] (`spotify:user:<username>`); [ownerName] is
+    // a display name and can't be matched against an account.
     val ownerName: String? = null,
+    val ownerUri: String? = null,
     val followers: Long? = null,
     // Artist-specific
     val monthlyListeners: Long? = null,
@@ -67,6 +69,12 @@ data class DetailData(
     // Show-specific (podcast). Episodes are carried in [tracks] as episode-URI TrackInfos.
     val publisher: String? = null
 )
+
+/** True when this detail is a playlist [username] owns — the only case where a track may be removed. */
+fun DetailData.isPlaylistOwnedBy(username: String): Boolean =
+    type == "playlist" &&
+        username.isNotBlank() &&
+        ownerUri?.substringAfterLast(':') == username
 
 data class RelatedArtist(
     val uri: String,

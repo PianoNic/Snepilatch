@@ -38,6 +38,8 @@
     <string name="add_to_queue">I d Wartelischte</string>
     <string name="add_to_playlist">I d Playlist iifüege</string>
     <string name="remove_from_playlist">Us dere Playlist uusenäh</string>
+    <string name="go_to_song_radio">Zum Song-Radio</string>
+    <string name="go_to_artist_radio">Zum Künstler*inne-Radio</string>
     <string name="like">Gfallt mer</string>
     <string name="unlike">Gfallt mer nüm</string>
     <string name="visit_album">Album aaluege</string>

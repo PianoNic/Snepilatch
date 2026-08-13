@@ -8,6 +8,7 @@ import kotify.api.album.Album
 import kotify.api.artist.Artist
 import kotify.api.playlist.Playlist
 import kotify.api.podcast.Podcast
+import kotify.api.radio.Radio
 import kotify.api.song.Song
 import kotify.session.Session
 import kotlinx.coroutines.CancellationException
@@ -83,6 +84,24 @@ class DetailViewModel : SessionViewModel("DetailVM") {
                 ?.toDetailData(showId, publisher, imageUrl)
                 .also { if (it == null) LokiLogger.e(logTag, "openShow: no podcast info for $showId") }
         }
+
+    /**
+     * Open the station for [seedUri] (track = song radio, artist = artist radio) as a normal playlist
+     * page. Nothing starts playing — a station *is* a generated playlist.
+     *
+     * Unlike the other openers this navigates only after the response: the destination isn't known
+     * until then, and a seed with no radio would otherwise strand the user on an empty screen.
+     */
+    fun openRadio(seedUri: String) {
+        launchWithSession("openRadio") { sess ->
+            val stationUri = Radio(sess).getRadioPlaylistUri(seedUri)
+            if (stationUri == null) {
+                LokiLogger.w(logTag, "No radio station for $seedUri")
+                return@launchWithSession
+            }
+            openPlaylist(stationUri.substringAfterLast(':'))
+        }
+    }
 
     fun openAlbumForTrack(trackUri: String) {
         launchWithSession("openAlbumForTrack") { sess ->
@@ -301,5 +320,6 @@ object DetailRoutes {
     }
     fun openLikedSongs() { target?.openLikedSongs() }
     fun openAlbumForTrack(trackUri: String) { target?.openAlbumForTrack(trackUri) }
+    fun openRadio(seedUri: String) { target?.openRadio(seedUri) }
     fun openArtistForTrack(trackUri: String) { target?.openArtistForTrack(trackUri) }
 }

@@ -1169,6 +1169,7 @@ private fun NowPlayingMenu(
             val addPlaylistLabel = stringResource(R.string.add_to_playlist)
             val viewQueueLabel = stringResource(R.string.view_queue)
             val visitAlbumLabel = stringResource(R.string.visit_album)
+            val songRadioLabel = stringResource(R.string.go_to_song_radio)
             val devicesLabel = stringResource(R.string.devices)
             val shareLabel = stringResource(R.string.share)
             val downloadCtx = androidx.compose.ui.platform.LocalContext.current
@@ -1199,6 +1200,11 @@ private fun NowPlayingMenu(
                 },
                 Triple(Icons.Rounded.Album, visitAlbumLabel) {
                     onShowMore(false); vm.openAlbumFromCurrentTrack()
+                },
+                Triple(Icons.Rounded.Radio, songRadioLabel) {
+                    onShowMore(false)
+                    // Via the router: this menu is built outside a composable that owns a DetailViewModel.
+                    track?.uri?.let { ch.snepilatch.app.viewmodel.DetailRoutes.openRadio(it) }
                 },
                 // Same glyphs as the track rows in SharedComponents: the same track reached two ways
                 // showed two different icons for one state.

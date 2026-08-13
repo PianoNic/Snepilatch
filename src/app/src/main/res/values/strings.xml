@@ -30,6 +30,8 @@
     <string name="add_to_queue">Add to Queue</string>
     <string name="add_to_playlist">Add to Playlist</string>
     <string name="remove_from_playlist">Remove from this Playlist</string>
+    <string name="go_to_song_radio">Go to song radio</string>
+    <string name="go_to_artist_radio">Go to artist radio</string>
     <string name="like">Like</string>
     <string name="unlike">Unlike</string>
     <string name="visit_album">Visit Album</string>

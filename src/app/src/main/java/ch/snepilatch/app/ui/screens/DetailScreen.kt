@@ -24,6 +24,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.ui.draw.clip
 import androidx.compose.material3.*
 import androidx.compose.runtime.LaunchedEffect
@@ -866,6 +867,26 @@ private fun AlbumTrackRow(
  * Skips "Remove from Library" because the like/save toggle already lives
  * elsewhere in the header.
  */
+@Composable
+private fun DetailHeaderMenuTitle(detail: ch.snepilatch.app.data.DetailData, type: String) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        ch.snepilatch.app.ui.components.SpfyImage(
+            url = detail.imageUrl,
+            modifier = Modifier.size(48.dp),
+            shape = RoundedCornerShape(8.dp)
+        )
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text(detail.name, color = SpfyWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val subtitle = detail.artistName ?: detail.ownerName ?: type.replaceFirstChar { it.uppercase() }
+            Text(subtitle, color = SpfyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DetailHeaderMenu(
@@ -882,28 +903,14 @@ private fun DetailHeaderMenu(
     val isAlbum = type == "album"; val isCollection = type == "collection"; val isArtist = type == "artist"
     val shareLabel = stringResource(R.string.share); val addToQueueLabel = stringResource(R.string.add_to_queue)
     val addToPlaylistLabel = stringResource(R.string.add_to_playlist); val visitArtistLabel = stringResource(R.string.visit_artist)
+    val artistRadioLabel = stringResource(R.string.go_to_artist_radio)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = SpfyElevated,
     ) {
         ch.snepilatch.app.ui.components.SheetNavBarFix()
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            ch.snepilatch.app.ui.components.SpfyImage(
-                url = detail.imageUrl,
-                modifier = Modifier.size(48.dp),
-                shape = RoundedCornerShape(8.dp)
-            )
-            Spacer(Modifier.width(12.dp))
-            Column {
-                Text(detail.name, color = SpfyWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                val subtitle = detail.artistName ?: detail.ownerName ?: type.replaceFirstChar { it.uppercase() }
-                Text(subtitle, color = SpfyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
+        DetailHeaderMenuTitle(detail, type)
         Spacer(Modifier.height(8.dp))
         HorizontalDivider(color = SpfyLightGray.copy(alpha = 0.15f))
         val items = buildList<Triple<androidx.compose.ui.graphics.vector.ImageVector, String, () -> Unit>> {
@@ -933,6 +940,14 @@ private fun DetailHeaderMenu(
                     onDismiss()
                     val artistId = detail.artistUri.substringAfterLast(":")
                     DetailRoutes.openArtist(artistId)
+                })
+            }
+            // An album seeds with its artist, same as the desktop client — hence "artist radio" there.
+            val radioSeed = if (isArtist) detail.uri else detail.artistUri?.takeIf { isAlbum }
+            if (radioSeed != null) {
+                add(Triple(Icons.Rounded.Radio, artistRadioLabel) {
+                    onDismiss()
+                    DetailRoutes.openRadio(radioSeed)
                 })
             }
         }

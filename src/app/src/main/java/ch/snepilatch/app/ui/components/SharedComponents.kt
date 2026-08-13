@@ -83,20 +83,23 @@ import kotlinx.coroutines.delay
  * Match the app's transparent, edge-to-edge nav bar inside a ModalBottomSheet. The sheet
  * has its own window that re-enables the nav-bar contrast scrim the Activity turned off,
  * which shows as a static white backdrop behind the system buttons. Call at the top of the
- * sheet's content. From API 35 the system bars can't be tinted at all and both setters are
- * deprecated no-ops, hence the version gate rather than a blanket suppression.
+ * sheet's content.
  */
 @Composable
 fun SheetNavBarFix() {
     val view = LocalView.current
     SideEffect {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) return@SideEffect
         val window = (view.parent as? DialogWindowProvider)?.window ?: return@SideEffect
-        @Suppress("DEPRECATION")
-        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        // The scrim is all that's left from API 35 — the bar can't be tinted there — and this is the
+        // only setter that still removes it. NOT deprecated, and NOT skippable on 35+: doing so is
+        // what put the white backdrop back behind the buttons.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            @Suppress("DEPRECATION")
             window.isNavigationBarContrastEnforced = false
+        }
+        // Deprecated and ignored from API 35; below that it's the only way to clear the bar.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            @Suppress("DEPRECATION")
+            window.navigationBarColor = android.graphics.Color.TRANSPARENT
         }
     }
 }

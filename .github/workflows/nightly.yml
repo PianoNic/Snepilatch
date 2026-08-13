@@ -2,8 +2,9 @@ name: Cut a Nightly Build
 
 # Twice a day (see the cron below — times are UTC; adjust if you want a specific local time), plus
 # workflow_dispatch for a manual cut. Skips entirely if main hasn't moved since the last nightly.
-# Tags and publishes a prerelease (vX.Y.Z-nightly.N, N scoped to the current base version), then
-# calls build-apk.yml directly to build and upload the APK. See CLAUDE.md "Versioning".
+# Tags and publishes a prerelease (vX.Y.Z-nightly.N, where X.Y.Z mirrors release-drafter's draft and
+# N is scoped to it), then calls build-apk.yml directly to build and upload the APK. It never
+# publishes the draft itself — that stays a deliberate, human step. See CLAUDE.md "Versioning".
 on:
   schedule:
     - cron: "0 0 * * *"
@@ -33,9 +34,10 @@ jobs:
 
       - name: Determine the next nightly tag
         id: tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          BASE=$(grep -m1 'versionName = ' src/app/build.gradle.kts | sed -E 's/.*"([^"]+)".*/\1/')
           LAST_TAG=$(git tag -l 'v*-nightly.*' --sort=-creatordate | head -1)
           if [ -n "$LAST_TAG" ] && [ "$(git rev-list -n1 "$LAST_TAG")" = "$(git rev-parse HEAD)" ]; then
             echo "No commits on main since $LAST_TAG — skipping this cut."
@@ -43,11 +45,24 @@ jobs:
             exit 0
           fi
           echo "skip=false" >> "$GITHUB_OUTPUT"
+          # Mirror release-drafter's draft rather than inventing a version: it already resolves the
+          # next one from the labels on everything merged since the last release, so a nightly is a
+          # preview of the release it leads to. build.gradle.kts is only bumped by hand at release
+          # time, so reading it cut nightlies for a version that had already shipped. Sorted rather
+          # than first — the drafter can leave more than one draft behind.
+          BASE=$(gh api "repos/${{ github.repository }}/releases" \
+            --jq '[.[] | select(.draft) | .tag_name | ltrimstr("v")]
+                  | sort_by(split(".") | map(tonumber? // 0)) | last // empty')
+          SOURCE="the release draft"
+          if [ -z "$BASE" ]; then
+            BASE=$(grep -m1 'versionName = ' src/app/build.gradle.kts | sed -E 's/.*"([^"]+)".*/\1/')
+            SOURCE="build.gradle.kts (no release draft found)"
+          fi
           LAST_N=$(git tag -l "v${BASE}-nightly.*" | sed -E "s/.*-nightly\.([0-9]+)\$/\1/" | sort -n | tail -1)
           NEXT_N=$(( ${LAST_N:-0} + 1 ))
           TAG="v${BASE}-nightly.${NEXT_N}"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "Cutting $TAG (base version $BASE, from build.gradle.kts)"
+          echo "Cutting $TAG (base version $BASE, from $SOURCE)"
 
       - name: Create and push the tag
         if: steps.tag.outputs.skip != 'true'

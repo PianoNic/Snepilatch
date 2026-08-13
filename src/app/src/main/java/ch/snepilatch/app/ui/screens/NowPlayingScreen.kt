@@ -1083,14 +1083,22 @@ private fun PlayerBottomBar(
 
 @Composable
 private fun SourcePill(provider: String?) {
-    val active = provider != null
-    val label = when (provider) {
-        null -> "No CDN"
-        "qobuz" -> "Qobuz"
-        "deezer" -> "Deezer"
+    val jamVm: ch.snepilatch.app.viewmodel.JamViewModel = viewModel()
+    val jam by jamVm.jam.collectAsState()
+    val inJam = jam != null
+    val active = provider != null || inJam
+    val label = when {
+        inJam -> stringResource(R.string.jam_connected)
+        provider == null -> "No CDN"
+        provider == "qobuz" -> "Qobuz"
+        provider == "deezer" -> "Deezer"
         else -> provider.replaceFirstChar { it.uppercase() }
     }
-    val icon = if (active) Icons.Rounded.MusicNote else Icons.Rounded.CloudOff
+    val icon = when {
+        inJam -> Icons.Rounded.Groups
+        active -> Icons.Rounded.MusicNote
+        else -> Icons.Rounded.CloudOff
+    }
     val bgAlpha = if (active) 0.10f else 0.06f
     val fgAlpha = if (active) 1f else 0.55f
     Row(

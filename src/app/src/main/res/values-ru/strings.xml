@@ -366,6 +366,5 @@
     <string name="jam_not_ready">Ещё подключаемся. Попробуйте через момент.</string>
     <string name="jam_members">Участников: %1$d</string>
     <string name="join_jam">Присоединиться к джему</string>
-    <string name="jam_scan">Скан</string>
-    <string name="jam_scan_prompt">Наведите на QR-код джема</string>
+    <string name="jam_connected">Подключено к джему</string>
 </resources>

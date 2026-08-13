@@ -65,6 +65,9 @@ fun DevicesDialog(vm: PlaybackViewModel) {
         enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
     )
     val ourId = vm.ourDeviceId
+    val jamVm: ch.snepilatch.app.viewmodel.JamViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    val jam by jamVm.jam.collectAsState()
+    val inJam = jam != null
 
     // Sort: active device first
     val sortedDevices = devices.sortedByDescending { it.is_active }
@@ -147,8 +150,9 @@ fun DevicesDialog(vm: PlaybackViewModel) {
                     }
                 }
 
-                // Volume slider — only show for remote devices, not this phone
-                if (!isOurDevice) {
+                // Volume slider — only for remote devices, and never inside a jam: adjusting another
+                // participant's volume is a host-side feature we do not implement.
+                if (!isOurDevice && !inJam) {
                     Row(
                         Modifier
                             .fillMaxWidth()

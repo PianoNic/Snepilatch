@@ -364,6 +364,5 @@
     <string name="jam_not_ready">Verbindung wird noch aufgebaut. Gleich nochmal versuchen.</string>
     <string name="jam_members">%1$d in diesem Jam</string>
     <string name="join_jam">Einem Jam beitreten</string>
-    <string name="jam_scan">Scannen</string>
-    <string name="jam_scan_prompt">Auf den Jam-QR-Code richten</string>
+    <string name="jam_connected">Mit Jam verbunden</string>
 </resources>

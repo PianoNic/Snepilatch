@@ -380,6 +380,5 @@
     <string name="jam_not_ready">Verbindig wird no ufboue. Grad nomal probiere.</string>
     <string name="jam_members">%1$d i dem Jam</string>
     <string name="join_jam">Emene Jam biitrete</string>
-    <string name="jam_scan">Scanne</string>
-    <string name="jam_scan_prompt">Uf de Jam-QR-Code richte</string>
+    <string name="jam_connected">Mit em Jam verbunde</string>
 </resources>

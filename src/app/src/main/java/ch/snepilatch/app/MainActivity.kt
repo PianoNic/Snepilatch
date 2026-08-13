@@ -24,6 +24,7 @@ import ch.snepilatch.app.ui.components.UpdateDialog
 import ch.snepilatch.app.ui.screens.LoadingScreen
 import ch.snepilatch.app.ui.screens.SpfyApp
 import ch.snepilatch.app.ui.screens.SpfyLoginScreen
+import ch.snepilatch.app.ui.theme.SnepilatchTheme
 import ch.snepilatch.app.ui.theme.SpfyBlack
 import ch.snepilatch.app.util.UpdateInfo
 import ch.snepilatch.app.util.UpdateService
@@ -189,41 +190,43 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            Surface(
-                modifier = Modifier
-                    .fillMaxSize(),
-                color = SpfyBlack
-            ) {
-                // Update dialog
-                if (updateInfo != null) {
-                    UpdateDialog(
-                        updateInfo = updateInfo!!,
-                        onDismiss = { updateInfo = null }
-                    )
-                }
-
-                when {
-                    needsLogin -> SpfyLoginScreen(vm)
-                    !initialized -> {
-                        val cooldown by vm.rateLimitCooldown.collectAsState()
-                        val seconds by vm.cooldownSeconds.collectAsState()
-                        LoadingScreen(
-                            error = error,
-                            isRateLimited = cooldown,
-                            cooldownSecondsRemaining = seconds,
-                            onLogin = { if (!cooldown) vm.showLogin() },
-                            onRetry = {
-                                if (!cooldown) {
-                                    val cookies = loadCookies(context)
-                                    if (cookies != null) {
-                                        vm.initError.value = null
-                                        vm.initialize(cookies)
-                                    }
-                                }
-                            }
+            SnepilatchTheme {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    color = SpfyBlack
+                ) {
+                    // Update dialog
+                    if (updateInfo != null) {
+                        UpdateDialog(
+                            updateInfo = updateInfo!!,
+                            onDismiss = { updateInfo = null }
                         )
                     }
-                    else -> SpfyApp(vm)
+
+                    when {
+                        needsLogin -> SpfyLoginScreen(vm)
+                        !initialized -> {
+                            val cooldown by vm.rateLimitCooldown.collectAsState()
+                            val seconds by vm.cooldownSeconds.collectAsState()
+                            LoadingScreen(
+                                error = error,
+                                isRateLimited = cooldown,
+                                cooldownSecondsRemaining = seconds,
+                                onLogin = { if (!cooldown) vm.showLogin() },
+                                onRetry = {
+                                    if (!cooldown) {
+                                        val cookies = loadCookies(context)
+                                        if (cookies != null) {
+                                            vm.initError.value = null
+                                            vm.initialize(cookies)
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                        else -> SpfyApp(vm)
+                    }
                 }
             }
         }

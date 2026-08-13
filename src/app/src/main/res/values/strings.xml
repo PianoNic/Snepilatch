@@ -370,6 +370,5 @@
     <string name="jam_not_ready">Still connecting. Try again in a moment.</string>
     <string name="jam_members">%1$d in this jam</string>
     <string name="join_jam">Join a jam</string>
-    <string name="jam_scan">Scan</string>
-    <string name="jam_scan_prompt">Point at the jam QR code</string>
+    <string name="jam_connected">Connected to jam</string>
 </resources>

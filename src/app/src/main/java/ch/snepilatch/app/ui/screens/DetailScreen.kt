@@ -40,6 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
+import ch.snepilatch.app.data.isPlaylistOwnedBy
 import ch.snepilatch.app.download.Downloads
 import ch.snepilatch.app.ui.components.SpfyImage
 import ch.snepilatch.app.ui.components.TrackRow
@@ -64,6 +65,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
     val theme by ThemeController.themeColors.collectAsState()
     val accentColor by androidx.compose.animation.animateColorAsState(theme.primary, androidx.compose.animation.core.tween(800), label = "detailAccent")
     val isArtist = detail.type == "artist"
+    val isOwnPlaylist = detail.isPlaylistOwnedBy(ch.snepilatch.app.playback.SessionHolder.username)
 
     if (isLoading) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -396,7 +398,16 @@ fun DetailScreen(vm: PlaybackViewModel) {
             when {
                 isArtist -> ArtistTrackRow(index + 1, track, vm, detail.uri, detail.topTrackPlaycounts.getOrNull(index))
                 detail.type == "album" -> AlbumTrackRow(track, vm, detail.uri, index)
-                else -> TrackRow(track, vm, contextUri = detail.uri, trackIndex = index)
+                else -> TrackRow(
+                    track, vm,
+                    contextUri = detail.uri,
+                    trackIndex = index,
+                    onRemoveFromPlaylist = if (isOwnPlaylist && track.uid != null) {
+                        { detailVm.removeFromPlaylist(track) }
+                    } else {
+                        null
+                    }
+                )
             }
         }
 

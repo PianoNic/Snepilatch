@@ -27,6 +27,7 @@
     <string name="now_playing">Aktueller Titel</string>
     <string name="add_to_queue">Zur Warteschlange</string>
     <string name="add_to_playlist">Zu Playlist hinzufügen</string>
+    <string name="remove_from_playlist">Aus dieser Playlist entfernen</string>
     <string name="like">Gefällt mir</string>
     <string name="unlike">Gefällt mir nicht mehr</string>
     <string name="visit_album">Album anzeigen</string>

@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PlaylistRemove
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.Text
@@ -211,9 +212,19 @@ private const val PROGRESS_TICK_MS = 32L
 
 // --- Track Row ---
 
+/**
+ * [onRemoveFromPlaylist] adds a "Remove from this Playlist" entry. Passed in because only the caller
+ * knows whether this list is a playlist the user may edit (see [ch.snepilatch.app.data.isPlaylistOwnedBy]).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TrackRow(track: TrackInfo, vm: PlaybackViewModel, contextUri: String? = null, trackIndex: Int? = null) {
+fun TrackRow(
+    track: TrackInfo,
+    vm: PlaybackViewModel,
+    contextUri: String? = null,
+    trackIndex: Int? = null,
+    onRemoveFromPlaylist: (() -> Unit)? = null
+) {
     val detailVm: DetailViewModel = viewModel()
     var showMenu by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -313,12 +324,13 @@ fun TrackRow(track: TrackInfo, vm: PlaybackViewModel, contextUri: String? = null
             val likeLabel = stringResource(R.string.like)
             val visitAlbumLabel = stringResource(R.string.visit_album)
             val visitArtistLabel = stringResource(R.string.visit_artist)
+            val removeFromPlaylistLabel = stringResource(R.string.remove_from_playlist)
             val downloadLabel = if (isDownloaded) {
                 stringResource(R.string.remove_download)
             } else {
                 stringResource(R.string.download_track)
             }
-            val items = listOf(
+            val items = listOfNotNull(
                 Triple(
                     if (isDownloaded) Icons.Rounded.OfflinePin else Icons.Rounded.DownloadForOffline,
                     downloadLabel,
@@ -335,6 +347,11 @@ fun TrackRow(track: TrackInfo, vm: PlaybackViewModel, contextUri: String? = null
                 },
                 Triple(Icons.AutoMirrored.Rounded.PlaylistAdd, addToPlaylistLabel) {
                     showMenu = false; vm.showPlaylistPickerForTrack(track.uri)
+                },
+                onRemoveFromPlaylist?.let { remove ->
+                    Triple(Icons.Rounded.PlaylistRemove, removeFromPlaylistLabel) {
+                        showMenu = false; remove()
+                    }
                 },
                 Triple(Icons.Rounded.Favorite, likeLabel) {
                     vm.likeSong(track.uri.removePrefix("spotify:track:")); showMenu = false

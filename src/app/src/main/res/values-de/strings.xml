@@ -353,4 +353,17 @@
     <string name="offline_banner">Du bist offline</string>
     <string name="offline_while_youre_offline">Während du offline bist</string>
     <string name="offline_no_downloads">Du bist offline und es ist noch nichts heruntergeladen. Heruntergeladene Songs erscheinen hier.</string>
+    <string name="jam">Jam</string>
+    <string name="jam_join">Beitreten</string>
+    <string name="jam_joining">Trete bei...</string>
+    <string name="jam_leave">Jam verlassen</string>
+    <string name="jam_host">Host</string>
+    <string name="jam_paste_hint">Füge einen Jam-Link ein, den dir jemand geschickt hat.</string>
+    <string name="jam_link_placeholder">Jam-Link</string>
+    <string name="jam_join_failed">Beitritt fehlgeschlagen. Der Link ist vielleicht abgelaufen.</string>
+    <string name="jam_not_ready">Verbindung wird noch aufgebaut. Gleich nochmal versuchen.</string>
+    <string name="jam_members">%1$d in diesem Jam</string>
+    <string name="join_jam">Einem Jam beitreten</string>
+    <string name="jam_scan">Scannen</string>
+    <string name="jam_scan_prompt">Auf den Jam-QR-Code richten</string>
 </resources>

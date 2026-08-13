@@ -350,4 +350,7 @@
     </plurals>
     <string name="auto_save_listened">Gehörtes behalten</string>
     <string name="auto_save_listened_desc">Speichert einen Titel, sobald du ihn durchgehört hast</string>
+    <string name="offline_banner">Du bist offline</string>
+    <string name="offline_while_youre_offline">Während du offline bist</string>
+    <string name="offline_no_downloads">Du bist offline und es ist noch nichts heruntergeladen. Heruntergeladene Songs erscheinen hier.</string>
 </resources>

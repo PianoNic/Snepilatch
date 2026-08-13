@@ -352,4 +352,7 @@
     </plurals>
     <string name="auto_save_listened">Сохранять прослушанное</string>
     <string name="auto_save_listened_desc">Сохраняет трек после полного прослушивания</string>
+    <string name="offline_banner">Вы офлайн</string>
+    <string name="offline_while_youre_offline">Пока вы офлайн</string>
+    <string name="offline_no_downloads">Вы офлайн, и пока ничего не загружено. Загруженные треки появятся здесь.</string>
 </resources>

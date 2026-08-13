@@ -356,4 +356,7 @@
     </plurals>
     <string name="auto_save_listened">Keep what I listen to</string>
     <string name="auto_save_listened_desc">Save a track once you have played it through</string>
+    <string name="offline_banner">You\'re offline</string>
+    <string name="offline_while_youre_offline">While you\'re offline</string>
+    <string name="offline_no_downloads">You\'re offline and nothing is downloaded yet. Downloaded songs will show up here.</string>
 </resources>

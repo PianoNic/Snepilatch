@@ -13,7 +13,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.rounded.DownloadForOffline
 import androidx.compose.material.icons.rounded.OfflinePin
 import androidx.compose.material.icons.rounded.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -22,7 +21,9 @@ import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
+import androidx.compose.material.icons.rounded.AddCircleOutline
 import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.ui.draw.clip
@@ -219,13 +220,13 @@ fun DetailScreen(vm: PlaybackViewModel) {
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Save/Follow (albums & artists)
-                if (detail.type == "album" || isArtist) {
+                // Save/Follow (albums, playlists & artists)
+                if (detail.type == "album" || detail.type == "playlist" || isArtist) {
                     val saved by detailVm.detailSaved.collectAsState()
-                    val detailId = detail.uri
-                        .removePrefix("spotify:album:")
-                        .removePrefix("spotify:artist:")
-                    LaunchedEffect(detail.uri) { detailVm.checkDetailSaved(detail.type, detailId) }
+                    val detailId = detail.uri.substringAfterLast(':')
+                    LaunchedEffect(detail.uri, detail.savedInLibrary) {
+                        detailVm.checkDetailSaved(detail.type, detailId)
+                    }
 
                     if (isArtist) {
                         OutlinedButton(
@@ -254,7 +255,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                             modifier = Modifier.size(HEADER_BUTTON),
                         ) {
                             Icon(
-                                if (saved) Icons.Rounded.Favorite else Icons.Filled.FavoriteBorder,
+                                if (saved) Icons.Rounded.CheckCircle else Icons.Rounded.AddCircleOutline,
                                 stringResource(R.string.save),
                                 modifier = Modifier.size(HEADER_ICON)
                             )

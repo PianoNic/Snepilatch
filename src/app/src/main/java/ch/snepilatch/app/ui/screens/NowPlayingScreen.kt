@@ -396,6 +396,7 @@ fun NowPlayingScreen(
 
     var showMore by remember { mutableStateOf(false) }
     var showPlaylistPicker by remember { mutableStateOf(false) }
+    var showJam by remember { mutableStateOf(false) }
     val shareContext = LocalContext.current
     val shareTrackLabel = stringResource(R.string.share_track_chooser)
     val canvasVideoUrl by vm.canvasUrl.collectAsState()
@@ -501,9 +502,9 @@ fun NowPlayingScreen(
                                 showMore = showMore,
                                 onShowMore = { showMore = it },
                                 onShowPlaylistPicker = { showPlaylistPicker = true },
+                                onShowJam = { showJam = true },
                                 vm = vm,
                                 track = track,
-                                shareContext = shareContext,
                                 buttonBg = buttonBg
                             )
                         }
@@ -759,9 +760,9 @@ fun NowPlayingScreen(
                                 showMore = showMore,
                                 onShowMore = { showMore = it },
                                 onShowPlaylistPicker = { showPlaylistPicker = true },
+                                onShowJam = { showJam = true },
                                 vm = vm,
                                 track = track,
-                                shareContext = shareContext,
                                 buttonBg = buttonBg
                             )
                         }
@@ -793,6 +794,10 @@ fun NowPlayingScreen(
     } // end Box
 
     // Playlist picker dialog
+    if (showJam) {
+        ch.snepilatch.app.ui.components.JamSheet(onDismiss = { showJam = false })
+    }
+
     if (showPlaylistPicker) {
         val libraryItems by libraryVm.library.collectAsState()
         val playlists = libraryItems.filter { it.type == "playlist" }
@@ -1078,14 +1083,22 @@ private fun PlayerBottomBar(
 
 @Composable
 private fun SourcePill(provider: String?) {
-    val active = provider != null
-    val label = when (provider) {
-        null -> "No CDN"
-        "qobuz" -> "Qobuz"
-        "deezer" -> "Deezer"
+    val jamVm: ch.snepilatch.app.viewmodel.JamViewModel = viewModel()
+    val jam by jamVm.jam.collectAsState()
+    val inJam = jam != null
+    val active = provider != null || inJam
+    val label = when {
+        inJam -> stringResource(R.string.jam_connected)
+        provider == null -> "No CDN"
+        provider == "qobuz" -> "Qobuz"
+        provider == "deezer" -> "Deezer"
         else -> provider.replaceFirstChar { it.uppercase() }
     }
-    val icon = if (active) Icons.Rounded.MusicNote else Icons.Rounded.CloudOff
+    val icon = when {
+        inJam -> Icons.Rounded.Groups
+        active -> Icons.Rounded.MusicNote
+        else -> Icons.Rounded.CloudOff
+    }
     val bgAlpha = if (active) 0.10f else 0.06f
     val fgAlpha = if (active) 1f else 0.55f
     Row(
@@ -1107,9 +1120,9 @@ private fun NowPlayingMenu(
     showMore: Boolean,
     onShowMore: (Boolean) -> Unit,
     onShowPlaylistPicker: () -> Unit,
+    onShowJam: () -> Unit,
     vm: PlaybackViewModel,
     track: ch.snepilatch.app.data.TrackInfo?,
-    shareContext: android.content.Context,
     buttonBg: Color
 ) {
     FilledTonalIconButton(
@@ -1171,6 +1184,8 @@ private fun NowPlayingMenu(
             val visitAlbumLabel = stringResource(R.string.visit_album)
             val songRadioLabel = stringResource(R.string.go_to_song_radio)
             val shareLabel = stringResource(R.string.share)
+            val joinJamLabel = stringResource(R.string.join_jam)
+            val shareContext = LocalContext.current
             val downloadCtx = androidx.compose.ui.platform.LocalContext.current
             val downloadedUris by Downloads.downloaded.collectAsState()
             // In-flight as well as downloaded, like every track row: isDownloaded is still false while
@@ -1218,6 +1233,10 @@ private fun NowPlayingMenu(
                         isDownloaded -> vm.removeDownload(uri)
                         else -> vm.downloadCurrentTrack(downloadCtx)
                     }
+                },
+                Triple(Icons.Rounded.Groups, joinJamLabel) {
+                    onShowMore(false)
+                    onShowJam()
                 },
                 Triple(Icons.Rounded.Share, shareLabel) {
                     onShowMore(false)

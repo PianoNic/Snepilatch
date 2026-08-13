@@ -355,4 +355,16 @@
     <string name="offline_banner">Вы офлайн</string>
     <string name="offline_while_youre_offline">Пока вы офлайн</string>
     <string name="offline_no_downloads">Вы офлайн, и пока ничего не загружено. Загруженные треки появятся здесь.</string>
+    <string name="jam">Джем</string>
+    <string name="jam_join">Присоединиться</string>
+    <string name="jam_joining">Подключение...</string>
+    <string name="jam_leave">Покинуть джем</string>
+    <string name="jam_host">Хост</string>
+    <string name="jam_paste_hint">Вставьте ссылку на джем, которой с вами поделились.</string>
+    <string name="jam_link_placeholder">Ссылка на джем</string>
+    <string name="jam_join_failed">Не удалось присоединиться. Ссылка могла устареть.</string>
+    <string name="jam_not_ready">Ещё подключаемся. Попробуйте через момент.</string>
+    <string name="jam_members">Участников: %1$d</string>
+    <string name="join_jam">Присоединиться к джему</string>
+    <string name="jam_connected">Подключено к джему</string>
 </resources>

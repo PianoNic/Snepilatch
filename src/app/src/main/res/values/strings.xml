@@ -359,4 +359,16 @@
     <string name="offline_banner">You\'re offline</string>
     <string name="offline_while_youre_offline">While you\'re offline</string>
     <string name="offline_no_downloads">You\'re offline and nothing is downloaded yet. Downloaded songs will show up here.</string>
+    <string name="jam">Jam</string>
+    <string name="jam_join">Join</string>
+    <string name="jam_joining">Joining...</string>
+    <string name="jam_leave">Leave jam</string>
+    <string name="jam_host">Host</string>
+    <string name="jam_paste_hint">Paste a jam link someone shared with you.</string>
+    <string name="jam_link_placeholder">Jam link</string>
+    <string name="jam_join_failed">Couldn\'t join that jam. The link may have expired.</string>
+    <string name="jam_not_ready">Still connecting. Try again in a moment.</string>
+    <string name="jam_members">%1$d in this jam</string>
+    <string name="join_jam">Join a jam</string>
+    <string name="jam_connected">Connected to jam</string>
 </resources>

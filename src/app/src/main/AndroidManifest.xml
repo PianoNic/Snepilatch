@@ -62,6 +62,10 @@
                     android:scheme="https"
                     android:host="open.spotify.com"
                     android:pathPrefix="/artist" />
+                <data
+                    android:scheme="https"
+                    android:host="open.spotify.com"
+                    android:pathPrefix="/socialsession" />
             </intent-filter>
         </activity>
 

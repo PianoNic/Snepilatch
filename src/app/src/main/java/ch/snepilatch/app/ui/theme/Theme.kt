@@ -1,56 +1,42 @@
 package ch.snepilatch.app.ui.theme
 
-import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
-)
-
-private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+/**
+ * The app paints itself dark everywhere, so the Material scheme is dark-only — no dynamic colour and
+ * no system-theme switch, both of which would tint components against a background that never changes.
+ *
+ * Without this the app had no [MaterialTheme] at all and Material fell back to its default, which is
+ * the *light* scheme: dialogs and text fields drew near-black text on our dark surfaces.
+ */
+private val SnepilatchColors = darkColorScheme(
+    primary = SpfyGreen,
+    onPrimary = SpfyBlack,
+    secondary = SpfyLightGray,
+    onSecondary = SpfyBlack,
+    background = SpfyBlack,
+    onBackground = SpfyWhite,
+    surface = SpfyBlack,
+    onSurface = SpfyWhite,
+    surfaceVariant = SpfyGray,
+    onSurfaceVariant = SpfyLightGray,
+    surfaceContainer = SpfyElevated,
+    surfaceContainerHigh = SpfyElevated,
+    surfaceContainerHighest = SpfyCardBg,
+    surfaceContainerLow = SpfyDarkGray,
+    surfaceContainerLowest = SpfyBlack,
+    outline = SpfyLightGray,
+    outlineVariant = SpfyGray,
+    error = SpfyError,
+    onError = SpfyWhite
 )
 
 @Composable
-fun SnepilatchTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
-    content: @Composable () -> Unit
-) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
-
+fun SnepilatchTheme(content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = SnepilatchColors,
         typography = Typography,
         content = content
     )

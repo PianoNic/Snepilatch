@@ -852,6 +852,7 @@ class PlaybackViewModel : ViewModel() {
             "album" -> DetailRoutes.openAlbum(id)
             "playlist" -> DetailRoutes.openPlaylist(id)
             "artist" -> DetailRoutes.openArtist(id)
+            "socialsession" -> JamRoutes.join(id)
             else -> LokiLogger.i(TAG, "Unsupported deep link type: $type")
         }
     }

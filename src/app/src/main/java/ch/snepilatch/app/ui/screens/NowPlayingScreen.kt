@@ -1170,7 +1170,6 @@ private fun NowPlayingMenu(
             val viewQueueLabel = stringResource(R.string.view_queue)
             val visitAlbumLabel = stringResource(R.string.visit_album)
             val songRadioLabel = stringResource(R.string.go_to_song_radio)
-            val devicesLabel = stringResource(R.string.devices)
             val shareLabel = stringResource(R.string.share)
             val downloadCtx = androidx.compose.ui.platform.LocalContext.current
             val downloadedUris by Downloads.downloaded.collectAsState()
@@ -1219,9 +1218,6 @@ private fun NowPlayingMenu(
                         isDownloaded -> vm.removeDownload(uri)
                         else -> vm.downloadCurrentTrack(downloadCtx)
                     }
-                },
-                Triple(Icons.Rounded.Devices, devicesLabel) {
-                    onShowMore(false); vm.loadDevices(); vm.showDevices.value = true
                 },
                 Triple(Icons.Rounded.Share, shareLabel) {
                     onShowMore(false)

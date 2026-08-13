@@ -88,8 +88,8 @@ object AppSettings {
         return if (gb <= 0f) null else (gb * 1_000_000_000L).toLong()
     }
 
-    // Player background style: true = album-colour gradient (Spfy/YTM style), false = blurred art.
-    val playerGradientBg = MutableStateFlow(true)
+    // Player background style: true = album-colour gradient, false (default) = flowing album art.
+    val playerGradientBg = MutableStateFlow(false)
 
     // Canvas background toggle (the URL itself is playback state on PlaybackViewModel).
     val canvasEnabled = MutableStateFlow(false)
@@ -140,7 +140,7 @@ object AppSettings {
         eqHeadroomDb.value = prefs.getFloat("eq_headroom_db", -6f)
         eqMode.value = prefs.getString("eq_mode", null) ?: migratedEqMode(prefs)
         eqBands.value = parseBands(prefs.getString("eq_bands", null))
-        playerGradientBg.value = prefs.getBoolean("player_gradient_bg", true)
+        playerGradientBg.value = prefs.getBoolean("player_gradient_bg", false)
         contentRegion.value = prefs.getString("content_region", "nearest") ?: "nearest"
         updateChannel.value = prefs.getString("update_channel", CHANNEL_STABLE) ?: CHANNEL_STABLE
         lokiEndpoint.value = prefs.getString("loki_endpoint", "") ?: ""

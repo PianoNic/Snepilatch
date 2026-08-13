@@ -29,8 +29,9 @@ class EqModeMigrationTest {
     }
 
     @Test
-    fun neitherBecomesOff() {
-        assertEquals(AppSettings.EQ_OFF, AppSettings.migratedEqMode(prefs(inApp = false, headroom = false)))
+    fun neitherLandsOnTheInAppDefault() {
+        // "Neither set" is someone who never opened the screen, so it gets the fresh-install default.
+        assertEquals(AppSettings.EQ_IN_APP, AppSettings.migratedEqMode(prefs(inApp = false, headroom = false)))
     }
 
     @Test

@@ -164,6 +164,7 @@ fun PlaylistInfo.toDetailData(playlistId: String) = DetailData(
     ownerName = owner.name,
     ownerUri = owner.uri,
     followers = followers,
+    savedInLibrary = following,
     tracks = tracks.map { it.toTrackInfo() },
 )
 

@@ -242,6 +242,8 @@ class DetailViewModel : SessionViewModel("DetailVM") {
                 detailSaved.value = when (type) {
                     "album" -> Album(sess).isSaved(id)
                     "artist" -> Artist(sess).isFollowing(id)
+                    // getPlaylist already returned it; asking again would be a second round trip.
+                    "playlist" -> _detail.value.savedInLibrary
                     else -> false
                 }
             } catch (_: Exception) { detailSaved.value = false }
@@ -254,8 +256,19 @@ class DetailViewModel : SessionViewModel("DetailVM") {
             when (type) {
                 "album" -> if (currentlySaved) Album(sess).removeFromLibrary(id) else Album(sess).saveToLibrary(id)
                 "artist" -> if (currentlySaved) Artist(sess).unfollow(id) else Artist(sess).follow(id)
+                // Playlists live in the rootlist, not the generic library, so both sides need the username.
+                "playlist" -> Playlist(sess).let {
+                    if (currentlySaved) {
+                        it.removeFromLibrary(id, SessionHolder.username)
+                    } else {
+                        it.saveToLibrary(id, SessionHolder.username)
+                    }
+                }
             }
             detailSaved.value = !currentlySaved
+            if (type == "playlist") {
+                _detail.value = _detail.value.copy(savedInLibrary = !currentlySaved)
+            }
         }
     }
 

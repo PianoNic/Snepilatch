@@ -60,6 +60,7 @@ data class DetailData(
     val ownerName: String? = null,
     val ownerUri: String? = null,
     val followers: Long? = null,
+    val savedInLibrary: Boolean = false,
     // Artist-specific
     val monthlyListeners: Long? = null,
     val biography: String? = null,

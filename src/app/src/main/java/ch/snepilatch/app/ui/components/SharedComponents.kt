@@ -34,6 +34,7 @@ import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlaylistRemove
+import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.Text
@@ -325,6 +326,7 @@ fun TrackRow(
             val visitAlbumLabel = stringResource(R.string.visit_album)
             val visitArtistLabel = stringResource(R.string.visit_artist)
             val removeFromPlaylistLabel = stringResource(R.string.remove_from_playlist)
+            val songRadioLabel = stringResource(R.string.go_to_song_radio)
             val downloadLabel = if (isDownloaded) {
                 stringResource(R.string.remove_download)
             } else {
@@ -355,6 +357,9 @@ fun TrackRow(
                 },
                 Triple(Icons.Rounded.Favorite, likeLabel) {
                     vm.likeSong(track.uri.removePrefix("spotify:track:")); showMenu = false
+                },
+                Triple(Icons.Rounded.Radio, songRadioLabel) {
+                    showMenu = false; detailVm.openRadio(track.uri)
                 },
                 Triple(Icons.Rounded.Album, visitAlbumLabel) {
                     showMenu = false; detailVm.openAlbumForTrack(track.uri)

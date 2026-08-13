@@ -28,6 +28,8 @@
     <string name="add_to_queue">В очередь</string>
     <string name="add_to_playlist">В плейлист</string>
     <string name="remove_from_playlist">Удалить из плейлиста</string>
+    <string name="go_to_song_radio">Радио по треку</string>
+    <string name="go_to_artist_radio">Радио по исполнителю</string>
     <string name="like">Нравится</string>
     <string name="unlike">Не нравится</string>
     <string name="visit_album">Перейти к альбому</string>

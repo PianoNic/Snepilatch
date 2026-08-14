@@ -50,6 +50,7 @@ import ch.snepilatch.app.data.Screen
 import ch.snepilatch.app.ui.components.BottomNav
 import ch.snepilatch.app.ui.components.DevicesDialog
 import ch.snepilatch.app.ui.components.MiniPlayer
+import ch.snepilatch.app.ui.components.swipeToSkip
 import ch.snepilatch.app.ui.components.MiniPlayerContent
 import ch.snepilatch.app.ui.components.miniCardBaseColor
 import ch.snepilatch.app.ui.components.SpfyImage
@@ -185,6 +186,10 @@ fun SpfyApp(vm: PlaybackViewModel) {
                         .pointerInput(Unit) {
                             detectTapGestures { vm.navigateTo(Screen.NOW_PLAYING) }
                         }
+                        // Swipe the bar, not just its 44dp thumbnail — at that size the artwork is
+                        // too small to aim a swipe at. Horizontal only, so the tap above and the
+                        // vertical expand drag below are unaffected.
+                        .swipeToSkip(onNext = vm::skipNext, onPrevious = vm::skipPrevious)
                         .pointerInput(Unit) {
                             var opened = false
                             // Rolling ~60ms window of (time, y) samples → an honest release

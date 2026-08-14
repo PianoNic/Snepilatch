@@ -52,6 +52,8 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.DialogWindowProvider
 import android.os.Build
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.alpha
@@ -493,6 +495,38 @@ fun ProfileInfoItem(label: String, value: String, icon: ImageVector) {
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     )
 }
+
+/** How far a finger must travel across the artwork before the release counts as a skip. */
+private val SWIPE_TO_SKIP_THRESHOLD = 48.dp
+
+/**
+ * Horizontal swipe over the artwork: left for the next track, right for the previous one.
+ *
+ * Deliberately decides on release against the accumulated distance rather than reacting to a single
+ * frame's [detectHorizontalDragGestures] delta — a slow drag arrives as many small deltas that no
+ * per-frame threshold catches, and a fast one as a couple of huge deltas that would fire twice.
+ *
+ * Claims only the horizontal axis. Compose waits for horizontal touch slop before this gesture wins,
+ * so the vertical drag that expands the mini player and the tap that opens it both still reach the
+ * parent untouched.
+ */
+fun Modifier.swipeToSkip(onNext: () -> Unit, onPrevious: () -> Unit): Modifier =
+    this.pointerInput(onNext, onPrevious) {
+        val threshold = SWIPE_TO_SKIP_THRESHOLD.toPx()
+        var travelled = 0f
+        detectHorizontalDragGestures(
+            onDragStart = { travelled = 0f },
+            onDragEnd = {
+                when {
+                    travelled <= -threshold -> onNext()
+                    travelled >= threshold -> onPrevious()
+                }
+            }
+        ) { change, dragAmount ->
+            travelled += dragAmount
+            change.consume()
+        }
+    }
 
 /**
  * Album cover with spicy-lyrics' cover transition: on [url] change the NEW cover slides in from the

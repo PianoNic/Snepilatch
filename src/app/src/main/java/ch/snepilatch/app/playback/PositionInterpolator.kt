@@ -21,7 +21,15 @@ class PositionInterpolator(
     private val playback: MutableStateFlow<PlaybackUiState>,
     private val isStreaming: StateFlow<Boolean>,
     private val getExoPositionMs: () -> Long?,
-    private val reportPosition: suspend (Long) -> Unit
+    private val reportPosition: suspend (Long) -> Unit,
+    /**
+     * False while the displayed track is one the audio has not switched to yet.
+     *
+     * ExoPlayer is still on the outgoing track during that window, so its position belongs to a
+     * different song — showing it puts the timeline seconds ahead of a track that has not started,
+     * and reporting it tells Spfy the new track is already that far in.
+     */
+    private val isAudioOnDisplayedTrack: () -> Boolean = { true }
 ) {
     private var job: Job? = null
     private var tickCount = 0
@@ -35,6 +43,9 @@ class PositionInterpolator(
             while (true) {
                 delay(TICK_MS)
                 val current = playback.value
+                // Mid-transition: neither advance the timeline nor report. The position we could
+                // read right now is the outgoing track's.
+                if (!isAudioOnDisplayedTrack()) continue
                 if (current.isPlaying && !current.isPaused && current.durationMs > 0) {
                     val newPos = if (isStreaming.value) {
                         getExoPositionMs() ?: (current.positionMs + TICK_MS)

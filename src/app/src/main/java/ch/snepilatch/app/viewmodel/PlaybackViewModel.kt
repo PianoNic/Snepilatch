@@ -249,7 +249,11 @@ class PlaybackViewModel : ViewModel() {
         playback = _playback,
         isStreaming = isStreaming,
         getExoPositionMs = { MusicPlaybackService.instance?.getCurrentPosition() },
-        reportPosition = { pos -> player?.reportPosition(pos, _playback.value.isPaused) ?: Unit }
+        reportPosition = { pos -> player?.reportPosition(pos, _playback.value.isPaused) ?: Unit },
+        // Once the local state machine announces a track, the UI shows it while ExoPlayer is still
+        // finishing the previous one. Its position belongs to that previous track, so it must not be
+        // shown against the new one — nor reported to Spfy as the new track's progress.
+        isAudioOnDisplayedTrack = { localTrackUri == null || currentStreamUri == localTrackUri }
     )
     private var commandJob: Job? = null
     private var userPlayJob: Job? = null  // Cancel an in-flight user-initiated play when another track is tapped

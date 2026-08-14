@@ -45,6 +45,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import ch.snepilatch.app.ui.components.SheetNavBarFix
 import ch.snepilatch.app.ui.components.SpfyImage
+import ch.snepilatch.app.ui.components.swipeToSkip
 import ch.snepilatch.app.ui.components.TightAlertDialog
 import ch.snepilatch.app.ui.components.InfiniPlayTimeline
 import ch.snepilatch.app.ui.components.rememberSmoothPositionMs
@@ -444,7 +445,10 @@ fun NowPlayingScreen(
                             url = displayArtUrl,
                             modifier = Modifier
                                 .fillMaxHeight(0.85f)
-                                .aspectRatio(1f),
+                                .aspectRatio(1f)
+                                // Ahead of the row's drag-right-to-dismiss below: on the artwork a
+                                // horizontal swipe means skip, everywhere else it still closes.
+                                .swipeToSkip(onNext = vm::skipNext, onPrevious = vm::skipPrevious),
                             shape = RoundedCornerShape(16.dp)
                         )
                     }
@@ -684,15 +688,23 @@ fun NowPlayingScreen(
                     Spacer(Modifier.weight(0.3f))
 
                     if (hasCanvas) {
-                        // Invisible placeholder — same size as album art to keep layout stable
-                        Box(Modifier.fillMaxWidth().aspectRatio(1f))
+                        // Invisible placeholder — same size as album art to keep layout stable.
+                        // Still swipeable: in canvas mode the video stands in for the cover, so the
+                        // skip gesture has to live in the same place rather than disappear.
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(1f)
+                                .swipeToSkip(onNext = vm::skipNext, onPrevious = vm::skipPrevious)
+                        )
                     } else {
                         // Album art — large with rounded corners; slides in from the right on song change.
                         ch.snepilatch.app.ui.components.SlidingCoverImage(
                             url = displayArtUrl,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .aspectRatio(1f),
+                                .aspectRatio(1f)
+                                .swipeToSkip(onNext = vm::skipNext, onPrevious = vm::skipPrevious),
                             shape = RoundedCornerShape(16.dp)
                         )
                     }

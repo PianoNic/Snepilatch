@@ -26,8 +26,9 @@ class PositionInterpolator(
      * False while the displayed track is one the audio has not switched to yet.
      *
      * ExoPlayer is still on the outgoing track during that window, so its position belongs to a
-     * different song — showing it puts the timeline seconds ahead of a track that has not started,
-     * and reporting it tells Spfy the new track is already that far in.
+     * different song. While this is false the timeline ticks on its own instead of reading the
+     * player, and nothing is reported upstream — a wrong position sent to Spfy is what every other
+     * client would then display.
      */
     private val isAudioOnDisplayedTrack: () -> Boolean = { true }
 ) {
@@ -43,11 +44,13 @@ class PositionInterpolator(
             while (true) {
                 delay(TICK_MS)
                 val current = playback.value
-                // Mid-transition: neither advance the timeline nor report. The position we could
-                // read right now is the outgoing track's.
-                if (!isAudioOnDisplayedTrack()) continue
                 if (current.isPlaying && !current.isPaused && current.durationMs > 0) {
-                    val newPos = if (isStreaming.value) {
+                    // Mid-transition the audio is still on the outgoing track, so its clock says
+                    // nothing about the track now on screen. Keep the timeline moving on its own
+                    // rather than reading it — a stalled timeline is worse than a slightly
+                    // imprecise one, and it recovers as soon as the new track is loaded.
+                    val audioReady = isAudioOnDisplayedTrack()
+                    val newPos = if (isStreaming.value && audioReady) {
                         getExoPositionMs() ?: (current.positionMs + TICK_MS)
                     } else {
                         current.positionMs + TICK_MS
@@ -55,7 +58,9 @@ class PositionInterpolator(
                     playback.value = current.copy(positionMs = newPos.coerceAtMost(current.durationMs))
 
                     tickCount++
-                    if (isStreaming.value && tickCount % REPORT_EVERY_N_TICKS == 0) {
+                    // Never report across a transition: telling Spfy the outgoing track's position
+                    // as the new track's is what other clients would then render.
+                    if (isStreaming.value && audioReady && tickCount % REPORT_EVERY_N_TICKS == 0) {
                         launch(Dispatchers.IO) {
                             try { reportPosition(newPos) } catch (_: Exception) {}
                         }

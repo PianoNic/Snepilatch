@@ -21,7 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -106,7 +106,9 @@ fun HomeScreen(vm: PlaybackViewModel) {
                         // are disposed/recomposed every time they scroll into view, so an Animatable
                         // fade+slide re-ran (and the offset{} relayed out per frame) on every scroll —
                         // that was the homepage jank. Keys keep item identity stable across scroll.
-                        items(section.items, key = { it.uri }) { item ->
+                        // ponytail: index in the key — some feed items come back with a blank
+                        // uri, and two of those made Compose throw on a duplicate key.
+                        itemsIndexed(section.items, key = { i, item -> "$i-${item.uri}" }) { _, item ->
                             HomeSectionCard(item, vm)
                         }
                     }

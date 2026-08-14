@@ -504,16 +504,19 @@ fun ProfileInfoItem(label: String, value: String, icon: ImageVector) {
 fun SlidingCoverImage(
     url: String?,
     modifier: Modifier = Modifier,
-    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(8.dp)
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(8.dp),
+    trackKey: Any? = url
 ) {
     var currentUrl by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(url) }
+    var currentKey by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(trackKey) }
     var previousUrl by androidx.compose.runtime.remember {
         androidx.compose.runtime.mutableStateOf<String?>(null)
     }
     val anim = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(1f) }
-    androidx.compose.runtime.LaunchedEffect(url) {
-        if (url != currentUrl) {
+    androidx.compose.runtime.LaunchedEffect(trackKey, url) {
+        if (trackKey != currentKey) {
             previousUrl = currentUrl
+            currentKey = trackKey
             currentUrl = url
             anim.snapTo(0f)
             anim.animateTo(
@@ -521,6 +524,12 @@ fun SlidingCoverImage(
                 tween(750, easing = androidx.compose.animation.core.CubicBezierEasing(0.835f, -0.008f, 0.149f, 0.866f))
             )
             previousUrl = null
+        } else if (url != currentUrl) {
+            // Same track, better artwork. An optimistic skip paints the queue entry's `imageUrl`,
+            // then the confirmed state upgrades it to `imageLargeUrl` — a different string for the
+            // same picture. Swap it in place; replaying the entrance would slide the identical
+            // cover in a second time, a beat after the first.
+            currentUrl = url
         }
     }
     // Clip to the cover frame (like spicy's `overflow: hidden` MediaImageContainer) so the incoming

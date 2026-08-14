@@ -132,7 +132,18 @@ class PlaybackViewModel : ViewModel() {
     private var pendingUserPlay = false
     private var nextCdnUrl: String? = null      // Pre-resolved Spfy CDN URL (DRM)
     private var nextCdnFileId: String? = null   // File ID for the pre-resolved CDN track
-    private var lastCommandTs: Long = 0L  // timing: when last user command was sent
+
+    // --- Optimistic skip (see #560) ---------------------------------------------------------
+    // Scaffolding, deliberately confined to `applyOptimisticSkip` and one guard in
+    // updatePlaybackFromState so it can be lifted out wholesale once the local state machine owns
+    // playback state. The web player never needs this: its core walks the state-machine graph on
+    // the spot (Application.ts `_transitionTo`) and the UI renders the new state immediately, with
+    // audio resolution trailing. We wait for the dealer instead, so we stand in for that here.
+    private var optimisticSkipFromUri: String? = null
+    private var optimisticSkipAt: Long = 0L
+
+    // timing: when last user command was sent
+    private var lastCommandTs: Long = 0L
     private var lastCommandName: String = ""
 
     // Diagnostic: wall-clock when the current ad-skip began (onAd). Milestones log deltas against it
@@ -262,6 +273,7 @@ class PlaybackViewModel : ViewModel() {
     val queueSheetVisible: StateFlow<Boolean> = _queueSheetVisible
     // Next track info (always available from WebSocket state for mini player swipe)
     val nextTrackPreview = MutableStateFlow<TrackInfo?>(null)
+    val prevTrackPreview = MutableStateFlow<TrackInfo?>(null)
 
     // Detail state + openers live in DetailViewModel; PlaybackViewModel's deep-link/playback bridges
     // reach them through DetailRoutes.
@@ -983,8 +995,16 @@ class PlaybackViewModel : ViewModel() {
             }
         }
 
-        val displayTrack = if (isTrackMismatch) _playback.value.track else trackInfo
-        val displayDuration = if (isTrackMismatch) _playback.value.durationMs else state.duration
+        // Hold the optimistic track while the dealer is still describing the one we skipped away
+        // from; without this the in-flight push reverts the UI for a frame before the real one lands.
+        val optimisticHold = optimisticSkipFromUri != null &&
+            stateTrackUri == optimisticSkipFromUri &&
+            System.currentTimeMillis() - optimisticSkipAt < OPTIMISTIC_SKIP_WINDOW_MS
+        if (!optimisticHold) optimisticSkipFromUri = null
+
+        val pinDisplay = isTrackMismatch || optimisticHold
+        val displayTrack = if (pinDisplay) _playback.value.track else trackInfo
+        val displayDuration = if (pinDisplay) _playback.value.durationMs else state.duration
 
         _playback.value = PlaybackUiState(
             track = displayTrack,
@@ -1025,7 +1045,7 @@ class PlaybackViewModel : ViewModel() {
 
         // Only update theme/liked/canvas for the track we're ACTUALLY displaying
         val displayUri = displayTrack?.uri
-        if (!isTrackMismatch) {
+        if (!pinDisplay) {
             ThemeController.updateFromArt(imageUrl)
             if (displayUri != null) {
                 checkLikedState(displayUri)
@@ -1035,6 +1055,8 @@ class PlaybackViewModel : ViewModel() {
 
         // Extract next track info for mini player swipe preview
         nextTrackPreview.value = state.next_tracks.firstOrNull()?.toTrackInfo()
+        // prev_tracks runs oldest-first, so the track we'd go back to is the LAST entry.
+        prevTrackPreview.value = state.prev_tracks.lastOrNull()?.toTrackInfo()
 
         if (actuallyPlaying) {
             startPositionTicker()
@@ -1589,7 +1611,29 @@ class PlaybackViewModel : ViewModel() {
         return PlaybackCache.keyFor(trackUri, AppSettings.preferredAudioSource.value)
     }
 
+    /**
+     * Show [to] as the playing track right now, before the dealer confirms it.
+     *
+     * Records which track we left so a state push still describing it can be held off — without that
+     * guard the push lands between the tap and the confirmation and snaps the UI back for a frame.
+     * The window is a backstop: if the skip never lands, truth wins after [OPTIMISTIC_SKIP_WINDOW_MS]
+     * rather than leaving the wrong track on screen forever.
+     */
+    private fun applyOptimisticSkip(to: TrackInfo?) {
+        val target = to ?: return
+        optimisticSkipFromUri = _playback.value.track?.uri
+        optimisticSkipAt = System.currentTimeMillis()
+        _playback.value = _playback.value.copy(
+            track = target,
+            positionMs = 0,
+            durationMs = target.durationMs
+        )
+        // The accent palette is as much of the "did it react" impression as the title is.
+        ThemeController.updateFromArt(target.albumArt)
+    }
+
     fun skipNext() {
+        applyOptimisticSkip(nextTrackPreview.value)
         commandJob?.cancel()
         lastCommandTs = System.currentTimeMillis()
         lastCommandName = "skipNext"
@@ -1614,6 +1658,7 @@ class PlaybackViewModel : ViewModel() {
             return
         }
         val pos = _playback.value.positionMs
+        applyOptimisticSkip(prevTrackPreview.value)
         commandJob?.cancel()
         lastCommandTs = System.currentTimeMillis()
         lastCommandName = "skipPrevious"
@@ -3277,6 +3322,13 @@ class PlaybackViewModel : ViewModel() {
          *  restart the track instead of going to the previous one. Matches the
          *  behavior most music players use. */
         private const val PREV_RESTART_THRESHOLD_MS = 3000L
+
+        /**
+         * How long an optimistic skip outranks the dealer's view. Long enough to cover a slow
+         * confirmation, short enough that a skip which never lands corrects itself rather than
+         * stranding the UI on a track that isn't playing.
+         */
+        private const val OPTIMISTIC_SKIP_WINDOW_MS = 8000L
 
         /** Cap on best-effort localNext() steps when a queue row has no uid (skipToTrack impossible).
          *  Deep no-uid jumps become approximate; we log when capped so the user can tap again. */

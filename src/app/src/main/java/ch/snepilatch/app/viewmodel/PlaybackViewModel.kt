@@ -30,6 +30,7 @@ import ch.snepilatch.app.data.*
 import kotify.api.artist.Artist
 import kotify.api.playerconnect.PlayerConnect
 import kotify.api.playlist.Playlist
+import kotify.api.playerstatus.AdvanceReason
 import kotify.api.playerstatus.DeviceInfo
 import kotify.api.playerstatus.PlayerStateData
 import kotify.api.playerstatus.PlayerTrack
@@ -133,14 +134,9 @@ class PlaybackViewModel : ViewModel() {
     private var nextCdnUrl: String? = null      // Pre-resolved Spfy CDN URL (DRM)
     private var nextCdnFileId: String? = null   // File ID for the pre-resolved CDN track
 
-    // --- Optimistic skip (see #560) ---------------------------------------------------------
-    // Scaffolding, deliberately confined to `applyOptimisticSkip` and one guard in
-    // updatePlaybackFromState so it can be lifted out wholesale once the local state machine owns
-    // playback state. The web player never needs this: its core walks the state-machine graph on
-    // the spot (Application.ts `_transitionTo`) and the UI renders the new state immediately, with
-    // audio resolution trailing. We wait for the dealer instead, so we stand in for that here.
-    private var optimisticSkipFromUri: String? = null
-    private var optimisticSkipAt: Long = 0L
+    // The track the local state machine last announced. It is what the UI shows while streaming; a
+    // cluster frame naming anything else is the network lagging behind a transition we already made.
+    private var localTrackUri: String? = null
 
     // timing: when last user command was sent
     private var lastCommandTs: Long = 0L
@@ -634,6 +630,12 @@ class PlaybackViewModel : ViewModel() {
             if (adSkipStartTs > 0 && event.current?.uri?.startsWith("spotify:ad:") == false) {
                 LokiLogger.i(TAG, "[AdTiming] post-ad onTrackChange -> real track (+${System.currentTimeMillis() - adSkipStartTs}ms from T0)")
             }
+            // Show it immediately. A local transition fires this before anything reaches the network,
+            // so this is the moment the track changed — waiting for the cluster to confirm what our
+            // own state machine already decided is what made skipping feel slow. Ads never surface.
+            event.current?.let { t ->
+                if (!t.uri.startsWith("spotify:ad:")) showLocallyAnnouncedTrack(t.toTrackInfo())
+            }
             // Set latestFileId from cluster state so resolveAndPlay doesn't wait for onPlaybackId
             if (event.currentFileId != null) latestFileId = event.currentFileId
             // Only auto-resolve when we're already streaming (legit track changes
@@ -937,16 +939,7 @@ class PlaybackViewModel : ViewModel() {
         val imageUrl = normalizeSpfyImageUrl(
             track?.imageLargeUrl ?: track?.imageUrl ?: track?.imageSmallUrl
         )
-        val trackInfo = if (track != null) {
-            TrackInfo(
-                uri = track.uri,
-                name = track.name.ifBlank { "Unknown" },
-                artist = track.displayArtist(),
-                albumArt = imageUrl,
-                albumName = track.albumName,
-                durationMs = state.duration
-            )
-        } else null
+        val trackInfo = track?.toTrackInfo(durationMs = state.duration)
 
         // When streaming locally, ExoPlayer is usually the source of truth for
         // play/pause. BUT during a remote pause transition Spfy's state push
@@ -995,14 +988,14 @@ class PlaybackViewModel : ViewModel() {
             }
         }
 
-        // Hold the optimistic track while the dealer is still describing the one we skipped away
-        // from; without this the in-flight push reverts the UI for a frame before the real one lands.
-        val optimisticHold = optimisticSkipFromUri != null &&
-            stateTrackUri == optimisticSkipFromUri &&
-            System.currentTimeMillis() - optimisticSkipAt < OPTIMISTIC_SKIP_WINDOW_MS
-        if (!optimisticHold) optimisticSkipFromUri = null
+        // The local state machine has already told us which track is current (onTrackChange fires on
+        // the transition itself). A cluster frame naming a different one is the network still
+        // catching up, so it does not get to move the display — the same identity check the web
+        // player makes in `_isCurrentStateRef` before applying a server state. No timeout: when the
+        // cluster agrees again the pin simply stops holding.
+        val localPin = isStreaming.value && localTrackUri != null && stateTrackUri != localTrackUri
 
-        val pinDisplay = isTrackMismatch || optimisticHold
+        val pinDisplay = isTrackMismatch || localPin
         val displayTrack = if (pinDisplay) _playback.value.track else trackInfo
         val displayDuration = if (pinDisplay) _playback.value.durationMs else state.duration
 
@@ -1612,28 +1605,24 @@ class PlaybackViewModel : ViewModel() {
     }
 
     /**
-     * Show [to] as the playing track right now, before the dealer confirms it.
+     * Render a track the local state machine just moved to.
      *
-     * Records which track we left so a state push still describing it can be held off — without that
-     * guard the push lands between the tap and the confirmation and snaps the UI back for a frame.
-     * The window is a backstop: if the skip never lands, truth wins after [OPTIMISTIC_SKIP_WINDOW_MS]
-     * rather than leaving the wrong track on screen forever.
+     * This is the whole point of the ownership switch: the transition has happened, so the UI shows
+     * it now and the audio resolution catches up — the order the web player works in. Nothing here
+     * is speculative, which is why the old optimistic scaffolding and its timeout are gone.
      */
-    private fun applyOptimisticSkip(to: TrackInfo?) {
-        val target = to ?: return
-        optimisticSkipFromUri = _playback.value.track?.uri
-        optimisticSkipAt = System.currentTimeMillis()
+    private fun showLocallyAnnouncedTrack(track: TrackInfo) {
+        localTrackUri = track.uri
         _playback.value = _playback.value.copy(
-            track = target,
+            track = track,
             positionMs = 0,
-            durationMs = target.durationMs
+            durationMs = track.durationMs
         )
         // The accent palette is as much of the "did it react" impression as the title is.
-        ThemeController.updateFromArt(target.albumArt)
+        ThemeController.updateFromArt(track.albumArt)
     }
 
     fun skipNext() {
-        applyOptimisticSkip(nextTrackPreview.value)
         commandJob?.cancel()
         lastCommandTs = System.currentTimeMillis()
         lastCommandName = "skipNext"
@@ -1642,7 +1631,9 @@ class PlaybackViewModel : ViewModel() {
             try {
                 val t0 = System.currentTimeMillis()
                 // Local advance (state report, never skip-capped) — the new track loads via onPlaybackId.
-                player?.localNext()
+                // USER_SKIP so the state machine takes its `skip_next` edge rather than the one meant
+                // for a track running out; the two can lead to different places.
+                player?.localNext(AdvanceReason.USER_SKIP)
                 LokiLogger.i(TAG, "[Timing] CMD skipNext API done in ${System.currentTimeMillis() - t0}ms")
             }
             catch (e: CancellationException) { throw e }
@@ -1658,7 +1649,6 @@ class PlaybackViewModel : ViewModel() {
             return
         }
         val pos = _playback.value.positionMs
-        applyOptimisticSkip(prevTrackPreview.value)
         commandJob?.cancel()
         lastCommandTs = System.currentTimeMillis()
         lastCommandName = "skipPrevious"
@@ -3322,13 +3312,6 @@ class PlaybackViewModel : ViewModel() {
          *  restart the track instead of going to the previous one. Matches the
          *  behavior most music players use. */
         private const val PREV_RESTART_THRESHOLD_MS = 3000L
-
-        /**
-         * How long an optimistic skip outranks the dealer's view. Long enough to cover a slow
-         * confirmation, short enough that a skip which never lands corrects itself rather than
-         * stranding the UI on a track that isn't playing.
-         */
-        private const val OPTIMISTIC_SKIP_WINDOW_MS = 8000L
 
         /** Cap on best-effort localNext() steps when a queue row has no uid (skipToTrack impossible).
          *  Deep no-uid jumps become approximate; we log when capped so the user can tap again. */

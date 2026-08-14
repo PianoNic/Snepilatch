@@ -4,6 +4,7 @@ import kotify.api.album.AlbumInfo
 import kotify.api.album.AlbumTrack
 import kotify.api.artist.ArtistInfo
 import kotify.api.artist.ArtistTopTrack
+import kotify.api.playerstatus.PlayerTrack
 import kotify.api.playerstatus.QueueTrack
 import kotify.api.playlist.LikedSong
 import kotify.api.playlist.LikedSongsPage
@@ -126,6 +127,27 @@ fun ArtistTopTrack.toTrackInfo(artistDisplayName: String) = TrackInfo(
 )
 
 /** A track from the dealer cluster_update queue (state.next_tracks / state.prev_tracks). */
+/**
+ * The single way a [PlayerTrack] becomes a [TrackInfo], used by both the local state-machine
+ * announcement and the cluster push.
+ *
+ * They must agree field for field. When each built its own, they picked different artwork sizes for
+ * the same track, and the cover animation — keyed on the URL — replayed the identical image a beat
+ * after the skip.
+ *
+ * [durationMs] is overridable because the cluster carries the authoritative duration alongside the
+ * track rather than inside it.
+ */
+fun PlayerTrack.toTrackInfo(durationMs: Long = this.durationMs) = TrackInfo(
+    uri = uri,
+    name = name.ifBlank { "Unknown" },
+    artist = artistName.orEmpty(),
+    albumArt = ch.snepilatch.app.util.normalizeSpfyImageUrl(imageLargeUrl ?: imageUrl ?: imageSmallUrl),
+    albumName = albumName,
+    durationMs = durationMs,
+    uid = uid,
+)
+
 fun QueueTrack.toTrackInfo() = TrackInfo(
     uri = uri,
     name = name ?: "Unknown",

@@ -240,10 +240,11 @@ fun TrackRow(
     val isPlaying = currentUri == track.uri && playing
     val theme by ThemeController.themeColors.collectAsState()
     val accent = theme.primary
-    // One set for the whole list, so a row costs a lookup rather than a query.
-    val downloadedUris by Downloads.downloaded.collectAsState()
+    // One list for the whole screen, so a row costs a scan rather than a query. Falls back to
+    // title/artist like playback does, so a relinked track's checkmark agrees with what plays.
+    val downloadedRows by Downloads.rows.collectAsState()
     val inFlight by Downloads.inProgress.collectAsState()
-    val isDownloaded = track.uri in downloadedUris
+    val isDownloaded = Downloads.isDownloaded(downloadedRows, track.uri, track.name, track.artist)
     val isDownloading = track.uri in inFlight
 
     Row(

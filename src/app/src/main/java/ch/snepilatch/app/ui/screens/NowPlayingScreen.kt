@@ -1189,12 +1189,14 @@ private fun NowPlayingMenu(
             val joinJamLabel = stringResource(R.string.join_jam)
             val shareContext = LocalContext.current
             val downloadCtx = androidx.compose.ui.platform.LocalContext.current
-            val downloadedUris by Downloads.downloaded.collectAsState()
+            // Falls back to title/artist like playback does, so a relinked track's menu label
+            // agrees with what's actually on disk.
+            val downloadedRows by Downloads.rows.collectAsState()
             // In-flight as well as downloaded, like every track row: isDownloaded is still false while
             // the fetch runs, so without this the entry looked untouched and a second tap started a
             // second download of the same track.
             val inFlight by Downloads.inProgress.collectAsState()
-            val isDownloaded = track?.uri?.let { it in downloadedUris } == true
+            val isDownloaded = track?.let { Downloads.isDownloaded(downloadedRows, it.uri, it.name, it.artist) } == true
             val isDownloading = track?.uri?.let { it in inFlight } == true
             val downloadLabel = when {
                 isDownloading -> stringResource(R.string.downloading)

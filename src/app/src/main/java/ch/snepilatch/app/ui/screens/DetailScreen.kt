@@ -266,8 +266,10 @@ fun DetailScreen(vm: PlaybackViewModel) {
                 // Albums and playlists are a fixed set of tracks worth keeping; an artist page just
                 // lists their popular songs, so downloading "an artist" means nothing.
                 val downloadable = detail.type in setOf("album", "playlist", "collection")
-                // Flips to a tick once every track is on disk, and then removes them instead.
-                val downloadedUris by Downloads.downloaded.collectAsState()
+                // Flips to a tick once every track is on disk, and then removes them instead. Falls
+                // back to title/artist per track like playback does, so a relinked track that only
+                // matches that way still counts toward "all downloaded".
+                val downloadedRows by Downloads.rows.collectAsState()
                 val inFlight by Downloads.inProgress.collectAsState()
                 val downloading = detail.tracks.any { it.uri in inFlight }
                 // detail.tracks is one loaded page. Downloading it would silently cover the first 50 of
@@ -277,7 +279,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                 // with no confirmation while the rest stayed downloaded.
                 val loadingAll by detailVm.isLoadingAll.collectAsState()
                 val allDownloaded = !hasMore && detail.tracks.isNotEmpty() &&
-                    detail.tracks.all { it.uri in downloadedUris }
+                    detail.tracks.all { Downloads.isDownloaded(downloadedRows, it.uri, it.name, it.artist) }
                 if (downloadable) {
                     IconButton(
                         onClick = {

@@ -205,6 +205,19 @@ object Downloads {
         }
     }
 
+    /**
+     * Whether [trackUri] is downloaded, checking the exact uri first and falling back to
+     * title/artist like [ch.snepilatch.app.playback.AudioSourceResolver.localOrNull] does to
+     * resolve playback. Without this, a track that only matches through the fallback plays from
+     * disk correctly but every checkmark in the UI still called it not downloaded.
+     *
+     * Pure over [rows], like [matchByMetadata]: callers pass whatever [rows] StateFlow snapshot
+     * they already collected, so this stays cheap enough to call per row in a list.
+     */
+    fun isDownloaded(rows: List<DownloadedTrack>, trackUri: String, title: String? = null, artist: String? = null): Boolean =
+        rows.any { it.trackUri == trackUri } ||
+            (!title.isNullOrBlank() && matchByMetadata(rows, title, artist.orEmpty()) != null)
+
     /** Case- and width-insensitive: half- and full-width forms of a title are the same song. */
     private fun normalize(value: String): String =
         java.text.Normalizer.normalize(value.trim(), java.text.Normalizer.Form.NFKC).lowercase()

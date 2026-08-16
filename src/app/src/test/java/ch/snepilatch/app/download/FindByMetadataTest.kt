@@ -1,7 +1,9 @@
 package ch.snepilatch.app.download
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -63,5 +65,34 @@ class FindByMetadataTest {
     @Test
     fun aBlankTitleNeverMatches() {
         assertNull(match("", "GEMN"))
+    }
+
+    // --- isDownloaded: the checkmark's uri-then-metadata lookup, same fallback playback uses ---
+
+    @Test
+    fun isDownloadedMatchesByExactUriRegardlessOfMetadata() {
+        assertTrue(Downloads.isDownloaded(listOf(row), row.trackUri, title = "Some Other Title", artist = "Someone Else"))
+    }
+
+    @Test
+    fun isDownloadedFallsBackToMetadataWhenTheUriDiffers() {
+        assertTrue(
+            Downloads.isDownloaded(
+                listOf(row),
+                trackUri = "spotify:track:relinkedIdNotInTheIndex",
+                title = "ファタール - Fatal",
+                artist = "GEMN, Kento Nakajima, Tatsuya Kitani",
+            )
+        )
+    }
+
+    @Test
+    fun isDownloadedIsFalseWhenNeitherUriNorMetadataMatch() {
+        assertFalse(Downloads.isDownloaded(listOf(row), "spotify:track:notDownloaded", "Another Song", "Nobody"))
+    }
+
+    @Test
+    fun isDownloadedIsFalseForAMissingUriAndNoMetadataToFallBackOn() {
+        assertFalse(Downloads.isDownloaded(listOf(row), "spotify:track:notDownloaded"))
     }
 }

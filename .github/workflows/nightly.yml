@@ -14,7 +14,12 @@ on:
     # in winter. Publishing a release pings the update role in Discord, so a cut at 02:00 wakes
     # people up. Every three hours across the day is close enough to "as soon as it merged".
     - cron: "0 7,10,13,16,19 * * *"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Cut one even if main has not moved since the last nightly"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -44,10 +49,21 @@ jobs:
         run: |
           set -e
           LAST_TAG=$(git tag -l 'v*-nightly.*' --sort=-creatordate | head -1)
+          UNCHANGED=false
           if [ -n "$LAST_TAG" ] && [ "$(git rev-list -n1 "$LAST_TAG")" = "$(git rev-parse HEAD)" ]; then
-            echo "No commits on main since $LAST_TAG — skipping this cut."
+            UNCHANGED=true
+          fi
+          # The skip exists so a quiet day produces nothing on the schedule. A human asking for a
+          # build has already decided it is worth one, so force overrides it: the tag number is
+          # scoped per base version, not per commit, so re-cutting the same commit is a valid
+          # nightly rather than a collision.
+          if [ "$UNCHANGED" = "true" ] && [ "${{ inputs.force }}" != "true" ]; then
+            echo "No commits on main since $LAST_TAG, skipping this cut."
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
+          fi
+          if [ "$UNCHANGED" = "true" ]; then
+            echo "Forced: cutting a nightly even though main has not moved since $LAST_TAG."
           fi
           echo "skip=false" >> "$GITHUB_OUTPUT"
           # Mirror release-drafter's draft rather than inventing a version: it already resolves the

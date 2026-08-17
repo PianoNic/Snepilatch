@@ -1,6 +1,8 @@
 package ch.snepilatch.app.ui.components
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.SystemUpdate
@@ -146,10 +148,14 @@ fun UpdateDialog(
                             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                         )
                     ) {
-                        Text(
-                            updateInfo.releaseNotes.take(500),
-                            modifier = Modifier.padding(12.dp),
-                            style = MaterialTheme.typography.bodySmall
+                        // Scrolled rather than truncated: take(500) used to cut a
+                        // changelog mid-word, and the last entries are the newest.
+                        MarkdownText(
+                            updateInfo.releaseNotes,
+                            modifier = Modifier
+                                .heightIn(max = 220.dp)
+                                .verticalScroll(rememberScrollState())
+                                .padding(12.dp)
                         )
                     }
                 }

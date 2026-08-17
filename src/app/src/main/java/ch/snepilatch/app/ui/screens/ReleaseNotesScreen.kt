@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
+import ch.snepilatch.app.ui.components.MarkdownText
 import ch.snepilatch.app.ui.components.TightAlertDialog
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.util.UpdateService
@@ -93,53 +94,6 @@ private fun ReleaseNoteCard(note: ReleaseNote, isLatest: Boolean) {
             }
         }
     }
-}
-
-@Composable
-private fun MarkdownText(markdown: String) {
-    // Simple markdown rendering: headers, bullets, bold, links
-    val lines = markdown.lines()
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        for (line in lines) {
-            val trimmed = line.trim()
-            when {
-                trimmed.isEmpty() -> Spacer(Modifier.height(4.dp))
-                trimmed.startsWith("### ") -> Text(
-                    trimmed.removePrefix("### "),
-                    color = SpfyWhite, fontSize = 14.sp, fontWeight = FontWeight.SemiBold
-                )
-                trimmed.startsWith("## ") -> Text(
-                    trimmed.removePrefix("## "),
-                    color = SpfyWhite, fontSize = 15.sp, fontWeight = FontWeight.Bold
-                )
-                trimmed.startsWith("# ") -> Text(
-                    trimmed.removePrefix("# "),
-                    color = SpfyWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold
-                )
-                trimmed.startsWith("- ") || trimmed.startsWith("* ") -> Text(
-                    "  •  ${trimmed.drop(2).cleanMarkdown()}",
-                    color = SpfyLightGray, fontSize = 14.sp, lineHeight = 20.sp
-                )
-                trimmed.startsWith("> ") -> Text(
-                    trimmed.removePrefix("> ").cleanMarkdown(),
-                    color = SpfyLightGray.copy(alpha = 0.7f), fontSize = 13.sp,
-                    modifier = Modifier.padding(start = 12.dp)
-                )
-                else -> Text(
-                    trimmed.cleanMarkdown(),
-                    color = SpfyLightGray, fontSize = 14.sp, lineHeight = 20.sp
-                )
-            }
-        }
-    }
-}
-
-private fun String.cleanMarkdown(): String {
-    return this
-        .replace(Regex("\\*\\*(.+?)\\*\\*"), "$1")  // bold
-        .replace(Regex("\\*(.+?)\\*"), "$1")          // italic
-        .replace(Regex("\\[(.+?)]\\(.+?\\)"), "$1")  // links
-        .replace(Regex("`(.+?)`"), "$1")               // inline code
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

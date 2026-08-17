@@ -225,10 +225,17 @@ jobs:
 
           timestamp = release_published if release_published else datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
 
+          # "App Updatez" role, rather than the whole server. Discord only turns a mention into a
+          # notification when it is the numeric form AND allowed_mentions names the role — the literal
+          # text "@App Updatez" posts fine and notifies nobody. parse is emptied so the release notes,
+          # which are arbitrary text from the changelog, can never smuggle an @everyone back in.
+          UPDATE_ROLE_ID = "1538597433775358062"
+
           payload = {
-              "content": "||@everyone||",
+              "content": f"||<@&{UPDATE_ROLE_ID}>||",
               "allowed_mentions": {
-                  "parse": ["everyone"]
+                  "parse": [],
+                  "roles": [UPDATE_ROLE_ID]
               },
               "embeds": [{
                   "title": f"📱 New Release — {release_tag}",

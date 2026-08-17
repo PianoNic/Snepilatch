@@ -197,6 +197,17 @@ jobs:
           description = re.sub(r"^## What's Changed\n*", '', description, flags=re.MULTILINE)
           description = re.sub(r'\*\*Full Changelog[:\*].*', '', description, flags=re.DOTALL)
           description = re.sub(r'📝 \*\*Note:\*\*.*\n*', '', description)
+
+          # GitHub's generated notes end every line with a bare pull request url, which in
+          # an embed means each entry is mostly url. Mask them as #number pointing at the
+          # same place. The lookbehind leaves anything already written as [text](url) alone,
+          # and the compare link in the footer is neither a pull nor an issue url, so it
+          # survives untouched.
+          description = re.sub(
+              r'(?<!\()(https://github\.com/[^/\s]+/[^/\s]+/(?:pull|issues)/(\d+))',
+              r'[#\2](\1)',
+              description,
+          )
           description = description.strip()
 
           if not description:

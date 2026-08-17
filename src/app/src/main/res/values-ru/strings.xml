@@ -109,7 +109,7 @@
     <string name="whats_new">Что нового:</string>
     <string name="update_now">Обновить</string>
     <string name="later">Позже</string>
-    <string name="nightly_build_warning">⚠️ Ночная сборка — непроверенная и может быть нестабильной. Видна только пользователям канала обновлений Nightly. Используйте на свой риск.</string>
+    <string name="nightly_build_warning">⚠️ Ночная сборка. Непроверенная, вероятно с ошибками. Используйте на свой риск.</string>
     <string name="enable_unknown_apps">Разрешите Snepilatch устанавливать приложения в открывшихся настройках, затем снова нажмите «Обновить».</string>
 
     <!-- Devices -->

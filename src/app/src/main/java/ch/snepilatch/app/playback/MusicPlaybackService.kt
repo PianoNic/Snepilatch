@@ -138,6 +138,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     private var currentAudioSessionId: Int = 0
     private var openAudioEffectSession = false
 
+    /** Whether startForeground has actually been accepted; see ensureForeground. */
+    private var isForeground = false
+
     // Callbacks for forwarding controls to Spfy
     var onPlay: (() -> Unit)? = null
     var onPause: (() -> Unit)? = null
@@ -500,13 +503,45 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         instance = this
         serviceReady.value = true
 
-        // Start foreground immediately with a placeholder notification
-        startForeground(NOTIFICATION_ID, buildNotification())
+        // Best effort. See ensureForeground: this is not allowed to throw here.
+        ensureForeground()
         LokiLogger.i(TAG, "Service created with MediaBrowserServiceCompat")
     }
 
+    /**
+     * Promote to a foreground service, tolerating a refusal.
+     *
+     * Android 12+ throws `ForegroundServiceStartNotAllowedException` when a service is
+     * created from the background, and a sticky restart after the process dies is
+     * exactly that. Throwing from `onCreate` took the process down, the system restarted
+     * the service, and it threw again: a crash loop where the launcher icon did nothing
+     * and the only way out was force-stopping the app.
+     *
+     * Playback can wait for a user action, which is when the promotion succeeds. A crash
+     * loop cannot recover on its own, so a refusal is logged and the service simply stays
+     * in the background.
+     */
+    private fun ensureForeground() {
+        if (isForeground) return
+        try {
+            startForeground(NOTIFICATION_ID, buildNotification())
+            isForeground = true
+        } catch (e: Exception) {
+            // Caught broadly on purpose: the specific exception is API 31+, and any
+            // failure here has the same correct response, which is to carry on.
+            LokiLogger.w(
+                TAG,
+                "startForeground refused (${e::class.simpleName}: ${e.message}); " +
+                    "staying in the background until playback starts"
+            )
+        }
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        return START_STICKY
+        // Not sticky. A restarted media service arrives with no intent and no media, so
+        // it cannot resume anything, and being recreated in the background is what put
+        // startForeground in an illegal position in the first place.
+        return START_NOT_STICKY
     }
 
     var onReady: (() -> Unit)? = null
@@ -1269,6 +1304,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     }
 
     fun updateNotification() {
+        // If onCreate was refused, this is where the promotion finally lands: a
+        // notification update follows a real playback change, which is a user action.
+        ensureForeground()
         updatePlaybackState()
         updateMediaSessionMetadata()
         val nm = getSystemService(NotificationManager::class.java)

@@ -1,14 +1,18 @@
 name: Cut a Nightly Build
 
-# Twice a day (see the cron below — times are UTC; adjust if you want a specific local time), plus
-# workflow_dispatch for a manual cut. Skips entirely if main hasn't moved since the last nightly.
+# Five checks a day, plus workflow_dispatch for a manual cut. Skips entirely if main hasn't moved
+# since the last nightly, so a quiet day still produces nothing and the extra checks cost nothing.
+# Checking often is the point: the gap between merging something and having a build to test on a
+# phone is the gap this closes.
+#
 # Tags and publishes a prerelease (vX.Y.Z-nightly.N, where X.Y.Z mirrors release-drafter's draft and
 # N is scoped to it), then calls build-apk.yml directly to build and upload the APK. It never
-# publishes the draft itself — that stays a deliberate, human step. See CLAUDE.md "Versioning".
+# publishes the draft itself, which stays a deliberate human step. See CLAUDE.md "Versioning".
 on:
   schedule:
-    - cron: "0 0 * * *"
-    - cron: "0 12 * * *"
+    # UTC. Roughly every five hours, which lands at 02:00, 07:00, 12:00, 17:00 and 22:00 in
+    # Switzerland during summer time, so a merge is rarely more than a few hours from a build.
+    - cron: "0 0,5,10,15,20 * * *"
   workflow_dispatch: {}
 
 permissions:

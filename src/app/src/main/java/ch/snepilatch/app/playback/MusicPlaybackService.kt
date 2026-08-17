@@ -671,12 +671,27 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         }
     }
 
+    /**
+     * Whether ExoPlayer still holds something [syncPlay] could resume.
+     *
+     * Callers decide between resuming what is loaded and re-resolving the stream from scratch, and
+     * the answer is not the same as "the app thinks it is streaming" — the service can be reclaimed
+     * or the player released while paused, leaving that flag stale.
+     *
+     * Main thread only: ExoPlayer is confined to the thread that created it.
+     */
+    fun hasLoadedMedia(): Boolean = player.mediaItemCount > 0
+
     fun syncPlay(positionMs: Long) {
         mainHandler.post {
             if (player.mediaItemCount > 0) {
                 player.seekTo(positionMs)
                 player.play()
                 updateNotification()
+            } else {
+                // Silence here was a resume that reported itself as succeeding while never asking for
+                // audio, which left nothing in the log to explain a play button that did nothing.
+                LokiLogger.w(TAG, "syncPlay ignored — ExoPlayer holds no media (caller should cold start)")
             }
         }
     }

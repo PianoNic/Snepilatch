@@ -1217,7 +1217,14 @@ class PlaybackViewModel : ViewModel() {
                     return@launch
                 }
                 if (action == "resume") {
-                    if (isStreaming.value) {
+                    // `isStreaming` says we loaded a stream at some point, not that ExoPlayer still
+                    // holds it: the service can be reclaimed or the player released while paused, and
+                    // nothing clears the flag when that happens. Resuming on the flag alone flipped the
+                    // UI to playing and reported the position to Spfy while `syncPlay` silently
+                    // returned — a play button that did nothing, however many times it was tapped.
+                    val canResumeLoaded = isStreaming.value &&
+                        withContext(Dispatchers.Main) { MusicPlaybackService.instance?.hasLoadedMedia() == true }
+                    if (canResumeLoaded) {
                         // Hot path: ExoPlayer is already loaded — flip the UI to playing
                         // and start audio locally + sync Spfy Connect.
                         _playback.value = _playback.value.copy(isPlaying = true, isPaused = false)
@@ -1226,6 +1233,13 @@ class PlaybackViewModel : ViewModel() {
                         // Local state report — never fails the way a command can, so no transfer/retry needed.
                         p.localResume(_playback.value.positionMs)
                     } else {
+                        if (isStreaming.value) {
+                            // The stream is gone underneath us; drop the claim so the cold start below
+                            // reloads rather than trusting what it finds.
+                            LokiLogger.w(TAG, "resume: streaming flag set but ExoPlayer has no media — cold starting")
+                            isStreaming.value = false
+                            currentStreamUri = null
+                        }
                         // Cold start: nothing loaded in ExoPlayer yet. Mirror the Spfy
                         // web player's protocol — fetch track metadata directly (no WS,
                         // no Spfy state changes), claim the device with

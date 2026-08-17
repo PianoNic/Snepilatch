@@ -58,8 +58,12 @@ class PlaybackTestRig {
      * Put the VM into "streaming locally" state so handleRemote* exercise the
      * streaming branches. The default state is "not streaming".
      */
-    fun seedStreaming(positionMs: Long = 0L, isPaused: Boolean = false) {
+    fun seedStreaming(positionMs: Long = 0L, isPaused: Boolean = false, hasLoadedMedia: Boolean = true) {
         vm.isStreaming.value = true
+        // Streaming and "ExoPlayer still holds the media" are separate facts; resume checks the second
+        // one. Default to loaded so this stays "we are playing normally", and pass false for the case
+        // where the service lost the media while the flag stayed set.
+        every { service.hasLoadedMedia() } returns hasLoadedMedia
         vm._playback.value = PlaybackUiState(
             track = TrackInfo(uri = "spotify:track:test", name = "Test", artist = "Tester", albumArt = null, durationMs = 200_000),
             isPlaying = !isPaused,

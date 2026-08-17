@@ -151,6 +151,19 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     var onShuffleToggle: (() -> Unit)? = null
     var onRepeatToggle: (() -> Unit)? = null
 
+    /**
+     * Audio focus moved, so tell Spfy where we now stand — and nothing else.
+     *
+     * These are deliberately not [onPlay]/[onPause]: those are wired to a *toggle*, which decides
+     * from UI state rather than from the event, and which drives the local player. ExoPlayer already
+     * owns focus ([setAudioAttributes] with `handleAudioFocus = true`): it suppresses itself on a
+     * transient loss and resumes itself when focus returns. Re-issuing a local resume on top is what
+     * took focus straight back off whatever app had asked for it. All that is left for us is the
+     * report, because Spfy's cloud clock keeps advancing while our audio is muted.
+     */
+    var onAudioFocusPaused: (() -> Unit)? = null
+    var onAudioFocusResumed: (() -> Unit)? = null
+
     // Notification custom button state
     var isLiked: Boolean = false
     var isShuffling: Boolean = false
@@ -163,10 +176,6 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     // Which extra buttons to show: "like", "shuffle", "repeat"
     var notificationLeftButton: String = "repeat"
     var notificationRightButton: String = "like"
-
-    /** True while playback is paused because another app holds transient audio focus.
-     *  Used to auto-resume Spfy when focus returns. */
-    private var wasSuppressedByFocus = false
 
     // Control-plane keep-awake. ExoPlayer's WAKE_MODE_NETWORK only holds a wake/Wi-Fi lock while the
     // PLAYER needs the network (i.e. buffering); once a track is buffered it lets the radio sleep. But
@@ -325,33 +334,33 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                     openAudioEffectSession = false
                 }
 
-                // Full (permanent) audio focus loss — e.g. phone call answered.
-                // ExoPlayer flips playWhenReady to false. Mirror to Spfy side.
+                // Permanent focus loss (a call answered, another app taking over): ExoPlayer clears
+                // playWhenReady and will not come back on its own, which is correct. Report it.
                 if (!playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS) {
-                    LokiLogger.i(TAG, "Pausing Spfy side due to audio focus loss")
-                    onPause?.invoke()
+                    LokiLogger.i(TAG, "Audio focus lost for good — reporting pause to Spfy")
+                    onAudioFocusPaused?.invoke()
                 }
             }
 
+            /**
+             * Transient focus loss and its return, reported to Spfy and nothing more.
+             *
+             * ExoPlayer handles the focus itself — it suppresses playback here and un-suppresses when
+             * focus comes back. The only thing it cannot know is that we are also a Spfy Connect
+             * device whose cloud clock keeps advancing while our audio is muted; left unreported the
+             * track "finishes" server-side and the next one auto-plays over whatever app took focus.
+             *
+             * So this reports and never commands. Driving the local player from here is what made the
+             * app un-shareable: resuming on focus return re-requested focus and took it straight back
+             * off the other app.
+             */
             override fun onPlaybackSuppressionReasonChanged(playbackSuppressionReason: Int) {
-                // Transient focus loss (e.g. Instagram video starts) — ExoPlayer keeps
-                // playWhenReady = true but suppresses playback. Spfy's cloud position
-                // keeps advancing though, so we must mirror the pause to the Spfy side
-                // — otherwise the muted track ends and the next one auto-plays over the
-                // focus-stealing app. Resume both sides when focus returns.
-                when (playbackSuppressionReason) {
-                    Player.PLAYBACK_SUPPRESSION_REASON_TRANSIENT_AUDIO_FOCUS_LOSS -> {
-                        LokiLogger.i(TAG, "Pausing Spfy side due to transient focus loss")
-                        wasSuppressedByFocus = true
-                        onPause?.invoke()
-                    }
-                    Player.PLAYBACK_SUPPRESSION_REASON_NONE -> {
-                        if (wasSuppressedByFocus) {
-                            wasSuppressedByFocus = false
-                            LokiLogger.i(TAG, "Resuming Spfy side — transient focus restored")
-                            onPlay?.invoke()
-                        }
-                    }
+                if (playbackSuppressionReason == Player.PLAYBACK_SUPPRESSION_REASON_TRANSIENT_AUDIO_FOCUS_LOSS) {
+                    LokiLogger.i(TAG, "Transient focus loss — reporting pause to Spfy")
+                    onAudioFocusPaused?.invoke()
+                } else {
+                    LokiLogger.i(TAG, "Playback no longer suppressed — reporting play to Spfy")
+                    onAudioFocusResumed?.invoke()
                 }
             }
 

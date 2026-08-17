@@ -2172,10 +2172,38 @@ class PlaybackViewModel : ViewModel() {
         wirePlaybackLifecycleCallbacks(svc)
     }
 
+    /**
+     * ExoPlayer suppressed itself because another app took audio focus. Tell Spfy, touch nothing else.
+     *
+     * No `syncPause` here: the audio has already stopped, and issuing a local transport command is
+     * what used to re-request focus and yank it back off the other app. Internal for the test rig.
+     */
+    internal fun handleAudioFocusPaused() {
+        if (!isStreaming.value) return
+        _playback.value = _playback.value.copy(isPlaying = false, isPaused = true)
+        stopPositionTicker()
+        launchWithPlayer("focusPaused") { p -> p.localPause(_playback.value.positionMs) }
+    }
+
+    /**
+     * Focus came back and ExoPlayer resumed on its own. Report that, and again touch nothing else.
+     *
+     * Fires on every un-suppression, so it must be safe to run when we were never suppressed —
+     * reporting the position we are already at is a no-op as far as Spfy is concerned.
+     */
+    internal fun handleAudioFocusResumed() {
+        if (!isStreaming.value) return
+        _playback.value = _playback.value.copy(isPlaying = true, isPaused = false)
+        startPositionTicker()
+        launchWithPlayer("focusResumed") { p -> p.localResume(_playback.value.positionMs) }
+    }
+
     /** Play / pause / skip / seek — forwarded through KotifyClient's local-device transport (uncapped). */
     private fun wireTransportCallbacks(svc: MusicPlaybackService) {
         svc.onPlay = { togglePlayPause() }
         svc.onPause = { togglePlayPause() }
+        svc.onAudioFocusPaused = { handleAudioFocusPaused() }
+        svc.onAudioFocusResumed = { handleAudioFocusResumed() }
         svc.onSkipNext = {
             viewModelScope.launch(Dispatchers.IO) {
                 try { player?.localNext() }

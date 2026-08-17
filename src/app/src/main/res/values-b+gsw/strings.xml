@@ -122,7 +122,7 @@
     <string name="whats_new">Was isch neu:</string>
     <string name="update_now">Jetz aktualisiere</string>
     <string name="later">Spöter</string>
-    <string name="nightly_build_warning">Das isch en Nightly-Build — ungprüeft und chönnt instabil si. Nutzig uf eigeni Gfahr.</string>
+    <string name="nightly_build_warning">⚠️ Nightly-Build — ungprüeft und chönnt instabil si. Nur sichtbar für Lüt uf em Nightly-Update-Kanal. Nutzig uf eigeni Gfahr.</string>
     <string name="enable_unknown_apps">Erlaub Snepilatch i de aktuelle Iistellige s Installiere vo Apps und tipp de wieder uf Jetz aktualisiere.</string>
 
     <!-- Devices -->

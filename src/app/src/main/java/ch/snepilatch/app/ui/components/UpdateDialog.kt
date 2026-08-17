@@ -90,11 +90,8 @@ fun UpdateDialog(
                             modifier = Modifier.padding(12.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(
-                                Icons.Rounded.ErrorOutline,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onErrorContainer
-                            )
+                            // No Icon here: the string leads with a warning glyph, and an
+                            // ErrorOutline next to it read as two warnings stacked.
                             Text(
                                 stringResource(R.string.nightly_build_warning),
                                 color = MaterialTheme.colorScheme.onErrorContainer,

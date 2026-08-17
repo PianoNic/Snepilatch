@@ -10,9 +10,10 @@ name: Cut a Nightly Build
 # publishes the draft itself, which stays a deliberate human step. See CLAUDE.md "Versioning".
 on:
   schedule:
-    # UTC. Roughly every five hours, which lands at 02:00, 07:00, 12:00, 17:00 and 22:00 in
-    # Switzerland during summer time, so a merge is rarely more than a few hours from a build.
-    - cron: "0 0,5,10,15,20 * * *"
+    # UTC, and deliberately inside waking hours: 09:00 to 21:00 Swiss summer time, 08:00 to 20:00
+    # in winter. Publishing a release pings the update role in Discord, so a cut at 02:00 wakes
+    # people up. Every three hours across the day is close enough to "as soon as it merged".
+    - cron: "0 7,10,13,16,19 * * *"
   workflow_dispatch: {}
 
 permissions:

@@ -114,7 +114,7 @@
     <string name="whats_new">What\'s new:</string>
     <string name="update_now">Update Now</string>
     <string name="later">Later</string>
-    <string name="nightly_build_warning">This is a nightly build — unreviewed and may be unstable. Install at your own risk.</string>
+    <string name="nightly_build_warning">⚠️ Nightly build — unreviewed and may be unstable. Only visible to users on the Nightly update channel. Install at your own risk.</string>
     <string name="enable_unknown_apps">Allow Snepilatch to install apps in the settings that just opened, then tap Update Now again.</string>
 
     <!-- Devices -->

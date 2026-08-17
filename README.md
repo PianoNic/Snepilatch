@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://github.com/PianoNic/Snepilatch/stargazers"><img src="https://img.shields.io/github/stars/PianoNic/Snepilatch?style=flat&color=1DB954" alt="Stars"/></a>
   <a href="https://github.com/PianoNic/Snepilatch/releases"><img src="https://img.shields.io/github/v/release/PianoNic/Snepilatch?include_prereleases&color=1DB954&label=Latest" alt="Release"/></a>
-  <a href="https://discord.gg/NJxKMSNYRG"><img src="https://img.shields.io/discord/1288927764787752990?color=5865F2&label=Discord&logo=discord&logoColor=white" alt="Discord"/></a>
+  <a href="https://discord.gg/NJxKMSNYRG"><img src="https://img.shields.io/discord/1421178590027841618?color=5865F2&label=Discord&logo=discord&logoColor=white" alt="Discord"/></a>
 </p>
 
 <p align="center">

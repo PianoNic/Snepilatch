@@ -87,7 +87,7 @@ jobs:
             --title "${{ steps.tag.outputs.tag }}" \
             --prerelease \
             --generate-notes \
-            --notes "⚠️ **Nightly build** — unreviewed and may be unstable. Only visible to users on the Nightly update channel. Install at your own risk."
+            --notes "⚠️ Nightly build. Unreviewed, probably buggy. Install at your own risk."
 
   build:
     needs: cut-nightly

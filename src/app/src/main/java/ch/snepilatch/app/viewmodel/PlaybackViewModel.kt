@@ -2173,28 +2173,31 @@ class PlaybackViewModel : ViewModel() {
     }
 
     /**
-     * ExoPlayer suppressed itself because another app took audio focus. Tell Spfy, touch nothing else.
+     * Audio focus moved, so report it to Spfy — and *only* report it.
      *
-     * No `syncPause` here: the audio has already stopped, and issuing a local transport command is
-     * what used to re-request focus and yank it back off the other app. Internal for the test rig.
+     * Both directions deliberately leave [_playback] and ExoPlayer alone, because the echo does that
+     * work already: Spfy pushes the new state straight back, and [handleRemotePause]/[handleRemotePlay]
+     * are what pause and resume the local player. Two earlier attempts got this wrong from opposite
+     * sides. Driving the local player from here re-requested audio focus and took it back off the app
+     * that had asked for it. Then merely pre-setting `isPaused = false` here was just as bad: the echo
+     * arrives, [handleRemotePlay] finds the flag already cleared, its `isPaused` guard fails and the
+     * audio never restarts — Spfy shows playing while the phone stays silent.
+     *
+     * Internal for the test rig.
      */
     internal fun handleAudioFocusPaused() {
         if (!isStreaming.value) return
-        _playback.value = _playback.value.copy(isPlaying = false, isPaused = true)
-        stopPositionTicker()
         launchWithPlayer("focusPaused") { p -> p.localPause(_playback.value.positionMs) }
     }
 
     /**
-     * Focus came back and ExoPlayer resumed on its own. Report that, and again touch nothing else.
+     * Focus came back. Report it and let the echo restart the audio, per [handleAudioFocusPaused].
      *
-     * Fires on every un-suppression, so it must be safe to run when we were never suppressed —
-     * reporting the position we are already at is a no-op as far as Spfy is concerned.
+     * Fires on every un-suppression, including when we were never suppressed, so it has to be safe to
+     * run spuriously — reporting the position we already hold is a no-op as far as Spfy is concerned.
      */
     internal fun handleAudioFocusResumed() {
         if (!isStreaming.value) return
-        _playback.value = _playback.value.copy(isPlaying = true, isPaused = false)
-        startPositionTicker()
         launchWithPlayer("focusResumed") { p -> p.localResume(_playback.value.positionMs) }
     }
 

@@ -4,7 +4,6 @@ import io.mockk.coVerify
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.After
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -12,14 +11,14 @@ import org.junit.Test
 /**
  * Regression tests for issue #571: Snepilatch would not let another app play.
  *
- * ExoPlayer is built with `handleAudioFocus = true`, so it owns focus entirely — it suppresses itself
- * on a transient loss and un-suppresses when focus returns. Android's guidance is that an app with
- * automatic handling should contain no code responding to focus changes. Snepilatch had some anyway:
- * on focus return it called `togglePlayPause()`, which resumed the local player, which re-requested
- * focus and took it straight back off whatever app had asked for it.
+ * ExoPlayer is built with `handleAudioFocus = true`, so it owns focus entirely, and Android's guidance
+ * is that an app with automatic handling should contain no code responding to focus changes. Snepilatch
+ * had some anyway: on focus return it called `togglePlayPause()`, which restarted the local player,
+ * re-requested focus and took it straight back off whatever app had asked for it.
  *
- * What remains is a report to Spfy, because we are also a Connect device whose cloud clock keeps
- * advancing while our audio is muted. These tests pin "report, never command".
+ * All that is left is a report to Spfy, because we are also a Connect device whose cloud clock keeps
+ * advancing while our audio is muted. The local player is moved by the *echo* of that report through
+ * [PlaybackViewModel.handleRemotePause] / [PlaybackViewModel.handleRemotePlay], not from here.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AudioFocusReportOnlyTest {
@@ -33,7 +32,7 @@ class AudioFocusReportOnlyTest {
     fun tearDown() = rig.uninstall()
 
     @Test
-    fun focusLoss_reportsPauseToSpfyWithoutTouchingTheLocalPlayer() {
+    fun focusLoss_reportsPauseAndLeavesTheLocalPlayerAlone() {
         rig.seedStreaming(positionMs = 30_000)
 
         rig.vm.handleAudioFocusPaused()
@@ -41,25 +40,41 @@ class AudioFocusReportOnlyTest {
         coVerify(exactly = 1) { rig.player.localPause(30_000) }
         verify(exactly = 0) { rig.service.syncPause() }
         verify(exactly = 0) { rig.service.syncPlay(any()) }
-        assertTrue(rig.vm._playback.value.isPaused)
     }
 
-    /** The actual #571 bug: regaining focus must not start the local player back up. */
     @Test
-    fun focusRegain_reportsPlayToSpfyWithoutRestartingTheLocalPlayer() {
+    fun focusRegain_reportsResumeAndLeavesTheLocalPlayerAlone() {
         rig.seedStreaming(positionMs = 30_000, isPaused = true)
 
         rig.vm.handleAudioFocusResumed()
 
         coVerify(exactly = 1) { rig.player.localResume(30_000) }
         verify(exactly = 0) { rig.service.syncPlay(any()) }
-        assertFalse(rig.vm._playback.value.isPaused)
     }
 
     /**
-     * Un-suppression fires whether or not we were ever suppressed, and while idle there is nothing to
-     * report — an unsolicited resume would claim the device.
+     * The bug that survived the first fix: focus regain must not pre-clear `isPaused`.
+     *
+     * [PlaybackViewModel.handleRemotePlay] only restarts ExoPlayer when it still sees `isPaused`, so
+     * clearing the flag here made the echo a no-op — Spfy showed playing while the phone stayed silent.
      */
+    @Test
+    fun focusRegain_leavesIsPausedSetSoTheEchoStillRestartsTheAudio() {
+        rig.seedStreaming(positionMs = 30_000, isPaused = true)
+
+        rig.vm.handleAudioFocusResumed()
+
+        assertTrue(
+            "isPaused must survive the report, or handleRemotePlay's guard skips syncPlay",
+            rig.vm._playback.value.isPaused
+        )
+
+        // The echo lands and *this* is what restarts the audio.
+        rig.vm.handleRemotePlay(30_000)
+        verify(exactly = 1) { rig.service.syncPlay(30_000) }
+    }
+
+    /** Un-suppression fires whether or not we were suppressed; idle means nothing to report. */
     @Test
     fun focusCallbacksAreInertWhenNotStreaming() {
         rig.vm.handleAudioFocusResumed()

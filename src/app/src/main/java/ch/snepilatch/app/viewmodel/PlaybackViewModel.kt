@@ -2186,10 +2186,41 @@ class PlaybackViewModel : ViewModel() {
         wirePlaybackLifecycleCallbacks(svc)
     }
 
+    /**
+     * Audio focus moved, so report it to Spfy — and *only* report it.
+     *
+     * Both directions deliberately leave [_playback] and ExoPlayer alone, because the echo does that
+     * work already: Spfy pushes the new state straight back, and [handleRemotePause]/[handleRemotePlay]
+     * are what pause and resume the local player. Two earlier attempts got this wrong from opposite
+     * sides. Driving the local player from here re-requested audio focus and took it back off the app
+     * that had asked for it. Then merely pre-setting `isPaused = false` here was just as bad: the echo
+     * arrives, [handleRemotePlay] finds the flag already cleared, its `isPaused` guard fails and the
+     * audio never restarts — Spfy shows playing while the phone stays silent.
+     *
+     * Internal for the test rig.
+     */
+    internal fun handleAudioFocusPaused() {
+        if (!isStreaming.value) return
+        launchWithPlayer("focusPaused") { p -> p.localPause(_playback.value.positionMs) }
+    }
+
+    /**
+     * Focus came back. Report it and let the echo restart the audio, per [handleAudioFocusPaused].
+     *
+     * Fires on every un-suppression, including when we were never suppressed, so it has to be safe to
+     * run spuriously — reporting the position we already hold is a no-op as far as Spfy is concerned.
+     */
+    internal fun handleAudioFocusResumed() {
+        if (!isStreaming.value) return
+        launchWithPlayer("focusResumed") { p -> p.localResume(_playback.value.positionMs) }
+    }
+
     /** Play / pause / skip / seek — forwarded through KotifyClient's local-device transport (uncapped). */
     private fun wireTransportCallbacks(svc: MusicPlaybackService) {
         svc.onPlay = { togglePlayPause() }
         svc.onPause = { togglePlayPause() }
+        svc.onAudioFocusPaused = { handleAudioFocusPaused() }
+        svc.onAudioFocusResumed = { handleAudioFocusResumed() }
         svc.onSkipNext = {
             viewModelScope.launch(Dispatchers.IO) {
                 try { player?.localNext() }

@@ -128,51 +128,74 @@ private fun QueueList(
     queuedCount: Int,
     modifier: Modifier = Modifier,
 ) {
-    val rowKeys = remember(queue) { queueRowKeys(queue) }
-    // Row height is measured rather than assumed, so the drop lands on the row under the finger
-    // even if the row's padding changes later.
+    // Keys ride with their entry, so the preview below can reorder freely without a row's identity
+    // following its position. See queueRowKeys for why a positional key is not enough.
+    val keyed = remember(queue) { queueRowKeys(queue).zip(queue) }
     var dragKey by remember { mutableStateOf<String?>(null) }
+    var dragFrom by remember { mutableIntStateOf(-1) }
     var dragDy by remember { mutableFloatStateOf(0f) }
     var rowHeight by remember { mutableIntStateOf(0) }
 
-    fun dragFor(key: String, track: ch.snepilatch.app.data.TrackInfo, displayIndex: Int) = RowDrag(
+    fun sectionOf(index: Int): IntRange =
+        if (index < queuedCount) 0..(queuedCount - 1) else queuedCount..keyed.lastIndex
+
+    val steps = if (rowHeight > 0) (dragDy / rowHeight).roundToInt() else 0
+    val dragTo = if (dragFrom >= 0) (dragFrom + steps).coerceIn(sectionOf(dragFrom)) else -1
+    // Rows shift as the finger crosses them rather than only on release. Seeing where it will land
+    // is the point of dragging; without it the gesture gives nothing back until it is too late.
+    val shown = if (dragKey != null && dragTo >= 0 && dragTo != dragFrom) {
+        keyed.toMutableList().apply { add(dragTo, removeAt(dragFrom)) }
+    } else {
+        keyed
+    }
+    // What is left after the row has snapped into its previewed slot, so it keeps tracking the
+    // finger instead of jumping a whole row at a time.
+    val carried = if (dragFrom >= 0) dragDy - (dragTo - dragFrom) * rowHeight else 0f
+
+    fun dragFor(key: String, displayIndex: Int) = RowDrag(
         dragging = key == dragKey,
-        offsetY = if (key == dragKey) dragDy else 0f,
+        offsetY = if (key == dragKey) carried else 0f,
         onMeasured = { rowHeight = it },
         onStart = {
             dragKey = key
+            dragFrom = displayIndex
             dragDy = 0f
         },
         onDrag = { dragDy += it },
         onEnd = {
-            val rows = if (rowHeight > 0) (dragDy / rowHeight).roundToInt() else 0
+            val to = dragTo
+            val landed = shown.getOrNull(to)?.second
+            val moved = to != dragFrom
             dragKey = null
+            dragFrom = -1
             dragDy = 0f
-            if (rows != 0) vm.moveQueueEntry(track, displayIndex + rows)
+            if (moved && landed != null) vm.moveQueueEntry(landed, to)
         },
     )
 
-    val upNext = queue.drop(queuedCount)
+    val upNext = shown.drop(queuedCount)
     LazyColumn(modifier, contentPadding = PaddingValues(bottom = 16.dp)) {
         if (queuedCount > 0) {
             item(key = "header-queued") { SectionHeader(stringResource(R.string.queue_next_in_queue)) }
-            itemsIndexed(queue.take(queuedCount), key = { i, _ -> rowKeys[i] }) { i, track ->
+            itemsIndexed(shown.take(queuedCount), key = { _, entry -> entry.first }) { i, entry ->
                 SwipeableQueueRow(
-                    track,
-                    dragFor(rowKeys[i], track, i),
+                    entry.second,
+                    dragFor(entry.first, i),
                     onClick = { vm.skipToQueueIndex(i) },
-                    onRemove = { vm.removeFromQueue(track) },
+                    onRemove = { vm.removeFromQueue(entry.second) },
                 )
             }
         }
         if (upNext.isNotEmpty()) {
             item(key = "header-upnext") { SectionHeader(stringResource(R.string.queue_next_up)) }
-            itemsIndexed(upNext, key = { i, _ -> rowKeys[queuedCount + i] }) { i, track ->
+            itemsIndexed(upNext, key = { _, entry -> entry.first }) { i, entry ->
                 SwipeableQueueRow(
-                    track,
-                    dragFor(rowKeys[queuedCount + i], track, queuedCount + i),
+                    entry.second,
+                    // No grip here: Next up is the context continuing, and the server rebuilds it
+                    // from the playlist, so a write to it is quietly recomputed away.
+                    null,
                     onClick = { vm.skipToQueueIndex(queuedCount + i) },
-                    onRemove = { vm.removeFromQueue(track) },
+                    onRemove = { vm.removeFromQueue(entry.second) },
                 )
             }
         }
@@ -182,7 +205,7 @@ private fun QueueList(
 @Composable
 private fun SwipeableQueueRow(
     track: ch.snepilatch.app.data.TrackInfo,
-    drag: RowDrag,
+    drag: RowDrag?,
     onClick: () -> Unit,
     onRemove: () -> Unit,
 ) {
@@ -192,11 +215,11 @@ private fun SwipeableQueueRow(
         modifier = Modifier
             // The dragged row rides above the rest and follows the finger; everything else
             // holds still until the drop, so the list cannot reflow under the gesture.
-            .zIndex(if (drag.dragging) 1f else 0f)
-            .offset { IntOffset(0, drag.offsetY.roundToInt()) },
+            .zIndex(if (drag?.dragging == true) 1f else 0f)
+            .offset { IntOffset(0, (drag?.offsetY ?: 0f).roundToInt()) },
         onDismiss = { value -> if (value == SwipeToDismissBoxValue.EndToStart) onRemove() },
         // A vertical drag on the grip must not also read as a swipe to delete.
-        enableDismissFromEndToStart = !drag.dragging,
+        enableDismissFromEndToStart = drag?.dragging != true,
         enableDismissFromStartToEnd = false,
         backgroundContent = {
             Box(
@@ -210,7 +233,7 @@ private fun SwipeableQueueRow(
             }
         }
     ) {
-        QueueRow(track, onClick, drag.onMeasured, drag.onStart, drag.onDrag, drag.onEnd)
+        QueueRow(track, onClick, drag)
     }
 }
 
@@ -229,15 +252,12 @@ private fun SectionHeader(title: String) {
 private fun QueueRow(
     track: ch.snepilatch.app.data.TrackInfo,
     onClick: () -> Unit,
-    onMeasured: (Int) -> Unit,
-    onDragStart: () -> Unit,
-    onDrag: (Float) -> Unit,
-    onDragEnd: () -> Unit,
+    drag: RowDrag?,
 ) {
     Row(
         Modifier
             .fillMaxWidth()
-            .onSizeChanged { onMeasured(it.height) }
+            .onSizeChanged { drag?.onMeasured?.invoke(it.height) }
             // Opaque on purpose: the delete panel sits behind every row, so a transparent row shows
             // it through and the whole list reads as though it were mid-swipe.
             .background(SpfyElevated)
@@ -250,27 +270,29 @@ private fun QueueRow(
             Text(track.name, color = SpfyWhite, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(track.artist, color = SpfyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Icon(
-            Icons.Rounded.DragHandle,
-            stringResource(R.string.queue_reorder),
-            tint = SpfyLightGray,
-            modifier = Modifier
-                .padding(start = 8.dp)
-                .size(24.dp)
-                // The grip starts the drag, not the row: a row-wide vertical drag would fight
-                // the list's own scrolling, which is why a touch queue needs a handle at all.
-                .pointerInput(track.qid) {
-                    detectDragGestures(
-                        onDragStart = { onDragStart() },
-                        onDrag = { change, amount ->
-                            change.consume()
-                            onDrag(amount.y)
-                        },
-                        onDragEnd = { onDragEnd() },
-                        onDragCancel = { onDragEnd() },
-                    )
-                }
-        )
+        if (drag != null) {
+            Icon(
+                Icons.Rounded.DragHandle,
+                stringResource(R.string.queue_reorder),
+                tint = SpfyLightGray,
+                modifier = Modifier
+                    .padding(start = 8.dp)
+                    .size(24.dp)
+                    // The grip starts the drag, not the row: a row-wide vertical drag would fight
+                    // the list's own scrolling, which is why a touch queue needs a handle at all.
+                    .pointerInput(track.qid) {
+                        detectDragGestures(
+                            onDragStart = { drag.onStart() },
+                            onDrag = { change, amount ->
+                                change.consume()
+                                drag.onDrag(amount.y)
+                            },
+                            onDragEnd = { drag.onEnd() },
+                            onDragCancel = { drag.onEnd() },
+                        )
+                    }
+            )
+        }
     }
 }
 

@@ -46,7 +46,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -2094,30 +2093,34 @@ class PlaybackViewModel : ViewModel() {
             // Show immediately with what we have
             _queue.value = parsed.map { it.info }
 
-            // Fetch missing metadata concurrently
-            val needFetch = parsed.filter { it.needsFetch }
-            if (needFetch.isNotEmpty()) {
-                val fetched = coroutineScope {
-                    needFetch.map { pt ->
-                        async {
-                            try {
-                                val trackId = pt.uri.removePrefix("spotify:track:")
-                                songApi.getSong(trackId)?.toTrackInfo() ?: pt.info
-                            } catch (e: Exception) {
-                                LokiLogger.e(TAG, "refreshQueue fetch ${pt.uri}", e)
-                                pt.info
-                            }
-                        }
-                    }.awaitAll()
+            // One request for everything the state left blank. Spfy populates metadata for only the
+            // first entry or two, so this used to be one getSong per row, awaited together, with the
+            // slowest setting the delay. The web player sends decorateContextTracks with the uris
+            // instead; measured live, 44 entries came back in 173ms in a single request.
+            val missing = parsed.filter { it.needsFetch }.map { it.uri }.distinct()
+            if (missing.isNotEmpty()) {
+                val started = System.currentTimeMillis()
+                val decorated = try {
+                    songApi.decorateTracks(missing).associateBy { it.uri }
+                } catch (e: Exception) {
+                    LokiLogger.e(TAG, "refreshQueue decorate", e)
+                    emptyMap()
                 }
-
-                // Rebuild the full list with fetched data, preserving UIDs
-                var fetchIdx = 0
-                _queue.value = parsed.map { pt ->
-                    if (pt.needsFetch) {
-                        val f = fetched[fetchIdx++]
-                        f.copy(uid = pt.info.uid ?: f.uid)
-                    } else pt.info
+                LokiLogger.i(
+                    TAG,
+                    "Queue: ${parsed.size} rows, ${missing.size} needed metadata, " +
+                        "${decorated.size} decorated in ${System.currentTimeMillis() - started}ms"
+                )
+                if (decorated.isNotEmpty()) {
+                    _queue.value = parsed.map { pt ->
+                        val d = decorated[pt.uri] ?: return@map pt.info
+                        pt.info.copy(
+                            name = d.name ?: pt.info.name,
+                            artist = d.artistName ?: pt.info.artist,
+                            albumArt = normalizeSpfyImageUrl(d.imageUrl) ?: pt.info.albumArt,
+                            durationMs = if (d.durationMs > 0) d.durationMs else pt.info.durationMs,
+                        )
+                    }
                 }
             }
         }

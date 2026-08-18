@@ -97,6 +97,7 @@ class PlaybackViewModel : ViewModel() {
         get() = SessionHolder.cdnResolver
         set(value) { SessionHolder.cdnResolver = value }
     private var latestFileId: String? = null  // from TrackPlaybackHandler via onPlaybackId
+    private var latestFileIdUri: String? = null  // the track it was issued for; null when unknown
 
     // Direct https audio URLs for external/RSS podcast episodes (no Spfy file id, no DRM), keyed by
     // episode uri and pushed via onExternalUrl. Small bounded cache; hosted content never appears here.
@@ -612,13 +613,26 @@ class PlaybackViewModel : ViewModel() {
      * past the end and instantly kill the track. The web player never hits this — the media element
      * clamps currentTime to [0, duration] — so we ignore any target outside the known duration.
      */
+    private fun rememberFileId(fileId: String, uri: String?) {
+        latestFileId = fileId
+        latestFileIdUri = uri
+    }
+
+    /**
+     * The remembered file id, but only when it was issued for [trackUri]. The cluster routinely sends
+     * a track change carrying no file id, and reusing whichever id arrived last paired one track with
+     * another track's audio when the cluster flapped back to a track it had already left.
+     */
+    private fun fileIdFor(trackUri: String): String? =
+        latestFileId?.takeIf { latestFileIdUri == null || latestFileIdUri == trackUri }
+
     /**
      * The state machine announced the current track's audio file id, with the track it belongs to.
      * Ads never emit one, so this also proves any ad is over. Internal for unit tests.
      */
     internal fun handlePlaybackId(fileId: String, uri: String?) {
         LokiLogger.i(TAG, "Got file ID from state machine: $fileId (${uri ?: "uri unknown"})")
-        latestFileId = fileId
+        rememberFileId(fileId, uri)
         // A tap is waiting on exactly this.
         tapFileId?.let { pending ->
             if (!pending.isCompleted && (uri == null || uri == tapUri)) pending.complete(fileId)
@@ -738,7 +752,7 @@ class PlaybackViewModel : ViewModel() {
                 LokiLogger.i(TAG, "[AdTiming] post-ad onTrackChange -> real track (+${System.currentTimeMillis() - adSkipStartTs}ms from T0)")
             }
             // Set latestFileId from cluster state so resolveAndPlay doesn't wait for onPlaybackId
-            if (event.currentFileId != null) latestFileId = event.currentFileId
+            event.currentFileId?.let { rememberFileId(it, event.current?.uri) }
             // Only auto-resolve when we're already streaming (legit track changes
             // during active playback), OR when the user just tapped a track to
             // play (pendingUserPlay). Otherwise the very first WS push on init
@@ -1693,7 +1707,7 @@ class PlaybackViewModel : ViewModel() {
         // can't leave us reloading the wrong file; latestFileId covers hosted episodes.
         val resolver = cdnResolver ?: return false
         val fileId = safeMediaFileId(failedUri)
-            ?: latestFileId
+            ?: fileIdFor(failedUri)
             ?: resolver.fetchFileIdFromMetadata(failedUri)
             ?: return false
         // Rotate to a DIFFERENT CDN mirror each retry (mirror index = attempt count). storage-resolve
@@ -1970,7 +1984,7 @@ class PlaybackViewModel : ViewModel() {
                     startPlaying = true, pssh = stream.pssh,
                 )
             }
-            latestFileId = fileId
+            rememberFileId(fileId, trackUri)
             currentStreamUri = trackUri
             isStreaming.value = true
             streamProvider.value = "Spotify CDN"
@@ -2752,7 +2766,7 @@ class PlaybackViewModel : ViewModel() {
         // diverging pairs each loaded the identical song). Requiring the URIs to be equal treated that
         // as a mismatch, discarded a valid pre-resolved id and dropped playback to the third-party CDN.
         // The file id itself identifies the audio, so it is the thing worth checking.
-        val currentFileId = event.currentFileId ?: latestFileId
+        val currentFileId = event.currentFileId ?: fileIdFor(trackUri)
         val cachedCdnUrl = if (currentFileId != null && nextCdnFileId == currentFileId) nextCdnUrl else null
         return if (cachedCdnUrl != null) {
             LokiLogger.i(TAG, "SpfyCDN: Using pre-resolved CDN URL (fileId=$currentFileId)")
@@ -2769,8 +2783,8 @@ class PlaybackViewModel : ViewModel() {
                 // endpoint below only offers premium MP4_256 on many accounts, which a free CDM
                 // can't license. Cheap: only runs when the cluster hasn't supplied a file id yet.
                 LokiLogger.d(TAG, "SpfyCDN: Waiting for state-machine file ID...")
-                pollFor(15) { latestFileId != null }
-                fileId = latestFileId
+                pollFor(15) { fileIdFor(trackUri) != null }
+                fileId = fileIdFor(trackUri)
             }
             // Still null: self-resolve. Use the media endpoint only when the file id is
             // licensable for this account (see safeMediaFileId), else metadata/4/track.
@@ -2779,7 +2793,7 @@ class PlaybackViewModel : ViewModel() {
                 fileId = safeMediaFileId(trackUri) ?: resolver.fetchFileIdFromMetadata(trackUri)
                 if (fileId != null) {
                     LokiLogger.i(TAG, "SpfyCDN: Got file ID from self-resolve: $fileId")
-                    latestFileId = fileId
+                    rememberFileId(fileId, trackUri)
                 }
             }
             if (fileId == null) {
@@ -3308,7 +3322,7 @@ class PlaybackViewModel : ViewModel() {
                 }
                 // Hosted: Widevine file id -> CDN + v2 PSSH + license, played like a track.
                 fileId != null -> {
-                    latestFileId = fileId
+                    rememberFileId(fileId, trackUri)
                     val stream = resolver.resolveForFileId(fileId)
                     withContext(Dispatchers.Main) { MusicPlaybackService.instance?.stop() }
                     playUrlAt = System.currentTimeMillis()
@@ -3358,12 +3372,12 @@ class PlaybackViewModel : ViewModel() {
             // avoids racing the state machine and fixes DRM_LICENSE_ACQUISITION_FAILED on podcasts.
             if (resolveEpisodeViaSoundfinder(trackUri, title, artist, art, resolveStart)) return
 
-            var fileId = event.currentFileId ?: latestFileId
+            var fileId = event.currentFileId ?: fileIdFor(trackUri)
             var externalUrl = externalUrlByUri[trackUri]
             if (fileId == null && externalUrl == null) {
                 // Either callback can land just after onTrackChange — give them a moment.
-                pollFor(8) { latestFileId != null || externalUrlByUri[trackUri] != null }
-                fileId = latestFileId
+                pollFor(8) { fileIdFor(trackUri) != null || externalUrlByUri[trackUri] != null }
+                fileId = fileIdFor(trackUri)
                 externalUrl = externalUrlByUri[trackUri]
             }
 
@@ -3387,7 +3401,7 @@ class PlaybackViewModel : ViewModel() {
             // Hosted: Spfy file id → Widevine, exactly like a track.
             if (fileId != null) {
                 val resolver = cdnResolver ?: throw IllegalStateException("CdnResolver not initialized")
-                latestFileId = fileId
+                rememberFileId(fileId, trackUri)
                 val stream = resolver.resolveForFileId(fileId)
                 val coldStart = coldStartPending
                 withContext(Dispatchers.Main) { MusicPlaybackService.instance?.stop() }

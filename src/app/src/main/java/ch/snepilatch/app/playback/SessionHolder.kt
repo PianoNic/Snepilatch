@@ -2,6 +2,7 @@ package ch.snepilatch.app.playback
 
 import ch.snepilatch.app.playback.engine.SpfyCdnResolver
 import kotify.api.playerconnect.PlayerConnect
+import kotify.api.playlist.PlaylistStore
 import kotify.cdn.SpfyPlayback
 import kotify.session.Session
 
@@ -26,6 +27,12 @@ object SessionHolder {
     @Volatile var spfyPlayback: SpfyPlayback? = null
     @Volatile var cdnResolver: SpfyCdnResolver? = null
 
+    /**
+     * Playlist pages, kept until the dealer says they are stale. Process scoped like the session so
+     * a playlist read once stays read across screens rather than per ViewModel.
+     */
+    @Volatile var playlistStore: PlaylistStore? = null
+
     /** The signed-in user's Spfy username. Set during initialize once the profile loads; read by
      *  library mutations (create/delete/save playlist) that need it. */
     @Volatile var username: String = ""
@@ -49,6 +56,8 @@ object SessionHolder {
 
     /** Called on teardown — clears all references without disconnecting. */
     fun clear() {
+        playlistStore?.clear()
+        playlistStore = null
         session = null
         player = null
         spfyPlayback = null

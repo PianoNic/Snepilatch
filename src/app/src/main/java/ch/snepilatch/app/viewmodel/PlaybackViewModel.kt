@@ -514,6 +514,9 @@ class PlaybackViewModel : ViewModel() {
                 // SessionHolder — session/spfyPlayback/cdnResolver are already
                 // live there from the initialization block above.
                 player = pc
+                // Handed the client so it hears the dealer's playlist-changed signal itself; a store
+                // nobody wired up is a cache that never expires.
+                SessionHolder.playlistStore = kotify.api.playlist.PlaylistStore(sess, pc)
                 LokiLogger.i(TAG, "Player ready, device: ${pc.ourDeviceId()}")
                 loadDevices()
 

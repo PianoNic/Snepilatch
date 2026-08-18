@@ -7,6 +7,7 @@ import ch.snepilatch.app.util.LokiLogger
 import kotify.api.album.Album
 import kotify.api.artist.Artist
 import kotify.api.playlist.Playlist
+import kotify.api.playlist.PlaylistInfo
 import kotify.api.podcast.Podcast
 import kotify.api.radio.Radio
 import kotify.api.song.Song
@@ -62,7 +63,49 @@ class DetailViewModel : SessionViewModel("DetailVM") {
     }
 
     fun openPlaylist(playlistId: String) = openDetail(Screen.PLAYLIST_DETAIL, "openPlaylist") { sess ->
-        Playlist(sess).getPlaylist(playlistId, limit = 50).toDetailData(playlistId)
+        playlistPage(sess, playlistId, limit = 50, offset = 0).toDetailData(playlistId)
+    }
+
+    /**
+     * A playlist page from the store, which keeps it until the dealer says it changed. Falls back to
+     * a direct read if the store is not up yet, so opening a playlist never depends on init order.
+     */
+    private suspend fun playlistPage(sess: Session, playlistId: String, limit: Int, offset: Int): PlaylistInfo {
+        val store = SessionHolder.playlistStore?.also { watchForInvalidations(it) }
+        val started = System.currentTimeMillis()
+        val page = store?.page(playlistId, limit, offset)
+            ?: Playlist(sess).getPlaylist(playlistId, limit, offset)
+        // A cached page returns in about no time; a fetched one does not. Worth a line, because
+        // "did that cost a request" is otherwise invisible.
+        LokiLogger.i(
+            logTag,
+            "Playlist $playlistId offset $offset: ${page.tracks.size} tracks in " +
+                "${System.currentTimeMillis() - started}ms${if (store == null) " (no store)" else ""}"
+        )
+        return page
+    }
+
+    private var watchingInvalidations = false
+
+    /**
+     * Refresh the playlist on screen when it changes somewhere else.
+     *
+     * Attached on first use rather than in an init block, because the store is created with the
+     * session and this ViewModel can exist before that. A playlist that is not on screen needs
+     * nothing: its pages are already dropped, so opening it reads fresh.
+     */
+    private fun watchForInvalidations(store: kotify.api.playlist.PlaylistStore) {
+        if (watchingInvalidations) return
+        watchingInvalidations = true
+        store.onInvalidated { playlistId ->
+            val open = _detail.value
+            if (open.type != "playlist" || !open.uri.endsWith(playlistId)) return@onInvalidated
+            launchWithSession("reloadInvalidatedPlaylist") { sess ->
+                val fresh = playlistPage(sess, playlistId, limit = 50, offset = 0).toDetailData(playlistId)
+                // The user may have navigated on while this was in flight.
+                if (_detail.value.uri == open.uri) _detail.value = fresh
+            }
+        }
     }
 
     fun openAlbum(albumId: String) = openDetail(Screen.ALBUM_DETAIL, "openAlbum") { sess ->
@@ -141,7 +184,7 @@ class DetailViewModel : SessionViewModel("DetailVM") {
                     )
                 } else if (uri.startsWith("spotify:playlist:")) {
                     val id = uri.removePrefix("spotify:playlist:")
-                    val info = Playlist(sess).getPlaylist(id, limit = DETAIL_PAGE_SIZE, offset = offset)
+                    val info = playlistPage(sess, id, limit = DETAIL_PAGE_SIZE, offset = offset)
                     val more = info.tracks.map { it.toTrackInfo() }
                     val newSize = current.tracks.size + more.size
                     // Server-reported totalTracks is unreliable (PlaylistMapper
@@ -293,6 +336,9 @@ class DetailViewModel : SessionViewModel("DetailVM") {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 Playlist(sess).removeFromPlaylist(playlistId, listOf(uid))
+                // Our own write leaves the cached pages describing a playlist that no longer exists
+                // in that shape, and the dealer does not necessarily tell us about our own change.
+                SessionHolder.playlistStore?.invalidate(playlistId)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

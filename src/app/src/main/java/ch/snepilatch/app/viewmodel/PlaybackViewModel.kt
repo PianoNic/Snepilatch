@@ -163,6 +163,15 @@ class PlaybackViewModel : ViewModel() {
     // callback. We then resolve a CDN URL for that file, load ExoPlayer paused,
     // and the shared onReady callback seeks + starts ExoPlayer + Spfy in
     // lock-step. This is the same protocol the open.spotify.com web player uses.
+    // A queue tap already knows which track it asked for, and the local state machine hands us its
+    // file id about 250ms later. Waiting for the dealer's onTrackChange echo instead costs roughly
+    // 2.3s, and that echo carries no file id anyway. The reference client's player resolves the CDN
+    // url the moment it has a file id, and its own capture shows storage-resolve 190ms after the
+    // command, so this matches it rather than inventing something.
+    private var tapUri: String? = null
+    private var tapFileId: kotlinx.coroutines.CompletableDeferred<String>? = null
+    private var earlyLoadedUri: String? = null
+
     private var coldStartPending = false
     private var coldStartFileId: kotlinx.coroutines.CompletableDeferred<String>? = null
 
@@ -610,6 +619,10 @@ class PlaybackViewModel : ViewModel() {
     internal fun handlePlaybackId(fileId: String, uri: String?) {
         LokiLogger.i(TAG, "Got file ID from state machine: $fileId (${uri ?: "uri unknown"})")
         latestFileId = fileId
+        // A tap is waiting on exactly this.
+        tapFileId?.let { pending ->
+            if (!pending.isCompleted && (uri == null || uri == tapUri)) pending.complete(fileId)
+        }
         // The post-ad state (which clears isAd and moves currentStreamUri) lands over a second later,
         // so without this an armed watchdog still sees "stuck on the ad" and forces a redundant
         // advance, skipping the track that is just starting.
@@ -733,6 +746,13 @@ class PlaybackViewModel : ViewModel() {
             // resets _playback.value.positionMs to 0 — clobbering the saved
             // snapshot position. The one-shot pendingUserPlay flag distinguishes
             // a user-initiated play from a passive idle push.
+            // We already started this one from the tap, so the echo is only confirmation. Loading it
+            // again would cancel the in-flight resolve and start over, which is the delay we removed.
+            if (event.current?.uri != null && event.current?.uri == earlyLoadedUri) {
+                earlyLoadedUri = null
+                LokiLogger.i(TAG, "[QueueTap] echo for a track already started, not loading it twice")
+                return@onTrackChange
+            }
             val userPlay = pendingUserPlay
             pendingUserPlay = false
             if (!isStreaming.value && !userPlay) {
@@ -2004,7 +2024,13 @@ class PlaybackViewModel : ViewModel() {
                 val ctxUri = playingContext.value?.uri
                 if (uid != null) {
                     LokiLogger.i(TAG, "QUEUE SKIP: index=$index, name=${track.name}, uri=${track.uri}, uid=$uid")
+                    // Armed before the command so the file id cannot land before we are listening.
+                    val fileIdDeferred = kotlinx.coroutines.CompletableDeferred<String>()
+                    tapUri = track.uri
+                    tapFileId = fileIdDeferred
+                    val sentAt = System.currentTimeMillis()
                     p.skipToTrack(track.uri, uid, ctxUri)
+                    startTappedTrack(track, fileIdDeferred, sentAt)
                 } else {
                     LokiLogger.w(TAG, "No UID for queue track, falling back to local advance")
                     val steps = minOf(index + 1, MAX_LOCAL_WALK)
@@ -2764,6 +2790,56 @@ class PlaybackViewModel : ViewModel() {
             LokiLogger.i(TAG, "SpfyCDN: Resolved ${resolved.mirrorCount} mirrors")
             resolved
         }
+    }
+
+    /**
+     * Start a tapped queue row as soon as its file id arrives, rather than waiting for the dealer to
+     * echo back a track change we caused ourselves.
+     *
+     * Cold start solved the same problem the same way: wait on a deferred the file id completes, not
+     * on the echo. If the id does not turn up we fall through and the echo handles it as before, so
+     * the slow path is still there for when this one cannot help.
+     */
+    private suspend fun startTappedTrack(
+        track: TrackInfo,
+        fileIdDeferred: kotlinx.coroutines.CompletableDeferred<String>,
+        sentAt: Long,
+    ) {
+        val fileId = kotlinx.coroutines.withTimeoutOrNull(TAP_FILE_ID_TIMEOUT_MS) { fileIdDeferred.await() }
+        tapUri = null
+        tapFileId = null
+        if (fileId == null) {
+            LokiLogger.w(TAG, "[QueueTap] no file id in ${TAP_FILE_ID_TIMEOUT_MS}ms, leaving it to the echo")
+            return
+        }
+        LokiLogger.i(
+            TAG,
+            "[QueueTap] file id for ${track.name} after ${System.currentTimeMillis() - sentAt}ms, " +
+                "loading without waiting for the echo"
+        )
+        earlyLoadedUri = track.uri
+        val event = kotify.api.playerstatus.TrackChangeEvent(
+            previous = _playback.value.track?.uri,
+            current = kotify.api.playerstatus.PlayerTrack(
+                uri = track.uri,
+                uid = track.uid,
+                provider = null,
+                name = track.name,
+                artistName = track.artist,
+                artistUri = null,
+                albumName = track.albumName,
+                albumUri = null,
+                durationMs = track.durationMs,
+                isExplicit = false,
+                imageUrl = track.albumArt,
+                imageSmallUrl = track.albumArt,
+                imageLargeUrl = track.albumArt,
+                contextUri = playingContext.value?.uri,
+            ),
+            currentFileId = fileId,
+        )
+        resolveJob?.cancel()
+        resolveJob = viewModelScope.launch(Dispatchers.IO) { resolveAndPlay(event) }
     }
 
     private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent) {
@@ -3532,6 +3608,9 @@ class PlaybackViewModel : ViewModel() {
 
         /** Delay before re-reading true state to repaint the notification after a button command. */
         private const val NOTIFICATION_RESYNC_MS = 300L
+
+        /** How long a tap waits for its file id before giving up and letting the echo do it. */
+        private const val TAP_FILE_ID_TIMEOUT_MS = 3_000L
 
         /** How long to wait after ExoPlayer's STATE_ENDED before falling back to
          *  a forced player.skipNext(). Spfy's natural onTrackChange reliably

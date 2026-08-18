@@ -71,10 +71,22 @@ fun QueueSheet(vm: PlaybackViewModel) {
             // What you queued and what simply plays next are different things, so they get their own
             // headers rather than one flat list that reads as if you had queued the whole album.
             val upNext = queue.drop(queuedCount)
+            // Key by the entry, not its position: an index in the key means removing one row
+            // renames every row below it, so the list rebuilds and a swipe offset can be recycled
+            // onto a different track. Duplicate qids do happen in an autoplay queue, and a repeated
+            // key crashes the list, so the nth copy carries its own suffix.
+            val rowKeys = remember(queue) {
+                val seen = mutableMapOf<String, Int>()
+                queue.map { track ->
+                    val base = track.qid ?: track.uri
+                    val nth = seen.merge(base, 1, Int::plus) ?: 1
+                    if (nth == 1) base else "$base#$nth"
+                }
+            }
             LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 16.dp)) {
                 if (queuedCount > 0) {
                     item(key = "header-queued") { SectionHeader(stringResource(R.string.queue_next_in_queue)) }
-                    itemsIndexed(queue.take(queuedCount), key = { i, t -> "q-$i-${t.uri}" }) { i, track ->
+                    itemsIndexed(queue.take(queuedCount), key = { i, _ -> rowKeys[i] }) { i, track ->
                         SwipeableQueueRow(
                             track,
                             onClick = { vm.skipToQueueIndex(i) },
@@ -84,7 +96,7 @@ fun QueueSheet(vm: PlaybackViewModel) {
                 }
                 if (upNext.isNotEmpty()) {
                     item(key = "header-upnext") { SectionHeader(stringResource(R.string.queue_next_up)) }
-                    itemsIndexed(upNext, key = { i, t -> "n-$i-${t.uri}" }) { i, track ->
+                    itemsIndexed(upNext, key = { i, _ -> rowKeys[queuedCount + i] }) { i, track ->
                         SwipeableQueueRow(
                             track,
                             onClick = { vm.skipToQueueIndex(queuedCount + i) },

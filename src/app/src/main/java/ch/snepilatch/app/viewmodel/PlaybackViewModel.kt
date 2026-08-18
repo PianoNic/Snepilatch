@@ -2084,9 +2084,17 @@ class PlaybackViewModel : ViewModel() {
             _queuedCount.value -= 1
         }
         launchWithPlayer("removeFromQueue") { pc ->
-            val removed = pc.removeFromQueue(qid)
-            LokiLogger.i(TAG, "Queue remove ${track.name}: ${if (removed) "accepted" else "already gone"}")
-            refreshQueue()
+            val removed = try {
+                pc.removeFromQueue(qid)
+            } catch (e: Exception) {
+                LokiLogger.e(TAG, "removeFromQueue ${track.name}", e)
+                false
+            }
+            LokiLogger.i(TAG, "Queue remove ${track.name}: ${if (removed) "accepted" else "not found"}")
+            // Only refetch when the local edit and the server disagree. Refreshing after every swipe
+            // cost a getState plus a decorate round trip per row and rebuilt the list mid-gesture,
+            // which is what made it feel like the sheet was fighting the finger.
+            if (!removed) refreshQueue()
         }
     }
 

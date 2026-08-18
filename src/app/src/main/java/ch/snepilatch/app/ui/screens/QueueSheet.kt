@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -69,21 +71,85 @@ fun QueueSheet(vm: PlaybackViewModel) {
             // What you queued and what simply plays next are different things, so they get their own
             // headers rather than one flat list that reads as if you had queued the whole album.
             val upNext = queue.drop(queuedCount)
+            // Key by the entry, not its position: an index in the key means removing one row
+            // renames every row below it, so the list rebuilds and a swipe offset can be recycled
+            // onto a different track. Duplicate qids do happen in an autoplay queue, and a repeated
+            // key crashes the list, so the nth copy carries its own suffix.
+            val rowKeys = remember(queue) { queueRowKeys(queue) }
             LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 16.dp)) {
                 if (queuedCount > 0) {
                     item(key = "header-queued") { SectionHeader(stringResource(R.string.queue_next_in_queue)) }
-                    itemsIndexed(queue.take(queuedCount), key = { i, t -> "q-$i-${t.uri}" }) { i, track ->
-                        QueueRow(track) { vm.skipToQueueIndex(i) }
+                    itemsIndexed(queue.take(queuedCount), key = { i, _ -> rowKeys[i] }) { i, track ->
+                        SwipeableQueueRow(
+                            track,
+                            onClick = { vm.skipToQueueIndex(i) },
+                            onRemove = { vm.removeFromQueue(track) },
+                        )
                     }
                 }
                 if (upNext.isNotEmpty()) {
                     item(key = "header-upnext") { SectionHeader(stringResource(R.string.queue_next_up)) }
-                    itemsIndexed(upNext, key = { i, t -> "n-$i-${t.uri}" }) { i, track ->
-                        QueueRow(track) { vm.skipToQueueIndex(queuedCount + i) }
+                    itemsIndexed(upNext, key = { i, _ -> rowKeys[queuedCount + i] }) { i, track ->
+                        SwipeableQueueRow(
+                            track,
+                            onClick = { vm.skipToQueueIndex(queuedCount + i) },
+                            onRemove = { vm.removeFromQueue(track) },
+                        )
                     }
                 }
             }
         }
+    }
+}
+
+/**
+ * A queue row you can swipe away, which is the primary way out of a track added by mistake.
+ *
+ * One direction only: a row also responds to a tap, and a two way swipe on top of that turns an
+ * imprecise gesture into a coin flip between playing something and deleting it.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * A stable, unique key per queue row.
+ *
+ * Stable because an index in the key renames every row below a removed one, which rebuilds the list
+ * and lets a swipe offset land on a different track. Unique because a repeated key throws inside a
+ * LazyColumn, and qid is not guaranteed unique: an autoplay queue can hold two entries with the same
+ * uid and iteration. The first occurrence keeps the plain key, later ones carry their count.
+ */
+internal fun queueRowKeys(queue: List<ch.snepilatch.app.data.TrackInfo>): List<String> {
+    val seen = mutableMapOf<String, Int>()
+    return queue.map { track ->
+        val base = track.qid ?: track.uri
+        val nth = seen.merge(base, 1, Int::plus) ?: 1
+        if (nth == 1) base else "$base#$nth"
+    }
+}
+
+@Composable
+private fun SwipeableQueueRow(
+    track: ch.snepilatch.app.data.TrackInfo,
+    onClick: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    val state = rememberSwipeToDismissBoxState()
+    SwipeToDismissBox(
+        state = state,
+        onDismiss = { value -> if (value == SwipeToDismissBoxValue.EndToStart) onRemove() },
+        enableDismissFromStartToEnd = false,
+        backgroundContent = {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(SpfyError)
+                    .padding(horizontal = 24.dp),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                Icon(Icons.Rounded.Delete, stringResource(R.string.queue_remove), tint = SpfyWhite)
+            }
+        }
+    ) {
+        QueueRow(track, onClick)
     }
 }
 
@@ -103,6 +169,9 @@ private fun QueueRow(track: ch.snepilatch.app.data.TrackInfo, onClick: () -> Uni
     Row(
         Modifier
             .fillMaxWidth()
+            // Opaque on purpose: the delete panel sits behind every row, so a transparent row shows
+            // it through and the whole list reads as though it were mid-swipe.
+            .background(SpfyElevated)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically

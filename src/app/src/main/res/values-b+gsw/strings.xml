@@ -241,6 +241,7 @@
     <!-- Queue Screen -->
     <string name="queue_next_up">Als Nächschts</string>
     <string name="queue_next_in_queue">Als Nächschts i de Warteschlange</string>
+    <string name="queue_remove">Us de Warteschlange neh</string>
     <string name="queue_empty">D Wartelischte isch leer</string>
 
     <!-- Lyrics Screen -->

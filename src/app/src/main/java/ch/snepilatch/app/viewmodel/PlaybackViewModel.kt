@@ -693,11 +693,26 @@ class PlaybackViewModel : ViewModel() {
 
         pc.onSeek { positionMs -> handleRemoteSeek(positionMs) }
 
+        // The library publishes the queue only when its revision actually changed, so this is told
+        // about a new queue rather than re-deriving one from every position update.
+        pc.onQueue { view ->
+            val sess = session ?: return@onQueue
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    // Metadata only while someone is looking. A queue nobody has open costs nothing.
+                    applyQueue(view, if (queueSheetVisible.value) Song(sess) else null)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    LokiLogger.e(TAG, "onQueue", e)
+                }
+            }
+        }
+
         pc.onState { state ->
             val delta = if (lastCommandTs > 0) System.currentTimeMillis() - lastCommandTs else -1
             LokiLogger.i(TAG, "[Timing] WS onState arrived (${delta}ms after CMD '$lastCommandName')")
             viewModelScope.launch { updatePlaybackFromState(state) }
-            applyQueueFromPush(state)
         }
 
         pc.onTrackChange { event ->
@@ -2148,52 +2163,21 @@ class PlaybackViewModel : ViewModel() {
     /** Decorated metadata by uri, so a queue that has been seen once costs no request to show again. */
     private val decoratedByUri = mutableMapOf<String, kotify.api.song.DecoratedTrack>()
 
-    @Volatile
-    private var lastQueueRevision: String? = null
-
     /** Seed the queue, or resync it after a write the server disagreed with. */
     fun refreshQueue() {
         launchWithSession("refreshQueue") { sess ->
             val state = player?.getState() ?: return@launchWithSession
-            lastQueueRevision = state.queue_revision
-            applyQueue(state, Song(sess))
+            applyQueue(kotify.api.playerstatus.queueViewOf(state), Song(sess))
         }
     }
 
     /**
-     * The queue as the cluster just delivered it.
-     *
-     * Every dealer push carries the whole of `next_tracks`, so there is nothing to fetch: the list
-     * is rebuilt from what already arrived. Guarded on the queue revision, because a push lands for
-     * position and playing state too and the queue is usually identical.
-     */
-    private fun applyQueueFromPush(state: kotify.api.playerstatus.PlayerStateData) {
-        if (state.queue_revision == lastQueueRevision && _queue.value.isNotEmpty()) return
-        lastQueueRevision = state.queue_revision
-        val sess = session ?: return
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                // Only reach for metadata while the sheet is open. A push for a queue nobody is
-                // looking at should cost nothing.
-                applyQueue(state, if (queueSheetVisible.value) Song(sess) else null)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                LokiLogger.e(TAG, "applyQueueFromPush", e)
-            }
-        }
-    }
-
-    /**
-     * Build the displayed queue from [state], filling blanks from the cache and, if [songApi] is
+     * Build the displayed queue from [view], filling blanks from the cache and, if [songApi] is
      * given, decorating whatever is still missing in one request.
      */
-    private suspend fun applyQueue(state: kotify.api.playerstatus.PlayerStateData, songApi: Song?) {
+    private suspend fun applyQueue(view: kotify.api.playerstatus.QueueView, songApi: Song?) {
         data class ParsedTrack(val uri: String, val info: TrackInfo, val needsFetch: Boolean)
 
-        // Which entries are real, where the boundary is and which are queued is wire knowledge and
-        // lives in KotifyClient now. What is left here is turning it into rows.
-        val view = kotify.api.playerstatus.queueViewOf(state)
         _queuedCount.value = view.queued.size
         val parsed = view.entries.map { (qt, rawIndex) ->
             val cached = decoratedByUri[qt.uri]

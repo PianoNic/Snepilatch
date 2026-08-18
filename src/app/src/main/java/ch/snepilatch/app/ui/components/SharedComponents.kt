@@ -152,11 +152,9 @@ fun SpfyImage(
     ) {
         Icon(icon, null, tint = SpfyLightGray.copy(alpha = 0.5f), modifier = Modifier.size(32.dp))
         if (!url.isNullOrEmpty()) {
+            val ctx = androidx.compose.ui.platform.LocalContext.current
             AsyncImage(
-                model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
-                    .data(url)
-                    .crossfade(300)
-                    .build(),
+                model = remember(url) { coil.request.ImageRequest.Builder(ctx).data(url).crossfade(300).build() },
                 contentDescription = contentDescription,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
@@ -242,9 +240,9 @@ fun TrackRow(
     val accent = theme.primary
     // One list for the whole screen, so a row costs a scan rather than a query. Falls back to
     // title/artist like playback does, so a relinked track's checkmark agrees with what plays.
-    val downloadedRows by Downloads.rows.collectAsState()
+    val downloadedIndex by Downloads.index.collectAsState()
     val inFlight by Downloads.inProgress.collectAsState()
-    val isDownloaded = Downloads.isDownloaded(downloadedRows, track.uri, track.name, track.artist)
+    val isDownloaded = Downloads.isDownloaded(downloadedIndex, track.uri, track.name, track.artist)
     val isDownloading = track.uri in inFlight
 
     Row(

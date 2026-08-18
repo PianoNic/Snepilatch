@@ -56,6 +56,11 @@ object Downloads {
     /** Track URIs with a local copy, for the UI to tint rows without querying per item. */
     val downloaded: StateFlow<Set<String>> = _downloaded.asStateFlow()
 
+    private val _index = MutableStateFlow<Set<String>>(emptySet())
+
+    /** Uri and title/artist keys of every row, so a list row costs a hash lookup, not a scan. */
+    val index: StateFlow<Set<String>> = _index.asStateFlow()
+
     private val _inProgress = MutableStateFlow<Set<String>>(emptySet())
 
     /** Track URIs being fetched right now, so a row can show a spinner instead of a download icon. */
@@ -211,12 +216,25 @@ object Downloads {
      * resolve playback. Without this, a track that only matches through the fallback plays from
      * disk correctly but every checkmark in the UI still called it not downloaded.
      *
-     * Pure over [rows], like [matchByMetadata]: callers pass whatever [rows] StateFlow snapshot
-     * they already collected, so this stays cheap enough to call per row in a list.
+     * Pure over [index]: callers pass the snapshot they already collected, so a row costs a
+     * hash lookup rather than a scan of every downloaded row.
      */
-    fun isDownloaded(rows: List<DownloadedTrack>, trackUri: String, title: String? = null, artist: String? = null): Boolean =
-        rows.any { it.trackUri == trackUri } ||
-            (!title.isNullOrBlank() && matchByMetadata(rows, title, artist.orEmpty()) != null)
+    fun isDownloaded(index: Set<String>, trackUri: String, title: String? = null, artist: String? = null): Boolean {
+        if (trackUri in index) return true
+        if (title.isNullOrBlank()) return false
+        val key = normalize(title)
+        val artists = artistSet(artist.orEmpty())
+        return if (artists.isEmpty()) "$key$SEP" in index else artists.any { "$key$SEP$it" in index }
+    }
+
+    internal fun indexOf(rows: List<DownloadedTrack>): Set<String> = rows.flatMapTo(mutableSetOf(), ::keysOf)
+
+    private fun keysOf(row: DownloadedTrack): List<String> {
+        val key = normalize(row.title)
+        return listOf(row.trackUri, "$key$SEP") + artistSet(row.artist).map { "$key$SEP$it" }
+    }
+
+    private val SEP = 0.toChar()
 
     /** Case- and width-insensitive: half- and full-width forms of a title are the same song. */
     private fun normalize(value: String): String =
@@ -303,6 +321,7 @@ object Downloads {
         val loaded = all()
         _rows.value = loaded
         _downloaded.value = loaded.mapTo(mutableSetOf()) { it.trackUri }
+        _index.value = indexOf(loaded)
     }
 
     private fun DownloadedTrack.toValues() = ContentValues().apply {

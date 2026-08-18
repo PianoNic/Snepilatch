@@ -1,6 +1,6 @@
 name: Cut a Nightly Build
 
-# Five checks a day, plus workflow_dispatch for a manual cut. Skips entirely if main hasn't moved
+# Six checks a day, plus workflow_dispatch for a manual cut. Skips entirely if main hasn't moved
 # since the last nightly, so a quiet day still produces nothing and the extra checks cost nothing.
 # Checking often is the point: the gap between merging something and having a build to test on a
 # phone is the gap this closes.
@@ -10,11 +10,12 @@ name: Cut a Nightly Build
 # publishes the draft itself, which stays a deliberate human step. See CLAUDE.md "Versioning".
 on:
   schedule:
-    # UTC, because cron has no timezone. These are 05:00, 10:00, 15:00, 20:00 and midnight Swiss
-    # summer time. In winter each lands an hour earlier and the quiet-hours guard in the job drops
-    # the one that would fall at 04:00. Publishing pings the update role in Discord, so nothing
+    # UTC, because cron has no timezone. These are 05:00, 09:00, 13:00, 17:00, 21:00 and midnight
+    # Swiss summer time, a four hour cadence across the day with a shorter gap into midnight. In
+    # winter each lands an hour earlier and the quiet-hours guard in the job drops the one that
+    # would fall at 04:00, leaving five. Publishing pings the update role in Discord, so nothing
     # goes out overnight.
-    - cron: "0 3,8,13,18,22 * * *"
+    - cron: "0 3,7,11,15,19,22 * * *"
   workflow_dispatch:
     inputs:
       force:

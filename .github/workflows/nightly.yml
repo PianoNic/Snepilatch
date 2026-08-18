@@ -10,10 +10,11 @@ name: Cut a Nightly Build
 # publishes the draft itself, which stays a deliberate human step. See CLAUDE.md "Versioning".
 on:
   schedule:
-    # UTC, and deliberately inside waking hours: 09:00 to 21:00 Swiss summer time, 08:00 to 20:00
-    # in winter. Publishing a release pings the update role in Discord, so a cut at 02:00 wakes
-    # people up. Every three hours across the day is close enough to "as soon as it merged".
-    - cron: "0 7,10,13,16,19 * * *"
+    # UTC, because cron has no timezone. These are 05:00, 10:00, 15:00, 20:00 and midnight Swiss
+    # summer time. In winter each lands an hour earlier and the quiet-hours guard in the job drops
+    # the one that would fall at 04:00. Publishing pings the update role in Discord, so nothing
+    # goes out overnight.
+    - cron: "0 3,8,13,18,22 * * *"
   workflow_dispatch:
     inputs:
       force:
@@ -48,6 +49,15 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
+          # Cron has no timezone, so the window is enforced here: nothing goes out between 01:00
+          # and 05:00 Swiss time whatever DST is doing. Midnight is allowed on purpose, it is the
+          # last slot of the day. A manual run is a human asking, so it is never blocked.
+          SWISS_HOUR=$(TZ=Europe/Zurich date +%-H)
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ] && [ "$SWISS_HOUR" -ge 1 ] && [ "$SWISS_HOUR" -le 4 ]; then
+            echo "It is ${SWISS_HOUR}:00 in Zurich, inside the quiet hours. Not cutting."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           LAST_TAG=$(git tag -l 'v*-nightly.*' --sort=-creatordate | head -1)
           UNCHANGED=false
           if [ -n "$LAST_TAG" ] && [ "$(git rev-list -n1 "$LAST_TAG")" = "$(git rev-parse HEAD)" ]; then
@@ -68,17 +78,32 @@ jobs:
           echo "skip=false" >> "$GITHUB_OUTPUT"
           # Mirror release-drafter's draft rather than inventing a version: it already resolves the
           # next one from the labels on everything merged since the last release, so a nightly is a
-          # preview of the release it leads to. build.gradle.kts is only bumped by hand at release
-          # time, so reading it cut nightlies for a version that had already shipped. Sorted rather
-          # than first — the drafter can leave more than one draft behind.
-          BASE=$(gh api "repos/${{ github.repository }}/releases" \
+          # preview of the release it leads to. Sorted rather than first, since the drafter can
+          # leave more than one draft behind.
+          #
+          # There is no fallback on purpose. An API failure and "there is no draft" both leave this
+          # empty, and guessing from build.gradle.kts (only bumped by hand at release time) cut
+          # nightlies for a version that had already shipped, then cut v3.0.0-nightly.4 on a four
+          # month old line during the outage on 2026-08-17. Not cutting is a safe outcome, a forked
+          # version line is not, and quiet days already skip.
+          if ! BASE=$(gh api "repos/${{ github.repository }}/releases" \
             --jq '[.[] | select(.draft) | .tag_name | ltrimstr("v")]
-                  | sort_by(split(".") | map(tonumber? // 0)) | last // empty')
-          SOURCE="the release draft"
-          if [ -z "$BASE" ]; then
-            BASE=$(grep -m1 'versionName = ' src/app/build.gradle.kts | sed -E 's/.*"([^"]+)".*/\1/')
-            SOURCE="build.gradle.kts (no release draft found)"
+                  | sort_by(split(".") | map(tonumber? // 0)) | last // empty'); then
+            echo "::error::Could not read the releases API, so the base version is unknown."
+            exit 1
           fi
+          if [ -z "$BASE" ]; then
+            echo "::error::No release draft to mirror. Let release-drafter run, then re-run this."
+            exit 1
+          fi
+          # Catches a fork whatever caused it: a base below the newest nightly line means we are
+          # tagging backwards, which is how v3.0.0-nightly.4 landed after v3.1.0-nightly.8.
+          NEWEST=$(git tag -l 'v*-nightly.*' | sed -E 's/^v(.*)-nightly\.[0-9]+$/\1/' | sort -V | tail -1)
+          if [ -n "$NEWEST" ] && [ "$(printf '%s\n%s\n' "$BASE" "$NEWEST" | sort -V | tail -1)" != "$BASE" ]; then
+            echo "::error::Base $BASE is older than the newest nightly line $NEWEST. Refusing to fork."
+            exit 1
+          fi
+          SOURCE="the release draft"
           LAST_N=$(git tag -l "v${BASE}-nightly.*" | sed -E "s/.*-nightly\.([0-9]+)\$/\1/" | sort -n | tail -1)
           NEXT_N=$(( ${LAST_N:-0} + 1 ))
           TAG="v${BASE}-nightly.${NEXT_N}"

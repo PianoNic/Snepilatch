@@ -232,6 +232,7 @@
 
     <!-- Queue Screen -->
     <string name="queue_next_up">Next up</string>
+    <string name="queue_next_in_queue">Next in queue</string>
     <string name="queue_empty">Queue is empty</string>
 
     <!-- Lyrics Screen -->

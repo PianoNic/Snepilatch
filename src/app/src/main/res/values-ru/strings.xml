@@ -229,6 +229,7 @@
 
     <!-- Queue Screen -->
     <string name="queue_next_up">Далее</string>
+    <string name="queue_next_in_queue">Далее в очереди</string>
     <string name="queue_empty">Очередь пуста</string>
 
     <!-- Lyrics Screen -->

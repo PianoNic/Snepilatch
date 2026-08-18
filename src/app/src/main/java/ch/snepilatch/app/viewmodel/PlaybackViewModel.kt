@@ -1984,8 +1984,13 @@ class PlaybackViewModel : ViewModel() {
      * removed as though they were tracks, and showed the rest of the album as though it were queued.
      */
     internal fun visibleQueue(next: List<kotify.api.playerstatus.QueueTrack>) =
-        next.takeWhile { !it.isDelimiter }
-            .filterNot { it.isHidden || it.isHiddenInQueue || it.removedReasons.isNotEmpty() }
+        visibleQueueIndexed(next).map { it.value }
+
+    /** As [visibleQueue], but keeping each entry's index in the server list so a write can address it. */
+    internal fun visibleQueueIndexed(next: List<kotify.api.playerstatus.QueueTrack>) =
+        next.withIndex()
+            .takeWhile { !it.value.isDelimiter }
+            .filterNot { it.value.isHidden || it.value.isHiddenInQueue || it.value.removedReasons.isNotEmpty() }
 
     fun skipToQueueIndex(index: Int) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -2098,6 +2103,63 @@ class PlaybackViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Move a queue entry to [toDisplayedIndex], the position the drag ended on.
+     *
+     * Two translations happen here. The displayed list hides the delimiter and anything flagged, so
+     * the server's index comes from whichever entry currently occupies the target row rather than
+     * from the row number. And the move is clamped to the entry's own section, mirroring what the
+     * server does, so the local list cannot show an order the server would refuse to store.
+     */
+    fun moveQueueEntry(track: TrackInfo, toDisplayedIndex: Int) {
+        // Every exit is logged: a move that quietly does nothing looks exactly like a broken drag.
+        val qid = track.qid ?: run {
+            LokiLogger.w(TAG, "Queue move: ${track.name} has no qid, nothing to address")
+            return
+        }
+        val list = _queue.value
+        val from = list.indexOfFirst { it.qid == qid }
+        if (from < 0) {
+            LokiLogger.w(TAG, "Queue move: ${track.name} is no longer in the list")
+            return
+        }
+
+        val queued = _queuedCount.value
+        val section = if (from < queued) 0..(queued - 1) else queued..list.lastIndex
+        if (section.isEmpty()) {
+            LokiLogger.w(TAG, "Queue move: ${track.name} sits in an empty section, from=$from queued=$queued")
+            return
+        }
+        val target = toDisplayedIndex.coerceIn(section)
+        if (target == from) {
+            LokiLogger.i(
+                TAG,
+                "Queue move: ${track.name} asked for $toDisplayedIndex, clamped to $target inside " +
+                    "$section, so it is already there. queued=$queued size=${list.size}"
+            )
+            return
+        }
+
+        val rawTarget = list[target].queueIndex ?: run {
+            LokiLogger.w(TAG, "Queue move: no server index on the row at $target")
+            return
+        }
+        LokiLogger.i(TAG, "Queue move: ${track.name} $from -> $target (server $rawTarget), queued=$queued")
+        _queue.value = list.toMutableList().apply { add(target, removeAt(from)) }
+
+        launchWithPlayer("moveQueueEntry") { pc ->
+            val moved = try {
+                pc.moveInQueue(qid, rawTarget)
+            } catch (e: Exception) {
+                LokiLogger.e(TAG, "moveQueueEntry ${track.name}", e)
+                false
+            }
+            LokiLogger.i(TAG, "Queue move ${track.name} to $target (server $rawTarget): $moved")
+            // Only resync when the server disagrees, so a good drag does not rebuild the list.
+            if (!moved) refreshQueue()
+        }
+    }
+
     fun refreshQueue() {
         launchWithSession("refreshQueue") { sess ->
             val state = player?.getState() ?: return@launchWithSession
@@ -2109,9 +2171,9 @@ class PlaybackViewModel : ViewModel() {
                 val info: TrackInfo,
                 val needsFetch: Boolean
             )
-            val visible = visibleQueue(state.next_tracks)
-            _queuedCount.value = visible.takeWhile { it.isQueued }.size
-            val parsed = visible.map { qt ->
+            val visible = visibleQueueIndexed(state.next_tracks)
+            _queuedCount.value = visible.takeWhile { it.value.isQueued }.size
+            val parsed = visible.map { (rawIndex, qt) ->
                 val art = normalizeSpfyImageUrl(qt.imageUrl)
                 val needsFetch = qt.name.isNullOrEmpty() || qt.artistName.isNullOrEmpty() || art == null
                 val info = TrackInfo(
@@ -2122,6 +2184,7 @@ class PlaybackViewModel : ViewModel() {
                     durationMs = qt.durationMs,
                     uid = qt.uid,
                     qid = qt.qid,
+                    queueIndex = rawIndex,
                 )
                 ParsedTrack(qt.uri, info, needsFetch)
             }

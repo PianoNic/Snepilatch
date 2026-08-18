@@ -27,6 +27,7 @@ import ch.snepilatch.app.viewmodel.PlaybackViewModel
 @Composable
 fun QueueSheet(vm: PlaybackViewModel) {
     val queue by vm.queue.collectAsState()
+    val queuedCount by vm.queuedCount.collectAsState()
     val playback by vm.playback.collectAsState()
     val sheetState = rememberBottomSheetState(
         initialValue = SheetValue.Hidden,
@@ -59,39 +60,57 @@ fun QueueSheet(vm: PlaybackViewModel) {
 
             playback.track?.let { NowPlayingRow(it) }
 
-            if (queue.isNotEmpty()) {
-                Text(
-                    stringResource(R.string.queue_next_up),
-                    color = SpfyLightGray,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                )
-            }
-
             if (queue.isEmpty() && playback.track == null) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(stringResource(R.string.queue_empty), color = SpfyLightGray, fontSize = 16.sp)
                 }
                 return@Column
             }
+            // What you queued and what simply plays next are different things, so they get their own
+            // headers rather than one flat list that reads as if you had queued the whole album.
+            val upNext = queue.drop(queuedCount)
             LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 16.dp)) {
-                itemsIndexed(queue, key = { index, track -> "$index-${track.uri}" }) { index, track ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { vm.skipToQueueIndex(index) }
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        SpfyImage(track.albumArt, Modifier.size(48.dp).clip(RoundedCornerShape(4.dp)))
-                        Column(Modifier.padding(start = 12.dp).weight(1f)) {
-                            Text(track.name, color = SpfyWhite, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(track.artist, color = SpfyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
+                if (queuedCount > 0) {
+                    item(key = "header-queued") { SectionHeader(stringResource(R.string.queue_next_in_queue)) }
+                    itemsIndexed(queue.take(queuedCount), key = { i, t -> "q-$i-${t.uri}" }) { i, track ->
+                        QueueRow(track) { vm.skipToQueueIndex(i) }
+                    }
+                }
+                if (upNext.isNotEmpty()) {
+                    item(key = "header-upnext") { SectionHeader(stringResource(R.string.queue_next_up)) }
+                    itemsIndexed(upNext, key = { i, t -> "n-$i-${t.uri}" }) { i, track ->
+                        QueueRow(track) { vm.skipToQueueIndex(queuedCount + i) }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SectionHeader(title: String) {
+    Text(
+        title,
+        color = SpfyLightGray,
+        fontSize = 14.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+    )
+}
+
+@Composable
+private fun QueueRow(track: ch.snepilatch.app.data.TrackInfo, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        SpfyImage(track.albumArt, Modifier.size(48.dp).clip(RoundedCornerShape(4.dp)))
+        Column(Modifier.padding(start = 12.dp).weight(1f)) {
+            Text(track.name, color = SpfyWhite, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(track.artist, color = SpfyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

@@ -269,6 +269,10 @@ class PlaybackViewModel : ViewModel() {
     private val _queue = MutableStateFlow<List<TrackInfo>>(emptyList())
     val queue: StateFlow<List<TrackInfo>> = _queue
 
+    /** How many leading entries of [queue] the user queued, so the sheet can break the two apart. */
+    private val _queuedCount = MutableStateFlow(0)
+    val queuedCount: StateFlow<Int> = _queuedCount
+
     private val _queueSheetVisible = MutableStateFlow(false)
     val queueSheetVisible: StateFlow<Boolean> = _queueSheetVisible
     // Next track info (always available from WebSocket state for mini player swipe)
@@ -1905,6 +1909,17 @@ class PlaybackViewModel : ViewModel() {
         showPlaylistPicker.value = true
     }
 
+    /**
+     * The part of `next_tracks` that is actually the queue.
+     *
+     * The list is the queued block, then a boundary, then the rest of whatever context is playing.
+     * Rendering it raw showed the boundary marker and entries the server had flagged as hidden or
+     * removed as though they were tracks, and showed the rest of the album as though it were queued.
+     */
+    internal fun visibleQueue(next: List<kotify.api.playerstatus.QueueTrack>) =
+        next.takeWhile { !it.isDelimiter }
+            .filterNot { it.isHidden || it.isHiddenInQueue || it.removedReasons.isNotEmpty() }
+
     fun skipToQueueIndex(index: Int) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -1995,7 +2010,9 @@ class PlaybackViewModel : ViewModel() {
                 val info: TrackInfo,
                 val needsFetch: Boolean
             )
-            val parsed = state.next_tracks.map { qt ->
+            val visible = visibleQueue(state.next_tracks)
+            _queuedCount.value = visible.takeWhile { it.isQueued }.size
+            val parsed = visible.map { qt ->
                 val art = normalizeSpfyImageUrl(qt.imageUrl)
                 val needsFetch = qt.name.isNullOrEmpty() || qt.artistName.isNullOrEmpty() || art == null
                 val info = TrackInfo(

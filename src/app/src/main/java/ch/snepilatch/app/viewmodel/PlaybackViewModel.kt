@@ -2112,18 +2112,39 @@ class PlaybackViewModel : ViewModel() {
      * server does, so the local list cannot show an order the server would refuse to store.
      */
     fun moveQueueEntry(track: TrackInfo, toDisplayedIndex: Int) {
-        val qid = track.qid ?: return
+        // Every exit is logged: a move that quietly does nothing looks exactly like a broken drag.
+        val qid = track.qid ?: run {
+            LokiLogger.w(TAG, "Queue move: ${track.name} has no qid, nothing to address")
+            return
+        }
         val list = _queue.value
         val from = list.indexOfFirst { it.qid == qid }
-        if (from < 0) return
+        if (from < 0) {
+            LokiLogger.w(TAG, "Queue move: ${track.name} is no longer in the list")
+            return
+        }
 
         val queued = _queuedCount.value
         val section = if (from < queued) 0..(queued - 1) else queued..list.lastIndex
-        if (section.isEmpty()) return
+        if (section.isEmpty()) {
+            LokiLogger.w(TAG, "Queue move: ${track.name} sits in an empty section, from=$from queued=$queued")
+            return
+        }
         val target = toDisplayedIndex.coerceIn(section)
-        if (target == from) return
+        if (target == from) {
+            LokiLogger.i(
+                TAG,
+                "Queue move: ${track.name} asked for $toDisplayedIndex, clamped to $target inside " +
+                    "$section, so it is already there. queued=$queued size=${list.size}"
+            )
+            return
+        }
 
-        val rawTarget = list[target].queueIndex ?: return
+        val rawTarget = list[target].queueIndex ?: run {
+            LokiLogger.w(TAG, "Queue move: no server index on the row at $target")
+            return
+        }
+        LokiLogger.i(TAG, "Queue move: ${track.name} $from -> $target (server $rawTarget), queued=$queued")
         _queue.value = list.toMutableList().apply { add(target, removeAt(from)) }
 
         launchWithPlayer("moveQueueEntry") { pc ->

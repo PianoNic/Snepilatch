@@ -28,6 +28,7 @@ import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.components.SheetNavBarFix
 import ch.snepilatch.app.ui.components.SpfyImage
 import ch.snepilatch.app.ui.theme.*
+import ch.snepilatch.app.util.LokiLogger
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import kotlin.math.roundToInt
 
@@ -152,7 +153,7 @@ private fun QueueList(
     // finger instead of jumping a whole row at a time.
     val carried = if (dragFrom >= 0) dragDy - (dragTo - dragFrom) * rowHeight else 0f
 
-    fun dragFor(key: String, displayIndex: Int) = RowDrag(
+    fun dragFor(key: String, track: ch.snepilatch.app.data.TrackInfo, displayIndex: Int) = RowDrag(
         dragging = key == dragKey,
         offsetY = if (key == dragKey) carried else 0f,
         onMeasured = { rowHeight = it },
@@ -163,13 +164,20 @@ private fun QueueList(
         },
         onDrag = { dragDy += it },
         onEnd = {
-            val to = dragTo
-            val landed = shown.getOrNull(to)?.second
-            val moved = to != dragFrom
+            // Recomputed here rather than captured: pointerInput keeps the callbacks from the
+            // composition the gesture started in, where dragFrom was still -1, so a captured
+            // target is always the one from before the drag began.
+            val from = dragFrom
+            val travelled = if (rowHeight > 0) (dragDy / rowHeight).roundToInt() else 0
+            val to = if (from >= 0) (from + travelled).coerceIn(sectionOf(from)) else from
+            LokiLogger.i(
+                "QueueDrag",
+                "drop from=$from to=$to dy=$dragDy rowHeight=$rowHeight queued=$queuedCount"
+            )
             dragKey = null
             dragFrom = -1
             dragDy = 0f
-            if (moved && landed != null) vm.moveQueueEntry(landed, to)
+            if (from >= 0 && to != from) vm.moveQueueEntry(track, to)
         },
     )
 
@@ -180,7 +188,7 @@ private fun QueueList(
             itemsIndexed(shown.take(queuedCount), key = { _, entry -> entry.first }) { i, entry ->
                 SwipeableQueueRow(
                     entry.second,
-                    dragFor(entry.first, i),
+                    dragFor(entry.first, entry.second, i),
                     onClick = { vm.skipToQueueIndex(i) },
                     onRemove = { vm.removeFromQueue(entry.second) },
                 )
@@ -191,9 +199,7 @@ private fun QueueList(
             itemsIndexed(upNext, key = { _, entry -> entry.first }) { i, entry ->
                 SwipeableQueueRow(
                     entry.second,
-                    // No grip here: Next up is the context continuing, and the server rebuilds it
-                    // from the playlist, so a write to it is quietly recomputed away.
-                    null,
+                    dragFor(entry.first, entry.second, queuedCount + i),
                     onClick = { vm.skipToQueueIndex(queuedCount + i) },
                     onRemove = { vm.removeFromQueue(entry.second) },
                 )

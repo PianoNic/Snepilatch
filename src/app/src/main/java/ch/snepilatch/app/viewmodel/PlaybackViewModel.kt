@@ -375,14 +375,33 @@ class PlaybackViewModel : ViewModel() {
     }
 
     /** [_account] is ViewModel state, not holder state, so an adopting ViewModel has to refetch it. */
-    private suspend fun loadAccount(sess: Session) {
+    /**
+     * Not a startup gate. The reference client fetches the profile as a query and renders around it,
+     * which is why its avatar is briefly blank on a cold load. Waiting for it cost 302ms of loading
+     * screen for data only the avatar and the account tab need.
+     */
+    private fun loadAccountInBackground(sess: Session) {
+        initScope.launch {
+            try {
+                loadAccount(sess)
+            } catch (e: Exception) {
+                LokiLogger.e(TAG, "Profile load failed", e)
+            }
+        }
+    }
+
+    private suspend fun loadAccount(sess: Session) = coroutineScope {
         val userApi = User(sess)
         val me = userApi.getCurrentUser()
         username = me.username
         SessionHolder.username = me.username
-        val isPremium = userApi.hasPremium()
+        // Only getCurrentUser has to come first, because the other two need the username. Those two
+        // do not depend on each other, so they go together.
+        val premium = async { userApi.hasPremium() }
         // Get public profile (display name + avatar) from user-profile-view API
-        val pubProfile = userApi.getProfile(username)
+        val profile = async { userApi.getProfile(username) }
+        val isPremium = premium.await()
+        val pubProfile = profile.await()
         val displayName = pubProfile.displayName.ifEmpty { username }
         val imageUrl = pubProfile.imageUrl
         LokiLogger.i(TAG, "Profile: display=$displayName, user=$username, image=${imageUrl?.take(40)}")
@@ -465,11 +484,10 @@ class PlaybackViewModel : ViewModel() {
 
                 // Home and library load themselves from HomeViewModel.init / LibraryViewModel.init.
 
-                loadAccount(sess)
-
                 isInitialized.value = true
                 initRetryCount = 0
                 authRecovering = false
+                loadAccountInBackground(sess)
                 // Session is healthy again — dismiss any lingering "connection lost" alert.
                 MusicPlaybackService.instance?.clearError()
 

@@ -697,6 +697,7 @@ class PlaybackViewModel : ViewModel() {
             val delta = if (lastCommandTs > 0) System.currentTimeMillis() - lastCommandTs else -1
             LokiLogger.i(TAG, "[Timing] WS onState arrived (${delta}ms after CMD '$lastCommandName')")
             viewModelScope.launch { updatePlaybackFromState(state) }
+            applyQueueFromPush(state)
         }
 
         pc.onTrackChange { event ->
@@ -2160,68 +2161,104 @@ class PlaybackViewModel : ViewModel() {
         }
     }
 
+    /** Decorated metadata by uri, so a queue that has been seen once costs no request to show again. */
+    private val decoratedByUri = mutableMapOf<String, kotify.api.song.DecoratedTrack>()
+
+    @Volatile
+    private var lastQueueRevision: String? = null
+
+    /** Seed the queue, or resync it after a write the server disagreed with. */
     fun refreshQueue() {
         launchWithSession("refreshQueue") { sess ->
             val state = player?.getState() ?: return@launchWithSession
-            val songApi = Song(sess)
+            lastQueueRevision = state.queue_revision
+            applyQueue(state, Song(sess))
+        }
+    }
 
-            // Parse what we have from the typed cluster queue first.
-            data class ParsedTrack(
-                val uri: String,
-                val info: TrackInfo,
-                val needsFetch: Boolean
+    /**
+     * The queue as the cluster just delivered it.
+     *
+     * Every dealer push carries the whole of `next_tracks`, so there is nothing to fetch: the list
+     * is rebuilt from what already arrived. Guarded on the queue revision, because a push lands for
+     * position and playing state too and the queue is usually identical.
+     */
+    private fun applyQueueFromPush(state: kotify.api.playerstatus.PlayerStateData) {
+        if (state.queue_revision == lastQueueRevision && _queue.value.isNotEmpty()) return
+        lastQueueRevision = state.queue_revision
+        val sess = session ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                // Only reach for metadata while the sheet is open. A push for a queue nobody is
+                // looking at should cost nothing.
+                applyQueue(state, if (queueSheetVisible.value) Song(sess) else null)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                LokiLogger.e(TAG, "applyQueueFromPush", e)
+            }
+        }
+    }
+
+    /**
+     * Build the displayed queue from [state], filling blanks from the cache and, if [songApi] is
+     * given, decorating whatever is still missing in one request.
+     */
+    private suspend fun applyQueue(state: kotify.api.playerstatus.PlayerStateData, songApi: Song?) {
+        data class ParsedTrack(val uri: String, val info: TrackInfo, val needsFetch: Boolean)
+
+        val visible = visibleQueueIndexed(state.next_tracks)
+        _queuedCount.value = visible.takeWhile { it.value.isQueued }.size
+        val parsed = visible.map { (rawIndex, qt) ->
+            val cached = decoratedByUri[qt.uri]
+            val name = qt.name?.takeIf { it.isNotEmpty() } ?: cached?.name
+            val artist = qt.artistName?.takeIf { it.isNotEmpty() } ?: cached?.artistName
+            val art = normalizeSpfyImageUrl(qt.imageUrl) ?: normalizeSpfyImageUrl(cached?.imageUrl)
+            val info = TrackInfo(
+                uri = qt.uri,
+                name = name ?: "Unknown",
+                artist = artist ?: "Unknown",
+                albumArt = art,
+                durationMs = if (qt.durationMs > 0) qt.durationMs else cached?.durationMs ?: 0L,
+                uid = qt.uid,
+                qid = qt.qid,
+                queueIndex = rawIndex,
             )
-            val visible = visibleQueueIndexed(state.next_tracks)
-            _queuedCount.value = visible.takeWhile { it.value.isQueued }.size
-            val parsed = visible.map { (rawIndex, qt) ->
-                val art = normalizeSpfyImageUrl(qt.imageUrl)
-                val needsFetch = qt.name.isNullOrEmpty() || qt.artistName.isNullOrEmpty() || art == null
-                val info = TrackInfo(
-                    uri = qt.uri,
-                    name = qt.name ?: "Unknown",
-                    artist = qt.artistName ?: "Unknown",
-                    albumArt = art,
-                    durationMs = qt.durationMs,
-                    uid = qt.uid,
-                    qid = qt.qid,
-                    queueIndex = rawIndex,
-                )
-                ParsedTrack(qt.uri, info, needsFetch)
-            }
+            ParsedTrack(qt.uri, info, name.isNullOrEmpty() || artist.isNullOrEmpty() || art == null)
+        }
+        _queue.value = parsed.map { it.info }
 
-            // Show immediately with what we have
-            _queue.value = parsed.map { it.info }
+        val missing = parsed.filter { it.needsFetch }.map { it.uri }.distinct()
+        if (missing.isEmpty() || songApi == null) {
+            LokiLogger.i(TAG, "Queue: ${parsed.size} rows, ${missing.size} missing, none fetched")
+            return
+        }
 
-            // One request for everything the state left blank. Spfy populates metadata for only the
-            // first entry or two, so this used to be one getSong per row, awaited together, with the
-            // slowest setting the delay. The web player sends decorateContextTracks with the uris
-            // instead; measured live, 44 entries came back in 173ms in a single request.
-            val missing = parsed.filter { it.needsFetch }.map { it.uri }.distinct()
-            if (missing.isNotEmpty()) {
-                val started = System.currentTimeMillis()
-                val decorated = try {
-                    songApi.decorateTracks(missing).associateBy { it.uri }
-                } catch (e: Exception) {
-                    LokiLogger.e(TAG, "refreshQueue decorate", e)
-                    emptyMap()
-                }
-                LokiLogger.i(
-                    TAG,
-                    "Queue: ${parsed.size} rows, ${missing.size} needed metadata, " +
-                        "${decorated.size} decorated in ${System.currentTimeMillis() - started}ms"
-                )
-                if (decorated.isNotEmpty()) {
-                    _queue.value = parsed.map { pt ->
-                        val d = decorated[pt.uri] ?: return@map pt.info
-                        pt.info.copy(
-                            name = d.name ?: pt.info.name,
-                            artist = d.artistName ?: pt.info.artist,
-                            albumArt = normalizeSpfyImageUrl(d.imageUrl) ?: pt.info.albumArt,
-                            durationMs = if (d.durationMs > 0) d.durationMs else pt.info.durationMs,
-                        )
-                    }
-                }
-            }
+        // One request for the rest, the way the web player fills a queue. Spfy populates metadata
+        // for only the first entry or two, so this was once a getSong per row awaited together.
+        val started = System.currentTimeMillis()
+        val decorated = try {
+            songApi.decorateTracks(missing)
+        } catch (e: Exception) {
+            LokiLogger.e(TAG, "refreshQueue decorate", e)
+            emptyList()
+        }
+        decorated.forEach { decoratedByUri[it.uri] = it }
+        LokiLogger.i(
+            TAG,
+            "Queue: ${parsed.size} rows, ${missing.size} needed metadata, " +
+                "${decorated.size} decorated in ${System.currentTimeMillis() - started}ms"
+        )
+        if (decorated.isEmpty()) return
+        val byUri = decorated.associateBy { it.uri }
+        _queue.value = parsed.map { pt ->
+            val d = byUri[pt.uri] ?: return@map pt.info
+            pt.info.copy(
+                name = d.name ?: pt.info.name,
+                artist = d.artistName ?: pt.info.artist,
+                albumArt = normalizeSpfyImageUrl(d.imageUrl) ?: pt.info.albumArt,
+                durationMs = if (d.durationMs > 0) d.durationMs else pt.info.durationMs,
+            )
         }
     }
 

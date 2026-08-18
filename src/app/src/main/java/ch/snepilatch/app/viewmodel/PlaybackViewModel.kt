@@ -41,8 +41,10 @@ import kotify.cdn.StreamInfo
 import kotify.cdn.StreamResult
 import kotify.session.Session
 import kotify.session.SessionConfig
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -353,6 +355,9 @@ class PlaybackViewModel : ViewModel() {
                 surfaceAuthLost()
             } else {
                 LokiLogger.i(TAG, "Auth recovery: re-initializing session from saved cookies")
+                // Deliberately replacing the current session, so drop the in-flight guard first,
+                // otherwise initialize() waits on the job this is recovering from.
+                initJob = null
                 initialize(savedCookies)
             }
         }
@@ -369,14 +374,71 @@ class PlaybackViewModel : ViewModel() {
         )
     }
 
+    /** [_account] is ViewModel state, not holder state, so an adopting ViewModel has to refetch it. */
+    private suspend fun loadAccount(sess: Session) {
+        val userApi = User(sess)
+        val me = userApi.getCurrentUser()
+        username = me.username
+        SessionHolder.username = me.username
+        val isPremium = userApi.hasPremium()
+        // Get public profile (display name + avatar) from user-profile-view API
+        val pubProfile = userApi.getProfile(username)
+        val displayName = pubProfile.displayName.ifEmpty { username }
+        val imageUrl = pubProfile.imageUrl
+        LokiLogger.i(TAG, "Profile: display=$displayName, user=$username, image=${imageUrl?.take(40)}")
+        _account.value = AccountInfo(
+            username = username,
+            displayName = displayName,
+            isPremium = isPremium,
+            profileImageUrl = imageUrl,
+            userId = username,
+            followers = pubProfile.followers,
+            playlistCount = pubProfile.publicPlaylists
+        )
+        LokiLogger.i(TAG, "User: $username ($displayName), premium: $isPremium")
+    }
+
+    /** Rewire this ViewModel to a session that is already live, without touching the network path. */
+    internal fun adoptRunningSession() {
+        val pc = SessionHolder.player ?: return
+        LokiLogger.i(TAG, "Adopting the running session, device: ${pc.ourDeviceId()}")
+        username = SessionHolder.username
+        wirePlayerConnectCallbacks(pc)
+        wireServiceControls()
+        isInitialized.value = true
+        MusicPlaybackService.instance?.clearError()
+        launchWithSession("adoptAccount") { sess -> loadAccount(sess) }
+        launchWithPlayer("adoptState") { p -> p.getState()?.let { updatePlaybackFromState(it) } }
+    }
+
     fun initialize(cookies: Map<String, String>) {
         startInfiniPlayRepeatGuard()
+
+        // A recreated Activity gets a fresh ViewModel, but not a fresh session: the holder is
+        // process-scoped and still live. Rewire to it rather than tearing it down and paying for the
+        // whole network init again.
+        if (SessionHolder.isReady) {
+            adoptRunningSession()
+            return
+        }
+
+        // An init started by a ViewModel that has since died is still running. Wait for it — clearing
+        // the holder here is what turned a slow init into an app that never got past "connecting".
+        initJob?.takeIf { it.isActive }?.let { running ->
+            LokiLogger.i(TAG, "Init already in flight, waiting for it instead of restarting")
+            viewModelScope.launch {
+                running.join()
+                if (SessionHolder.isReady) adoptRunningSession()
+            }
+            return
+        }
+
         // Clean up any leftover from previous session
         SessionHolder.player?.let {
             try { kotlinx.coroutines.runBlocking { it.disconnect() } } catch (_: Exception) {}
         }
         SessionHolder.clear()
-        viewModelScope.launch(Dispatchers.IO) {
+        initJob = initScope.launch {
             try {
                 val sess = Session(SessionConfig(
                     identifier = "kotify-android",
@@ -403,27 +465,7 @@ class PlaybackViewModel : ViewModel() {
 
                 // Home and library load themselves from HomeViewModel.init / LibraryViewModel.init.
 
-                val userApi = User(sess)
-                val me = userApi.getCurrentUser()
-                username = me.username
-                SessionHolder.username = me.username
-                val isPremium = userApi.hasPremium()
-                // Get public profile (display name + avatar) from user-profile-view API
-                val pubProfile = userApi.getProfile(username)
-                val displayName = pubProfile.displayName.ifEmpty { username }
-                val userId = username
-                val imageUrl = pubProfile.imageUrl
-                LokiLogger.i(TAG, "Profile: display=$displayName, user=$username, image=${imageUrl?.take(40)}")
-                _account.value = AccountInfo(
-                    username = username,
-                    displayName = displayName,
-                    isPremium = isPremium,
-                    profileImageUrl = imageUrl,
-                    userId = username,
-                    followers = pubProfile.followers,
-                    playlistCount = pubProfile.publicPlaylists
-                )
-                LokiLogger.i(TAG, "User: $username ($displayName), premium: $isPremium")
+                loadAccount(sess)
 
                 isInitialized.value = true
                 initRetryCount = 0
@@ -470,6 +512,10 @@ class PlaybackViewModel : ViewModel() {
                         resolveCurrentTrack(state)
                     }
                 }
+            } catch (e: CancellationException) {
+                // Not a failure and not ours to report: swallowing it surfaced a torn-down scope as
+                // "Init failed: Job was cancelled", which reads as a network fault and is not one.
+                throw e
             } catch (e: Exception) {
                 LokiLogger.e(TAG, "Init failed", e)
                 val msg = e.message ?: "Unknown error"
@@ -505,6 +551,7 @@ class PlaybackViewModel : ViewModel() {
                         val ctx = MusicPlaybackService.instance as? android.content.Context ?: return@launch
                         val savedCookies = ch.snepilatch.app.util.loadCookies(ctx)
                         if (savedCookies != null) {
+                            initJob = null
                             initialize(savedCookies)
                         } else {
                             needsLogin.value = true
@@ -3327,6 +3374,13 @@ class PlaybackViewModel : ViewModel() {
     }
 
     companion object {
+        // Init outlives the Activity that starts it. In viewModelScope a teardown mid-init abandoned
+        // the session, and the next ViewModel cleared the holder and re-ran the whole cascade, so a
+        // slow init could never finish (issue #612).
+        private val initScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+        @Volatile private var initJob: Job? = null
+
         /** SharedPreferences file name for all persisted settings. */
 
         /** Delay before re-reading true state to repaint the notification after a button command. */

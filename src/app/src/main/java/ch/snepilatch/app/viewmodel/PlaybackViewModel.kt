@@ -267,11 +267,14 @@ class PlaybackViewModel : ViewModel() {
     // add-to-playlist picker stay here (snackbar + non-composable callers).
 
     // Queue
-    private val _queue = MutableStateFlow<List<TrackInfo>>(emptyList())
+    // internal so tests can seed a queue without a live PlayerConnect, same reason as _playback.
+    @Suppress("VariableNaming")
+    internal val _queue = MutableStateFlow<List<TrackInfo>>(emptyList())
     val queue: StateFlow<List<TrackInfo>> = _queue
 
     /** How many leading entries of [queue] the user queued, so the sheet can break the two apart. */
-    private val _queuedCount = MutableStateFlow(0)
+    @Suppress("VariableNaming")
+    internal val _queuedCount = MutableStateFlow(0)
     val queuedCount: StateFlow<Int> = _queuedCount
 
     private val _queueSheetVisible = MutableStateFlow(false)
@@ -2063,6 +2066,30 @@ class PlaybackViewModel : ViewModel() {
         navigateTo(Screen.LYRICS)
     }
 
+    /**
+     * Drop one entry from the queue.
+     *
+     * Addressed by qid, not uri: a queue legitimately holds the same track twice, and with repeat on
+     * the same uid comes back on the next pass. The row goes immediately so the swipe feels like it
+     * did something, and a refresh follows to reconcile with whatever the server actually did.
+     */
+    fun removeFromQueue(track: TrackInfo) {
+        val qid = track.qid ?: run {
+            LokiLogger.w(TAG, "No qid on ${track.name}, cannot address it for removal")
+            return
+        }
+        val before = _queue.value
+        _queue.value = before.filterNot { it.qid == qid }
+        if (_queuedCount.value > 0 && before.take(_queuedCount.value).any { it.qid == qid }) {
+            _queuedCount.value -= 1
+        }
+        launchWithPlayer("removeFromQueue") { pc ->
+            val removed = pc.removeFromQueue(qid)
+            LokiLogger.i(TAG, "Queue remove ${track.name}: ${if (removed) "accepted" else "already gone"}")
+            refreshQueue()
+        }
+    }
+
     fun refreshQueue() {
         launchWithSession("refreshQueue") { sess ->
             val state = player?.getState() ?: return@launchWithSession
@@ -2086,6 +2113,7 @@ class PlaybackViewModel : ViewModel() {
                     albumArt = art,
                     durationMs = qt.durationMs,
                     uid = qt.uid,
+                    qid = qt.qid,
                 )
                 ParsedTrack(qt.uri, info, needsFetch)
             }

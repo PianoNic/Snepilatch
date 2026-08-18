@@ -14,7 +14,9 @@ data class TrackInfo(
     val albumArt: String?,
     val durationMs: Long = 0,
     val albumName: String? = null,
-    val uid: String? = null
+    val uid: String? = null,
+    /** Queue identity: uid plus the repeat iteration, since uid alone recurs on the next pass. */
+    val qid: String? = null
 )
 
 data class PlaybackUiState(

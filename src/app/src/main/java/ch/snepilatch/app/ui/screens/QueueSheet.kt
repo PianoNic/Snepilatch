@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -73,17 +75,59 @@ fun QueueSheet(vm: PlaybackViewModel) {
                 if (queuedCount > 0) {
                     item(key = "header-queued") { SectionHeader(stringResource(R.string.queue_next_in_queue)) }
                     itemsIndexed(queue.take(queuedCount), key = { i, t -> "q-$i-${t.uri}" }) { i, track ->
-                        QueueRow(track) { vm.skipToQueueIndex(i) }
+                        SwipeableQueueRow(
+                            track,
+                            onClick = { vm.skipToQueueIndex(i) },
+                            onRemove = { vm.removeFromQueue(track) },
+                        )
                     }
                 }
                 if (upNext.isNotEmpty()) {
                     item(key = "header-upnext") { SectionHeader(stringResource(R.string.queue_next_up)) }
                     itemsIndexed(upNext, key = { i, t -> "n-$i-${t.uri}" }) { i, track ->
-                        QueueRow(track) { vm.skipToQueueIndex(queuedCount + i) }
+                        SwipeableQueueRow(
+                            track,
+                            onClick = { vm.skipToQueueIndex(queuedCount + i) },
+                            onRemove = { vm.removeFromQueue(track) },
+                        )
                     }
                 }
             }
         }
+    }
+}
+
+/**
+ * A queue row you can swipe away, which is the primary way out of a track added by mistake.
+ *
+ * One direction only: a row also responds to a tap, and a two way swipe on top of that turns an
+ * imprecise gesture into a coin flip between playing something and deleting it.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeableQueueRow(
+    track: ch.snepilatch.app.data.TrackInfo,
+    onClick: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    val state = rememberSwipeToDismissBoxState()
+    SwipeToDismissBox(
+        state = state,
+        onDismiss = { value -> if (value == SwipeToDismissBoxValue.EndToStart) onRemove() },
+        enableDismissFromStartToEnd = false,
+        backgroundContent = {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(SpfyError)
+                    .padding(horizontal = 24.dp),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                Icon(Icons.Rounded.Delete, stringResource(R.string.queue_remove), tint = SpfyWhite)
+            }
+        }
+    ) {
+        QueueRow(track, onClick)
     }
 }
 

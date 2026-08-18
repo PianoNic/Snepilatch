@@ -147,6 +147,9 @@ private fun QueueRow(track: ch.snepilatch.app.data.TrackInfo, onClick: () -> Uni
     Row(
         Modifier
             .fillMaxWidth()
+            // Opaque on purpose: the delete panel sits behind every row, so a transparent row shows
+            // it through and the whole list reads as though it were mid-swipe.
+            .background(SpfyElevated)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically

@@ -269,7 +269,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                 // Flips to a tick once every track is on disk, and then removes them instead. Falls
                 // back to title/artist per track like playback does, so a relinked track that only
                 // matches that way still counts toward "all downloaded".
-                val downloadedRows by Downloads.rows.collectAsState()
+                val downloadedIndex by Downloads.index.collectAsState()
                 val inFlight by Downloads.inProgress.collectAsState()
                 val downloading = detail.tracks.any { it.uri in inFlight }
                 // detail.tracks is one loaded page. Downloading it would silently cover the first 50 of
@@ -279,7 +279,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                 // with no confirmation while the rest stayed downloaded.
                 val loadingAll by detailVm.isLoadingAll.collectAsState()
                 val allDownloaded = !hasMore && detail.tracks.isNotEmpty() &&
-                    detail.tracks.all { Downloads.isDownloaded(downloadedRows, it.uri, it.name, it.artist) }
+                    detail.tracks.all { Downloads.isDownloaded(downloadedIndex, it.uri, it.name, it.artist) }
                 if (downloadable) {
                     IconButton(
                         onClick = {

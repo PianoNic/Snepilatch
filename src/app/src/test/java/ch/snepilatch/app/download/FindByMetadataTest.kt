@@ -71,14 +71,14 @@ class FindByMetadataTest {
 
     @Test
     fun isDownloadedMatchesByExactUriRegardlessOfMetadata() {
-        assertTrue(Downloads.isDownloaded(listOf(row), row.trackUri, title = "Some Other Title", artist = "Someone Else"))
+        assertTrue(Downloads.isDownloaded(Downloads.indexOf(listOf(row)), row.trackUri, title = "Some Other Title", artist = "Someone Else"))
     }
 
     @Test
     fun isDownloadedFallsBackToMetadataWhenTheUriDiffers() {
         assertTrue(
             Downloads.isDownloaded(
-                listOf(row),
+                Downloads.indexOf(listOf(row)),
                 trackUri = "spotify:track:relinkedIdNotInTheIndex",
                 title = "ファタール - Fatal",
                 artist = "GEMN, Kento Nakajima, Tatsuya Kitani",
@@ -88,11 +88,11 @@ class FindByMetadataTest {
 
     @Test
     fun isDownloadedIsFalseWhenNeitherUriNorMetadataMatch() {
-        assertFalse(Downloads.isDownloaded(listOf(row), "spotify:track:notDownloaded", "Another Song", "Nobody"))
+        assertFalse(Downloads.isDownloaded(Downloads.indexOf(listOf(row)), "spotify:track:notDownloaded", "Another Song", "Nobody"))
     }
 
     @Test
     fun isDownloadedIsFalseForAMissingUriAndNoMetadataToFallBackOn() {
-        assertFalse(Downloads.isDownloaded(listOf(row), "spotify:track:notDownloaded"))
+        assertFalse(Downloads.isDownloaded(Downloads.indexOf(listOf(row)), "spotify:track:notDownloaded"))
     }
 }

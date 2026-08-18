@@ -2099,12 +2099,18 @@ class PlaybackViewModel : ViewModel() {
             // instead; measured live, 44 entries came back in 173ms in a single request.
             val missing = parsed.filter { it.needsFetch }.map { it.uri }.distinct()
             if (missing.isNotEmpty()) {
+                val started = System.currentTimeMillis()
                 val decorated = try {
                     songApi.decorateTracks(missing).associateBy { it.uri }
                 } catch (e: Exception) {
                     LokiLogger.e(TAG, "refreshQueue decorate", e)
                     emptyMap()
                 }
+                LokiLogger.i(
+                    TAG,
+                    "Queue: ${parsed.size} rows, ${missing.size} needed metadata, " +
+                        "${decorated.size} decorated in ${System.currentTimeMillis() - started}ms"
+                )
                 if (decorated.isNotEmpty()) {
                     _queue.value = parsed.map { pt ->
                         val d = decorated[pt.uri] ?: return@map pt.info

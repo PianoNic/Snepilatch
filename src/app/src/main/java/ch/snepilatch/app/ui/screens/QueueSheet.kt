@@ -75,14 +75,7 @@ fun QueueSheet(vm: PlaybackViewModel) {
             // renames every row below it, so the list rebuilds and a swipe offset can be recycled
             // onto a different track. Duplicate qids do happen in an autoplay queue, and a repeated
             // key crashes the list, so the nth copy carries its own suffix.
-            val rowKeys = remember(queue) {
-                val seen = mutableMapOf<String, Int>()
-                queue.map { track ->
-                    val base = track.qid ?: track.uri
-                    val nth = seen.merge(base, 1, Int::plus) ?: 1
-                    if (nth == 1) base else "$base#$nth"
-                }
-            }
+            val rowKeys = remember(queue) { queueRowKeys(queue) }
             LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 16.dp)) {
                 if (queuedCount > 0) {
                     item(key = "header-queued") { SectionHeader(stringResource(R.string.queue_next_in_queue)) }
@@ -116,6 +109,23 @@ fun QueueSheet(vm: PlaybackViewModel) {
  * imprecise gesture into a coin flip between playing something and deleting it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
+/**
+ * A stable, unique key per queue row.
+ *
+ * Stable because an index in the key renames every row below a removed one, which rebuilds the list
+ * and lets a swipe offset land on a different track. Unique because a repeated key throws inside a
+ * LazyColumn, and qid is not guaranteed unique: an autoplay queue can hold two entries with the same
+ * uid and iteration. The first occurrence keeps the plain key, later ones carry their count.
+ */
+internal fun queueRowKeys(queue: List<ch.snepilatch.app.data.TrackInfo>): List<String> {
+    val seen = mutableMapOf<String, Int>()
+    return queue.map { track ->
+        val base = track.qid ?: track.uri
+        val nth = seen.merge(base, 1, Int::plus) ?: 1
+        if (nth == 1) base else "$base#$nth"
+    }
+}
+
 @Composable
 private fun SwipeableQueueRow(
     track: ch.snepilatch.app.data.TrackInfo,

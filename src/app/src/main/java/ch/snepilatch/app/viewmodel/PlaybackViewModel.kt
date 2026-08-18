@@ -1977,22 +1977,6 @@ class PlaybackViewModel : ViewModel() {
         showPlaylistPicker.value = true
     }
 
-    /**
-     * The part of `next_tracks` that is actually the queue.
-     *
-     * The list is the queued block, then a boundary, then the rest of whatever context is playing.
-     * Rendering it raw showed the boundary marker and entries the server had flagged as hidden or
-     * removed as though they were tracks, and showed the rest of the album as though it were queued.
-     */
-    internal fun visibleQueue(next: List<kotify.api.playerstatus.QueueTrack>) =
-        visibleQueueIndexed(next).map { it.value }
-
-    /** As [visibleQueue], but keeping each entry's index in the server list so a write can address it. */
-    internal fun visibleQueueIndexed(next: List<kotify.api.playerstatus.QueueTrack>) =
-        next.withIndex()
-            .takeWhile { !it.value.isDelimiter }
-            .filterNot { it.value.isHidden || it.value.isHiddenInQueue || it.value.removedReasons.isNotEmpty() }
-
     fun skipToQueueIndex(index: Int) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -2207,9 +2191,11 @@ class PlaybackViewModel : ViewModel() {
     private suspend fun applyQueue(state: kotify.api.playerstatus.PlayerStateData, songApi: Song?) {
         data class ParsedTrack(val uri: String, val info: TrackInfo, val needsFetch: Boolean)
 
-        val visible = visibleQueueIndexed(state.next_tracks)
-        _queuedCount.value = visible.takeWhile { it.value.isQueued }.size
-        val parsed = visible.map { (rawIndex, qt) ->
+        // Which entries are real, where the boundary is and which are queued is wire knowledge and
+        // lives in KotifyClient now. What is left here is turning it into rows.
+        val view = kotify.api.playerstatus.queueViewOf(state)
+        _queuedCount.value = view.queued.size
+        val parsed = view.entries.map { (qt, rawIndex) ->
             val cached = decoratedByUri[qt.uri]
             val name = qt.name?.takeIf { it.isNotEmpty() } ?: cached?.name
             val artist = qt.artistName?.takeIf { it.isNotEmpty() } ?: cached?.artistName

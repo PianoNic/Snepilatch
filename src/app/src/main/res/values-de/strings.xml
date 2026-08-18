@@ -232,6 +232,7 @@
     <string name="queue_next_up">Als Nächstes</string>
     <string name="queue_next_in_queue">Als Nächstes in der Warteschlange</string>
     <string name="queue_remove">Aus der Warteschlange entfernen</string>
+    <string name="queue_reorder">Verschieben</string>
     <string name="queue_empty">Warteschlange ist leer</string>
 
     <!-- Lyrics Screen -->

@@ -16,7 +16,12 @@ data class TrackInfo(
     val albumName: String? = null,
     val uid: String? = null,
     /** Queue identity: uid plus the repeat iteration, since uid alone recurs on the next pass. */
-    val qid: String? = null
+    val qid: String? = null,
+    /**
+     * Position in the server's unfiltered `next_tracks`. The queue we display hides the delimiter
+     * and anything flagged, so a row's position on screen is not the index a queue write wants.
+     */
+    val queueIndex: Int? = null
 )
 
 data class PlaybackUiState(

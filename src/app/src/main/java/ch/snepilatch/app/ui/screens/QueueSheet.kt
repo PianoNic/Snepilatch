@@ -2,6 +2,7 @@ package ch.snepilatch.app.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -9,10 +10,15 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -23,6 +29,7 @@ import ch.snepilatch.app.ui.components.SheetNavBarFix
 import ch.snepilatch.app.ui.components.SpfyImage
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
+import kotlin.math.roundToInt
 
 /** The queue as a bottom drawer over whatever is showing; the full player stays open underneath. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -68,36 +75,7 @@ fun QueueSheet(vm: PlaybackViewModel) {
                 }
                 return@Column
             }
-            // What you queued and what simply plays next are different things, so they get their own
-            // headers rather than one flat list that reads as if you had queued the whole album.
-            val upNext = queue.drop(queuedCount)
-            // Key by the entry, not its position: an index in the key means removing one row
-            // renames every row below it, so the list rebuilds and a swipe offset can be recycled
-            // onto a different track. Duplicate qids do happen in an autoplay queue, and a repeated
-            // key crashes the list, so the nth copy carries its own suffix.
-            val rowKeys = remember(queue) { queueRowKeys(queue) }
-            LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 16.dp)) {
-                if (queuedCount > 0) {
-                    item(key = "header-queued") { SectionHeader(stringResource(R.string.queue_next_in_queue)) }
-                    itemsIndexed(queue.take(queuedCount), key = { i, _ -> rowKeys[i] }) { i, track ->
-                        SwipeableQueueRow(
-                            track,
-                            onClick = { vm.skipToQueueIndex(i) },
-                            onRemove = { vm.removeFromQueue(track) },
-                        )
-                    }
-                }
-                if (upNext.isNotEmpty()) {
-                    item(key = "header-upnext") { SectionHeader(stringResource(R.string.queue_next_up)) }
-                    itemsIndexed(upNext, key = { i, _ -> rowKeys[queuedCount + i] }) { i, track ->
-                        SwipeableQueueRow(
-                            track,
-                            onClick = { vm.skipToQueueIndex(queuedCount + i) },
-                            onRemove = { vm.removeFromQueue(track) },
-                        )
-                    }
-                }
-            }
+            QueueList(vm, queue, queuedCount, Modifier.weight(1f))
         }
     }
 }
@@ -126,16 +104,99 @@ internal fun queueRowKeys(queue: List<ch.snepilatch.app.data.TrackInfo>): List<S
     }
 }
 
+/** One row's drag wiring, bundled so a row takes a drag contract rather than six loose callbacks. */
+private class RowDrag(
+    val dragging: Boolean,
+    val offsetY: Float,
+    val onMeasured: (Int) -> Unit,
+    val onStart: () -> Unit,
+    val onDrag: (Float) -> Unit,
+    val onEnd: () -> Unit,
+)
+
+/**
+ * The queue itself: what you queued, then what simply plays next, each under its own header.
+ *
+ * Rows are keyed by the entry rather than its position. An index in the key renames every row below
+ * a removed one, which rebuilds the list and can recycle a swipe offset onto a different track.
+ * Duplicate qids do occur in an autoplay queue and a repeated key throws, so the nth copy is suffixed.
+ */
+@Composable
+private fun QueueList(
+    vm: PlaybackViewModel,
+    queue: List<ch.snepilatch.app.data.TrackInfo>,
+    queuedCount: Int,
+    modifier: Modifier = Modifier,
+) {
+    val rowKeys = remember(queue) { queueRowKeys(queue) }
+    // Row height is measured rather than assumed, so the drop lands on the row under the finger
+    // even if the row's padding changes later.
+    var dragKey by remember { mutableStateOf<String?>(null) }
+    var dragDy by remember { mutableFloatStateOf(0f) }
+    var rowHeight by remember { mutableIntStateOf(0) }
+
+    fun dragFor(key: String, track: ch.snepilatch.app.data.TrackInfo, displayIndex: Int) = RowDrag(
+        dragging = key == dragKey,
+        offsetY = if (key == dragKey) dragDy else 0f,
+        onMeasured = { rowHeight = it },
+        onStart = {
+            dragKey = key
+            dragDy = 0f
+        },
+        onDrag = { dragDy += it },
+        onEnd = {
+            val rows = if (rowHeight > 0) (dragDy / rowHeight).roundToInt() else 0
+            dragKey = null
+            dragDy = 0f
+            if (rows != 0) vm.moveQueueEntry(track, displayIndex + rows)
+        },
+    )
+
+    val upNext = queue.drop(queuedCount)
+    LazyColumn(modifier, contentPadding = PaddingValues(bottom = 16.dp)) {
+        if (queuedCount > 0) {
+            item(key = "header-queued") { SectionHeader(stringResource(R.string.queue_next_in_queue)) }
+            itemsIndexed(queue.take(queuedCount), key = { i, _ -> rowKeys[i] }) { i, track ->
+                SwipeableQueueRow(
+                    track,
+                    dragFor(rowKeys[i], track, i),
+                    onClick = { vm.skipToQueueIndex(i) },
+                    onRemove = { vm.removeFromQueue(track) },
+                )
+            }
+        }
+        if (upNext.isNotEmpty()) {
+            item(key = "header-upnext") { SectionHeader(stringResource(R.string.queue_next_up)) }
+            itemsIndexed(upNext, key = { i, _ -> rowKeys[queuedCount + i] }) { i, track ->
+                SwipeableQueueRow(
+                    track,
+                    dragFor(rowKeys[queuedCount + i], track, queuedCount + i),
+                    onClick = { vm.skipToQueueIndex(queuedCount + i) },
+                    onRemove = { vm.removeFromQueue(track) },
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun SwipeableQueueRow(
     track: ch.snepilatch.app.data.TrackInfo,
+    drag: RowDrag,
     onClick: () -> Unit,
     onRemove: () -> Unit,
 ) {
     val state = rememberSwipeToDismissBoxState()
     SwipeToDismissBox(
         state = state,
+        modifier = Modifier
+            // The dragged row rides above the rest and follows the finger; everything else
+            // holds still until the drop, so the list cannot reflow under the gesture.
+            .zIndex(if (drag.dragging) 1f else 0f)
+            .offset { IntOffset(0, drag.offsetY.roundToInt()) },
         onDismiss = { value -> if (value == SwipeToDismissBoxValue.EndToStart) onRemove() },
+        // A vertical drag on the grip must not also read as a swipe to delete.
+        enableDismissFromEndToStart = !drag.dragging,
         enableDismissFromStartToEnd = false,
         backgroundContent = {
             Box(
@@ -149,7 +210,7 @@ private fun SwipeableQueueRow(
             }
         }
     ) {
-        QueueRow(track, onClick)
+        QueueRow(track, onClick, drag.onMeasured, drag.onStart, drag.onDrag, drag.onEnd)
     }
 }
 
@@ -165,10 +226,18 @@ private fun SectionHeader(title: String) {
 }
 
 @Composable
-private fun QueueRow(track: ch.snepilatch.app.data.TrackInfo, onClick: () -> Unit) {
+private fun QueueRow(
+    track: ch.snepilatch.app.data.TrackInfo,
+    onClick: () -> Unit,
+    onMeasured: (Int) -> Unit,
+    onDragStart: () -> Unit,
+    onDrag: (Float) -> Unit,
+    onDragEnd: () -> Unit,
+) {
     Row(
         Modifier
             .fillMaxWidth()
+            .onSizeChanged { onMeasured(it.height) }
             // Opaque on purpose: the delete panel sits behind every row, so a transparent row shows
             // it through and the whole list reads as though it were mid-swipe.
             .background(SpfyElevated)
@@ -181,6 +250,27 @@ private fun QueueRow(track: ch.snepilatch.app.data.TrackInfo, onClick: () -> Uni
             Text(track.name, color = SpfyWhite, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(track.artist, color = SpfyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
+        Icon(
+            Icons.Rounded.DragHandle,
+            stringResource(R.string.queue_reorder),
+            tint = SpfyLightGray,
+            modifier = Modifier
+                .padding(start = 8.dp)
+                .size(24.dp)
+                // The grip starts the drag, not the row: a row-wide vertical drag would fight
+                // the list's own scrolling, which is why a touch queue needs a handle at all.
+                .pointerInput(track.qid) {
+                    detectDragGestures(
+                        onDragStart = { onDragStart() },
+                        onDrag = { change, amount ->
+                            change.consume()
+                            onDrag(amount.y)
+                        },
+                        onDragEnd = { onDragEnd() },
+                        onDragCancel = { onDragEnd() },
+                    )
+                }
+        )
     }
 }
 

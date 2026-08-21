@@ -46,7 +46,11 @@ object Yt1dSource {
 
     /** A direct audio url for [videoId], or null when yt1d has nothing for it. */
     suspend fun audioUrl(videoId: String): String? = withContext(Dispatchers.IO) {
-        val config = cached ?: fetchConfig()?.also { cached = it } ?: return@withContext null
+        val config = cached ?: fetchConfig()?.also { cached = it }
+        if (config == null) {
+            LokiLogger.w(TAG, "no config, cannot resolve $videoId")
+            return@withContext null
+        }
         val body = FormBody.Builder()
             .add("action", "process_youtube_audio_download")
             .add("video_url", "https://www.youtube.com/watch?v=$videoId")
@@ -62,8 +66,19 @@ object Yt1dSource {
             .header("User-Agent", UA)
             .build()
         val payload = runCatching {
-            http.newCall(request).execute().use { if (it.isSuccessful) it.body?.string() else null }
-        }.getOrNull() ?: return@withContext null
+            http.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    response.body?.string()
+                } else {
+                    // A stale nonce and a drifted endpoint both read as a plain 400 here, so drop the
+                    // config: the next attempt re-fetches it and the log says which it was.
+                    LokiLogger.w(TAG, "download HTTP ${response.code} for $videoId")
+                    cached = null
+                    null
+                }
+            }
+        }.onFailure { LokiLogger.w(TAG, "download request failed: $it") }.getOrNull()
+            ?: return@withContext null
         val url = runCatching { downloadUrl(json.parseToJsonElement(payload)) }.getOrNull()
         if (url == null) {
             // A stale nonce reads as a plain failure, so drop it and let the next attempt re-fetch.
@@ -80,9 +95,20 @@ object Yt1dSource {
             .header("User-Agent", UA)
             .build()
         val html = runCatching {
-            http.newCall(request).execute().use { if (it.isSuccessful) it.body?.string() else null }
-        }.getOrNull() ?: return null
-        val nonce = noncePattern.find(html)?.groupValues?.get(1) ?: return null
+            http.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    response.body?.string()
+                } else {
+                    LokiLogger.w(TAG, "config HTTP ${response.code}")
+                    null
+                }
+            }
+        }.onFailure { LokiLogger.w(TAG, "config fetch failed: $it") }.getOrNull() ?: return null
+        val nonce = noncePattern.find(html)?.groupValues?.get(1)
+        if (nonce == null) {
+            LokiLogger.w(TAG, "no nonce in ${html.length} bytes of config")
+            return null
+        }
         val ajax = ajaxPattern.find(html)?.groupValues?.get(1)?.replace(ESCAPED_SLASH, "/") ?: AJAX_URL
         return Config(ajax, nonce)
     }

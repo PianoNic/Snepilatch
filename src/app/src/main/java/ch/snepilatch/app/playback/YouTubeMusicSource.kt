@@ -117,6 +117,21 @@ object YouTubeMusicSource {
         region: String?,
         durationMs: Long,
     ): Stream? = withContext(Dispatchers.IO) {
+        val videoId = findVideoId(title, artist, region, durationMs) ?: return@withContext null
+        val visitor = visitorData ?: return@withContext null
+        streamFor(videoId, region, visitor)
+    }
+
+    /**
+     * The matched YouTube id on its own. The fallback provider needs it when googlevideo refuses the
+     * media url, which is the case the direct route cannot recover from.
+     */
+    suspend fun findVideoId(
+        title: String,
+        artist: String,
+        region: String?,
+        durationMs: Long,
+    ): String? = withContext(Dispatchers.IO) {
         // The display placeholder is not a search word. bestMatch drops it again as a match constraint.
         val artist = realArtist(artist)
         val query = searchQuery(artist, title)
@@ -140,8 +155,7 @@ object YouTubeMusicSource {
             return@withContext null
         }
         LokiLogger.i(TAG, "'$query' -> ${match.videoId} '${match.title}' ${match.durationSec}s")
-
-        streamFor(match.videoId, region, visitor)
+        match.videoId
     }
 
     /** Any InnerTube response carries one; a throwaway search is the cheapest way to get it. */

@@ -181,28 +181,20 @@ object TrackDownloader {
                     return@withContext DownloadOutcome.Failed("the played audio was not available to save")
                 }
 
-                val info = when (val resolved = resolve(request)) {
+                var info = when (val resolved = resolve(request)) {
                     is StreamResult.Success -> resolved.info
                     is StreamResult.Failure ->
-                        return@withContext DownloadOutcome.Failed(resolved.message)
+                        viaYt1d(request) ?: return@withContext DownloadOutcome.Failed(resolved.message)
                 }
-                val fetched = runCatching { fetchTo(info, temp, report) }
-                    .recoverCatching { failure ->
-                        // A refused media url usually means the cached visitor id went stale, so mint
-                        // a fresh one and resolve again before giving up.
-                        if (failure is CancellationException) throw failure
-                        if (failure.message?.contains("HTTP 403") != true) throw failure
-                        LokiLogger.w(TAG, "403 for '${request.title}', retrying with a fresh visitor id")
-                        YouTubeMusicSource.invalidateVisitorData()
-                        val retry = resolve(request)
-                        if (retry !is StreamResult.Success) throw failure
-                        fetchTo(retry.info, temp, report)
-                    }.getOrElse {
+                val attempt = runCatching { fetchWithFallbacks(request, info, temp, report) }
+                    .getOrElse {
                         if (it is CancellationException) throw it
                         LokiLogger.e(TAG, "fetch failed for ${request.title}: ${it.message}")
                         DownloadNotifier.failed(context, request.title, it.message ?: "failed")
                         return@withContext DownloadOutcome.Failed(it.message ?: "fetch failed")
                     }
+                info = attempt.info
+                val fetched = attempt.bytes
                 if (fetched <= 0L) {
                     DownloadNotifier.failed(context, request.title, "empty download")
                     return@withContext DownloadOutcome.Failed("empty download")
@@ -283,6 +275,67 @@ object TrackDownloader {
             input.read(head) == bytes.size && bytes.withIndex().all { (i, b) -> head[i] == b.toByte() }
         }
     }.getOrDefault(false)
+
+    /**
+     * The last rung. googlevideo refused us, so ask yt1d for the same recording. Only for a YouTube
+     * download: a Qobuz or Deezer request wants that source's master, not a YouTube upload of it.
+     */
+    private class Attempt(val bytes: Long, val info: StreamInfo)
+
+    /**
+     * Fetches [initial], and when the media url is refused works down the rungs that remain: a fresh
+     * visitor id first, then the fallback provider. Throws once none are left.
+     */
+    private suspend fun fetchWithFallbacks(
+        request: DownloadRequest,
+        initial: StreamInfo,
+        temp: File,
+        report: (Int) -> Unit,
+    ): Attempt {
+        var info = initial
+        val bytes = runCatching { fetchTo(info, temp, report) }
+            .recoverCatching { failure ->
+                info = freshVisitorInfo(request, failure) ?: throw failure
+                fetchTo(info, temp, report)
+            }
+            .recoverCatching { failure ->
+                info = fallbackInfo(request, failure) ?: throw failure
+                fetchTo(info, temp, report)
+            }
+            .getOrThrow()
+        return Attempt(bytes, info)
+    }
+
+    /**
+     * A re-resolve behind a fresh visitor id, or null when this failure is not one that stands to
+     * benefit — a refused media url usually means the cached id went stale.
+     */
+    private suspend fun freshVisitorInfo(request: DownloadRequest, failure: Throwable): StreamInfo? {
+        if (failure is CancellationException) throw failure
+        if (failure.message?.contains("HTTP 403") != true) return null
+        LokiLogger.w(TAG, "403 for '${request.title}', retrying with a fresh visitor id")
+        YouTubeMusicSource.invalidateVisitorData()
+        return (resolve(request) as? StreamResult.Success)?.info
+    }
+
+    /** The last rung, once the direct route is out of moves. */
+    private suspend fun fallbackInfo(request: DownloadRequest, failure: Throwable): StreamInfo? {
+        if (failure is CancellationException) throw failure
+        return viaYt1d(request)
+    }
+
+    private suspend fun viaYt1d(request: DownloadRequest): StreamInfo? {
+        if (AppSettings.downloadSource.value != AppSettings.SOURCE_YTM) return null
+        val videoId = YouTubeMusicSource.findVideoId(
+            title = request.title,
+            artist = request.artist,
+            region = AppSettings.effectiveRegion(),
+            durationMs = request.durationMs,
+        ) ?: return null
+        val url = Yt1dSource.audioUrl(videoId) ?: return null
+        LokiLogger.i(TAG, "yt1d fallback for '${request.title}' ($videoId)")
+        return StreamInfo(url = url, provider = "yt1d", mimeType = "audio/mp4", headers = emptyMap())
+    }
 
     private suspend fun resolve(request: DownloadRequest): StreamResult = AudioSourceResolver.byQuery(
         trackUri = request.trackUri,

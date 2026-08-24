@@ -5,7 +5,6 @@ import ch.snepilatch.app.playback.AudioSourceResolver
 import ch.snepilatch.app.playback.DeezerBlockCipher
 import ch.snepilatch.app.playback.MusicPlaybackService
 import ch.snepilatch.app.playback.PlaybackCache
-import ch.snepilatch.app.playback.YouTubeMusicSource
 import ch.snepilatch.app.util.LokiLogger
 import ch.snepilatch.app.viewmodel.AppSettings
 import kotify.cdn.StreamInfo
@@ -181,20 +180,23 @@ object TrackDownloader {
                     return@withContext DownloadOutcome.Failed("the played audio was not available to save")
                 }
 
-                var info = when (val resolved = resolve(request)) {
-                    is StreamResult.Success -> resolved.info
-                    is StreamResult.Failure ->
-                        viaYt1d(request) ?: return@withContext DownloadOutcome.Failed(resolved.message)
+                val info = if (AppSettings.downloadSource.value == AppSettings.SOURCE_YTM) {
+                    viaArgonFetch(request) ?: return@withContext DownloadOutcome.Failed(
+                        "no ArgonFetch source for '${request.title}'"
+                    )
+                } else {
+                    when (val resolved = resolve(request)) {
+                        is StreamResult.Success -> resolved.info
+                        is StreamResult.Failure -> return@withContext DownloadOutcome.Failed(resolved.message)
+                    }
                 }
-                val attempt = runCatching { fetchWithFallbacks(request, info, temp, report) }
+                val fetched = runCatching { fetchTo(info, temp, report) }
                     .getOrElse {
                         if (it is CancellationException) throw it
                         LokiLogger.e(TAG, "fetch failed for ${request.title}: ${it.message}")
                         DownloadNotifier.failed(context, request.title, it.message ?: "failed")
                         return@withContext DownloadOutcome.Failed(it.message ?: "fetch failed")
                     }
-                info = attempt.info
-                val fetched = attempt.bytes
                 if (fetched <= 0L) {
                     DownloadNotifier.failed(context, request.title, "empty download")
                     return@withContext DownloadOutcome.Failed("empty download")
@@ -222,7 +224,7 @@ object TrackDownloader {
             return null
         }
         LokiLogger.i(TAG, "'${request.title}' encoded from the decoded capture (${temp.length()} bytes)")
-        return StreamInfo(url = "pcm-capture", provider = "Decoded audio", mimeType = "audio/mp4")
+        return StreamInfo(url = "pcm-capture", provider = "Decoded audio", mimeType = "audio/mpeg")
     }
 
     /**
@@ -277,64 +279,19 @@ object TrackDownloader {
     }.getOrDefault(false)
 
     /**
-     * The last rung. googlevideo refused us, so ask yt1d for the same recording. Only for a YouTube
-     * download: a Qobuz or Deezer request wants that source's master, not a YouTube upload of it.
+     * Where a YouTube download comes from. googlevideo refuses the urls its own player hands us, so
+     * the direct route only ever cost a 403 and two retries before landing here anyway. Not for the
+     * other sources: ArgonFetch pulls from YouTube and would turn a lossless request into an Opus one.
      */
-    private class Attempt(val bytes: Long, val info: StreamInfo)
-
-    /**
-     * Fetches [initial], and when the media url is refused works down the rungs that remain: a fresh
-     * visitor id first, then the fallback provider. Throws once none are left.
-     */
-    private suspend fun fetchWithFallbacks(
-        request: DownloadRequest,
-        initial: StreamInfo,
-        temp: File,
-        report: (Int) -> Unit,
-    ): Attempt {
-        var info = initial
-        val bytes = runCatching { fetchTo(info, temp, report) }
-            .recoverCatching { failure ->
-                info = freshVisitorInfo(request, failure) ?: throw failure
-                fetchTo(info, temp, report)
-            }
-            .recoverCatching { failure ->
-                info = fallbackInfo(request, failure) ?: throw failure
-                fetchTo(info, temp, report)
-            }
-            .getOrThrow()
-        return Attempt(bytes, info)
-    }
-
-    /**
-     * A re-resolve behind a fresh visitor id, or null when this failure is not one that stands to
-     * benefit — a refused media url usually means the cached id went stale.
-     */
-    private suspend fun freshVisitorInfo(request: DownloadRequest, failure: Throwable): StreamInfo? {
-        if (failure is CancellationException) throw failure
-        if (failure.message?.contains("HTTP 403") != true) return null
-        LokiLogger.w(TAG, "403 for '${request.title}', retrying with a fresh visitor id")
-        YouTubeMusicSource.invalidateVisitorData()
-        return (resolve(request) as? StreamResult.Success)?.info
-    }
-
-    /** The last rung, once the direct route is out of moves. */
-    private suspend fun fallbackInfo(request: DownloadRequest, failure: Throwable): StreamInfo? {
-        if (failure is CancellationException) throw failure
-        return viaYt1d(request)
-    }
-
-    private suspend fun viaYt1d(request: DownloadRequest): StreamInfo? {
-        if (AppSettings.downloadSource.value != AppSettings.SOURCE_YTM) return null
-        val videoId = YouTubeMusicSource.findVideoId(
-            title = request.title,
-            artist = request.artist,
-            region = AppSettings.effectiveRegion(),
-            durationMs = request.durationMs,
-        ) ?: return null
-        val url = Yt1dSource.audioUrl(videoId) ?: return null
-        LokiLogger.i(TAG, "yt1d fallback for '${request.title}' ($videoId)")
-        return StreamInfo(url = url, provider = "yt1d", mimeType = "audio/mp4", headers = emptyMap())
+    private suspend fun viaArgonFetch(request: DownloadRequest): StreamInfo? {
+        val audio = ArgonFetchSource.audio(request.trackUri) ?: return null
+        LokiLogger.i(TAG, "ArgonFetch source for '${request.title}'")
+        return StreamInfo(
+            url = audio.url,
+            provider = "ArgonFetch",
+            mimeType = audio.mimeType,
+            headers = emptyMap(),
+        )
     }
 
     private suspend fun resolve(request: DownloadRequest): StreamResult = AudioSourceResolver.byQuery(

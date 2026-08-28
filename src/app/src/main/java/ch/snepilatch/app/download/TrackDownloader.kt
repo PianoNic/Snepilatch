@@ -5,7 +5,6 @@ import ch.snepilatch.app.playback.AudioSourceResolver
 import ch.snepilatch.app.playback.DeezerBlockCipher
 import ch.snepilatch.app.playback.MusicPlaybackService
 import ch.snepilatch.app.playback.PlaybackCache
-import ch.snepilatch.app.playback.YouTubeMusicSource
 import ch.snepilatch.app.util.LokiLogger
 import ch.snepilatch.app.viewmodel.AppSettings
 import kotify.cdn.StreamInfo
@@ -181,23 +180,18 @@ object TrackDownloader {
                     return@withContext DownloadOutcome.Failed("the played audio was not available to save")
                 }
 
-                val info = when (val resolved = resolve(request)) {
-                    is StreamResult.Success -> resolved.info
-                    is StreamResult.Failure ->
-                        return@withContext DownloadOutcome.Failed(resolved.message)
+                val info = if (AppSettings.downloadSource.value == AppSettings.SOURCE_YTM) {
+                    viaArgonFetch(request) ?: return@withContext DownloadOutcome.Failed(
+                        "no ArgonFetch source for '${request.title}'"
+                    )
+                } else {
+                    when (val resolved = resolve(request)) {
+                        is StreamResult.Success -> resolved.info
+                        is StreamResult.Failure -> return@withContext DownloadOutcome.Failed(resolved.message)
+                    }
                 }
                 val fetched = runCatching { fetchTo(info, temp, report) }
-                    .recoverCatching { failure ->
-                        // A refused media url usually means the cached visitor id went stale, so mint
-                        // a fresh one and resolve again before giving up.
-                        if (failure is CancellationException) throw failure
-                        if (failure.message?.contains("HTTP 403") != true) throw failure
-                        LokiLogger.w(TAG, "403 for '${request.title}', retrying with a fresh visitor id")
-                        YouTubeMusicSource.invalidateVisitorData()
-                        val retry = resolve(request)
-                        if (retry !is StreamResult.Success) throw failure
-                        fetchTo(retry.info, temp, report)
-                    }.getOrElse {
+                    .getOrElse {
                         if (it is CancellationException) throw it
                         LokiLogger.e(TAG, "fetch failed for ${request.title}: ${it.message}")
                         DownloadNotifier.failed(context, request.title, it.message ?: "failed")
@@ -230,7 +224,7 @@ object TrackDownloader {
             return null
         }
         LokiLogger.i(TAG, "'${request.title}' encoded from the decoded capture (${temp.length()} bytes)")
-        return StreamInfo(url = "pcm-capture", provider = "Decoded audio", mimeType = "audio/mp4")
+        return StreamInfo(url = "pcm-capture", provider = "Decoded audio", mimeType = "audio/mpeg")
     }
 
     /**
@@ -283,6 +277,22 @@ object TrackDownloader {
             input.read(head) == bytes.size && bytes.withIndex().all { (i, b) -> head[i] == b.toByte() }
         }
     }.getOrDefault(false)
+
+    /**
+     * Where a YouTube download comes from. googlevideo refuses the urls its own player hands us, so
+     * the direct route only ever cost a 403 and two retries before landing here anyway. Not for the
+     * other sources: ArgonFetch pulls from YouTube and would turn a lossless request into an Opus one.
+     */
+    private suspend fun viaArgonFetch(request: DownloadRequest): StreamInfo? {
+        val audio = ArgonFetchSource.audio(request.trackUri) ?: return null
+        LokiLogger.i(TAG, "ArgonFetch source for '${request.title}'")
+        return StreamInfo(
+            url = audio.url,
+            provider = "ArgonFetch",
+            mimeType = audio.mimeType,
+            headers = emptyMap(),
+        )
+    }
 
     private suspend fun resolve(request: DownloadRequest): StreamResult = AudioSourceResolver.byQuery(
         trackUri = request.trackUri,

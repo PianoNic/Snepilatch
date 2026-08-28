@@ -35,13 +35,18 @@ object YouTubeMusicSource {
     private const val SONGS_PARAMS = "EgWKAQIIAWoKEAoQAxAEEAkQBQ%3D%3D"
     private const val VIDEOS_PARAMS = "EgWKAQIQAWoKEAoQAxAEEAkQBQ%3D%3D"
 
-    private const val WEB_REMIX_VERSION = "1.20240101.01.00"
+    private const val WEB_REMIX_VERSION = "1.20240801.01.00"
     private const val WEB_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
         "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
+    /** X-YouTube-Client-Name ids: WEB_REMIX is 67, ANDROID_VR is 28. */
+    private const val WEB_REMIX_ID = "67"
+    private const val ANDROID_VR_ID = "28"
+
     private const val VR_VERSION = "1.65.10"
     private const val VR_UA =
-        "com.google.android.apps.youtube.vr.oculus/$VR_VERSION (Linux; U; Android 12; GB) gzip"
+        "com.google.android.apps.youtube.vr.oculus/$VR_VERSION " +
+            "(Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip"
 
     /** Wide because a music-video upload of the same track carries an intro or outro. */
     internal const val DURATION_TOLERANCE_SEC = 30L
@@ -112,6 +117,21 @@ object YouTubeMusicSource {
         region: String?,
         durationMs: Long,
     ): Stream? = withContext(Dispatchers.IO) {
+        val videoId = findVideoId(title, artist, region, durationMs) ?: return@withContext null
+        val visitor = visitorData ?: return@withContext null
+        streamFor(videoId, region, visitor)
+    }
+
+    /**
+     * The matched YouTube id on its own. The fallback provider needs it when googlevideo refuses the
+     * media url, which is the case the direct route cannot recover from.
+     */
+    suspend fun findVideoId(
+        title: String,
+        artist: String,
+        region: String?,
+        durationMs: Long,
+    ): String? = withContext(Dispatchers.IO) {
         // The display placeholder is not a search word. bestMatch drops it again as a match constraint.
         val artist = realArtist(artist)
         val query = searchQuery(artist, title)
@@ -125,7 +145,7 @@ object YouTubeMusicSource {
 
         var seen = 0
         val match = listOf(SONGS_PARAMS, VIDEOS_PARAMS).firstNotNullOfOrNull { params ->
-            val body = post(SEARCH_URL, searchBody(query, region, visitor, params), WEB_UA, visitor)
+            val body = post(SEARCH_URL, searchBody(query, region, visitor, params), WEB_UA, visitor, WEB_REMIX_ID)
             val candidates = body?.let { runCatching { parseCandidates(it) }.getOrNull() }.orEmpty()
             seen += candidates.size
             bestMatch(candidates, title, artist, durationMs, officialShelf = params == SONGS_PARAMS)
@@ -135,8 +155,7 @@ object YouTubeMusicSource {
             return@withContext null
         }
         LokiLogger.i(TAG, "'$query' -> ${match.videoId} '${match.title}' ${match.durationSec}s")
-
-        streamFor(match.videoId, region, visitor)
+        match.videoId
     }
 
     /** Any InnerTube response carries one; a throwaway search is the cheapest way to get it. */
@@ -144,20 +163,21 @@ object YouTubeMusicSource {
         val gl = (region ?: "US").uppercase()
         val body = """{"context":{"client":{"clientName":"WEB_REMIX",""" +
             """"clientVersion":"$WEB_REMIX_VERSION","hl":"en","gl":"$gl"}},"query":"a"}"""
-        val raw = post(SEARCH_URL, body, WEB_UA, visitor = null) ?: return null
+        val raw = post(SEARCH_URL, body, WEB_UA, visitor = null, clientId = WEB_REMIX_ID) ?: return null
         return runCatching {
             json.parseToJsonElement(raw).jsonObject["responseContext"]?.jsonObject
                 ?.get("visitorData")?.jsonPrimitive?.content
         }.getOrNull()
     }
 
-    private fun post(url: String, body: String, userAgent: String, visitor: String?): String? = runCatching {
+    private fun post(url: String, body: String, userAgent: String, visitor: String?, clientId: String? = null): String? = runCatching {
         val request = Request.Builder()
             .url(url)
             .post(body.toRequestBody(jsonMedia))
             .header("User-Agent", userAgent)
             .header("Accept", "*/*")
             .apply { if (visitor != null) header("X-Goog-Visitor-Id", visitor) }
+            .apply { if (clientId != null) header("X-YouTube-Client-Name", clientId) }
             .build()
         http.newCall(request).execute().use { if (it.isSuccessful) it.body?.string() else null }
     }.getOrNull()
@@ -172,13 +192,14 @@ object YouTubeMusicSource {
     private fun playerBody(videoId: String, region: String?, visitor: String): String {
         val gl = (region ?: "US").uppercase()
         return """{"context":{"client":{"clientName":"ANDROID_VR","clientVersion":"$VR_VERSION",""" +
-            """"deviceMake":"Oculus","deviceModel":"Quest 3","osName":"Android","osVersion":"12",""" +
+            """"deviceMake":"Oculus","deviceModel":"Quest 3","osName":"Android","osVersion":"12L",""" +
+            """"platform":"MOBILE","timeZone":"UTC","utcOffsetMinutes":0,""" +
             """"androidSdkVersion":32,"hl":"en","gl":"$gl","visitorData":"$visitor"}},""" +
             """"videoId":"$videoId","contentCheckOk":true,"racyCheckOk":true}"""
     }
 
     private fun streamFor(videoId: String, region: String?, visitor: String): Stream? {
-        val raw = post(PLAYER_URL, playerBody(videoId, region, visitor), VR_UA, visitor)
+        val raw = post(PLAYER_URL, playerBody(videoId, region, visitor), VR_UA, visitor, ANDROID_VR_ID)
         if (raw == null) {
             LokiLogger.w(TAG, "player request failed for $videoId")
             return null

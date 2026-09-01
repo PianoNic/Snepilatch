@@ -278,6 +278,25 @@ class DetailViewModel : SessionViewModel("DetailVM") {
         }
     }
 
+    /**
+     * One page of an entity's tracks, fetched without touching the open detail, for acting on
+     * something straight from the feed.
+     *
+     * ponytail: one page, same as opening it would have loaded. A 700 track playlist hands over its
+     * first 50; page it here if "add the whole thing to the queue" ever needs to mean all of it.
+     */
+    fun fetchTrackUris(uri: String, onReady: (List<String>) -> Unit) {
+        launchWithSession("fetchTrackUris") { sess ->
+            val id = uri.substringAfterLast(":")
+            val tracks = when {
+                uri.contains(":collection") -> Playlist(sess).getLikedSongs(limit = 50).toDetailData(offset = 0)
+                uri.contains(":album:") -> Album(sess).getAlbum(id, limit = 50).toDetailData(id)
+                else -> Playlist(sess).getPlaylist(id, 50, 0).toDetailData(id)
+            }
+            onReady(tracks.tracks.map { it.uri })
+        }
+    }
+
     fun checkDetailSaved(type: String, id: String) {
         viewModelScope.launch(Dispatchers.IO) {
             try {

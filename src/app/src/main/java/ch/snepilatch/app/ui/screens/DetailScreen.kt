@@ -17,6 +17,8 @@ import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Share
+import ch.snepilatch.app.ui.components.EntityMenuSheet
+import ch.snepilatch.app.ui.components.MenuAction
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -861,35 +863,6 @@ private fun AlbumTrackRow(
     }
 }
 
-/**
- * Bottom-sheet menu opened from the 3-dot button on the detail header
- * (album, playlist, artist, Liked Songs). Each row is a single action that
- * KotifyClient actually supports — no Premium-gated entries, no UI-only
- * "show Spfy Code" filler. Action set adapts to the detail type.
- *
- * Skips "Remove from Library" because the like/save toggle already lives
- * elsewhere in the header.
- */
-@Composable
-private fun DetailHeaderMenuTitle(detail: ch.snepilatch.app.data.DetailData, type: String) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        ch.snepilatch.app.ui.components.SpfyImage(
-            url = detail.imageUrl,
-            modifier = Modifier.size(48.dp),
-            shape = RoundedCornerShape(8.dp)
-        )
-        Spacer(Modifier.width(12.dp))
-        Column {
-            Text(detail.name, color = SpfyWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            val subtitle = detail.artistName ?: detail.ownerName ?: type.replaceFirstChar { it.uppercase() }
-            Text(subtitle, color = SpfyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DetailHeaderMenu(
@@ -898,75 +871,53 @@ private fun DetailHeaderMenu(
     context: android.content.Context,
     onDismiss: () -> Unit,
 ) {
-    val sheetState = rememberBottomSheetState(
-        initialValue = SheetValue.Hidden,
-        enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
-    )
     val trackUris = detail.tracks.map { it.uri }; val hasTracks = trackUris.isNotEmpty(); val type = detail.type
     val isAlbum = type == "album"; val isCollection = type == "collection"; val isArtist = type == "artist"
     val shareLabel = stringResource(R.string.share); val addToQueueLabel = stringResource(R.string.add_to_queue)
     val addToPlaylistLabel = stringResource(R.string.add_to_playlist); val visitArtistLabel = stringResource(R.string.visit_artist)
     val artistRadioLabel = stringResource(R.string.go_to_artist_radio)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = SpfyElevated,
-    ) {
-        ch.snepilatch.app.ui.components.SheetNavBarFix()
-        DetailHeaderMenuTitle(detail, type)
-        Spacer(Modifier.height(8.dp))
-        HorizontalDivider(color = SpfyLightGray.copy(alpha = 0.15f))
-        val items = buildList<Triple<androidx.compose.ui.graphics.vector.ImageVector, String, () -> Unit>> {
-            if (!isCollection) {
-                val id = detail.uri.substringAfterLast(":")
-                add(Triple(Icons.Rounded.Share, shareLabel) {
-                    onDismiss()
-                    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                        this.type = "text/plain"
-                        putExtra(android.content.Intent.EXTRA_TEXT, "https://open.spotify.com/$type/$id")
-                    }
-                    context.startActivity(android.content.Intent.createChooser(intent, shareLabel))
-                })
-            }
-            if (hasTracks && !isArtist) {
-                add(Triple(Icons.AutoMirrored.Rounded.QueueMusic, addToQueueLabel) {
-                    onDismiss()
-                    vm.addAllToQueue(trackUris)
-                })
-                add(Triple(Icons.AutoMirrored.Rounded.PlaylistAdd, addToPlaylistLabel) {
-                    onDismiss()
-                    vm.showPlaylistPickerForTracks(trackUris)
-                })
-            }
-            if (isAlbum && detail.artistUri != null) {
-                add(Triple(Icons.Rounded.Person, visitArtistLabel) {
-                    onDismiss()
-                    val artistId = detail.artistUri.substringAfterLast(":")
-                    DetailRoutes.openArtist(artistId)
-                })
-            }
-            // An album seeds with its artist, same as the desktop client — hence "artist radio" there.
-            val radioSeed = if (isArtist) detail.uri else detail.artistUri?.takeIf { isAlbum }
-            if (radioSeed != null) {
-                add(Triple(Icons.Rounded.Radio, artistRadioLabel) {
-                    onDismiss()
-                    DetailRoutes.openRadio(radioSeed)
-                })
-            }
+    val actions = buildList {
+        if (!isCollection) {
+            val id = detail.uri.substringAfterLast(":")
+            add(MenuAction(Icons.Rounded.Share, shareLabel) {
+                onDismiss()
+                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    this.type = "text/plain"
+                    putExtra(android.content.Intent.EXTRA_TEXT, "https://open.spotify.com/$type/$id")
+                }
+                context.startActivity(android.content.Intent.createChooser(intent, shareLabel))
+            })
         }
-        items.forEach { (icon, label, onClick) ->
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clickable { onClick() }
-                    .padding(horizontal = 20.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(icon, null, tint = SpfyWhite, modifier = Modifier.size(24.dp))
-                Spacer(Modifier.width(16.dp))
-                Text(label, color = SpfyWhite, fontSize = 15.sp)
-            }
+        if (hasTracks && !isArtist) {
+            add(MenuAction(Icons.AutoMirrored.Rounded.QueueMusic, addToQueueLabel) {
+                onDismiss()
+                vm.addAllToQueue(trackUris)
+            })
+            add(MenuAction(Icons.AutoMirrored.Rounded.PlaylistAdd, addToPlaylistLabel) {
+                onDismiss()
+                vm.showPlaylistPickerForTracks(trackUris)
+            })
         }
-        Spacer(Modifier.navigationBarsPadding().height(12.dp))
+        if (isAlbum && detail.artistUri != null) {
+            add(MenuAction(Icons.Rounded.Person, visitArtistLabel) {
+                onDismiss()
+                DetailRoutes.openArtist(detail.artistUri.substringAfterLast(":"))
+            })
+        }
+        // An album seeds with its artist, same as the desktop client — hence "artist radio" there.
+        val radioSeed = if (isArtist) detail.uri else detail.artistUri?.takeIf { isAlbum }
+        if (radioSeed != null) {
+            add(MenuAction(Icons.Rounded.Radio, artistRadioLabel) {
+                onDismiss()
+                DetailRoutes.openRadio(radioSeed)
+            })
+        }
     }
+    EntityMenuSheet(
+        imageUrl = detail.imageUrl,
+        title = detail.name,
+        subtitle = detail.artistName ?: detail.ownerName ?: type.replaceFirstChar { it.uppercase() },
+        actions = actions,
+        onDismiss = onDismiss
+    )
 }

@@ -36,6 +36,18 @@ object DownloadQueue {
     /** Everything asked for, oldest first. */
     val queue: StateFlow<List<QueueEntry>> = _queue.asStateFlow()
 
+    private val _progress = MutableStateFlow<Map<String, Int>>(emptyMap())
+
+    /**
+     * How far along each track being fetched is, by uri. A queue entry knows the album or playlist
+     * the user asked for, so a track row cannot tell whether an entry's percentage is its own.
+     */
+    val progress: StateFlow<Map<String, Int>> = _progress.asStateFlow()
+
+    fun reportTrack(uri: String, percent: Int) = _progress.update { it + (uri to percent) }
+
+    fun clearTrack(uri: String) = _progress.update { it - uri }
+
     private val nextJobId = java.util.concurrent.atomic.AtomicInteger(0)
 
     private val gates = java.util.concurrent.ConcurrentHashMap<Int, CompletableDeferred<Unit>>()

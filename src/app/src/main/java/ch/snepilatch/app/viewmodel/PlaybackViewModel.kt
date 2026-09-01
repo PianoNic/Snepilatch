@@ -3186,7 +3186,10 @@ class PlaybackViewModel : ViewModel() {
             val progress: ((Int) -> Unit)? = if (localOnly) {
                 null
             } else {
-                { percent -> DownloadQueue.updateJob(id, done = 1, trackPercent = percent) }
+                { percent ->
+                    DownloadQueue.updateJob(id, done = 1, trackPercent = percent)
+                    DownloadQueue.reportTrack(track.uri, percent)
+                }
             }
             var state = DownloadQueue.QueueEntry.State.Failed
             try {
@@ -3199,6 +3202,7 @@ class PlaybackViewModel : ViewModel() {
                 state = DownloadQueue.QueueEntry.State.Cancelled
                 throw e
             } finally {
+                DownloadQueue.clearTrack(track.uri)
                 // In a finally because cancellation (backing out of the app) has to settle the entry
                 // too; it used to be left running, so the tab claimed a download that had stopped.
                 DownloadQueue.finishJob(id, state)
@@ -3250,17 +3254,24 @@ class PlaybackViewModel : ViewModel() {
                     // rather than abandoning bytes already fetched.
                     DownloadQueue.awaitResume(id)
                     DownloadNotifier.batch(ctx, track.name, index + 1, tracks.size)
-                    val outcome = TrackDownloader.download(
-                        track.toRequest(
-                            contextUri = contextUri,
-                            contextName = contextName,
-                            contextType = contextType,
-                        ),
-                        ctx,
-                        notify = false,
-                    ) { percent ->
-                        DownloadQueue.updateJob(id, index + 1, percent)
-                        DownloadNotifier.batch(ctx, track.name, index + 1, tracks.size, percent)
+                    // Cleared in a finally: a cancelled batch unwinds before the call returns, and a
+                    // percentage left behind would freeze that row's ring for the rest of the process.
+                    val outcome = try {
+                        TrackDownloader.download(
+                            track.toRequest(
+                                contextUri = contextUri,
+                                contextName = contextName,
+                                contextType = contextType,
+                            ),
+                            ctx,
+                            notify = false,
+                        ) { percent ->
+                            DownloadQueue.updateJob(id, index + 1, percent)
+                            DownloadQueue.reportTrack(track.uri, percent)
+                            DownloadNotifier.batch(ctx, track.name, index + 1, tracks.size, percent)
+                        }
+                    } finally {
+                        DownloadQueue.clearTrack(track.uri)
                     }
                     if (outcome !is DownloadOutcome.Done) failed++
                     if (outcome is DownloadOutcome.NoFolder) {

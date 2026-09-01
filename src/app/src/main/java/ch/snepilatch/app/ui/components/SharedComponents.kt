@@ -3,6 +3,7 @@
 package ch.snepilatch.app.ui.components
 
 import ch.snepilatch.app.R
+import ch.snepilatch.app.download.DownloadQueue
 import ch.snepilatch.app.download.Downloads
 import ch.snepilatch.app.ui.theme.SpfyWhite
 import androidx.compose.animation.core.tween
@@ -244,6 +245,10 @@ fun TrackRow(
     val inFlight by Downloads.inProgress.collectAsState()
     val isDownloaded = Downloads.isDownloaded(downloadedIndex, track.uri, track.name, track.artist)
     val isDownloading = track.uri in inFlight
+    // Keyed by uri so a row costs a lookup rather than a scan of the queue. Absent until the first
+    // progress lands, which is why a row that has started still falls back to the spinner.
+    val percent by DownloadQueue.progress.collectAsState()
+    val trackPercent = percent[track.uri]
 
     Row(
         Modifier
@@ -265,7 +270,16 @@ fun TrackRow(
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (isDownloading) {
-            CircularProgressIndicator(color = accent, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
+            if (trackPercent == null) {
+                CircularProgressIndicator(color = accent, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
+            } else {
+                CircularProgressIndicator(
+                    progress = { trackPercent.coerceIn(0, 100) / 100f },
+                    color = accent,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
             Spacer(Modifier.width(6.dp))
         } else if (isDownloaded) {
             Icon(

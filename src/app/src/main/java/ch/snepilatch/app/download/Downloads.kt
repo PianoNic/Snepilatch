@@ -66,54 +66,6 @@ object Downloads {
     /** Track URIs being fetched right now, so a row can show a spinner instead of a download icon. */
     val inProgress: StateFlow<Set<String>> = _inProgress.asStateFlow()
 
-    /** What is being fetched right now, as the album, playlist or single the user asked for. */
-    data class ActiveJob(
-        val name: String,
-        val type: String,
-        val imageUrl: String?,
-        val done: Int,
-        val total: Int,
-        val trackPercent: Int,
-    )
-
-    private val _activeJob = MutableStateFlow<ActiveJob?>(null)
-    val activeJob: StateFlow<ActiveJob?> = _activeJob.asStateFlow()
-
-    /**
-     * Which job owns the card. There is one slot and several things can download at once — a batch, a
-     * tapped row, an auto-save — so an update or a clear has to prove it is the current owner. Without
-     * that, whichever finished first blanked the card while the others were still running.
-     */
-    private val jobOwner = java.util.concurrent.atomic.AtomicInteger(0)
-
-    /** [ActiveJob.type] for a track kept from what was played rather than fetched. */
-    const val TYPE_REENCODE = "reencode"
-
-    /**
-     * @param onlyIfIdle leaves a running job's card alone and returns 0, which no update can match.
-     *   The auto-save uses it: it belongs on the list, but not at the price of blanking an album's
-     *   progress mid-batch.
-     * @return the token to pass back to [updateJob] and [clearJob].
-     */
-    fun startJob(name: String, type: String, imageUrl: String?, total: Int, onlyIfIdle: Boolean = false): Int {
-        // Safe to hand back 0: the card is only taken once jobOwner has passed 1, so a live job can
-        // never own that token.
-        if (onlyIfIdle && _activeJob.value != null) return 0
-        val token = jobOwner.incrementAndGet()
-        _activeJob.value = ActiveJob(name, type, imageUrl, done = 1, total = total, trackPercent = 0)
-        return token
-    }
-
-    fun updateJob(token: Int, done: Int, trackPercent: Int) {
-        if (token != jobOwner.get()) return
-        _activeJob.update { it?.copy(done = done, trackPercent = trackPercent) }
-    }
-
-    fun clearJob(token: Int) {
-        if (token != jobOwner.get()) return
-        _activeJob.value = null
-    }
-
     // update {} rather than value = value + x: several downloads run on independent IO coroutines,
     // and a lost remove would leave a row spinning for the rest of the process.
     fun markStarted(trackUri: String) {

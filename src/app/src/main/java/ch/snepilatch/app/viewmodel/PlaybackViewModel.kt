@@ -19,6 +19,7 @@ import ch.snepilatch.app.playback.PositionInterpolator
 import ch.snepilatch.app.playback.SessionHolder
 import ch.snepilatch.app.download.DownloadFolder
 import ch.snepilatch.app.download.DownloadNotifier
+import ch.snepilatch.app.download.DownloadQueue
 import ch.snepilatch.app.download.Downloads
 import ch.snepilatch.app.download.DownloadOutcome
 import ch.snepilatch.app.download.DownloadRequest
@@ -3172,45 +3173,59 @@ class PlaybackViewModel : ViewModel() {
         // applicationContext, or a batch outlives the Activity that started it and pins it — and its
         // whole Compose tree — for the minutes the download runs. Nothing here needs an Activity.
         val ctx = context.applicationContext
-        viewModelScope.launch(Dispatchers.IO) {
-            // A localOnly save is the auto-save path: it re-encodes what was played rather than
-            // fetching, so it shows as its own kind of job. onlyIfIdle because taking the slot
-            // mid-batch would blank an album's progress for no reason.
-            val token = Downloads.startJob(
-                name = track.name,
-                type = if (localOnly) Downloads.TYPE_REENCODE else "single",
-                imageUrl = track.albumArt,
-                total = 1,
-                onlyIfIdle = localOnly,
-            )
+        // A localOnly save is the auto-save path: it re-encodes what was played rather than fetching,
+        // so it shows as its own kind of entry. It no longer has to wait for an idle slot — every
+        // entry carries its own progress now.
+        val id = DownloadQueue.enqueue(
+            name = track.name,
+            type = if (localOnly) DownloadQueue.TYPE_REENCODE else "single",
+            imageUrl = track.albumArt,
+            total = 1,
+        )
+        // initScope, not viewModelScope: a download outlives the screen that started it, and backing
+        // out of the app used to cancel it and leave the entry reading as cancelled on the next launch.
+        val job = initScope.launch {
             val progress: ((Int) -> Unit)? = if (localOnly) {
                 null
             } else {
-                { percent -> Downloads.updateJob(token, done = 1, trackPercent = percent) }
+                { percent -> DownloadQueue.updateJob(id, done = 1, trackPercent = percent) }
             }
+            var state = DownloadQueue.QueueEntry.State.Failed
             try {
                 val outcome = TrackDownloader.download(
                     track.toRequest(capture, localOnly), ctx, onProgress = progress
                 )
+                if (outcome is DownloadOutcome.Done) state = DownloadQueue.QueueEntry.State.Done
                 warnNoFolder(ctx, outcome, track.name)
+            } catch (e: CancellationException) {
+                state = DownloadQueue.QueueEntry.State.Cancelled
+                throw e
             } finally {
-                // In a finally because cancellation (backing out of the app) has to clear the card too;
-                // it used to be left set, so the manager claimed a download was running forever.
-                Downloads.clearJob(token)
+                // In a finally because cancellation (backing out of the app) has to settle the entry
+                // too; it used to be left running, so the tab claimed a download that had stopped.
+                DownloadQueue.finishJob(id, state)
             }
         }
+        keep(id, job)
     }
 
     /**
      * Downloads a whole album or playlist, one track at a time so the per-track notifications are
      * replaced by a single count. Tracks already on disk are skipped by the downloader itself.
      */
-    /** The running download, kept so it can be stopped. Cancelling it stops the rest of the batch. */
-    private var downloadJob: Job? = null
+    /** Every running download by queue id, so one entry can be stopped without touching the others. */
+    private val downloadJobs = java.util.concurrent.ConcurrentHashMap<Int, Job>()
 
-    /** Stops whatever is downloading. The batch clears its own notification and card on the way out. */
-    fun cancelDownloads() {
-        downloadJob?.cancel()
+    private fun keep(id: Int, job: Job) {
+        // Prune here rather than when a download ends: removing from inside the job races the put
+        // that registered it, and a job that removed itself first would linger for good.
+        downloadJobs.values.removeAll { it.isCompleted }
+        downloadJobs[id] = job
+    }
+
+    /** Stops one queue entry. It settles its own notification and state on the way out. */
+    fun cancelDownload(id: Int) {
+        downloadJobs[id]?.cancel()
     }
 
     fun downloadTracks(
@@ -3222,16 +3237,20 @@ class PlaybackViewModel : ViewModel() {
     ) {
         if (tracks.isEmpty()) return
         val ctx = context.applicationContext
-        downloadJob = viewModelScope.launch(Dispatchers.IO) {
-            val token = Downloads.startJob(
-                name = contextName ?: tracks.first().name,
-                type = contextType ?: "single",
-                imageUrl = tracks.first().albumArt,
-                total = tracks.size,
-            )
+        val id = DownloadQueue.enqueue(
+            name = contextName ?: tracks.first().name,
+            type = contextType ?: "single",
+            imageUrl = tracks.first().albumArt,
+            total = tracks.size,
+        )
+        val job = initScope.launch {
             var failed = 0
+            var state = DownloadQueue.QueueEntry.State.Done
             try {
                 tracks.forEachIndexed { index, track ->
+                    // Between tracks, not mid-file: a paused entry stops before starting the next one
+                    // rather than abandoning bytes already fetched.
+                    DownloadQueue.awaitResume(id)
                     DownloadNotifier.batch(ctx, track.name, index + 1, tracks.size)
                     val outcome = TrackDownloader.download(
                         track.toRequest(
@@ -3242,15 +3261,17 @@ class PlaybackViewModel : ViewModel() {
                         ctx,
                         notify = false,
                     ) { percent ->
-                        Downloads.updateJob(token, index + 1, percent)
+                        DownloadQueue.updateJob(id, index + 1, percent)
                         DownloadNotifier.batch(ctx, track.name, index + 1, tracks.size, percent)
                     }
                     if (outcome !is DownloadOutcome.Done) failed++
                     if (outcome is DownloadOutcome.NoFolder) {
                         warnNoFolder(ctx, outcome, track.name)
+                        state = DownloadQueue.QueueEntry.State.Failed
                         return@launch
                     }
                 }
+                if (failed == tracks.size) state = DownloadQueue.QueueEntry.State.Failed
                 DownloadNotifier.batchFinished(ctx, tracks.size, failed)
             } catch (e: CancellationException) {
                 // The batch posts its own ongoing notification, so notify=false keeps TrackDownloader
@@ -3258,11 +3279,13 @@ class PlaybackViewModel : ViewModel() {
                 // cancelled with the Activity would leave "Downloading 7 of 30" posted for a download
                 // that is not running.
                 DownloadNotifier.clear(ctx)
+                state = DownloadQueue.QueueEntry.State.Cancelled
                 throw e
             } finally {
-                Downloads.clearJob(token)
+                DownloadQueue.finishJob(id, state)
             }
         }
+        keep(id, job)
     }
 
     fun removeDownload(trackUri: String) {

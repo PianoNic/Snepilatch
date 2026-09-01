@@ -353,6 +353,13 @@
     <string name="downloaded_indicator">Downloaded</string>
     <string name="downloads_active">Active</string>
     <string name="downloads_idle">Nothing downloading right now</string>
+    <string name="downloads_finished">Finished</string>
+    <string name="downloads_failed">Failed</string>
+    <string name="downloads_cancelled">Cancelled</string>
+    <string name="downloads_clear_finished">Clear finished</string>
+    <string name="downloads_paused">Paused at %1$d of %2$d</string>
+    <string name="pause">Pause</string>
+    <string name="resume">Resume</string>
     <plurals name="remove_download_message">
         <item quantity="one">Delete the downloaded file for %1$s? (%2$d track)</item>
         <item quantity="other">Delete the downloaded files for %1$s? (%2$d tracks)</item>

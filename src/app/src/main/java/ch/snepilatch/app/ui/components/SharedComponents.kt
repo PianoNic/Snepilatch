@@ -504,46 +504,60 @@ fun SlidingCoverImage(
     url: String?,
     modifier: Modifier = Modifier,
     shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(8.dp),
-    trackKey: Any? = url
+    trackKey: Any? = url,
+    /** False when the change came from going back, which reverses the entrance. */
+    forward: Boolean = true
 ) {
     var currentUrl by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(url) }
     var currentKey by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(trackKey) }
     var previousUrl by androidx.compose.runtime.remember {
         androidx.compose.runtime.mutableStateOf<String?>(null)
     }
+    var back by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     val anim = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(1f) }
-    androidx.compose.runtime.LaunchedEffect(trackKey, url) {
-        if (trackKey != currentKey) {
-            previousUrl = currentUrl
-            currentKey = trackKey
-            currentUrl = url
+    // Keyed on the track alone. Keying on the url as well let a mid-animation artwork upgrade cancel
+    // the effect, leaving previousUrl set and the entrance frozen part-way: the old cover stayed on
+    // top of a new one parked off to the side, which reads as the cover never changing.
+    androidx.compose.runtime.LaunchedEffect(trackKey) {
+        if (trackKey == currentKey) return@LaunchedEffect
+        previousUrl = currentUrl
+        currentKey = trackKey
+        currentUrl = url
+        back = !forward
+        try {
             anim.snapTo(0f)
             anim.animateTo(
                 1f,
                 tween(750, easing = androidx.compose.animation.core.CubicBezierEasing(0.835f, -0.008f, 0.149f, 0.866f))
             )
+        } finally {
             previousUrl = null
-        } else if (url != currentUrl) {
-            // Same track, better artwork. An optimistic skip paints the queue entry's `imageUrl`,
-            // then the confirmed state upgrades it to `imageLargeUrl` — a different string for the
-            // same picture. Swap it in place; replaying the entrance would slide the identical
-            // cover in a second time, a beat after the first.
-            currentUrl = url
         }
+    }
+    // Same track, better artwork. An optimistic skip paints the queue entry's `imageUrl`, then the
+    // confirmed state upgrades it to `imageLargeUrl` — a different string for the same picture. Swap
+    // it in place; replaying the entrance would slide the identical cover in a second time.
+    androidx.compose.runtime.LaunchedEffect(url) {
+        if (trackKey == currentKey) currentUrl = url
     }
     // Clip to the cover frame (like spicy's `overflow: hidden` MediaImageContainer) so the incoming
     // cover slides in from the frame's own right edge, not from off-screen.
     Box(modifier.clip(shape)) {
-        previousUrl?.let { prev ->
-            SpfyImage(url = prev, modifier = Modifier.matchParentSize(), shape = shape)
-        }
         val sliding = previousUrl != null
+        // Forward, the arriving cover slides in over the one being left. Going back it is the other
+        // way round: the cover being left slides away and uncovers the one returning underneath.
+        val under = if (back) currentUrl else previousUrl
+        val over = if (back) previousUrl else currentUrl
+        under?.let { beneath ->
+            SpfyImage(url = beneath, modifier = Modifier.matchParentSize(), shape = shape)
+        }
         SpfyImage(
-            url = currentUrl,
+            url = over,
             modifier = Modifier
                 .matchParentSize()
                 .graphicsLayer {
-                    translationX = size.width * (1f - anim.value)
+                    translationX =
+                        if (back) -size.width * anim.value else size.width * (1f - anim.value)
                     if (sliding) {
                         shadowElevation = 24f
                         this.shape = shape

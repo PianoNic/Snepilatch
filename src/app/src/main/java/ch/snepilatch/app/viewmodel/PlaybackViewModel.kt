@@ -3205,6 +3205,14 @@ class PlaybackViewModel : ViewModel() {
      * Downloads a whole album or playlist, one track at a time so the per-track notifications are
      * replaced by a single count. Tracks already on disk are skipped by the downloader itself.
      */
+    /** The running download, kept so it can be stopped. Cancelling it stops the rest of the batch. */
+    private var downloadJob: Job? = null
+
+    /** Stops whatever is downloading. The batch clears its own notification and card on the way out. */
+    fun cancelDownloads() {
+        downloadJob?.cancel()
+    }
+
     fun downloadTracks(
         tracks: List<TrackInfo>,
         context: android.content.Context,
@@ -3214,7 +3222,7 @@ class PlaybackViewModel : ViewModel() {
     ) {
         if (tracks.isEmpty()) return
         val ctx = context.applicationContext
-        viewModelScope.launch(Dispatchers.IO) {
+        downloadJob = viewModelScope.launch(Dispatchers.IO) {
             val token = Downloads.startJob(
                 name = contextName ?: tracks.first().name,
                 type = contextType ?: "single",

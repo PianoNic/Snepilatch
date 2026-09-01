@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.Downloading
 import androidx.compose.material3.*
@@ -107,7 +108,7 @@ fun DownloadsScreen(vm: PlaybackViewModel) {
             return@Column
         }
 
-        ActiveDownload(active)
+        ActiveDownload(active, onCancel = { vm.cancelDownloads() })
     }
 }
 
@@ -118,7 +119,7 @@ fun DownloadsScreen(vm: PlaybackViewModel) {
  * the current track.
  */
 @Composable
-private fun ActiveDownload(job: Downloads.ActiveJob) {
+private fun ActiveDownload(job: Downloads.ActiveJob, onCancel: () -> Unit) {
     // A re-encode keeps the recording that was just played; there is nothing to fetch, so it has no
     // percentage to report and spins rather than filling a ring stuck at zero.
     val reencode = job.type == Downloads.TYPE_REENCODE
@@ -143,14 +144,23 @@ private fun ActiveDownload(job: Downloads.ActiveJob) {
             )
         },
         trailingContent = {
-            if (reencode) {
-                CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
-            } else {
-                CircularProgressIndicator(
-                    progress = { job.trackPercent.coerceIn(0, 100) / 100f },
-                    strokeWidth = 2.dp,
-                    modifier = Modifier.size(18.dp),
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (reencode) {
+                    CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                } else {
+                    CircularProgressIndicator(
+                        progress = { job.trackPercent.coerceIn(0, 100) / 100f },
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+                // Only a batch can be stopped: a single track is done in seconds, and the auto-save
+                // runs on its own and would be cancelled out from under the listener.
+                if (job.total > 1) {
+                    IconButton(onClick = onCancel) {
+                        Icon(Icons.Rounded.Close, stringResource(R.string.cancel), tint = SpfyLightGray)
+                    }
+                }
             }
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)

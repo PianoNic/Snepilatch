@@ -1046,15 +1046,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         }
     }
 
+    /** The next track's metadata, so the notification can name it before it starts. */
     @OptIn(UnstableApi::class)
-    fun setNextUrl(
-        url: String,
-        title: String,
-        artist: String,
-        albumArtUrl: String?,
-        headers: Map<String, String> = emptyMap()
-    ) {
-        LokiLogger.i(TAG, "Next: $title by $artist (headers=${headers.keys})")
+    fun setNextMetadata(title: String, artist: String, albumArtUrl: String?) {
+        LokiLogger.i(TAG, "Next: $title by $artist")
         val meta = TrackMetadata(title, artist, albumArtUrl)
 
         // Keep only the current track's metadata, replace any queued next
@@ -1068,16 +1063,15 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             meta.art = albumArtUrl?.let { loadBitmap(it) }
         }
 
+        // Metadata only. Enqueuing the next track as a second media item let ExoPlayer perform the
+        // boundary itself, on the local file's clock — and only ever for a non-DRM next track, since a
+        // Widevine one needs its own license session and was never enqueued. Spfy then received an
+        // advance that did not line up with the track it believed was playing, refused it, and its
+        // state_conflict reply put us back on the previous track, forever (#636). The state machine
+        // owns the boundary; playPreResolved loads this url through the normal path when we get there.
         mainHandler.post {
             staleQueueStart(player.currentMediaItemIndex, player.mediaItemCount)?.let { from ->
                 player.removeMediaItems(from, player.mediaItemCount)
-            }
-            // Header-gated sources (anandserver Qobuz) must be enqueued as a
-            // header-injecting MediaSource, or the gapless advance hits a 401.
-            if (headers.isEmpty()) {
-                player.addMediaItem(buildMediaItem(url))
-            } else {
-                player.addMediaSource(buildHeaderedSource(url, headers))
             }
         }
     }

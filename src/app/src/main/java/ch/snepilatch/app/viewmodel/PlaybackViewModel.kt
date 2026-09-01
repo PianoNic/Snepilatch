@@ -3591,7 +3591,7 @@ class PlaybackViewModel : ViewModel() {
                     nextStreamHeaders = headers
                     nextTrackInfo = TrackInfo(uri = nextUri, name = title, artist = artist, albumArt = art)
                     nextStreamProvider = info.provider
-                    MusicPlaybackService.instance?.setNextUrl(playable, title, artist, art, headers)
+                    MusicPlaybackService.instance?.setNextMetadata(title, artist, art)
                     isNextReady.value = true
                     LokiLogger.i(TAG, "Next track pre-resolved: ${info.provider}")
                 }

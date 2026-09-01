@@ -99,6 +99,10 @@ class PlaybackViewModel : ViewModel() {
         set(value) { SessionHolder.cdnResolver = value }
     private var latestFileId: String? = null  // from TrackPlaybackHandler via onPlaybackId
 
+    // Which track latestFileId belongs to. Without it a file id outlives its own track and gets
+    // handed to the next one, which then loads the wrong song's audio under the new song's name.
+    private var latestFileUri: String? = null
+
     // Direct https audio URLs for external/RSS podcast episodes (no Spfy file id, no DRM), keyed by
     // episode uri and pushed via onExternalUrl. Small bounded cache; hosted content never appears here.
     private val externalUrlByUri = java.util.Collections.synchronizedMap(
@@ -623,6 +627,7 @@ class PlaybackViewModel : ViewModel() {
     internal fun handlePlaybackId(fileId: String, uri: String?) {
         LokiLogger.i(TAG, "Got file ID from state machine: $fileId (${uri ?: "uri unknown"})")
         latestFileId = fileId
+        latestFileUri = uri
         // A tap is waiting on exactly this.
         tapFileId?.let { pending ->
             if (!pending.isCompleted && (uri == null || uri == tapUri)) pending.complete(fileId)
@@ -742,7 +747,10 @@ class PlaybackViewModel : ViewModel() {
                 LokiLogger.i(TAG, "[AdTiming] post-ad onTrackChange -> real track (+${System.currentTimeMillis() - adSkipStartTs}ms from T0)")
             }
             // Set latestFileId from cluster state so resolveAndPlay doesn't wait for onPlaybackId
-            if (event.currentFileId != null) latestFileId = event.currentFileId
+            if (event.currentFileId != null) {
+                latestFileId = event.currentFileId
+                latestFileUri = event.current?.uri
+            }
             // Only auto-resolve when we're already streaming (legit track changes
             // during active playback), OR when the user just tapped a track to
             // play (pendingUserPlay). Otherwise the very first WS push on init
@@ -1977,6 +1985,7 @@ class PlaybackViewModel : ViewModel() {
                 )
             }
             latestFileId = fileId
+            latestFileUri = trackUri
             currentStreamUri = trackUri
             isStreaming.value = true
             streamProvider.value = "Spotify CDN"
@@ -2742,6 +2751,16 @@ class PlaybackViewModel : ViewModel() {
     }
 
     /**
+     * The file id to resolve [trackUri] with. [eventFileId] is the state machine's own answer and wins.
+     * [latestFileId] only stands in when it is known to be this track's: taken unconditionally it is
+     * whatever song was last seen, and the pre-resolved-CDN check then compares that id against itself
+     * and can never fail. Measured live on 2026-09-01 — a change to Sugar carried no file id and loaded
+     * Heartwave's audio under Sugar's name.
+     */
+    internal fun fileIdForTrack(eventFileId: String?, trackUri: String): String? =
+        eventFileId ?: latestFileId?.takeIf { latestFileUri == null || latestFileUri == trackUri }
+
+    /**
      * Acquire the Spfy-CDN [SpfyStream] for [trackUri]: reuse the pre-resolved next-track CDN URL
      * when its file id matches, else wait for the state-machine file id (up to ~1.5s), self-resolve if
      * still absent, and resolve mirrors. Throws if the resolver is uninitialised or no file id is
@@ -2758,7 +2777,7 @@ class PlaybackViewModel : ViewModel() {
         // diverging pairs each loaded the identical song). Requiring the URIs to be equal treated that
         // as a mismatch, discarded a valid pre-resolved id and dropped playback to the third-party CDN.
         // The file id itself identifies the audio, so it is the thing worth checking.
-        val currentFileId = event.currentFileId ?: latestFileId
+        val currentFileId = fileIdForTrack(event.currentFileId, trackUri)
         val cachedCdnUrl = if (currentFileId != null && nextCdnFileId == currentFileId) nextCdnUrl else null
         return if (cachedCdnUrl != null) {
             LokiLogger.i(TAG, "SpfyCDN: Using pre-resolved CDN URL (fileId=$currentFileId)")
@@ -2786,6 +2805,7 @@ class PlaybackViewModel : ViewModel() {
                 if (fileId != null) {
                     LokiLogger.i(TAG, "SpfyCDN: Got file ID from self-resolve: $fileId")
                     latestFileId = fileId
+                    latestFileUri = trackUri
                 }
             }
             if (fileId == null) {

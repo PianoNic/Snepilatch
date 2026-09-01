@@ -3182,9 +3182,7 @@ class PlaybackViewModel : ViewModel() {
             imageUrl = track.albumArt,
             total = 1,
         )
-        // initScope, not viewModelScope: a download outlives the screen that started it, and backing
-        // out of the app used to cancel it and leave the entry reading as cancelled on the next launch.
-        val job = initScope.launch {
+        val job = viewModelScope.launch(Dispatchers.IO) {
             val progress: ((Int) -> Unit)? = if (localOnly) {
                 null
             } else {
@@ -3243,7 +3241,7 @@ class PlaybackViewModel : ViewModel() {
             imageUrl = tracks.first().albumArt,
             total = tracks.size,
         )
-        val job = initScope.launch {
+        val job = viewModelScope.launch(Dispatchers.IO) {
             var failed = 0
             var state = DownloadQueue.QueueEntry.State.Done
             try {

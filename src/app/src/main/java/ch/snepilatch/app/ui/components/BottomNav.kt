@@ -2,9 +2,16 @@ package ch.snepilatch.app.ui.components
 
 import ch.snepilatch.app.ui.theme.SpfyWhite
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -13,17 +20,14 @@ import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
@@ -56,10 +60,17 @@ fun BottomNav(screen: Screen, vm: PlaybackViewModel, hazeState: HazeState) {
                 )
             )
     ) {
-        NavigationBar(
-            containerColor = Color.Transparent,
-            contentColor = SpfyWhite,
-            tonalElevation = 0.dp,
+        // Air above the buttons, inside the blur, so the content scrolls under something rather
+        // than straight into the icons.
+        Spacer(Modifier.height(6.dp))
+        // Hand rolled rather than a NavigationBar: its 80dp height and the gap between its icon and
+        // label slots are both fixed, and this bar wants a bigger icon in less height.
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .height(58.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             data class NavItem(val s: Screen, val icon: ImageVector, val label: String)
             val items = listOf(
@@ -71,41 +82,37 @@ fun BottomNav(screen: Screen, vm: PlaybackViewModel, hazeState: HazeState) {
             val accountDesc = stringResource(R.string.account_image)
             items.forEach { nav ->
                 val selected = screen == nav.s
-                NavigationBarItem(
-                    selected = selected,
-                    onClick = { vm.navigateToTab(nav.s) },
-                    icon = {
-                        if (nav.s == Screen.ACCOUNT && account.profileImageUrl != null) {
-                            Box(
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .clip(CircleShape)
-                                    .then(
-                                        if (selected) Modifier.border(2.dp, SpfyWhite, CircleShape)
-                                        else Modifier
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                AsyncImage(
-                                    model = account.profileImageUrl,
-                                    contentDescription = accountDesc,
-                                    modifier = Modifier.size(24.dp).clip(CircleShape),
-                                    contentScale = ContentScale.Crop
-                                )
-                            }
-                        } else {
-                            Icon(nav.icon, nav.label, modifier = Modifier.size(24.dp))
-                        }
-                    },
-                    label = { Text(nav.label, fontSize = 11.sp) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = SpfyWhite,
-                        selectedTextColor = SpfyWhite,
-                        unselectedIconColor = SpfyLightGray,
-                        unselectedTextColor = SpfyLightGray,
-                        indicatorColor = Color.Transparent
-                    )
-                )
+                val tint = if (selected) SpfyWhite else SpfyLightGray
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { vm.navigateToTab(nav.s) },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    if (nav.s == Screen.ACCOUNT && account.profileImageUrl != null) {
+                        AsyncImage(
+                            model = account.profileImageUrl,
+                            contentDescription = accountDesc,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .then(
+                                    if (selected) Modifier.border(2.dp, SpfyWhite, CircleShape)
+                                    else Modifier
+                                ),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(nav.icon, nav.label, modifier = Modifier.size(32.dp), tint = tint)
+                    }
+                    Spacer(Modifier.height(2.dp))
+                    Text(nav.label, fontSize = 11.sp, color = tint)
+                }
             }
         }
     }

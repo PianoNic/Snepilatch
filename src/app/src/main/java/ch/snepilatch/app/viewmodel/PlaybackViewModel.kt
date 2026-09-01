@@ -3612,17 +3612,47 @@ class PlaybackViewModel : ViewModel() {
 
     // --- Playlist Management ---
 
-    fun followArtist(artistId: String) {
-        launchWithSession("followArtist", R.string.error_follow) { sess ->
-            Artist(sess).follow(artistId)
+    /**
+     * Save any entity to the library by its type. Albums, artists and playlists each land somewhere
+     * different, and a caller holding a feed item should not have to know which.
+     */
+    fun saveToLibrary(type: String, id: String, onSaved: (() -> Unit)? = null) {
+        when (type) {
+            "artist" -> followArtist(id, onSaved)
+            "album" -> launchWithSession("saveAlbum", R.string.error_save_library) { sess ->
+                kotify.api.album.Album(sess).saveToLibrary(id)
+                onSaved?.invoke()
+            }
+            else -> savePlaylist(id, onSaved)
         }
     }
 
-    fun savePlaylist(playlistId: String) {
+    /** The mirror of [saveToLibrary], so a caller can undo a save without holding the library list. */
+    fun removeFromLibrary(type: String, id: String, onDone: (() -> Unit)? = null) {
+        launchWithSession("removeFromLibrary", R.string.error_save_library) { sess ->
+            when (type) {
+                "artist" -> Artist(sess).unfollow(id)
+                "album" -> kotify.api.album.Album(sess).removeFromLibrary(id)
+                else -> kotify.api.playlist.Playlist(sess).deletePlaylist(id, username)
+            }
+            onDone?.invoke()
+        }
+    }
+
+    /** [onSaved] runs once the server has taken it, for a caller that shows the library. */
+    fun followArtist(artistId: String, onSaved: (() -> Unit)? = null) {
+        launchWithSession("followArtist", R.string.error_follow) { sess ->
+            Artist(sess).follow(artistId)
+            onSaved?.invoke()
+        }
+    }
+
+    fun savePlaylist(playlistId: String, onSaved: (() -> Unit)? = null) {
         launchWithSession("savePlaylist", R.string.error_save_library) { sess ->
             // Playlists live in the rootlist, not the generic library (which rejects PLAYLIST uris),
             // so saveToLibrary needs the current username.
             kotify.api.playlist.Playlist(sess).saveToLibrary(playlistId, username)
+            onSaved?.invoke()
         }
     }
 

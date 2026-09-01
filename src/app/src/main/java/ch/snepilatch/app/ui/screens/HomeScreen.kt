@@ -1,6 +1,7 @@
 package ch.snepilatch.app.ui.screens
 
 import ch.snepilatch.app.R
+import ch.snepilatch.app.data.LIKED_SONGS_COVER_URL
 import ch.snepilatch.app.ui.theme.SpfyWhite
 import androidx.compose.foundation.clickable
 import androidx.compose.animation.core.LinearEasing
@@ -138,6 +139,7 @@ fun QuickPickGrid(items: List<kotify.api.home.HomeSectionItem>, vm: PlaybackView
                             .clickable {
                                 val id = item.uri.split(":").lastOrNull() ?: return@clickable
                                 when (item.type) {
+                                    "collection" -> detailVm.openLikedSongs()
                                     "playlist" -> detailVm.openPlaylist(id)
                                     "album" -> detailVm.openAlbum(id)
                                     "artist" -> detailVm.openArtist(id)
@@ -150,12 +152,12 @@ fun QuickPickGrid(items: List<kotify.api.home.HomeSectionItem>, vm: PlaybackView
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             SpfyImage(
-                                url = item.imageUrl,
+                                url = homeArt(item),
                                 modifier = Modifier.size(48.dp),
                                 shape = RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp)
                             )
                             Text(
-                                item.name,
+                                homeLabel(item),
                                 color = SpfyWhite,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold,
@@ -219,6 +221,17 @@ fun HomeShimmer() {
     }
 }
 
+/**
+ * The saved songs entry arrives from the feed as a uri and nothing else, so its label and cover come
+ * from here rather than from the payload.
+ */
+@Composable
+private fun homeLabel(item: kotify.api.home.HomeSectionItem): String =
+    if (item.type == "collection") stringResource(R.string.liked_songs) else item.name
+
+private fun homeArt(item: kotify.api.home.HomeSectionItem): String? =
+    if (item.type == "collection") LIKED_SONGS_COVER_URL else item.imageUrl
+
 @Composable
 fun HomeSectionCard(item: kotify.api.home.HomeSectionItem, vm: PlaybackViewModel, modifier: Modifier = Modifier) {
     val detailVm: DetailViewModel = viewModel()
@@ -229,6 +242,7 @@ fun HomeSectionCard(item: kotify.api.home.HomeSectionItem, vm: PlaybackViewModel
             .clickable {
                 val id = item.uri.split(":").lastOrNull() ?: return@clickable
                 when (item.type) {
+                    "collection" -> detailVm.openLikedSongs()
                     "playlist" -> detailVm.openPlaylist(id)
                     "album" -> detailVm.openAlbum(id)
                     "artist" -> detailVm.openArtist(id)
@@ -239,14 +253,14 @@ fun HomeSectionCard(item: kotify.api.home.HomeSectionItem, vm: PlaybackViewModel
         horizontalAlignment = if (isArtist) Alignment.CenterHorizontally else Alignment.Start
     ) {
         SpfyImage(
-            url = item.imageUrl,
+            url = homeArt(item),
             modifier = Modifier.size(140.dp),
             shape = if (isArtist) CircleShape else RoundedCornerShape(8.dp),
             icon = if (isArtist) Icons.Rounded.Person else Icons.Rounded.MusicNote
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            item.name,
+            homeLabel(item),
             color = SpfyWhite,
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,

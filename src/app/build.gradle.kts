@@ -78,7 +78,9 @@ android {
         }
         create("dev") {
             dimension = "environment"
-            applicationIdSuffix = ".dev"
+            // -PappIdSuffix=.something installs a throwaway copy beside the usual dev build, so a
+            // test that has to start logged out cannot touch a working install.
+            applicationIdSuffix = ".dev" + ((project.findProperty("appIdSuffix") as String?) ?: "")
             versionNameSuffix = "-dev"
         }
     }

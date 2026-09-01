@@ -147,6 +147,9 @@ class PlaybackViewModel : ViewModel() {
     private var lastCommandTs: Long = 0L
     private var lastCommandName: String = ""
 
+    /** Which way the last track change went, so the cover animates towards where the track came from. */
+    val skippedBack = MutableStateFlow(false)
+
     // Diagnostic: wall-clock when the current ad-skip began (onAd). Milestones log deltas against it
     // so we can see exactly where a single-ad skip spends its ~3s (silent clip / advance / post-ad
     // resolve). Reset to 0 once the post-ad real track's audio is producing.
@@ -1758,6 +1761,7 @@ class PlaybackViewModel : ViewModel() {
 
     fun skipNext() {
         applyOptimisticSkip(nextTrackPreview.value)
+        skippedBack.value = false
         commandJob?.cancel()
         lastCommandTs = System.currentTimeMillis()
         lastCommandName = "skipNext"
@@ -1783,6 +1787,7 @@ class PlaybackViewModel : ViewModel() {
         }
         val pos = _playback.value.positionMs
         applyOptimisticSkip(prevTrackPreview.value)
+        skippedBack.value = true
         commandJob?.cancel()
         lastCommandTs = System.currentTimeMillis()
         lastCommandName = "skipPrevious"

@@ -373,6 +373,7 @@ fun NowPlayingScreen(
     val isAd by vm.isAdFlow.collectAsState()
     val isShuffling by vm.isShufflingFlow.collectAsState()
     val repeatMode by vm.repeatModeFlow.collectAsState()
+    val skippedBack by vm.skippedBack.collectAsState()
     // While an ad is being skipped we keep the CURRENT song frozen on screen (cover/title/progress)
     // and show a loading spinner (see spinnerActive) — so the ~2.5s ad skip reads as "loading the next
     // track", not an interruption. `track` is unchanged during an ad, so no blanking is needed.
@@ -446,7 +447,8 @@ fun NowPlayingScreen(
                                 .fillMaxHeight(0.85f)
                                 .aspectRatio(1f),
                             shape = RoundedCornerShape(16.dp),
-                            trackKey = track?.uri
+                            trackKey = track?.uri,
+                            forward = !skippedBack
                         )
                     }
 
@@ -688,14 +690,16 @@ fun NowPlayingScreen(
                         // Invisible placeholder — same size as album art to keep layout stable
                         Box(Modifier.fillMaxWidth().aspectRatio(1f))
                     } else {
-                        // Album art — large with rounded corners; slides in from the right on song change.
+                        // Album art — large with rounded corners; the arriving cover slides in from
+                        // the right, or the leaving one slides off left when going back.
                         ch.snepilatch.app.ui.components.SlidingCoverImage(
                             url = displayArtUrl,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .aspectRatio(1f),
                             shape = RoundedCornerShape(16.dp),
-                            trackKey = track?.uri
+                            trackKey = track?.uri,
+                            forward = !skippedBack
                         )
                     }
 

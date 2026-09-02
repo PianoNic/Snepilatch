@@ -115,6 +115,24 @@ object AppSettings {
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
+    /**
+     * One Connect device id for the life of the install. The web player mints a fresh id per page
+     * load but DELETEs its registration on unload, so it never holds more than one; Android gives
+     * no such hook on a kill, and a fresh id per process left every killed process's registration
+     * behind as a ghost (71 in 30 hours, none ever removed). Re-registering the same id replaces the
+     * previous registration instead.
+     */
+    fun persistedDeviceId(): String {
+        val ctx = appContext ?: return newDeviceId()
+        val prefs = prefs(ctx)
+        prefs.getString("device_id", null)?.let { return it }
+        return newDeviceId().also { prefs.edit().putString("device_id", it).apply() }
+    }
+
+    /** 32 hex chars, the shape KotifyClient mints itself. */
+    private fun newDeviceId(): String =
+        ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
+
     fun load(context: Context) {
         appContext = context.applicationContext
         val prefs = prefs(context)

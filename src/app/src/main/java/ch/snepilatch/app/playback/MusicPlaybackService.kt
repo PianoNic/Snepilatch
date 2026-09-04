@@ -286,6 +286,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
         player = ExoPlayer.Builder(this, renderersFactory)
             .setAudioAttributes(audioAttributes, true)
+            .setHandleAudioBecomingNoisy(true)
             .setLoadControl(loadControl)
             // Let ExoPlayer manage a wake/Wi-Fi lock for its OWN network needs (buffering). Note this
             // is scoped to the player — once a track is buffered ExoPlayer releases it and lets the
@@ -339,8 +340,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
                 // Permanent focus loss (a call answered, another app taking over): ExoPlayer clears
                 // playWhenReady and will not come back on its own, which is correct. Report it.
-                if (!playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS) {
-                    LokiLogger.i(TAG, "Audio focus lost for good — reporting pause to Spfy")
+                if (!playWhenReady && (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS ||
+                        reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY)) {
+                    LokiLogger.i(TAG, "Focus lost or output disconnected — reporting pause to Spfy")
                     onAudioFocusPaused?.invoke()
                 }
             }

@@ -1972,31 +1972,9 @@ class PlaybackViewModel : ViewModel() {
                 LokiLogger.i(TAG, "[InstantTap] downloaded copy started in ${System.currentTimeMillis() - t0}ms")
                 return
             }
-            val resolver = cdnResolver ?: return
-            val fileId = safeMediaFileId(trackUri) ?: run {
-                LokiLogger.i(TAG, "[InstantTap] no licensable media file id for $trackUri, deferring to echo")
-                return
-            }
-            val stream = resolver.resolveForFileId(fileId)
-            // The echo may have already loaded this exact track while we were resolving — don't double-load.
-            if (currentStreamUri == trackUri) return
-            // DRM: stop the old player to close its Widevine session, then load the new track.
-            withContext(Dispatchers.Main) { MusicPlaybackService.instance?.stop() }
-            playUrlAt = System.currentTimeMillis()
-            withContext(Dispatchers.Main) {
-                MusicPlaybackService.instance?.playDrmUrl(
-                    stream.cdnUrl, stream.licenseUrl, stream.licenseHeaders, title, artist, art,
-                    startPlaying = true, pssh = stream.pssh,
-                )
-            }
-            latestFileId = fileId
-            latestFileUri = trackUri
-            currentStreamUri = trackUri
-            isStreaming.value = true
-            streamProvider.value = "Spotify CDN"
-            isStreamLoading.value = false
-            LokiLogger.i(TAG, "[InstantTap] optimistic play started in ${System.currentTimeMillis() - t0}ms for $trackUri")
-            preResolveNextTrack()
+            // No downloaded copy: audio follows the server push, as the web player only resolves
+            // what the state machine holds.
+            LokiLogger.i(TAG, "[InstantTap] no downloaded copy for $trackUri, audio follows the echo")
         } catch (e: Exception) {
             LokiLogger.w(TAG, "[InstantTap] optimistic play failed (${e.message}); echo path will handle it")
         }

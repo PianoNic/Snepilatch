@@ -2439,19 +2439,18 @@ class PlaybackViewModel : ViewModel() {
      *
      * Internal for the test rig.
      */
+    private var pausedByFocusLoss = false
+
     internal fun handleAudioFocusPaused() {
-        if (!isStreaming.value) return
+        if (!isStreaming.value || _playback.value.isPaused) return
+        pausedByFocusLoss = true
         launchWithPlayer("focusPaused") { p -> p.localPause(_playback.value.positionMs) }
     }
 
-    /**
-     * Focus came back. Report it and let the echo restart the audio, per [handleAudioFocusPaused].
-     *
-     * Fires on every un-suppression, including when we were never suppressed, so it has to be safe to
-     * run spuriously — reporting the position we already hold is a no-op as far as Spfy is concerned.
-     */
+    /** Only a focus loss that paused us may resume us; a pause the user chose stays. */
     internal fun handleAudioFocusResumed() {
-        if (!isStreaming.value) return
+        if (!isStreaming.value || !pausedByFocusLoss) return
+        pausedByFocusLoss = false
         launchWithPlayer("focusResumed") { p -> p.localResume(_playback.value.positionMs) }
     }
 

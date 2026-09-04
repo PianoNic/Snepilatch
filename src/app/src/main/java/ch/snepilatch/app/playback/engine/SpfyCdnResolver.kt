@@ -36,8 +36,13 @@ class SpfyCdnResolver(
      * retry lands on a DIFFERENT CDN edge — hammering the same dead mirror is what left a bad edge
      * stuck in silence.
      */
+    /** Told what every resolve produced, so KotifyClient's playback telemetry carries the real stream. */
+    var onResolved: ((kotify.api.playerstatus.StreamInfo) -> Unit)? = null
+
     suspend fun resolveForFileId(fileId: String, mirrorIndex: Int = 0): SpfyStream {
+        val t0 = System.currentTimeMillis()
         val cdnUrls = spfyPlayback.getCdnUrls(fileId)
+        onResolved?.invoke(kotify.api.playerstatus.StreamInfo(fileId, cdnUrls, msResolveLatency = System.currentTimeMillis() - t0))
         if (cdnUrls.isEmpty()) throw IllegalStateException("No CDN mirrors for fileId=$fileId")
         val cdnUrl = cdnUrls[mirrorIndex.mod(cdnUrls.size)]
         return SpfyStream(
@@ -104,6 +109,10 @@ class SpfyCdnResolver(
             ?: spfyPlayback.findFile(meta, SpfyPlayback.AudioQuality.MP4_256)
         return mp4File?.fileId
     }
+
+    /** One license exchange for [stream] with no player, through the same browser-shaped client. */
+    suspend fun license(stream: SpfyStream): Long =
+        WidevineLicenser.license(session, stream.licenseUrl, stream.pssh ?: throw IllegalStateException("no pssh"))
 
     private fun buildLicenseHeaders(): Map<String, String> {
         val headers = mutableMapOf<String, String>()

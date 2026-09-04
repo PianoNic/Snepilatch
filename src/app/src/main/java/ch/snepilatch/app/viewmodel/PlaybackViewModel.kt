@@ -502,7 +502,9 @@ class PlaybackViewModel : ViewModel() {
                 session = sess
                 val sp = SpfyPlayback(sess)
                 spfyPlayback = sp
-                cdnResolver = SpfyCdnResolver(sess, sp)
+                cdnResolver = SpfyCdnResolver(sess, sp).also { r ->
+                    r.onResolved = { info -> player?.reportStreamResolved(info) }
+                }
                 LokiLogger.i(TAG, "Session loaded")
 
                 // Home and library load themselves from HomeViewModel.init / LibraryViewModel.init.
@@ -3030,6 +3032,26 @@ class PlaybackViewModel : ViewModel() {
      * Plays a downloaded copy. Runs before the Spfy branch, which returns without ever reaching the
      * resolver, so a downloaded track plays from disk whatever the selected source is.
      */
+    /**
+     * A downloaded copy still resolves and licenses like a stream (about 10 KB, no audio), so the
+     * server sees what it sees for the web player and the telemetry stays truthful.
+     */
+    private suspend fun licenseLocalCopy(trackUri: String) {
+        val resolver = cdnResolver ?: return
+        val fileId = fileIdForTrack(null, trackUri) ?: return
+        try {
+            val stream = resolver.resolveForFileId(fileId)
+            if (stream.pssh == null) return
+            val ms = resolver.license(stream)
+            player?.reportStreamResolved(kotify.api.playerstatus.StreamInfo(fileId, listOf(stream.cdnUrl), msLicenseLatency = ms))
+            LokiLogger.i(TAG, "Licensed downloaded copy of $trackUri in ${ms}ms")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            LokiLogger.w(TAG, "Licensing downloaded copy of $trackUri failed: ${e.message}")
+        }
+    }
+
     private suspend fun playDownloaded(trackUri: String, title: String, artist: String, art: String?): Boolean {
         val local = AudioSourceResolver.localOrNull(trackUri, title, artist) as? StreamResult.Success
             ?: return false
@@ -3045,6 +3067,7 @@ class PlaybackViewModel : ViewModel() {
         commitStream(trackUri, AudioSourceResolver.LOCAL_PROVIDER)
         isStreamLoading.value = false
         LokiLogger.i(TAG, "Playing downloaded copy of $trackUri")
+        viewModelScope.launch(Dispatchers.IO) { licenseLocalCopy(trackUri) }
         preResolveNextTrack()
         return true
     }

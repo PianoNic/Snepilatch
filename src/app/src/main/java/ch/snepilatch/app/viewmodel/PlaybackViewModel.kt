@@ -525,7 +525,9 @@ class PlaybackViewModel : ViewModel() {
                 val phoneName = android.os.Build.MODEL
                 val pc = PlayerConnect(sess, deviceName = phoneName)
 
-                // Fresh device ID every launch — avoids stale server-side registrations
+                // Same device id as last launch, so this registration replaces the one the previous
+                // process could not remove when it was killed (see AppSettings.persistedDeviceId).
+                pc.setPersistedDeviceId(AppSettings.persistedDeviceId())
                 pc.ready()
                 // Assigning through the property setter publishes the player to
                 // SessionHolder — session/spfyPlayback/cdnResolver are already

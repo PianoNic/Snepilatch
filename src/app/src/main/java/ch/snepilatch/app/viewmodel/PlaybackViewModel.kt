@@ -1781,7 +1781,10 @@ class PlaybackViewModel : ViewModel() {
             try {
                 val t0 = System.currentTimeMillis()
                 // Local advance (state report, never skip-capped) — the new track loads via onPlaybackId.
-                player?.localNext()
+                // A pressed button walks the machine's skip_next edge, as the web player's forward button
+                // does; the default reason walks advance, which is the natural end and lands elsewhere on
+                // graphs where the two differ (radio, autoplay, smart shuffle).
+                player?.localNext(kotify.api.playerstatus.AdvanceReason.USER_SKIP)
                 LokiLogger.i(TAG, "[Timing] CMD skipNext API done in ${System.currentTimeMillis() - t0}ms")
             }
             catch (e: CancellationException) { throw e }

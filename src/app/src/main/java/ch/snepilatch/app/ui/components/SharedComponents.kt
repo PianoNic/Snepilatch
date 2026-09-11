@@ -6,9 +6,12 @@ import ch.snepilatch.app.R
 import ch.snepilatch.app.download.DownloadQueue
 import ch.snepilatch.app.download.Downloads
 import ch.snepilatch.app.ui.theme.SpfyWhite
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -44,9 +47,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.platform.LocalView
@@ -62,7 +68,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -78,7 +86,9 @@ import ch.snepilatch.app.viewmodel.ThemeController
 import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import coil.compose.AsyncImage
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * Match the app's transparent, edge-to-edge nav bar inside a ModalBottomSheet. The sheet
@@ -520,8 +530,17 @@ fun SlidingCoverImage(
     shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(8.dp),
     trackKey: Any? = url,
     /** False when the change came from going back, which reverses the entrance. */
-    forward: Boolean = true
+    forward: Boolean = true,
+    onSwipePrevious: (() -> Unit)? = null,
+    onSwipeNext: (() -> Unit)? = null,
 ) {
+    val scope = rememberCoroutineScope()
+    val settledOffset = remember { Animatable(0f) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    var dragging by remember { mutableStateOf(false) }
+    var swipeDirection by remember { mutableIntStateOf(0) }
+    var coverWidth by remember { mutableFloatStateOf(0f) }
+    var settleJob by remember { mutableStateOf<Job?>(null) }
     var currentUrl by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(url) }
     var currentKey by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(trackKey) }
     var previousUrl by androidx.compose.runtime.remember {
@@ -534,18 +553,30 @@ fun SlidingCoverImage(
     // top of a new one parked off to the side, which reads as the cover never changing.
     androidx.compose.runtime.LaunchedEffect(trackKey) {
         if (trackKey == currentKey) return@LaunchedEffect
-        previousUrl = currentUrl
+        val gestureDirection = swipeDirection
+        val oldUrl = currentUrl
         currentKey = trackKey
         currentUrl = url
-        back = !forward
-        try {
-            anim.snapTo(0f)
-            anim.animateTo(
-                1f,
-                tween(750, easing = androidx.compose.animation.core.CubicBezierEasing(0.835f, -0.008f, 0.149f, 0.866f))
-            )
-        } finally {
+        if (gestureDirection != 0 && coverWidth > 0f) {
             previousUrl = null
+            back = false
+            swipeDirection = 0
+            settledOffset.snapTo(-gestureDirection * coverWidth)
+            settledOffset.animateTo(0f, tween(180))
+        } else {
+            settledOffset.snapTo(0f)
+            previousUrl = oldUrl
+            back = !forward
+            try {
+                anim.snapTo(0f)
+                anim.animateTo(
+                    1f,
+                    tween(750, easing = androidx.compose.animation.core.CubicBezierEasing(0.835f, -0.008f, 0.149f, 0.866f))
+                )
+            } finally {
+                previousUrl = null
+                back = false
+            }
         }
     }
     // Same track, better artwork. An optimistic skip paints the queue entry's `imageUrl`, then the
@@ -556,7 +587,62 @@ fun SlidingCoverImage(
     }
     // Clip to the cover frame (like spicy's `overflow: hidden` MediaImageContainer) so the incoming
     // cover slides in from the frame's own right edge, not from off-screen.
-    Box(modifier.clip(shape)) {
+    Box(
+        modifier
+            .onSizeChanged { coverWidth = it.width.toFloat() }
+            .clip(shape)
+            .pointerInput(onSwipePrevious, onSwipeNext) {
+                val tracker = androidx.compose.ui.input.pointer.util.VelocityTracker()
+                detectHorizontalDragGestures(
+                    onDragStart = {
+                        tracker.resetTracking()
+                        settleJob?.cancel()
+                        dragging = true
+                        dragOffset = settledOffset.value
+                    },
+                    onHorizontalDrag = { change, dragAmount ->
+                        tracker.addPosition(change.uptimeMillis, change.position)
+                        change.consume()
+                        dragOffset = (dragOffset + dragAmount)
+                            .coerceIn(-size.width.toFloat(), size.width.toFloat())
+                    },
+                    onDragEnd = {
+                        val width = size.width.toFloat()
+                        val release = dragOffset
+                        val velocity = tracker.calculateVelocity().x
+                        val direction = when {
+                            release > width * 0.15f || velocity > 700f -> 1
+                            release < -width * 0.15f || velocity < -700f -> -1
+                            else -> 0
+                        }
+                        settleJob = scope.launch {
+                            settledOffset.snapTo(release)
+                            dragging = false
+                            if (direction == 0) {
+                                settledOffset.animateTo(0f, spring(stiffness = 380f))
+                            } else {
+                                settledOffset.animateTo(direction * width, tween(180))
+                                swipeDirection = direction
+                                if (direction > 0) onSwipePrevious?.invoke() else onSwipeNext?.invoke()
+                                withFrameNanos { }
+                                if (swipeDirection == direction) {
+                                    swipeDirection = 0
+                                    settledOffset.animateTo(0f, spring(stiffness = 380f))
+                                }
+                            }
+                        }
+                    },
+                    onDragCancel = {
+                        val release = dragOffset
+                        settleJob = scope.launch {
+                            settledOffset.snapTo(release)
+                            dragging = false
+                            settledOffset.animateTo(0f, spring(stiffness = 380f))
+                        }
+                    }
+                )
+            }
+    ) {
         val sliding = previousUrl != null
         // Forward, the arriving cover slides in over the one being left. Going back it is the other
         // way round: the cover being left slides away and uncovers the one returning underneath.
@@ -570,7 +656,7 @@ fun SlidingCoverImage(
             modifier = Modifier
                 .matchParentSize()
                 .graphicsLayer {
-                    translationX =
+                    translationX = (if (dragging) dragOffset else settledOffset.value) +
                         if (back) -size.width * anim.value else size.width * (1f - anim.value)
                     if (sliding) {
                         shadowElevation = 24f

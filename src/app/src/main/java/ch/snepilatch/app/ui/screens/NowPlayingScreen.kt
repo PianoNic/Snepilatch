@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
@@ -448,7 +449,9 @@ fun NowPlayingScreen(
                                 .aspectRatio(1f),
                             shape = RoundedCornerShape(16.dp),
                             trackKey = track?.uri,
-                            forward = !skippedBack
+                            forward = !skippedBack,
+                            onSwipePrevious = { vm.skipPrevious(forceTrackChange = true) },
+                            onSwipeNext = { vm.skipNext() },
                         )
                     }
 
@@ -686,22 +689,19 @@ fun NowPlayingScreen(
 
                     Spacer(Modifier.weight(0.3f))
 
-                    if (hasCanvas) {
-                        // Invisible placeholder — same size as album art to keep layout stable
-                        Box(Modifier.fillMaxWidth().aspectRatio(1f))
-                    } else {
-                        // Album art — large with rounded corners; the arriving cover slides in from
-                        // the right, or the leaving one slides off left when going back.
-                        ch.snepilatch.app.ui.components.SlidingCoverImage(
-                            url = displayArtUrl,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(1f),
-                            shape = RoundedCornerShape(16.dp),
-                            trackKey = track?.uri,
-                            forward = !skippedBack
-                        )
-                    }
+                    // Keep the cover-sized swipe target over Canvas while leaving the video visible.
+                    ch.snepilatch.app.ui.components.SlidingCoverImage(
+                        url = displayArtUrl,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                            .graphicsLayer { alpha = if (hasCanvas) 0f else 1f },
+                        shape = RoundedCornerShape(16.dp),
+                        trackKey = track?.uri,
+                        forward = !skippedBack,
+                        onSwipePrevious = { vm.skipPrevious(forceTrackChange = true) },
+                        onSwipeNext = { vm.skipNext() },
+                    )
 
                     Spacer(Modifier.height(32.dp))
 
@@ -929,8 +929,8 @@ private fun TonalIconToggle(
         colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
             containerColor = buttonBg,
             contentColor = SpfyWhite,
-            checkedContainerColor = buttonBg,
-            checkedContentColor = accent,
+            checkedContainerColor = accent.copy(alpha = 0.45f),
+            checkedContentColor = SpfyWhite,
         ),
     ) { content() }
 }

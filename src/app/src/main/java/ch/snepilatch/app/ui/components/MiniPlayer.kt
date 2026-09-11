@@ -134,7 +134,7 @@ fun MiniPlayer(
                                 settledOffset.animateTo(0f, spring(stiffness = 380f))
                             } else {
                                 settledOffset.animateTo(direction * width, tween(180))
-                                if (direction > 0) vm.skipPrevious() else vm.skipNext()
+                                if (direction > 0) vm.skipPrevious(forceTrackChange = true) else vm.skipNext()
                                 settledOffset.snapTo(-direction * width)
                                 settledOffset.animateTo(0f, tween(180))
                             }

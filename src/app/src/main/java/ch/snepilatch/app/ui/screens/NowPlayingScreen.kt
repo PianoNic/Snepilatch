@@ -539,16 +539,15 @@ fun NowPlayingScreen(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                                track?.albumName?.let {
-                                    Spacer(Modifier.height(2.dp))
-                                    Text(
-                                        it,
-                                        color = SpfyLightGray.copy(alpha = 0.7f),
-                                        fontSize = 11.sp,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    track?.albumName.orEmpty(),
+                                    color = SpfyLightGray.copy(alpha = 0.7f),
+                                    fontSize = 11.sp,
+                                    minLines = 1,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
                             val isLiked by vm.currentTrackLiked.collectAsState()
                             FilledIconToggleButton(
@@ -726,16 +725,17 @@ fun NowPlayingScreen(
                                 isPlaying = isPlaying,
                                 modifier = Modifier.clickable { vm.openArtistFromCurrentTrack() }
                             )
-                            track?.albumName?.takeIf { !isAd }?.let {
-                                Spacer(Modifier.height(2.dp))
-                                MarqueeText(
-                                    text = it,
-                                    color = tertiaryText,
-                                    fontSize = 13.sp,
-                                    isPlaying = isPlaying,
-                                    modifier = Modifier.clickable { vm.openAlbumFromCurrentTrack() }
-                                )
-                            }
+                            Spacer(Modifier.height(2.dp))
+                            val albumName = track?.albumName?.takeIf { !isAd }
+                            MarqueeText(
+                                text = albumName.orEmpty(),
+                                color = tertiaryText,
+                                fontSize = 13.sp,
+                                isPlaying = isPlaying,
+                                modifier = Modifier.clickable(enabled = albumName != null) {
+                                    vm.openAlbumFromCurrentTrack()
+                                }
+                            )
                         }
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1302,6 +1302,7 @@ private fun MarqueeText(
         color = color,
         fontSize = fontSize,
         fontWeight = fontWeight,
+        minLines = 1,
         maxLines = 1,
         // Scroll forever while playing (so long titles always reveal their tail), but disable the
         // animation when paused (iterations = 0) so this per-frame marquee loop stops requesting frames.

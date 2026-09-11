@@ -187,6 +187,7 @@ fun SpfyApp(vm: PlaybackViewModel) {
                         }
                         .pointerInput(Unit) {
                             var opened = false
+                            var downwardDistance = 0f
                             // Rolling ~60ms window of (time, y) samples → an honest release
                             // velocity that's robust to 120Hz batching (a single-sample
                             // velocity inflates on near-zero dt and falsely "flings" a slow
@@ -195,7 +196,12 @@ fun SpfyApp(vm: PlaybackViewModel) {
                             val times = ArrayDeque<Long>()
                             val ys = ArrayDeque<Float>()
                             detectVerticalDragGestures(
-                                onDragStart = { opened = false; times.clear(); ys.clear() },
+                                onDragStart = {
+                                    opened = false
+                                    downwardDistance = 0f
+                                    times.clear()
+                                    ys.clear()
+                                },
                                 onDragEnd = {
                                     if (!opened) {
                                         val vel = if (times.size >= 2 && times.last() > times.first()) {
@@ -203,9 +209,14 @@ fun SpfyApp(vm: PlaybackViewModel) {
                                         } else {
                                             0f
                                         }
-                                        // Flick up (≥ ~700 px/s) or dragged past ~14% opens;
-                                        // else spring back.
-                                        if (vel < -0.7f || expand.value > 0.14f) {
+                                        val queueDrag = vel > 0.7f ||
+                                            downwardDistance >= with(density) { 48.dp.toPx() }
+                                        // Flick down or drag 48dp opens the queue; flick up or
+                                        // dragging past ~14% opens the player.
+                                        if (queueDrag) {
+                                            opened = true
+                                            vm.openQueue()
+                                        } else if (vel < -0.7f || expand.value > 0.14f) {
                                             opened = true
                                             vm.navigateTo(Screen.NOW_PLAYING)
                                         } else {
@@ -217,6 +228,7 @@ fun SpfyApp(vm: PlaybackViewModel) {
                                 val t = change.uptimeMillis
                                 times.addLast(t)
                                 ys.addLast(change.position.y)
+                                downwardDistance = (downwardDistance + dragAmount).coerceAtLeast(0f)
                                 while (times.size > 1 && t - times.first() > 60L) {
                                     times.removeFirst()
                                     ys.removeFirst()

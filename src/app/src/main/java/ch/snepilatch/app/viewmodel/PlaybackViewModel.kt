@@ -298,6 +298,7 @@ class PlaybackViewModel : ViewModel() {
     val queueSheetVisible: StateFlow<Boolean> = _queueSheetVisible
     // Next track info (always available from WebSocket state for mini player swipe)
     val nextTrackPreview = MutableStateFlow<TrackInfo?>(null)
+    val secondNextTrackPreview = MutableStateFlow<TrackInfo?>(null)
     val prevTrackPreview = MutableStateFlow<TrackInfo?>(null)
 
     // Detail state + openers live in DetailViewModel; PlaybackViewModel's deep-link/playback bridges
@@ -1179,6 +1180,7 @@ class PlaybackViewModel : ViewModel() {
 
         // Extract next track info for mini player swipe preview
         nextTrackPreview.value = state.next_tracks.firstOrNull()?.toTrackInfo()
+        secondNextTrackPreview.value = state.next_tracks.getOrNull(1)?.toTrackInfo()
         // prev_tracks runs oldest-first, so the track we'd go back to is the LAST entry.
         prevTrackPreview.value = state.prev_tracks.lastOrNull()?.toTrackInfo()
 

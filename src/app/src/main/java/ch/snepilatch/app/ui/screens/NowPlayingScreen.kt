@@ -375,6 +375,11 @@ fun NowPlayingScreen(
     val isShuffling by vm.isShufflingFlow.collectAsState()
     val repeatMode by vm.repeatModeFlow.collectAsState()
     val skippedBack by vm.skippedBack.collectAsState()
+    var buttonSkip by remember { mutableStateOf(0 to 0) }
+    val onButtonSkip: (Int) -> Unit = { direction ->
+        buttonSkip = buttonSkip.first + 1 to direction
+        if (direction > 0) vm.skipPrevious(forceTrackChange = true) else vm.skipNext()
+    }
     // While an ad is being skipped we keep the CURRENT song frozen on screen (cover/title/progress)
     // and show a loading spinner (see spinnerActive) — so the ~2.5s ad skip reads as "loading the next
     // track", not an interruption. `track` is unchanged during an ad, so no blanking is needed.
@@ -386,12 +391,9 @@ fun NowPlayingScreen(
     val spinnerActive = streamLoading || isAd
     val theme by ThemeController.themeColors.collectAsState()
 
-    // Prefetch the next track's cover so the slide-in on skip is instant (no load gap).
-    val prefetchCtx = LocalContext.current
     val nextPreview by vm.nextTrackPreview.collectAsState()
-    LaunchedEffect(nextPreview?.albumArt) {
-        ch.snepilatch.app.ui.components.prefetchCover(prefetchCtx, nextPreview?.albumArt)
-    }
+    val secondNextPreview by vm.secondNextTrackPreview.collectAsState()
+    val previousPreview by vm.prevTrackPreview.collectAsState()
 
     val animatedPrimary by animateColorAsState(theme.primary, tween(800), label = "primary")
     val buttonBg = Color.White.copy(alpha = 0.12f)
@@ -449,9 +451,13 @@ fun NowPlayingScreen(
                                 .aspectRatio(1f),
                             shape = RoundedCornerShape(16.dp),
                             trackKey = track?.uri,
+                            buttonSkip = buttonSkip,
                             forward = !skippedBack,
                             onSwipePrevious = { vm.skipPrevious(forceTrackChange = true) },
                             onSwipeNext = { vm.skipNext() },
+                            previousCoverUrl = previousPreview?.albumArt,
+                            nextCoverUrl = nextPreview?.albumArt,
+                            secondNextCoverUrl = secondNextPreview?.albumArt,
                         )
                     }
 
@@ -585,7 +591,7 @@ fun NowPlayingScreen(
 
                         Spacer(Modifier.weight(0.2f))
 
-                        PlayerControls(vm, animatedPrimary, buttonBg, spinnerActive, compact = true)
+                        PlayerControls(vm, animatedPrimary, buttonBg, spinnerActive, compact = true, onSkip = onButtonSkip)
 
                         Spacer(Modifier.weight(0.2f))
 
@@ -697,9 +703,14 @@ fun NowPlayingScreen(
                             .graphicsLayer { alpha = if (hasCanvas) 0f else 1f },
                         shape = RoundedCornerShape(16.dp),
                         trackKey = track?.uri,
+                        buttonSkip = buttonSkip,
                         forward = !skippedBack,
                         onSwipePrevious = { vm.skipPrevious(forceTrackChange = true) },
                         onSwipeNext = { vm.skipNext() },
+                        previousCoverUrl = previousPreview?.albumArt,
+                        nextCoverUrl = nextPreview?.albumArt,
+                        secondNextCoverUrl = secondNextPreview?.albumArt,
+                        clipToFrame = false,
                     )
 
                     Spacer(Modifier.height(32.dp))
@@ -787,7 +798,7 @@ fun NowPlayingScreen(
 
                     Spacer(Modifier.weight(0.15f))
 
-                    PlayerControls(vm, animatedPrimary, buttonBg, spinnerActive, compact = false)
+                    PlayerControls(vm, animatedPrimary, buttonBg, spinnerActive, compact = false, onSkip = onButtonSkip)
 
                     Spacer(Modifier.weight(0.2f))
 
@@ -945,6 +956,7 @@ private fun PlayerControls(
     buttonBg: Color,
     spinnerActive: Boolean,
     compact: Boolean,
+    onSkip: (Int) -> Unit,
 ) {
     val isPlaying by vm.isPlayingFlow.collectAsState()
     val isPaused by vm.isPausedFlow.collectAsState()
@@ -969,7 +981,7 @@ private fun PlayerControls(
         TonalIconToggle(isShuffling, { vm.toggleShuffle() }, sideBtn, buttonBg, animatedPrimary) {
             Icon(Icons.Rounded.Shuffle, stringResource(R.string.shuffle), modifier = Modifier.size(sideIcon))
         }
-        TonalIconBtn({ vm.skipPrevious() }, skipBtn, buttonBg) {
+        TonalIconBtn({ onSkip(1) }, skipBtn, buttonBg) {
             Icon(Icons.Rounded.SkipPrevious, stringResource(R.string.previous), modifier = Modifier.size(skipIcon))
         }
         FilledIconButton(
@@ -989,7 +1001,7 @@ private fun PlayerControls(
                 )
             }
         }
-        TonalIconBtn({ vm.skipNext() }, skipBtn, buttonBg) {
+        TonalIconBtn({ onSkip(-1) }, skipBtn, buttonBg) {
             if (nextLoading) {
                 LoadingIndicator(color = SpfyWhite, modifier = Modifier.size(nextSpinnerSize))
             } else {

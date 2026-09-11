@@ -58,6 +58,9 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.DialogWindowProvider
 import android.os.Build
+import androidx.core.graphics.drawable.toBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -518,10 +521,7 @@ fun ProfileInfoItem(label: String, value: String, icon: ImageVector) {
 }
 
 /**
- * Album cover with spicy-lyrics' cover transition: on [url] change the NEW cover slides in from the
- * right (translate 100%→0 over 750ms, cubic-bezier(0.835,-0.008,0.149,0.866)) over the previous cover,
- * casting a soft shadow (their `MB_anim_enter` + `.ti_ToImage` box-shadow). Prefetch the next cover
- * with [prefetchCover] so the slide starts instantly instead of waiting on the network.
+ * Three covers share one offset, keeping their spacing fixed throughout a drag and track change.
  */
 @Composable
 fun SlidingCoverImage(
@@ -529,105 +529,149 @@ fun SlidingCoverImage(
     modifier: Modifier = Modifier,
     shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(8.dp),
     trackKey: Any? = url,
-    /** False when the change came from going back, which reverses the entrance. */
     forward: Boolean = true,
     onSwipePrevious: (() -> Unit)? = null,
     onSwipeNext: (() -> Unit)? = null,
+    previousCoverUrl: String? = null,
+    nextCoverUrl: String? = null,
+    secondNextCoverUrl: String? = null,
+    clipToFrame: Boolean = true,
+    buttonSkip: Pair<Int, Int> = 0 to 0,
 ) {
     val scope = rememberCoroutineScope()
-    val settledOffset = remember { Animatable(0f) }
+    val offset = remember { Animatable(0f) }
+    val gap = with(androidx.compose.ui.platform.LocalDensity.current) { 32.dp.toPx() }
+    var width by remember { mutableFloatStateOf(0f) }
     var dragOffset by remember { mutableFloatStateOf(0f) }
     var dragging by remember { mutableStateOf(false) }
     var swipeDirection by remember { mutableIntStateOf(0) }
-    var coverWidth by remember { mutableFloatStateOf(0f) }
     var settleJob by remember { mutableStateOf<Job?>(null) }
-    var currentUrl by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(url) }
-    var currentKey by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(trackKey) }
-    var previousUrl by androidx.compose.runtime.remember {
-        androidx.compose.runtime.mutableStateOf<String?>(null)
-    }
-    var back by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    val anim = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(1f) }
-    // Keyed on the track alone. Keying on the url as well let a mid-animation artwork upgrade cancel
-    // the effect, leaving previousUrl set and the entrance frozen part-way: the old cover stayed on
-    // top of a new one parked off to the side, which reads as the cover never changing.
-    androidx.compose.runtime.LaunchedEffect(trackKey) {
-        if (trackKey == currentKey) return@LaunchedEffect
-        val gestureDirection = swipeDirection
-        val oldUrl = currentUrl
-        currentKey = trackKey
-        currentUrl = url
-        if (gestureDirection != 0 && coverWidth > 0f) {
-            previousUrl = null
-            back = false
-            swipeDirection = 0
-            settledOffset.snapTo(-gestureDirection * coverWidth)
-            settledOffset.animateTo(0f, tween(180))
-        } else {
-            settledOffset.snapTo(0f)
-            previousUrl = oldUrl
-            back = !forward
-            try {
-                anim.snapTo(0f)
-                anim.animateTo(
-                    1f,
-                    tween(750, easing = androidx.compose.animation.core.CubicBezierEasing(0.835f, -0.008f, 0.149f, 0.866f))
-                )
-            } finally {
-                previousUrl = null
-                back = false
+    var currentKey by remember { mutableStateOf(trackKey) }
+    var currentUrl by remember { mutableStateOf(url) }
+    var leftUrl by remember { mutableStateOf(previousCoverUrl) }
+    var rightUrl by remember { mutableStateOf(nextCoverUrl) }
+    val previousAction by androidx.compose.runtime.rememberUpdatedState(onSwipePrevious)
+    val nextAction by androidx.compose.runtime.rememberUpdatedState(onSwipeNext)
+    val latestPrevious by androidx.compose.runtime.rememberUpdatedState(previousCoverUrl)
+    val latestNext by androidx.compose.runtime.rememberUpdatedState(nextCoverUrl)
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var loadedCovers by remember { mutableStateOf(emptyMap<String, BitmapPainter>()) }
+    val coverUrls = listOfNotNull(
+        url, previousCoverUrl, nextCoverUrl, secondNextCoverUrl, leftUrl, currentUrl, rightUrl
+    ).filter { it.isNotBlank() }.distinct()
+    LaunchedEffect(coverUrls, width) {
+        if (width <= 0f) return@LaunchedEffect
+        loadedCovers = loadedCovers.filterKeys { it in coverUrls }
+        coverUrls.filterNot { it in loadedCovers }.forEach { cover ->
+            launch {
+                val painter = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    val result = coil.Coil.imageLoader(context).execute(
+                        coil.request.ImageRequest.Builder(context)
+                            .data(cover).size(width.toInt()).allowHardware(false).build()
+                    )
+                    (result as? coil.request.SuccessResult)?.drawable?.let {
+                        BitmapPainter(it.toBitmap().asImageBitmap())
+                    }
+                }
+                if (painter != null) loadedCovers = loadedCovers + (cover to painter)
             }
         }
     }
-    // Same track, better artwork. An optimistic skip paints the queue entry's `imageUrl`, then the
-    // confirmed state upgrades it to `imageLargeUrl` — a different string for the same picture. Swap
-    // it in place; replaying the entrance would slide the identical cover in a second time.
-    androidx.compose.runtime.LaunchedEffect(url) {
-        if (trackKey == currentKey) currentUrl = url
+
+    LaunchedEffect(buttonSkip) {
+        if (buttonSkip.first == 0) return@LaunchedEffect
+        settleJob?.cancel()
+        leftUrl = latestPrevious
+        rightUrl = latestNext
+        dragging = false
+        swipeDirection = buttonSkip.second
+        settleJob = scope.launch {
+            offset.animateTo(buttonSkip.second * (width + gap), tween(220))
+            delay(1000)
+            swipeDirection = 0
+            offset.animateTo(0f, tween(160))
+        }
     }
-    // Clip to the cover frame (like spicy's `overflow: hidden` MediaImageContainer) so the incoming
-    // cover slides in from the frame's own right edge, not from off-screen.
+
+    LaunchedEffect(trackKey) {
+        if (trackKey == currentKey) return@LaunchedEffect
+        val direction = swipeDirection
+        val oldUrl = currentUrl
+        val oldOffset = if (dragging) dragOffset else offset.value
+        settleJob?.cancel()
+        val movement = if (direction != 0) direction else if (forward) -1 else 1
+        val incomingUrl = if (movement < 0) rightUrl else leftUrl
+        // Move the strip and replace its contents together, before the next frame.
+        offset.snapTo((if (direction != 0) oldOffset else 0f) - movement * (width + gap))
+        dragging = false
+        swipeDirection = 0
+        currentKey = trackKey
+        currentUrl = url?.takeIf { it in loadedCovers }
+            ?: incomingUrl?.takeIf { it in loadedCovers } ?: url
+        leftUrl = if (movement < 0) oldUrl else previousCoverUrl
+        rightUrl = if (movement > 0) oldUrl else nextCoverUrl
+        settleJob = scope.launch {
+            offset.animateTo(0f, tween(if (direction != 0) 160 else 220))
+        }
+    }
+    LaunchedEffect(url, loadedCovers[url]) {
+        if (trackKey == currentKey && url in loadedCovers) currentUrl = url
+    }
+    LaunchedEffect(previousCoverUrl, nextCoverUrl, currentKey, dragging, swipeDirection) {
+        if (!dragging && swipeDirection == 0) {
+            settleJob?.join()
+            leftUrl = previousCoverUrl
+            rightUrl = nextCoverUrl
+        }
+    }
+
     Box(
         modifier
-            .onSizeChanged { coverWidth = it.width.toFloat() }
-            .clip(shape)
-            .pointerInput(onSwipePrevious, onSwipeNext) {
+            .onSizeChanged { width = it.width.toFloat() }
+            .then(if (clipToFrame) Modifier.clip(shape) else Modifier)
+            .pointerInput(gap) {
                 val tracker = androidx.compose.ui.input.pointer.util.VelocityTracker()
                 detectHorizontalDragGestures(
                     onDragStart = {
                         tracker.resetTracking()
                         settleJob?.cancel()
+                        swipeDirection = 0
+                        if (offset.value == 0f) {
+                            leftUrl = latestPrevious
+                            rightUrl = latestNext
+                        }
+                        dragOffset = offset.value
                         dragging = true
-                        dragOffset = settledOffset.value
                     },
-                    onHorizontalDrag = { change, dragAmount ->
+                    onHorizontalDrag = { change, amount ->
                         tracker.addPosition(change.uptimeMillis, change.position)
                         change.consume()
-                        dragOffset = (dragOffset + dragAmount)
-                            .coerceIn(-size.width.toFloat(), size.width.toFloat())
+                        dragOffset = (dragOffset + amount)
+                            .coerceIn(-size.width - gap, size.width + gap)
                     },
                     onDragEnd = {
-                        val width = size.width.toFloat()
                         val release = dragOffset
                         val velocity = tracker.calculateVelocity().x
                         val direction = when {
-                            release > width * 0.15f || velocity > 700f -> 1
-                            release < -width * 0.15f || velocity < -700f -> -1
+                            velocity > 700f -> 1
+                            velocity < -700f -> -1
+                            release > size.width * 0.15f -> 1
+                            release < -size.width * 0.15f -> -1
                             else -> 0
                         }
                         settleJob = scope.launch {
-                            settledOffset.snapTo(release)
+                            offset.snapTo(release)
                             dragging = false
                             if (direction == 0) {
-                                settledOffset.animateTo(0f, spring(stiffness = 380f))
+                                offset.animateTo(0f, spring(stiffness = 600f))
                             } else {
-                                settledOffset.animateTo(direction * width, tween(180))
                                 swipeDirection = direction
-                                if (direction > 0) onSwipePrevious?.invoke() else onSwipeNext?.invoke()
-                                withFrameNanos { }
+                                if (direction > 0) previousAction?.invoke() else nextAction?.invoke()
+                                offset.animateTo(direction * (size.width + gap), tween(160))
+                                delay(250)
                                 if (swipeDirection == direction) {
                                     swipeDirection = 0
-                                    settledOffset.animateTo(0f, spring(stiffness = 380f))
+                                    offset.animateTo(0f, spring(stiffness = 600f))
                                 }
                             }
                         }
@@ -635,44 +679,29 @@ fun SlidingCoverImage(
                     onDragCancel = {
                         val release = dragOffset
                         settleJob = scope.launch {
-                            settledOffset.snapTo(release)
+                            offset.snapTo(release)
                             dragging = false
-                            settledOffset.animateTo(0f, spring(stiffness = 380f))
+                            offset.animateTo(0f, spring(stiffness = 600f))
                         }
                     }
                 )
             }
     ) {
-        val sliding = previousUrl != null
-        // Forward, the arriving cover slides in over the one being left. Going back it is the other
-        // way round: the cover being left slides away and uncovers the one returning underneath.
-        val under = if (back) currentUrl else previousUrl
-        val over = if (back) previousUrl else currentUrl
-        under?.let { beneath ->
-            SpfyImage(url = beneath, modifier = Modifier.matchParentSize(), shape = shape)
-        }
-        SpfyImage(
-            url = over,
-            modifier = Modifier
-                .matchParentSize()
-                .graphicsLayer {
-                    translationX = (if (dragging) dragOffset else settledOffset.value) +
-                        if (back) -size.width * anim.value else size.width * (1f - anim.value)
-                    if (sliding) {
-                        shadowElevation = 24f
-                        this.shape = shape
-                        clip = true
+        val covers = listOf(leftUrl, currentUrl, rightUrl)
+        covers.forEachIndexed { index, cover ->
+            androidx.compose.foundation.Image(
+                painter = loadedCovers[cover] ?: androidx.compose.ui.graphics.painter.ColorPainter(SpfyGray),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .matchParentSize()
+                    .graphicsLayer {
+                        translationX = (if (dragging) dragOffset else offset.value) +
+                            (index - 1) * (size.width + gap)
                     }
-                },
-            shape = shape
-        )
+                    .clip(shape)
+                    .background(SpfyGray),
+            )
+        }
     }
-}
-
-/** Warm Coil's cache with a cover URL so a later [SlidingCoverImage] shows it instantly (no load gap
- *  on skip). Safe to call with null/blank — it no-ops. */
-fun prefetchCover(context: android.content.Context, url: String?) {
-    if (url.isNullOrBlank()) return
-    val request = coil.request.ImageRequest.Builder(context).data(url).build()
-    coil.Coil.imageLoader(context).enqueue(request)
 }

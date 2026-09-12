@@ -173,6 +173,28 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     var isShuffling: Boolean = false
     var repeatMode: String = "off"  // "off", "context", "track"
 
+    // The server's toggling restrictions. A custom action cannot be disabled, so a disallowed
+    // button shows a dimmed glyph and its tap is dropped by the view model.
+    var canToggleShuffle: Boolean = true
+    var canToggleRepeat: Boolean = true
+
+    /** The glyph for a like, shuffle or repeat button, from the state above. */
+    private fun buttonIcon(type: String) = when (type) {
+        "like" -> if (isLiked) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline
+        "shuffle" -> when {
+            !canToggleShuffle -> R.drawable.ic_shuffle_disabled
+            isShuffling -> R.drawable.ic_shuffle_on
+            else -> R.drawable.ic_shuffle_off
+        }
+        "repeat" -> when {
+            !canToggleRepeat -> R.drawable.ic_repeat_disabled
+            repeatMode == "track" -> R.drawable.ic_repeat_one
+            repeatMode == "context" -> R.drawable.ic_repeat_on
+            else -> R.drawable.ic_repeat_off
+        }
+        else -> R.drawable.ic_heart_outline
+    }
+
     // True while the silent ad clip is skipping an ad: the media-session card keeps the previous
     // track's metadata (no "Skipping ad…") and reports BUFFERING so the system notification shows a
     // loading spinner, matching the in-app UI. Cleared when the next real track loads.
@@ -1287,22 +1309,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         // Add custom actions for left and right buttons
         fun addButtonAction(type: String, actionName: String) {
             when (type) {
-                "like" -> {
-                    val icon = if (isLiked) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline
-                    builder.addCustomAction(actionName, if (isLiked) "Unlike" else "Like", icon)
-                }
-                "shuffle" -> {
-                    val icon = if (isShuffling) R.drawable.ic_shuffle_on else R.drawable.ic_shuffle_off
-                    builder.addCustomAction(actionName, "Shuffle", icon)
-                }
-                "repeat" -> {
-                    val icon = when (repeatMode) {
-                        "track" -> R.drawable.ic_repeat_one
-                        "context" -> R.drawable.ic_repeat_on
-                        else -> R.drawable.ic_repeat_off
-                    }
-                    builder.addCustomAction(actionName, "Repeat", icon)
-                }
+                "like" -> builder.addCustomAction(actionName, if (isLiked) "Unlike" else "Like", buttonIcon(type))
+                "shuffle" -> builder.addCustomAction(actionName, "Shuffle", buttonIcon(type))
+                "repeat" -> builder.addCustomAction(actionName, "Repeat", buttonIcon(type))
             }
         }
         addButtonAction(notificationLeftButton, "LEFT_ACTION")
@@ -1327,16 +1336,6 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         // Actions — prevIntent/playPauseIntent/nextIntent/leftIntent/rightIntent are cached fields.
         val playPauseIcon = if (isPlaying) R.drawable.ic_pause_rounded else R.drawable.ic_play_arrow_rounded
 
-        fun buttonIcon(type: String) = when (type) {
-            "like" -> if (isLiked) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline
-            "shuffle" -> if (isShuffling) R.drawable.ic_shuffle_on else R.drawable.ic_shuffle_off
-            "repeat" -> when (repeatMode) {
-                "track" -> R.drawable.ic_repeat_one
-                "context" -> R.drawable.ic_repeat_on
-                else -> R.drawable.ic_repeat_off
-            }
-            else -> R.drawable.ic_heart_outline
-        }
         fun buttonLabel(type: String) = when (type) {
             "like" -> if (isLiked) "Unlike" else "Like"
             "shuffle" -> "Shuffle"

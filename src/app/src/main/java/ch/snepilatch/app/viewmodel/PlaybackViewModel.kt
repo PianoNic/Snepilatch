@@ -1126,8 +1126,9 @@ class PlaybackViewModel : ViewModel() {
                 // of the track. isActuallyPlaying already accounts for has_active_device
                 // and the position-vs-duration boundary, so it's the correct gate here.
                 if (state.isActuallyPlaying) {
-                    val elapsed = (System.currentTimeMillis() - state.timestamp).coerceAtLeast(0)
-                    (state.position_as_of_timestamp + elapsed).coerceAtMost(state.duration)
+                    // The snapshot timestamp is server time, so advance it against the server clock.
+                    val now = player?.serverNowMs() ?: System.currentTimeMillis()
+                    state.positionAt(now).coerceAtMost(state.duration)
                 } else {
                     state.position_as_of_timestamp
                 }

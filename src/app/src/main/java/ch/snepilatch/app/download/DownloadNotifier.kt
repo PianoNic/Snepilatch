@@ -16,6 +16,7 @@ object DownloadNotifier {
 
     private const val CHANNEL_ID = "snepilatch_downloads"
     private const val NOTIFICATION_ID = 3
+    private const val REQUEST_CODE = 2
 
     /** Read by MainActivity to land on the downloads manager rather than the last screen. */
     const val EXTRA_OPEN_DOWNLOADS = "ch.snepilatch.app.OPEN_DOWNLOADS"
@@ -43,8 +44,11 @@ object DownloadNotifier {
             ?.putExtra(EXTRA_OPEN_DOWNLOADS, true)
             ?.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
             ?: return null
+        // Request code 0 is the media session's tap intent. Extras do not count towards PendingIntent
+        // identity, so with the same code FLAG_UPDATE_CURRENT would stamp the OPEN_DOWNLOADS extra onto
+        // the playback notification too and every tap on it would land on the downloads manager.
         return PendingIntent.getActivity(
-            context, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            context, REQUEST_CODE, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
     }
 

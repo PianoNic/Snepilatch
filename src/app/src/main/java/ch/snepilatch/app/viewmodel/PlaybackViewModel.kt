@@ -3029,10 +3029,6 @@ class PlaybackViewModel : ViewModel() {
     }
 
     /**
-     * Plays a downloaded copy. Runs before the Spfy branch, which returns without ever reaching the
-     * resolver, so a downloaded track plays from disk whatever the selected source is.
-     */
-    /**
      * A downloaded copy still resolves and licenses like a stream (about 10 KB, no audio), so the
      * server sees what it sees for the web player and the telemetry stays truthful.
      */
@@ -3043,7 +3039,11 @@ class PlaybackViewModel : ViewModel() {
             val stream = resolver.resolveForFileId(fileId)
             if (stream.pssh == null) return
             val ms = resolver.license(stream)
-            player?.reportStreamResolved(kotify.api.playerstatus.StreamInfo(fileId, listOf(stream.cdnUrl), msLicenseLatency = ms))
+            player?.reportStreamResolved(
+                kotify.api.playerstatus.StreamInfo(
+                    fileId, stream.cdnUrls, msResolveLatency = stream.msResolveLatency, msLicenseLatency = ms
+                )
+            )
             LokiLogger.i(TAG, "Licensed downloaded copy of $trackUri in ${ms}ms")
         } catch (e: CancellationException) {
             throw e
@@ -3052,6 +3052,10 @@ class PlaybackViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Plays a downloaded copy. Runs before the Spfy branch, which returns without ever reaching the
+     * resolver, so a downloaded track plays from disk whatever the selected source is.
+     */
     private suspend fun playDownloaded(trackUri: String, title: String, artist: String, art: String?): Boolean {
         val local = AudioSourceResolver.localOrNull(trackUri, title, artist) as? StreamResult.Success
             ?: return false

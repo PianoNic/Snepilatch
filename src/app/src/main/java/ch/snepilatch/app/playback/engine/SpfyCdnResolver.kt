@@ -15,7 +15,10 @@ data class SpfyStream(
     // Base64 Widevine PSSH from the seektable. Many Spfy files don't embed a Widevine pssh box, so
     // we inject this one into ExoPlayer's DRM session (see PsshInjectingDrmSessionManager). Null if the
     // seektable lookup failed — playback then falls back to the file's own (possibly missing) pssh.
-    val pssh: String? = null
+    val pssh: String? = null,
+    // Every mirror storage-resolve returned and how long it took, for the playback telemetry.
+    val cdnUrls: List<String> = listOf(cdnUrl),
+    val msResolveLatency: Long = 0
 )
 
 /**
@@ -27,6 +30,9 @@ class SpfyCdnResolver(
     private val session: Session,
     private val spfyPlayback: SpfyPlayback
 ) {
+    /** Told what every resolve produced, so KotifyClient's playback telemetry carries the real stream. */
+    var onResolved: ((kotify.api.playerstatus.StreamInfo) -> Unit)? = null
+
     /**
      * Resolve a CDN URL for a known file id plus Widevine license metadata.
      * Throws if no mirrors are returned by Spfy.
@@ -36,13 +42,11 @@ class SpfyCdnResolver(
      * retry lands on a DIFFERENT CDN edge — hammering the same dead mirror is what left a bad edge
      * stuck in silence.
      */
-    /** Told what every resolve produced, so KotifyClient's playback telemetry carries the real stream. */
-    var onResolved: ((kotify.api.playerstatus.StreamInfo) -> Unit)? = null
-
     suspend fun resolveForFileId(fileId: String, mirrorIndex: Int = 0): SpfyStream {
         val t0 = System.currentTimeMillis()
         val cdnUrls = spfyPlayback.getCdnUrls(fileId)
-        onResolved?.invoke(kotify.api.playerstatus.StreamInfo(fileId, cdnUrls, msResolveLatency = System.currentTimeMillis() - t0))
+        val msResolveLatency = System.currentTimeMillis() - t0
+        onResolved?.invoke(kotify.api.playerstatus.StreamInfo(fileId, cdnUrls, msResolveLatency = msResolveLatency))
         if (cdnUrls.isEmpty()) throw IllegalStateException("No CDN mirrors for fileId=$fileId")
         val cdnUrl = cdnUrls[mirrorIndex.mod(cdnUrls.size)]
         return SpfyStream(
@@ -50,7 +54,9 @@ class SpfyCdnResolver(
             licenseUrl = session.spclientUrl("widevine-license/v1/audio/license"),
             licenseHeaders = buildLicenseHeaders(),
             mirrorCount = cdnUrls.size,
-            pssh = runCatching { spfyPlayback.getPssh(fileId) }.getOrNull()
+            pssh = runCatching { spfyPlayback.getPssh(fileId) }.getOrNull(),
+            cdnUrls = cdnUrls,
+            msResolveLatency = msResolveLatency
         )
     }
 

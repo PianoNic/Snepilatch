@@ -53,7 +53,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -1209,13 +1211,6 @@ class PlaybackViewModel : ViewModel() {
             stopPositionTicker()
         }
 
-        // Sync notification button states
-        MusicPlaybackService.instance?.let { svc ->
-            svc.isLiked = currentTrackLiked.value
-            svc.isShuffling = state.is_shuffling
-            svc.repeatMode = state.repeat_mode
-        }
-
         // Detect playback transfer away — stop local ExoPlayer
         LokiLogger.d(TAG, "Transfer check: streaming=${isStreaming.value} hasActive=${state.has_active_device} isOurs=${state.is_active_device}")
         foreignDeviceActive = state.has_active_device && !state.is_active_device
@@ -1880,37 +1875,56 @@ class PlaybackViewModel : ViewModel() {
     }
 
     fun toggleShuffle() {
+        val wasShuffling = _playback.value.isShuffling
+        _playback.value = _playback.value.copy(isShuffling = !wasShuffling)
         launchWithPlayer("shuffle") { pc ->
-            val newMode = if (_playback.value.isShuffling) "off" else "on"
-            pc.setShuffle(newMode)
-            _playback.value = _playback.value.copy(isShuffling = newMode != "off")
-            pushTransportButtonsToNotification()
+            try {
+                pc.setShuffle(if (wasShuffling) "off" else "on")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _playback.value = _playback.value.copy(isShuffling = wasShuffling)
+                throw e
+            }
         }
     }
 
     fun cycleRepeat() {
+        val previous = _playback.value.repeatMode
+        val newMode = when (previous) {
+            "off" -> "context"
+            "context" -> "track"
+            else -> "off"
+        }
+        _playback.value = _playback.value.copy(repeatMode = newMode)
         launchWithPlayer("repeat") { pc ->
-            val newMode = when (_playback.value.repeatMode) {
-                "off" -> "context"
-                "context" -> "track"
-                else -> "off"
+            try {
+                pc.setRepeat(newMode)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _playback.value = _playback.value.copy(repeatMode = previous)
+                throw e
             }
-            pc.setRepeat(newMode)
-            _playback.value = _playback.value.copy(repeatMode = newMode)
-            pushTransportButtonsToNotification()
         }
     }
 
-    /** Mirror an in-app shuffle/repeat toggle onto the media-session notification's custom buttons,
-     *  which otherwise only refresh when toggled from the notification itself (same gap the like fix
-     *  closed for the heart). */
-    private fun pushTransportButtonsToNotification() {
-        viewModelScope.launch(Dispatchers.Main) {
-            MusicPlaybackService.instance?.let {
-                it.isShuffling = _playback.value.isShuffling
-                it.repeatMode = _playback.value.repeatMode
-                it.updateNotification()
-            }
+    // The notification's shuffle, repeat and like buttons render this state and nothing else, so one
+    // change repaints them, whether it came from a tap here, a tap on the notification, or the cluster.
+    // The first value is skipped: it is the empty default, and a repaint would promote the service.
+    init {
+        viewModelScope.launch {
+            combine(_playback, currentTrackLiked) { p, liked -> Triple(p.isShuffling, p.repeatMode, liked) }
+                .distinctUntilChanged()
+                .drop(1)
+                .collect { (shuffling, repeat, liked) ->
+                    MusicPlaybackService.instance?.let {
+                        it.isShuffling = shuffling
+                        it.repeatMode = repeat
+                        it.isLiked = liked
+                        it.updateNotification()
+                    }
+                }
         }
     }
 
@@ -2352,7 +2366,6 @@ class PlaybackViewModel : ViewModel() {
         launchWithSession("likeSong", R.string.error_like) { sess ->
             Song(sess).likeSong(trackId)
             currentTrackLiked.value = true
-            pushLikeToNotification(true)
         }
     }
 
@@ -2360,18 +2373,6 @@ class PlaybackViewModel : ViewModel() {
         launchWithSession("unlikeSong", R.string.error_like) { sess ->
             Song(sess).unlikeSong(trackId)
             currentTrackLiked.value = false
-            pushLikeToNotification(false)
-        }
-    }
-
-    /** Mirror an in-app like/unlike onto the media-session notification's heart, which otherwise only
-     *  refreshes when toggled from the notification itself. */
-    private fun pushLikeToNotification(liked: Boolean) {
-        viewModelScope.launch(Dispatchers.Main) {
-            MusicPlaybackService.instance?.let {
-                it.isLiked = liked
-                it.updateNotification()
-            }
         }
     }
 
@@ -2506,30 +2507,9 @@ class PlaybackViewModel : ViewModel() {
             val track = _playback.value.track ?: return@lambda
             val trackId = track.uri.removePrefix("spotify:track:")
             if (currentTrackLiked.value) unlikeSong(trackId) else likeSong(trackId)
-            resyncNotificationAfterCommand(svc) { svc.isLiked = currentTrackLiked.value }
         }
-        svc.onShuffleToggle = {
-            toggleShuffle()
-            resyncNotificationAfterCommand(svc) { svc.isShuffling = _playback.value.isShuffling }
-        }
-        svc.onRepeatToggle = {
-            cycleRepeat()
-            resyncNotificationAfterCommand(svc) { svc.repeatMode = _playback.value.repeatMode }
-        }
-    }
-
-    /**
-     * After a notification-button command, re-read the true source-of-truth state (which the toggle's
-     * optimistic push or an onState round-trip may not have repainted) and repaint the notification.
-     * Each caller sets ONLY its own field via [apply] — mirroring the others would paint a fresher-than-
-     * today glyph for state that lags (e.g. the infiniPlay repeat guard writes _playback but not svc).
-     */
-    private fun resyncNotificationAfterCommand(svc: MusicPlaybackService, apply: () -> Unit) {
-        viewModelScope.launch {
-            kotlinx.coroutines.delay(NOTIFICATION_RESYNC_MS)
-            apply()
-            svc.updateNotification()
-        }
+        svc.onShuffleToggle = { toggleShuffle() }
+        svc.onRepeatToggle = { cycleRepeat() }
     }
 
     /**
@@ -3782,7 +3762,6 @@ class PlaybackViewModel : ViewModel() {
         /** SharedPreferences file name for all persisted settings. */
 
         /** Delay before re-reading true state to repaint the notification after a button command. */
-        private const val NOTIFICATION_RESYNC_MS = 300L
 
         /** How long a tap waits for its file id before giving up and letting the echo do it. */
         private const val TAP_FILE_ID_TIMEOUT_MS = 3_000L

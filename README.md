@@ -28,6 +28,9 @@
 | **Interface** | **Languages and updates** |
 | <ul><li>Fully native UI built with Jetpack Compose and Material 3</li><li>Dynamic color theming from album art</li><li>Gesture-based player with swipe navigation</li><li>Canvas background animations</li></ul> | <ul><li>English, German, Russian and Swiss German</li><li>Automatic in-app updates</li></ul> |
 
+> [!CAUTION]
+> This is an unofficial client, use at your own risk or with an alternative account, as account safety cannot be guaranteed.
+
 ## Installation
 
 Download the latest APK from the [Releases](https://github.com/PianoNic/Snepilatch/releases) page.

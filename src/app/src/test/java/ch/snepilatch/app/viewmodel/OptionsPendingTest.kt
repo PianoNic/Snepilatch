@@ -53,22 +53,24 @@ class OptionsPendingTest {
         assertFalse(await { rig.vm.optionsPending.first { !it } })
     }
 
+    /** Issue #732: a tap while a change is in flight is a new request, and the newest one counts. */
     @Test
-    fun secondTap_whileTheFirstIsPending_isDropped() {
-        val commandReturns = CompletableDeferred<Boolean>()
-        coEvery { rig.player.setShuffle("on") } coAnswers { commandReturns.await() }
+    fun secondTap_whileTheFirstIsPending_isANewRequestThatWins() {
+        val firstReturns = CompletableDeferred<Boolean>()
+        coEvery { rig.player.setShuffle("on") } coAnswers { firstReturns.await() }
+        coEvery { rig.player.setShuffle("off") } returns true
 
         rig.vm.toggleShuffle()
         assertTrue(await { rig.vm.optionsPending.first { it } })
         rig.vm.toggleShuffle()
-        rig.vm.cycleRepeat()
 
-        coVerify(exactly = 1) { rig.player.setShuffle(any()) }
-        coVerify(exactly = 0) { rig.player.setRepeat(any()) }
-        assertTrue(rig.vm.playback.value.isShuffling)
-        commandReturns.complete(true)
-        assertFalse(await { rig.vm.optionsPending.first { !it } })
-        assertTrue(rig.vm.playback.value.isShuffling)
+        coVerify(timeout = 1_000, exactly = 1) { rig.player.setShuffle("off") }
+        assertFalse(await { rig.vm.playback.first { !it.isShuffling }.isShuffling })
+        // The first request comes back a failure after the second landed: it no longer paints back.
+        firstReturns.complete(false)
+        Thread.sleep(300)
+        assertFalse(rig.vm.playback.value.isShuffling)
+        assertFalse(rig.vm.optionsPending.value)
     }
 
     @Test

@@ -259,20 +259,21 @@ class PlaybackViewModel : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.Eagerly, 0L)
 
     /**
-     * A shuffle or repeat change the cluster has not confirmed yet. Like the web player, the buttons
-     * that send one are disabled until the verdict is in, and a tap from the notification is dropped
-     * the same way. Meanwhile the value we asked for stands: a cluster frame answering one of our own
-     * position reports can land in that window still carrying the old options.
+     * A shuffle or repeat change the cluster has not confirmed yet. Meanwhile the value we asked for
+     * stands: a cluster frame answering one of our own position reports can land in that window still
+     * carrying the old options. The buttons stay usable; a tap in that window is a new request.
      */
     val optionsPending = MutableStateFlow(false)
 
-    /** Whether the shuffle and repeat buttons are usable: not pending, and not disallowed by the server. */
-    val canToggleShuffleFlow: StateFlow<Boolean> = combine(_playback, optionsPending) { p, pending ->
-        p.canToggleShuffle && !pending
-    }.distinctUntilChanged().stateIn(viewModelScope, SharingStarted.Eagerly, true)
-    val canToggleRepeatFlow: StateFlow<Boolean> = combine(_playback, optionsPending) { p, pending ->
-        (p.canToggleRepeatContext || p.canToggleRepeatTrack) && !pending
-    }.distinctUntilChanged().stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    /** Whether the shuffle and repeat buttons are usable: the server's restrictions decide. */
+    val canToggleShuffleFlow: StateFlow<Boolean> = _playback
+        .map { it.canToggleShuffle }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val canToggleRepeatFlow: StateFlow<Boolean> = _playback
+        .map { it.canToggleRepeatContext || it.canToggleRepeatTrack }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val shuffleModeFlow: StateFlow<String> = _playback
         .map { it.shuffleMode }
         .distinctUntilChanged()
@@ -1972,8 +1973,11 @@ class PlaybackViewModel : ViewModel() {
     /** The shuffle and repeat the cluster last reported, untouched by any optimistic paint. */
     private var stateOptions = "off" to "off"
 
-    /** What the pending command asked for; a cluster frame reporting exactly that confirms it. */
+    /** What the newest request asked for; a cluster frame reporting exactly that confirms it. */
     private var pendingOptions: Pair<String, String>? = null
+
+    /** Counts requests, so an older one that comes back late neither paints back nor ends the phase. */
+    private var optionsRequest = 0
 
     private fun optionsOf(p: PlaybackUiState) = p.shuffleMode to p.repeatMode
 
@@ -1981,7 +1985,8 @@ class PlaybackViewModel : ViewModel() {
      * Paints [apply] at once, sends the command, and paints [restore] unless it is confirmed. The
      * command's acknowledgement is one confirmation; a cluster frame carrying the requested values is
      * the other, and it ends the pending phase on its own, since an acknowledgement can go missing
-     * for half a minute while the change itself has long landed.
+     * for half a minute while the change itself has long landed. Every tap is a request of its own;
+     * the newest one is the one that counts.
      */
     private fun changeOptions(
         tag: String,
@@ -1989,21 +1994,25 @@ class PlaybackViewModel : ViewModel() {
         restore: PlaybackUiState.() -> PlaybackUiState,
         send: suspend (PlayerConnect) -> Boolean,
     ) {
-        if (player == null || !optionsPending.compareAndSet(expect = false, update = true)) return
+        if (player == null) return
+        val request = ++optionsRequest
         _playback.value = _playback.value.apply()
         pendingOptions = optionsOf(_playback.value)
+        optionsPending.value = true
         launchWithPlayer(tag) { pc ->
             try {
-                if (!send(pc) && stateOptions != pendingOptions) {
+                if (!send(pc) && request == optionsRequest && stateOptions != pendingOptions) {
                     LokiLogger.w(TAG, "$tag: set_options not confirmed by the cluster, painting back")
                     _playback.value = _playback.value.restore()
                 }
             } catch (e: Exception) {
-                _playback.value = _playback.value.restore()
+                if (request == optionsRequest) _playback.value = _playback.value.restore()
                 throw e
             } finally {
-                pendingOptions = null
-                optionsPending.value = false
+                if (request == optionsRequest) {
+                    pendingOptions = null
+                    optionsPending.value = false
+                }
             }
         }
     }

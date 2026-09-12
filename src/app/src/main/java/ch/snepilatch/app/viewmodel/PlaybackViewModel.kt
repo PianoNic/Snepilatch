@@ -2467,8 +2467,11 @@ class PlaybackViewModel : ViewModel() {
     private var pausedByFocusLoss = false
 
     internal fun handleAudioFocusPaused() {
-        if (!isStreaming.value || _playback.value.isPaused) return
-        pausedByFocusLoss = true
+        if (!isStreaming.value) return
+        // Decided per loss: a permanent loss or an unplugged headphone never sees a regain, so a
+        // value left over from one of those must not speak for the next loss.
+        pausedByFocusLoss = !_playback.value.isPaused
+        if (!pausedByFocusLoss) return
         launchWithPlayer("focusPaused") { p -> p.localPause(_playback.value.positionMs) }
     }
 

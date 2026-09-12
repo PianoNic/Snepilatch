@@ -44,12 +44,44 @@ class AudioFocusReportOnlyTest {
 
     @Test
     fun focusRegain_reportsResumeAndLeavesTheLocalPlayerAlone() {
-        rig.seedStreaming(positionMs = 30_000, isPaused = true)
+        rig.seedStreaming(positionMs = 30_000)
+        rig.vm.handleAudioFocusPaused()
+        rig.vm.handleRemotePause(30_000) // the echo of that report
 
         rig.vm.handleAudioFocusResumed()
 
-        coVerify(exactly = 1) { rig.player.localResume(30_000) }
+        coVerify(timeout = 1_000, exactly = 1) { rig.player.localResume(30_000) }
         verify(exactly = 0) { rig.service.syncPlay(any()) }
+    }
+
+    /** Issue #700: a pause the user chose stays paused through a call. */
+    @Test
+    fun focusRegain_afterAManualPause_doesNotResume() {
+        rig.seedStreaming(positionMs = 30_000, isPaused = true)
+
+        rig.vm.handleAudioFocusPaused()
+        rig.vm.handleAudioFocusResumed()
+
+        coVerify(exactly = 0) { rig.player.localResume(any()) }
+    }
+
+    /**
+     * Issue #700 as reported: an earlier loss that never regained (another app taking over, headphones
+     * pulled) had paused us and left its mark. The user then played and paused by hand, and the call
+     * after that resumed on hang-up.
+     */
+    @Test
+    fun focusRegain_afterAManualPauseThatFollowedAnUnregainedLoss_doesNotResume() {
+        rig.seedStreaming(positionMs = 30_000)
+        rig.vm.handleAudioFocusPaused()
+        coVerify(timeout = 1_000, exactly = 1) { rig.player.localPause(30_000) }
+
+        rig.vm.handleRemotePlay(30_000) // the user presses play
+        rig.vm.handleRemotePause(30_000) // and later pause
+        rig.vm.handleAudioFocusPaused() // the call
+        rig.vm.handleAudioFocusResumed() // hang-up
+
+        coVerify(exactly = 0) { rig.player.localResume(any()) }
     }
 
     /**

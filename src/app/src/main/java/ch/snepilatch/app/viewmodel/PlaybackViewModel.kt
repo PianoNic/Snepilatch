@@ -2066,15 +2066,15 @@ class PlaybackViewModel : ViewModel() {
                 val p = player ?: return@launch
                 val track = _queue.value.getOrNull(index) ?: return@launch
                 val uid = track.uid
-                val ctxUri = playingContext.value?.uri
                 if (uid != null) {
-                    LokiLogger.i(TAG, "QUEUE SKIP: index=$index, name=${track.name}, uri=${track.uri}, uid=$uid")
+                    LokiLogger.i(TAG, "QUEUE SKIP: index=$index, name=${track.name}, uri=${track.uri}, qid=${track.qid ?: uid}")
                     // Armed before the command so the file id cannot land before we are listening.
                     val fileIdDeferred = kotlinx.coroutines.CompletableDeferred<String>()
                     tapUri = track.uri
                     tapFileId = fileIdDeferred
                     val sentAt = System.currentTimeMillis()
-                    p.skipToTrack(track.uri, uid, ctxUri)
+                    // The qid names the exact entry, which is what tells a hand-queued row from a context row.
+                    p.skipToTrack(track.qid ?: uid)
                     startTappedTrack(track, fileIdDeferred, sentAt)
                 } else {
                     LokiLogger.w(TAG, "No UID for queue track, falling back to local advance")

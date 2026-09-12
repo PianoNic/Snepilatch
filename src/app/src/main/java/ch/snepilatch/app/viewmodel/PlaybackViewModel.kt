@@ -1095,9 +1095,11 @@ class PlaybackViewModel : ViewModel() {
         // see "playing" and we'd overwrite the paused state the onPause handler
         // just set. Guard against the race by treating EITHER ExoPlayer-paused
         // OR Spfy-reports-paused as "paused", never flipping back.
+        // ExoPlayer-paused is playWhenReady, not isPlaying: a seek re-buffers, and a push landing in
+        // that window would otherwise read the buffering as a pause that nothing ever lifts.
         val exoPlaying = if (isStreaming.value) {
             withContext(Dispatchers.Main) {
-                MusicPlaybackService.instance?.isPlaying() == true
+                MusicPlaybackService.instance?.playWhenReady() == true
             }
         } else false
 

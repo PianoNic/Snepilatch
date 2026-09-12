@@ -1157,8 +1157,8 @@ class PlaybackViewModel : ViewModel() {
             isPaused = actuallyPaused,
             positionMs = posMs,
             durationMs = displayDuration,
-            isShuffling = state.is_shuffling,
-            repeatMode = state.repeat_mode,
+            isShuffling = if (optionsPending.value) _playback.value.isShuffling else state.is_shuffling,
+            repeatMode = if (optionsPending.value) _playback.value.repeatMode else state.repeat_mode,
             volume = _playback.value.volume,
             // A real track state clears any in-progress ad-skip placeholder.
             isAd = false
@@ -1874,37 +1874,51 @@ class PlaybackViewModel : ViewModel() {
         }
     }
 
+    /**
+     * A shuffle or repeat change the cluster has not confirmed yet. Like the web player, the buttons
+     * that send one are disabled until the verdict is in, and a tap from the notification is dropped
+     * the same way. Meanwhile the value we asked for stands: a cluster frame answering one of our own
+     * position reports can land in that window still carrying the old options.
+     */
+    val optionsPending = MutableStateFlow(false)
+
     fun toggleShuffle() {
-        val wasShuffling = _playback.value.isShuffling
-        _playback.value = _playback.value.copy(isShuffling = !wasShuffling)
-        launchWithPlayer("shuffle") { pc ->
-            try {
-                pc.setShuffle(if (wasShuffling) "off" else "on")
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                _playback.value = _playback.value.copy(isShuffling = wasShuffling)
-                throw e
-            }
+        val was = _playback.value.isShuffling
+        changeOptions("shuffle", { copy(isShuffling = !was) }, { copy(isShuffling = was) }) { pc ->
+            pc.setShuffle(if (was) "off" else "on")
         }
     }
 
     fun cycleRepeat() {
-        val previous = _playback.value.repeatMode
-        val newMode = when (previous) {
+        val was = _playback.value.repeatMode
+        val next = when (was) {
             "off" -> "context"
             "context" -> "track"
             else -> "off"
         }
-        _playback.value = _playback.value.copy(repeatMode = newMode)
-        launchWithPlayer("repeat") { pc ->
+        changeOptions("repeat", { copy(repeatMode = next) }, { copy(repeatMode = was) }) { pc -> pc.setRepeat(next) }
+    }
+
+    /** Paints [apply] at once, sends the command, and paints [restore] unless the cluster confirms it. */
+    private fun changeOptions(
+        tag: String,
+        apply: PlaybackUiState.() -> PlaybackUiState,
+        restore: PlaybackUiState.() -> PlaybackUiState,
+        send: suspend (PlayerConnect) -> Boolean,
+    ) {
+        if (player == null || !optionsPending.compareAndSet(expect = false, update = true)) return
+        _playback.value = _playback.value.apply()
+        launchWithPlayer(tag) { pc ->
             try {
-                pc.setRepeat(newMode)
-            } catch (e: CancellationException) {
-                throw e
+                if (!send(pc)) {
+                    LokiLogger.w(TAG, "$tag: set_options not confirmed by the cluster, painting back")
+                    _playback.value = _playback.value.restore()
+                }
             } catch (e: Exception) {
-                _playback.value = _playback.value.copy(repeatMode = previous)
+                _playback.value = _playback.value.restore()
                 throw e
+            } finally {
+                optionsPending.value = false
             }
         }
     }

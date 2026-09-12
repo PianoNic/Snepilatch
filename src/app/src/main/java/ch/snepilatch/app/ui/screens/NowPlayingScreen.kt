@@ -933,11 +933,13 @@ private fun TonalIconToggle(
     size: Dp,
     buttonBg: Color,
     accent: Color,
+    enabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     FilledTonalIconToggleButton(
         checked = checked,
         onCheckedChange = { onToggle() },
+        enabled = enabled,
         modifier = Modifier.size(size),
         colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
             containerColor = buttonBg,
@@ -964,6 +966,7 @@ private fun PlayerControls(
     val isPaused by vm.isPausedFlow.collectAsState()
     val isShuffling by vm.isShufflingFlow.collectAsState()
     val repeatMode by vm.repeatModeFlow.collectAsState()
+    val optionsPending by vm.optionsPending.collectAsState()
     val nextReady by vm.isNextReady.collectAsState()
     val isCurrentlyStreaming by vm.isStreaming.collectAsState()
     val nextLoading = !nextReady && isCurrentlyStreaming
@@ -980,7 +983,9 @@ private fun PlayerControls(
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        TonalIconToggle(isShuffling, { vm.toggleShuffle() }, sideBtn, buttonBg, animatedPrimary) {
+        TonalIconToggle(
+            isShuffling, { vm.toggleShuffle() }, sideBtn, buttonBg, animatedPrimary, enabled = !optionsPending
+        ) {
             Icon(Icons.Rounded.Shuffle, stringResource(R.string.shuffle), modifier = Modifier.size(sideIcon))
         }
         TonalIconBtn({ onSkip(1) }, skipBtn, buttonBg) {
@@ -1010,7 +1015,9 @@ private fun PlayerControls(
                 Icon(Icons.Rounded.SkipNext, stringResource(R.string.next), modifier = Modifier.size(skipIcon))
             }
         }
-        TonalIconToggle(repeatMode != "off", { vm.cycleRepeat() }, sideBtn, buttonBg, animatedPrimary) {
+        TonalIconToggle(
+            repeatMode != "off", { vm.cycleRepeat() }, sideBtn, buttonBg, animatedPrimary, enabled = !optionsPending
+        ) {
             Icon(
                 when (repeatMode) { "track" -> Icons.Rounded.RepeatOne; else -> Icons.Rounded.Repeat },
                 stringResource(R.string.repeat),

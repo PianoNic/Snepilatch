@@ -403,6 +403,7 @@ fun NowPlayingScreen(
     var showMore by remember { mutableStateOf(false) }
     var showPlaylistPicker by remember { mutableStateOf(false) }
     var showJam by remember { mutableStateOf(false) }
+    var showCode by remember { mutableStateOf(false) }
     val shareContext = LocalContext.current
     val shareTrackLabel = stringResource(R.string.share_track_chooser)
     val canvasVideoUrl by vm.canvasUrl.collectAsState()
@@ -515,8 +516,13 @@ fun NowPlayingScreen(
                             NowPlayingMenu(
                                 showMore = showMore,
                                 onShowMore = { showMore = it },
-                                onShowPlaylistPicker = { showPlaylistPicker = true },
-                                onShowJam = { showJam = true },
+                                onOpen = {
+                                    when (it) {
+                                        NowPlayingOverlay.PlaylistPicker -> showPlaylistPicker = true
+                                        NowPlayingOverlay.Jam -> showJam = true
+                                        NowPlayingOverlay.Code -> showCode = true
+                                    }
+                                },
                                 vm = vm,
                                 track = track,
                                 buttonBg = buttonBg
@@ -778,8 +784,13 @@ fun NowPlayingScreen(
                             NowPlayingMenu(
                                 showMore = showMore,
                                 onShowMore = { showMore = it },
-                                onShowPlaylistPicker = { showPlaylistPicker = true },
-                                onShowJam = { showJam = true },
+                                onOpen = {
+                                    when (it) {
+                                        NowPlayingOverlay.PlaylistPicker -> showPlaylistPicker = true
+                                        NowPlayingOverlay.Jam -> showJam = true
+                                        NowPlayingOverlay.Code -> showCode = true
+                                    }
+                                },
                                 vm = vm,
                                 track = track,
                                 buttonBg = buttonBg
@@ -815,6 +826,9 @@ fun NowPlayingScreen(
     // Playlist picker dialog
     if (showJam) {
         ch.snepilatch.app.ui.components.JamSheet(onDismiss = { showJam = false })
+    }
+    if (showCode) {
+        track?.let { ch.snepilatch.app.ui.components.ScannableCodeSheet(it, animatedPrimary) { showCode = false } }
     }
 
     if (showPlaylistPicker) {
@@ -1142,13 +1156,15 @@ private fun SourcePill(provider: String?) {
     }
 }
 
+/** What the three dots menu can open on top of the player. */
+private enum class NowPlayingOverlay { PlaylistPicker, Jam, Code }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NowPlayingMenu(
     showMore: Boolean,
     onShowMore: (Boolean) -> Unit,
-    onShowPlaylistPicker: () -> Unit,
-    onShowJam: () -> Unit,
+    onOpen: (NowPlayingOverlay) -> Unit,
     vm: PlaybackViewModel,
     track: ch.snepilatch.app.data.TrackInfo?,
     buttonBg: Color
@@ -1213,6 +1229,7 @@ private fun NowPlayingMenu(
             val songRadioLabel = stringResource(R.string.go_to_song_radio)
             val shareLabel = stringResource(R.string.share)
             val joinJamLabel = stringResource(R.string.join_jam)
+            val showCodeLabel = stringResource(R.string.show_code)
             val shareContext = LocalContext.current
             val downloadCtx = androidx.compose.ui.platform.LocalContext.current
             // Falls back to title/artist like playback does, so a relinked track's menu label
@@ -1237,7 +1254,7 @@ private fun NowPlayingMenu(
                     track?.uri?.let { vm.addToQueue(it) }; onShowMore(false)
                 },
                 Triple(Icons.AutoMirrored.Rounded.PlaylistAdd, addPlaylistLabel) {
-                    onShowMore(false); onShowPlaylistPicker()
+                    onShowMore(false); onOpen(NowPlayingOverlay.PlaylistPicker)
                 },
                 Triple(Icons.AutoMirrored.Rounded.QueueMusic, viewQueueLabel) {
                     vm.openQueue(); onShowMore(false)
@@ -1266,7 +1283,11 @@ private fun NowPlayingMenu(
                 },
                 Triple(Icons.Rounded.Groups, joinJamLabel) {
                     onShowMore(false)
-                    onShowJam()
+                    onOpen(NowPlayingOverlay.Jam)
+                },
+                Triple(Icons.Rounded.QrCode2, showCodeLabel) {
+                    onShowMore(false)
+                    onOpen(NowPlayingOverlay.Code)
                 },
                 Triple(Icons.Rounded.Share, shareLabel) {
                     onShowMore(false)

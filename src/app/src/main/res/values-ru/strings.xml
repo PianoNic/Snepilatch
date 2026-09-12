@@ -187,6 +187,7 @@
     <string name="search">Поиск</string>
     <string name="back">Назад</string>
     <string name="clear">Очистить</string>
+    <string name="show_code">Показать код</string>
     <string name="more">Ещё</string>
     <string name="play">Играть</string>
     <string name="play_pause">Играть/Пауза</string>

@@ -170,7 +170,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
     // Notification custom button state
     var isLiked: Boolean = false
-    var isShuffling: Boolean = false
+    var shuffleMode: String = "off"  // "off", "on", "smart"
     var repeatMode: String = "off"  // "off", "context", "track"
 
     // The server's toggling restrictions. A custom action cannot be disabled, so a disallowed
@@ -183,7 +183,8 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         "like" -> if (isLiked) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline
         "shuffle" -> when {
             !canToggleShuffle -> R.drawable.ic_shuffle_disabled
-            isShuffling -> R.drawable.ic_shuffle_on
+            shuffleMode == "smart" -> R.drawable.ic_shuffle_smart_on
+            shuffleMode == "on" -> R.drawable.ic_shuffle_on
             else -> R.drawable.ic_shuffle_off
         }
         "repeat" -> when {

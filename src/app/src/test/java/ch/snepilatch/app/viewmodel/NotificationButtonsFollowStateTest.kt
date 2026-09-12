@@ -39,7 +39,7 @@ class NotificationButtonsFollowStateTest {
         rig.vm.toggleShuffle()
 
         assertTrue(await { rig.vm.playback.first { it.isShuffling }.isShuffling })
-        verify(timeout = 1_000) { rig.service.isShuffling = true }
+        verify(timeout = 1_000) { rig.service.shuffleMode = "on" }
         verify(timeout = 1_000, atLeast = 1) { rig.service.updateNotification() }
         commandReturns.complete(true)
     }
@@ -51,7 +51,7 @@ class NotificationButtonsFollowStateTest {
         rig.vm.toggleShuffle()
 
         assertFalse(await { rig.vm.playback.first { !it.isShuffling }.isShuffling })
-        verify(timeout = 1_000) { rig.service.isShuffling = false }
+        verify(timeout = 1_000) { rig.service.shuffleMode = "off" }
     }
 
     @Test

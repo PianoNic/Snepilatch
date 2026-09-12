@@ -39,6 +39,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -351,7 +353,12 @@ fun DetailScreen(vm: PlaybackViewModel) {
 
                 IconButton(onClick = { vm.toggleShuffle() }, enabled = canToggleShuffle) {
                     Icon(
-                        Icons.Rounded.Shuffle, stringResource(R.string.shuffle),
+                        if (playback.shuffleMode == "smart") {
+                            ImageVector.vectorResource(R.drawable.ic_shuffle_smart)
+                        } else {
+                            Icons.Rounded.Shuffle
+                        },
+                        stringResource(R.string.shuffle),
                         tint = if (shuffling) accentColor else SpfyWhite,
                         modifier = Modifier.size(24.dp)
                     )

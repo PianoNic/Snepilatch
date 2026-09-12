@@ -126,6 +126,7 @@
     <string name="enable_unknown_apps">Erlaub Snepilatch i de aktuelle Iistellige s Installiere vo Apps und tipp de wieder uf Jetz aktualisiere.</string>
 
     <!-- Devices -->
+    <string name="transfer_failed">Wächsle uf das Grät hät nöd funktioniert</string>
     <string name="searching_devices">Am Gräte sueche…</string>
 
     <!-- Notification -->

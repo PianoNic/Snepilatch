@@ -29,6 +29,7 @@ import ch.snepilatch.app.playback.engine.SpfyCdnResolver
 import ch.snepilatch.app.playback.engine.SpfyStream
 import ch.snepilatch.app.data.*
 import kotify.api.artist.Artist
+import kotify.api.playerconnect.NoActiveDeviceException
 import kotify.api.playerconnect.PlayerConnect
 import kotify.api.playlist.Playlist
 import kotify.api.playerstatus.DeviceInfo
@@ -309,7 +310,15 @@ class PlaybackViewModel : ViewModel() {
     val devices: StateFlow<List<DeviceInfo>> = _devices
     val showDevices = MutableStateFlow(false)
     val activeDeviceName = MutableStateFlow<String?>(null)
+    /** Why the last device switch did not happen; the devices sheet shows it and stays open. */
+    val transferError = MutableStateFlow<UiMessage?>(null)
     val ourDeviceId: String? get() = player?.ourDeviceId()
+
+    /** The cluster names this phone under its plain id or a hobs_ prefixed copy of it. */
+    fun isOurDevice(deviceId: String): Boolean {
+        val ours = ourDeviceId ?: return false
+        return deviceId == ours || deviceId == "hobs_$ours"
+    }
 
     // Playing context (e.g. "Album • Abbey Road" or "Playlist • Chill Vibes")
     data class PlayingContext(val type: String, val name: String, val uri: String? = null)
@@ -722,6 +731,9 @@ class PlaybackViewModel : ViewModel() {
         pc.onAd { durationMs -> handleAd(durationMs) }
 
         pc.onSeek { positionMs -> handleRemoteSeek(positionMs) }
+
+        // Another device set this phone's volume (0..65535); the library has already acked it.
+        pc.onVolume { volume, _ -> setVolume(volume / 65535.0, MusicPlaybackService.instance) }
 
         // The library publishes the queue only when its revision actually changed, so this is told
         // about a new queue rather than re-deriving one from every position update.
@@ -1504,7 +1516,12 @@ class PlaybackViewModel : ViewModel() {
 
         LokiLogger.i(TAG, "[ColdStart] transfer to self with restore_paused=pause")
         try {
-            p.transferPlaybackHere(restorePaused = true)
+            if (!p.transferPlaybackHere(restorePaused = true)) {
+                LokiLogger.w(TAG, "[ColdStart] transfer to self not confirmed, falling back")
+                resetColdStart()
+                fallbackResume()
+                return
+            }
         } catch (e: CancellationException) {
             resetColdStart()
             throw e
@@ -3622,7 +3639,9 @@ class PlaybackViewModel : ViewModel() {
      */
     fun resyncOnForeground() {
         if (!isInitialized.value) return
-        launchWithPlayer("resyncOnForeground") {
+        launchWithPlayer("resyncOnForeground") { pc ->
+            // A socket that went half-open in the background answers no pong and gets reconnected.
+            pc.probeDealer()
             refreshState()
             loadDevices()
         }
@@ -3632,26 +3651,41 @@ class PlaybackViewModel : ViewModel() {
 
     fun loadDevices() {
         launchWithPlayer("loadDevices") { pc ->
-            val devicesInfo = pc.getDevices() ?: return@launchWithPlayer
-            // Filter out hobs_ duplicates — they're internal Spfy IDs for the same device
-            _devices.value = devicesInfo.devices.filter { !it.key.startsWith("hobs_") }.values.toList()
-            val activeId = devicesInfo.activeDeviceId
-            LokiLogger.i(TAG, "Devices: ${devicesInfo.devices.keys}, activeId=$activeId")
-            activeDeviceName.value = if (activeId != null) {
-                // Try exact match first, then with/without hobs_ prefix
-                devicesInfo.devices[activeId]?.name
-                    ?: devicesInfo.devices["hobs_$activeId"]?.name
-                    ?: devicesInfo.devices.entries.firstOrNull { it.key == activeId || it.key == "hobs_$activeId" || "hobs_${it.key}" == activeId }?.value?.name
-            } else null
+            val devicesInfo = pc.getDevices()
+            LokiLogger.i(TAG, "Devices: ${devicesInfo.devices.keys}, activeId=${devicesInfo.activeDeviceId}")
+            // is_active already accounts for the hobs_ spelling; the hobs_ copies are the same
+            // devices again, so they are dropped from the list but still count for the name.
+            _devices.value = devicesInfo.devices.values.filter { !it.id.startsWith("hobs_") }
+            activeDeviceName.value = devicesInfo.devices.values.firstOrNull { it.is_active }?.name
             LokiLogger.i(TAG, "Active device name: ${activeDeviceName.value}")
         }
     }
 
     fun transferPlayback(deviceId: String) {
+        transferError.value = null
         launchWithPlayer("transferPlayback") { pc ->
-            pc.transferPlaybackTo(deviceId)
-            delay(500)
-            refreshState()
+            if (isOurDevice(deviceId)) {
+                // A plain transfer would make this phone active with nothing loaded in ExoPlayer.
+                // The cold start claims the device and loads the track, as the play button does.
+                showDevices.value = false
+                coldStartPlay()
+                return@launchWithPlayer
+            }
+            val confirmed = try {
+                pc.transferPlaybackTo(deviceId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: NoActiveDeviceException) {
+                LokiLogger.w(TAG, "Transfer to $deviceId: device is gone from the cluster")
+                false
+            }
+            if (!confirmed) {
+                LokiLogger.w(TAG, "Transfer to $deviceId not confirmed")
+                transferError.value = UiMessage(R.string.transfer_failed)
+                return@launchWithPlayer
+            }
+            // The cluster push that confirmed the transfer already went through onState; only the
+            // device list and the active device name come from getDevices.
             loadDevices()
             showDevices.value = false
         }

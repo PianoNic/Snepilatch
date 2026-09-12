@@ -26,6 +26,7 @@ import androidx.compose.material.icons.rounded.Speaker
 import androidx.compose.material.icons.rounded.Tv
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
@@ -42,6 +43,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -58,13 +60,13 @@ import ch.snepilatch.app.viewmodel.PlaybackViewModel
 fun DevicesDialog(vm: PlaybackViewModel) {
     val devices by vm.devices.collectAsState()
     val playback by vm.playback.collectAsState()
+    val transferError by vm.transferError.collectAsState()
     val theme by ThemeController.themeColors.collectAsState()
     val accentColor by androidx.compose.animation.animateColorAsState(theme.primary, androidx.compose.animation.core.tween(800), label = "devAccent")
     val sheetState = rememberBottomSheetState(
         initialValue = SheetValue.Hidden,
         enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
     )
-    val ourId = vm.ourDeviceId
     val jamVm: ch.snepilatch.app.viewmodel.JamViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     val jam by jamVm.jam.collectAsState()
     val inJam = jam != null
@@ -75,7 +77,10 @@ fun DevicesDialog(vm: PlaybackViewModel) {
     val otherDevices = sortedDevices.filter { !it.is_active }
 
     ModalBottomSheet(
-        onDismissRequest = { vm.showDevices.value = false },
+        onDismissRequest = {
+            vm.transferError.value = null
+            vm.showDevices.value = false
+        },
         sheetState = sheetState,
         containerColor = SpfyElevated,
         dragHandle = {
@@ -103,6 +108,15 @@ fun DevicesDialog(vm: PlaybackViewModel) {
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
             )
 
+            transferError?.let {
+                Text(
+                    it.resolve(LocalContext.current),
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+                )
+            }
+
             if (devices.isEmpty()) {
                 Row(
                     Modifier.fillMaxWidth().padding(vertical = 24.dp),
@@ -117,7 +131,7 @@ fun DevicesDialog(vm: PlaybackViewModel) {
 
             // Active device section
             if (activeDevice != null) {
-                val isOurDevice = ourId != null && (activeDevice.id == ourId || activeDevice.id == "hobs_$ourId" || "hobs_${activeDevice.id}" == ourId)
+                val isOurDevice = vm.isOurDevice(activeDevice.id)
 
                 Row(
                     Modifier
@@ -191,7 +205,7 @@ fun DevicesDialog(vm: PlaybackViewModel) {
 
             // Other devices
             otherDevices.forEach { device ->
-                val isOurDevice = ourId != null && (device.id == ourId || device.id == "hobs_$ourId" || "hobs_${device.id}" == ourId)
+                val isOurDevice = vm.isOurDevice(device.id)
 
                 Row(
                     Modifier

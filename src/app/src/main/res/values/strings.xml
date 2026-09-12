@@ -118,6 +118,7 @@
     <string name="enable_unknown_apps">Allow Snepilatch to install apps in the settings that just opened, then tap Update Now again.</string>
 
     <!-- Devices -->
+    <string name="transfer_failed">Could not switch to that device</string>
     <string name="searching_devices">Searching for devices…</string>
 
     <!-- Notification -->

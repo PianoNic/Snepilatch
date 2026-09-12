@@ -787,6 +787,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     fun getCurrentPosition(): Long = infiniPlayPositionSource?.invoke() ?: player.currentPosition
     fun isPlaying(): Boolean = player.isPlaying
 
+    /** Whether the player was told to play, regardless of whether it is still buffering. */
+    fun playWhenReady(): Boolean = player.playWhenReady
+
     fun syncSeek(positionMs: Long) {
         mainHandler.post {
             if (player.mediaItemCount > 0) {

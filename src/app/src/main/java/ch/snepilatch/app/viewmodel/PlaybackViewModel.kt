@@ -328,7 +328,7 @@ class PlaybackViewModel : ViewModel() {
     // (is_active_device, has_active_device) at the last device-indicator update. The two booleans
     // fully determine which indicator branch runs, so re-running (and its loadDevices() network call)
     // is only needed when they change — not on every onState push (~5/track).
-    private var lastDeviceIndicatorKey: Pair<Boolean, Boolean>? = null
+    private var lastDeviceIndicatorKey: Pair<Boolean, String?>? = null
 
     // True while some OTHER Connect device holds playback. Written from the state handler on every
     // push, read by the transport commands: the local* state reports below describe THIS device, so
@@ -1225,9 +1225,10 @@ class PlaybackViewModel : ViewModel() {
             }
         }
 
-        // Update active device indicator from state — only on an actual edge, so the foreign-device
-        // getDevices() network call fires once on the transition into foreign-active, not every push.
-        val deviceIndicatorKey = state.is_active_device to state.has_active_device
+        // Update active device indicator from state, only when the active device changed, so the
+        // getDevices() network call fires once per switch, not on every push. Keyed on the device id
+        // so a move from one foreign device to another counts as a switch too.
+        val deviceIndicatorKey = state.is_active_device to state.active_device_id
         if (deviceIndicatorKey != lastDeviceIndicatorKey) {
             lastDeviceIndicatorKey = deviceIndicatorKey
             if (state.is_active_device) {

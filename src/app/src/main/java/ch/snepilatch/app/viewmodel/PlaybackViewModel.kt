@@ -2105,6 +2105,9 @@ class PlaybackViewModel : ViewModel() {
                     tapUri = track.uri
                     tapFileId = fileIdDeferred
                     val sentAt = System.currentTimeMillis()
+                    // The row becomes the playing track at the tap, as a skip does; the library trims
+                    // the queue the same instant, so the sheet moves with the tap and not with the echo.
+                    applyOptimisticSkip(track)
                     // The qid names the exact entry, which is what tells a hand-queued row from a context row.
                     p.skipToTrack(track.qid ?: uid)
                     startTappedTrack(track, fileIdDeferred, sentAt)

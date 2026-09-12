@@ -113,6 +113,7 @@
     <string name="enable_unknown_apps">Erlaube Snepilatch in den geöffneten Einstellungen das Installieren von Apps und tippe dann erneut auf Jetzt aktualisieren.</string>
 
     <!-- Devices -->
+    <string name="transfer_failed">Wechsel zu diesem Gerät nicht möglich</string>
     <string name="searching_devices">Suche nach Geräten…</string>
 
     <!-- Notification -->

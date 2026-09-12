@@ -60,8 +60,10 @@ class KotifyApp : Application(), ImageLoaderFactory {
 
         // Always wired, even before logging is enabled: LokiLogger no-ops until init() has run,
         // so this picks up KotifyClient logs immediately if the user turns logging on later.
+        // Debug builds also get the library's debug lines (which device a command was for, the
+        // state_clear on transfer, ACK statuses); release builds keep info and error only.
         Logger.setLogBackend(object : LogBackend {
-            override var isDebugEnabled: Boolean = false
+            override var isDebugEnabled: Boolean = BuildConfig.DEBUG
             override fun info(msg: String) { LokiLogger.i("Kotify", msg) }
             override fun error(msg: String) { LokiLogger.e("Kotify", msg) }
             override fun debug(msg: String) { if (isDebugEnabled) LokiLogger.d("Kotify", msg) }

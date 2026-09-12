@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material3.*
@@ -308,6 +309,15 @@ private fun QueueRow(
         Column(Modifier.padding(start = 12.dp).weight(1f)) {
             Text(track.name, color = SpfyWhite, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(track.artist, color = SpfyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        // A smart shuffle recommendation, marked so it is not mistaken for a track of the context.
+        if (track.isRecommended) {
+            Icon(
+                Icons.Rounded.AutoAwesome,
+                stringResource(R.string.shuffle),
+                tint = SpfyLightGray,
+                modifier = Modifier.padding(start = 8.dp).size(18.dp)
+            )
         }
         if (drag != null) {
             Icon(

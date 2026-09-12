@@ -273,6 +273,10 @@ class PlaybackViewModel : ViewModel() {
     val canToggleRepeatFlow: StateFlow<Boolean> = combine(_playback, optionsPending) { p, pending ->
         (p.canToggleRepeatContext || p.canToggleRepeatTrack) && !pending
     }.distinctUntilChanged().stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val shuffleModeFlow: StateFlow<String> = _playback
+        .map { it.shuffleMode }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "off")
     val isShufflingFlow: StateFlow<Boolean> = _playback
         .map { it.isShuffling }
         .distinctUntilChanged()
@@ -1169,6 +1173,9 @@ class PlaybackViewModel : ViewModel() {
         val displayTrack = if (pinDisplay) _playback.value.track else trackInfo
         val displayDuration = if (pinDisplay) _playback.value.durationMs else state.duration
 
+        stateOptions = state.shuffle_mode to state.repeat_mode
+        if (optionsPending.value && stateOptions == pendingOptions) optionsPending.value = false
+        smartShuffleAllowed = state.restrictions.canToggleSmartShuffle
         _playback.value = PlaybackUiState(
             track = displayTrack,
             isPlaying = actuallyPlaying,
@@ -1176,14 +1183,17 @@ class PlaybackViewModel : ViewModel() {
             positionMs = posMs,
             durationMs = displayDuration,
             isShuffling = if (optionsPending.value) _playback.value.isShuffling else state.is_shuffling,
+            shuffleMode = if (optionsPending.value) _playback.value.shuffleMode else state.shuffle_mode,
             repeatMode = if (optionsPending.value) _playback.value.repeatMode else state.repeat_mode,
             canToggleShuffle = state.restrictions.canToggleShuffle,
+            canSmartShuffle = smartShuffleAllowed && smartShuffleEligible == state.context_uri,
             canToggleRepeatContext = state.restrictions.canToggleRepeatContext,
             canToggleRepeatTrack = state.restrictions.canToggleRepeatTrack,
             volume = _playback.value.volume,
             // A real track state clears any in-progress ad-skip placeholder.
             isAd = false
         )
+        refreshSmartShuffle(state.context_uri)
 
         // While we're idle (not streaming locally), push the cluster's
         // current track to the system media notification so the user sees
@@ -1895,13 +1905,52 @@ class PlaybackViewModel : ViewModel() {
         }
     }
 
-    /** Nothing while the server disallows it; the buttons are greyed, and a notification tap lands here too. */
-    fun toggleShuffle() {
-        val was = _playback.value.isShuffling
-        if (!_playback.value.canToggleShuffle) return
-        changeOptions("shuffle", { copy(isShuffling = !was) }, { copy(isShuffling = was) }) { pc ->
-            pc.setShuffle(if (was) "off" else "on")
+    /**
+     * The context the smart shuffle lookup last said yes to. The web player asks per context and
+     * keeps the answer for a day (the library caches it); the ui only needs to know whether the one
+     * playing now qualifies, so a state whose context differs reads as not eligible until the lookup
+     * for it has answered.
+     */
+    private var smartShuffleEligible: String? = null
+    private var smartShuffleAsked: String? = null
+
+    /** The last state's own say on the mode, kept so a late lookup answer can be combined with it. */
+    private var smartShuffleAllowed = false
+
+    private fun refreshSmartShuffle(contextUri: String?) {
+        if (contextUri == null || contextUri == smartShuffleAsked) return
+        smartShuffleAsked = contextUri
+        launchWithPlayer("smartShuffle") { pc ->
+            val eligible = pc.canSmartShuffle(contextUri)
+            LokiLogger.i(TAG, "Smart shuffle eligible=$eligible for $contextUri (state allows it: $smartShuffleAllowed)")
+            if (smartShuffleAsked != contextUri) return@launchWithPlayer
+            smartShuffleEligible = if (eligible) contextUri else null
+            _playback.value = _playback.value.copy(canSmartShuffle = smartShuffleAllowed && eligible)
         }
+    }
+
+    /**
+     * The web player's cycle: off, on, smart, off, over the modes the server allows right now. Off is
+     * there unless shuffle is on and may not be toggled; on unless smart is on and may not be left;
+     * smart while it is on, or when the state allows the mode and the context is eligible. Nothing
+     * while the server disallows the control; the buttons are greyed, and a notification tap lands
+     * here too.
+     */
+    fun toggleShuffle() {
+        val p = _playback.value
+        val modes = buildList {
+            if (p.shuffleMode == "off" || p.canToggleShuffle) add("off")
+            if (if (p.shuffleMode == "smart") p.canSmartShuffle else p.shuffleMode == "on" || p.canToggleShuffle) add("on")
+            if (p.shuffleMode == "smart" || p.canSmartShuffle) add("smart")
+        }
+        val next = modes.getOrNull((modes.indexOf(p.shuffleMode) + 1) % modes.size) ?: return
+        if (next == p.shuffleMode) return
+        val was = p.shuffleMode
+        changeOptions(
+            "shuffle",
+            { copy(shuffleMode = next, isShuffling = next != "off") },
+            { copy(shuffleMode = was, isShuffling = was != "off") },
+        ) { pc -> pc.setShuffle(next) }
     }
 
     /** The web player's cycle: off, context, track, off, skipping a mode the server disallows. */
@@ -1920,7 +1969,20 @@ class PlaybackViewModel : ViewModel() {
         changeOptions("repeat", { copy(repeatMode = next) }, { copy(repeatMode = was) }) { pc -> pc.setRepeat(next) }
     }
 
-    /** Paints [apply] at once, sends the command, and paints [restore] unless the cluster confirms it. */
+    /** The shuffle and repeat the cluster last reported, untouched by any optimistic paint. */
+    private var stateOptions = "off" to "off"
+
+    /** What the pending command asked for; a cluster frame reporting exactly that confirms it. */
+    private var pendingOptions: Pair<String, String>? = null
+
+    private fun optionsOf(p: PlaybackUiState) = p.shuffleMode to p.repeatMode
+
+    /**
+     * Paints [apply] at once, sends the command, and paints [restore] unless it is confirmed. The
+     * command's acknowledgement is one confirmation; a cluster frame carrying the requested values is
+     * the other, and it ends the pending phase on its own, since an acknowledgement can go missing
+     * for half a minute while the change itself has long landed.
+     */
     private fun changeOptions(
         tag: String,
         apply: PlaybackUiState.() -> PlaybackUiState,
@@ -1929,9 +1991,10 @@ class PlaybackViewModel : ViewModel() {
     ) {
         if (player == null || !optionsPending.compareAndSet(expect = false, update = true)) return
         _playback.value = _playback.value.apply()
+        pendingOptions = optionsOf(_playback.value)
         launchWithPlayer(tag) { pc ->
             try {
-                if (!send(pc)) {
+                if (!send(pc) && stateOptions != pendingOptions) {
                     LokiLogger.w(TAG, "$tag: set_options not confirmed by the cluster, painting back")
                     _playback.value = _playback.value.restore()
                 }
@@ -1939,6 +2002,7 @@ class PlaybackViewModel : ViewModel() {
                 _playback.value = _playback.value.restore()
                 throw e
             } finally {
+                pendingOptions = null
                 optionsPending.value = false
             }
         }
@@ -1948,7 +2012,7 @@ class PlaybackViewModel : ViewModel() {
     // change repaints them, whether it came from a tap here, a tap on the notification, or the cluster.
     // The first value is skipped: it is the empty default, and a repaint would promote the service.
     private data class NotificationButtons(
-        val shuffling: Boolean,
+        val shuffleMode: String,
         val repeatMode: String,
         val liked: Boolean,
         val canToggleShuffle: Boolean,
@@ -1959,7 +2023,7 @@ class PlaybackViewModel : ViewModel() {
         viewModelScope.launch {
             combine(_playback, currentTrackLiked) { p, liked ->
                 NotificationButtons(
-                    p.isShuffling, p.repeatMode, liked,
+                    p.shuffleMode, p.repeatMode, liked,
                     p.canToggleShuffle, p.canToggleRepeatContext || p.canToggleRepeatTrack,
                 )
             }
@@ -1967,7 +2031,7 @@ class PlaybackViewModel : ViewModel() {
                 .drop(1)
                 .collect { b ->
                     MusicPlaybackService.instance?.let {
-                        it.isShuffling = b.shuffling
+                        it.shuffleMode = b.shuffleMode
                         it.repeatMode = b.repeatMode
                         it.isLiked = b.liked
                         it.canToggleShuffle = b.canToggleShuffle
@@ -2336,6 +2400,7 @@ class PlaybackViewModel : ViewModel() {
                 uid = qt.uid,
                 qid = qt.qid,
                 queueIndex = rawIndex,
+                isRecommended = qt.metadata["provider"] == "enhanced_recommendation",
             )
             ParsedTrack(qt.uri, info, name.isNullOrEmpty() || artist.isNullOrEmpty() || art == null)
         }

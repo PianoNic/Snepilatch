@@ -21,7 +21,9 @@ data class TrackInfo(
      * Position in the server's unfiltered `next_tracks`. The queue we display hides the delimiter
      * and anything flagged, so a row's position on screen is not the index a queue write wants.
      */
-    val queueIndex: Int? = null
+    val queueIndex: Int? = null,
+    /** A smart shuffle recommendation the server slid into the queue, not something from the context. */
+    val isRecommended: Boolean = false,
 )
 
 data class PlaybackUiState(
@@ -31,9 +33,13 @@ data class PlaybackUiState(
     val positionMs: Long = 0,
     val durationMs: Long = 0,
     val isShuffling: Boolean = false,
+    /** "off", "on" or "smart"; isShuffling is the same fact as a flag. */
+    val shuffleMode: String = "off",
     val repeatMode: String = "off",
     // The server's toggling restrictions; a disallowed control is greyed, as on the web player.
     val canToggleShuffle: Boolean = true,
+    /** Smart shuffle may be offered: the state allows the mode and the context is eligible for it. */
+    val canSmartShuffle: Boolean = false,
     val canToggleRepeatContext: Boolean = true,
     val canToggleRepeatTrack: Boolean = true,
     val volume: Double = 0.5,

@@ -28,6 +28,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -979,6 +981,7 @@ private fun PlayerControls(
     val isPlaying by vm.isPlayingFlow.collectAsState()
     val isPaused by vm.isPausedFlow.collectAsState()
     val isShuffling by vm.isShufflingFlow.collectAsState()
+    val shuffleMode by vm.shuffleModeFlow.collectAsState()
     val repeatMode by vm.repeatModeFlow.collectAsState()
     val canToggleShuffle by vm.canToggleShuffleFlow.collectAsState()
     val canToggleRepeat by vm.canToggleRepeatFlow.collectAsState()
@@ -1001,7 +1004,11 @@ private fun PlayerControls(
         TonalIconToggle(
             isShuffling, { vm.toggleShuffle() }, sideBtn, buttonBg, animatedPrimary, enabled = canToggleShuffle
         ) {
-            Icon(Icons.Rounded.Shuffle, stringResource(R.string.shuffle), modifier = Modifier.size(sideIcon))
+            Icon(
+                if (shuffleMode == "smart") ImageVector.vectorResource(R.drawable.ic_shuffle_smart) else Icons.Rounded.Shuffle,
+                stringResource(R.string.shuffle),
+                modifier = Modifier.size(sideIcon)
+            )
         }
         TonalIconBtn({ onSkip(1) }, skipBtn, buttonBg) {
             Icon(Icons.Rounded.SkipPrevious, stringResource(R.string.previous), modifier = Modifier.size(skipIcon))

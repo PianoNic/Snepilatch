@@ -90,6 +90,24 @@ class OptionsPendingTest {
         assertFalse(await { rig.vm.playback.first { !it.isShuffling }.isShuffling })
     }
 
+    /** A cluster frame carrying the requested value confirms the change even if the ack never comes. */
+    @Test
+    fun clusterFrame_withTheRequestedValue_endsThePendingPhaseWithoutTheAck() {
+        val commandReturns = CompletableDeferred<Boolean>()
+        coEvery { rig.player.setShuffle("on") } coAnswers { commandReturns.await() }
+        coEvery { rig.player.getState() } returns clusterSays(shuffling = true).copy(shuffle_mode = "on")
+
+        rig.vm.toggleShuffle()
+        assertTrue(await { rig.vm.optionsPending.first { it } })
+        rig.vm.resyncOnForeground()
+
+        assertFalse(await { rig.vm.optionsPending.first { !it } })
+        // The late verdict is a miss, but the state already showed the change: nothing paints back.
+        commandReturns.complete(false)
+        Thread.sleep(300)
+        assertTrue(rig.vm.playback.value.isShuffling)
+    }
+
     @Test
     fun repeatCycle_thatTheClusterDoesNotConfirm_paintsBack() {
         coEvery { rig.player.setRepeat("context") } returns false

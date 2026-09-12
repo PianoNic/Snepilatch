@@ -1845,9 +1845,11 @@ class PlaybackViewModel : ViewModel() {
                 val t0 = System.currentTimeMillis()
                 if (foreignDeviceActive) {
                     p.skipPrevious()
+                } else if (forceTrackChange) {
+                    p.localPreviousTrack()
                 } else {
                     // Local go-to-previous (state report, never skip-capped) — prev track loads via onPlaybackId.
-                    p.localPrevious(if (forceTrackChange) 0L else pos)
+                    p.localPrevious(pos)
                 }
                 LokiLogger.i(TAG, "[Timing] CMD skipPrevious API done in ${System.currentTimeMillis() - t0}ms")
             }

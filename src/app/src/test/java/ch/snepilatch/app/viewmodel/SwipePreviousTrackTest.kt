@@ -31,6 +31,6 @@ class SwipePreviousTrackTest {
 
         assertEquals("spotify:track:previous", rig.vm.playback.value.track?.uri)
         verify(exactly = 0) { rig.service.syncSeek(0L) }
-        coVerify(timeout = 1_000, exactly = 1) { rig.player.localPrevious(0L) }
+        coVerify(timeout = 1_000, exactly = 1) { rig.player.localPreviousTrack() }
     }
 }

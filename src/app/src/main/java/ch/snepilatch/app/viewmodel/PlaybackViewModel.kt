@@ -1825,12 +1825,13 @@ class PlaybackViewModel : ViewModel() {
         }
     }
 
-    fun skipPrevious(forceTrackChange: Boolean = false) {
+    /** True when the track changes, false when the current one restarts instead. */
+    fun skipPrevious(forceTrackChange: Boolean = false): Boolean {
         // If we're more than 3s into the track, restart it instead of going to previous.
         // (Same threshold KotifyClient's localPrevious uses; restarting also seeks ExoPlayer.)
         if (!forceTrackChange && _playback.value.positionMs > PREV_RESTART_THRESHOLD_MS) {
             seekTo(0)
-            return
+            return false
         }
         val pos = _playback.value.positionMs
         applyOptimisticSkip(prevTrackPreview.value)
@@ -1845,15 +1846,18 @@ class PlaybackViewModel : ViewModel() {
                 val t0 = System.currentTimeMillis()
                 if (foreignDeviceActive) {
                     p.skipPrevious()
+                } else if (forceTrackChange) {
+                    p.localPreviousTrack()
                 } else {
                     // Local go-to-previous (state report, never skip-capped) — prev track loads via onPlaybackId.
-                    p.localPrevious(if (forceTrackChange) 0L else pos)
+                    p.localPrevious(pos)
                 }
                 LokiLogger.i(TAG, "[Timing] CMD skipPrevious API done in ${System.currentTimeMillis() - t0}ms")
             }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { LokiLogger.e(TAG, "skipPrevious", e) }
         }
+        return true
     }
 
     fun seekTo(positionMs: Long) {

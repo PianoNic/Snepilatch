@@ -1066,7 +1066,9 @@ class PlaybackViewModel : ViewModel() {
         if (isStreaming.value) {
             svc?.refreshStreamingMetadata(t.name, name)
         } else {
-            svc?.setIdleMetadata(title = t.name, artist = name, albumArtUrl = t.albumArt, durationMs = t.durationMs)
+            svc?.setIdleMetadata(
+                title = t.name, artist = name, albumArtUrl = t.albumArt, durationMs = t.durationMs, positionMs = cur.positionMs
+            )
         }
     }
 
@@ -1171,7 +1173,8 @@ class PlaybackViewModel : ViewModel() {
                         title = displayTrack.name,
                         artist = displayTrack.artist,
                         albumArtUrl = displayTrack.albumArt,
-                        durationMs = displayDuration
+                        durationMs = displayDuration,
+                        positionMs = posMs
                     )
                 } else {
                     // Streaming locally: setIdleMetadata is a no-op once a media item is loaded, so a

@@ -129,6 +129,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     private var currentArtist = ""
     private var currentArt: Bitmap? = null
     private var currentDurationMs: Long = 0L
+    private var idlePositionMs: Long = 0L
 
     /**
      * The album-art URL most recently requested by setIdleMetadata. Used to
@@ -982,6 +983,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         stopInfiniPlay()
         metadataQueue.clear()
         currentDurationMs = 0L
+        idlePositionMs = 0L
         idleArtUrl = null
         mainHandler.post {
             player.stop()
@@ -1017,11 +1019,12 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
      * Skipped if a track is already loaded (we don't want to overwrite live
      * playback metadata).
      */
-    fun setIdleMetadata(title: String, artist: String, albumArtUrl: String?, durationMs: Long) {
+    fun setIdleMetadata(title: String, artist: String, albumArtUrl: String?, durationMs: Long, positionMs: Long) {
         if (player.mediaItemCount > 0) return
         currentTitle = title
         currentArtist = artist
         currentDurationMs = durationMs
+        idlePositionMs = positionMs
         // Track the most recent idle art URL so we can ignore stale callbacks
         // and only render the *current* track's art.
         val expectedUrl = albumArtUrl
@@ -1268,7 +1271,12 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             PlaybackStateCompat.ACTION_STOP
         if (!infiniPlayRemixing) actions = actions or PlaybackStateCompat.ACTION_SEEK_TO
         // In remix mode report an unknown position so the notification shows no seekbar to auto-advance.
-        val reportedPos = if (infiniPlayRemixing) PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN else player.currentPosition
+        // With nothing loaded the player sits at 0, so the seekbar takes the idle position instead.
+        val reportedPos = when {
+            infiniPlayRemixing -> PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN
+            player.mediaItemCount == 0 -> idlePositionMs
+            else -> player.currentPosition
+        }
         val builder = PlaybackStateCompat.Builder()
             .setActions(actions)
             .setState(state, reportedPos, 1f)

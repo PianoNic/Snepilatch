@@ -257,6 +257,22 @@ class PlaybackViewModel : ViewModel() {
         .map { it.durationMs }
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.Eagerly, 0L)
+
+    /**
+     * A shuffle or repeat change the cluster has not confirmed yet. Like the web player, the buttons
+     * that send one are disabled until the verdict is in, and a tap from the notification is dropped
+     * the same way. Meanwhile the value we asked for stands: a cluster frame answering one of our own
+     * position reports can land in that window still carrying the old options.
+     */
+    val optionsPending = MutableStateFlow(false)
+
+    /** Whether the shuffle and repeat buttons are usable: not pending, and not disallowed by the server. */
+    val canToggleShuffleFlow: StateFlow<Boolean> = combine(_playback, optionsPending) { p, pending ->
+        p.canToggleShuffle && !pending
+    }.distinctUntilChanged().stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val canToggleRepeatFlow: StateFlow<Boolean> = combine(_playback, optionsPending) { p, pending ->
+        (p.canToggleRepeatContext || p.canToggleRepeatTrack) && !pending
+    }.distinctUntilChanged().stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val isShufflingFlow: StateFlow<Boolean> = _playback
         .map { it.isShuffling }
         .distinctUntilChanged()
@@ -1161,6 +1177,9 @@ class PlaybackViewModel : ViewModel() {
             durationMs = displayDuration,
             isShuffling = if (optionsPending.value) _playback.value.isShuffling else state.is_shuffling,
             repeatMode = if (optionsPending.value) _playback.value.repeatMode else state.repeat_mode,
+            canToggleShuffle = state.restrictions.canToggleShuffle,
+            canToggleRepeatContext = state.restrictions.canToggleRepeatContext,
+            canToggleRepeatTrack = state.restrictions.canToggleRepeatTrack,
             volume = _playback.value.volume,
             // A real track state clears any in-progress ad-skip placeholder.
             isAd = false
@@ -1876,26 +1895,26 @@ class PlaybackViewModel : ViewModel() {
         }
     }
 
-    /**
-     * A shuffle or repeat change the cluster has not confirmed yet. Like the web player, the buttons
-     * that send one are disabled until the verdict is in, and a tap from the notification is dropped
-     * the same way. Meanwhile the value we asked for stands: a cluster frame answering one of our own
-     * position reports can land in that window still carrying the old options.
-     */
-    val optionsPending = MutableStateFlow(false)
-
+    /** Nothing while the server disallows it; the buttons are greyed, and a notification tap lands here too. */
     fun toggleShuffle() {
         val was = _playback.value.isShuffling
+        if (!_playback.value.canToggleShuffle) return
         changeOptions("shuffle", { copy(isShuffling = !was) }, { copy(isShuffling = was) }) { pc ->
             pc.setShuffle(if (was) "off" else "on")
         }
     }
 
+    /** The web player's cycle: off, context, track, off, skipping a mode the server disallows. */
     fun cycleRepeat() {
-        val was = _playback.value.repeatMode
+        val p = _playback.value
+        val was = p.repeatMode
         val next = when (was) {
-            "off" -> "context"
-            "context" -> "track"
+            "off" -> when {
+                p.canToggleRepeatContext -> "context"
+                p.canToggleRepeatTrack -> "track"
+                else -> return
+            }
+            "context" -> if (p.canToggleRepeatTrack) "track" else "off"
             else -> "off"
         }
         changeOptions("repeat", { copy(repeatMode = next) }, { copy(repeatMode = was) }) { pc -> pc.setRepeat(next) }
@@ -1928,16 +1947,31 @@ class PlaybackViewModel : ViewModel() {
     // The notification's shuffle, repeat and like buttons render this state and nothing else, so one
     // change repaints them, whether it came from a tap here, a tap on the notification, or the cluster.
     // The first value is skipped: it is the empty default, and a repaint would promote the service.
+    private data class NotificationButtons(
+        val shuffling: Boolean,
+        val repeatMode: String,
+        val liked: Boolean,
+        val canToggleShuffle: Boolean,
+        val canToggleRepeat: Boolean,
+    )
+
     init {
         viewModelScope.launch {
-            combine(_playback, currentTrackLiked) { p, liked -> Triple(p.isShuffling, p.repeatMode, liked) }
+            combine(_playback, currentTrackLiked) { p, liked ->
+                NotificationButtons(
+                    p.isShuffling, p.repeatMode, liked,
+                    p.canToggleShuffle, p.canToggleRepeatContext || p.canToggleRepeatTrack,
+                )
+            }
                 .distinctUntilChanged()
                 .drop(1)
-                .collect { (shuffling, repeat, liked) ->
+                .collect { b ->
                     MusicPlaybackService.instance?.let {
-                        it.isShuffling = shuffling
-                        it.repeatMode = repeat
-                        it.isLiked = liked
+                        it.isShuffling = b.shuffling
+                        it.repeatMode = b.repeatMode
+                        it.isLiked = b.liked
+                        it.canToggleShuffle = b.canToggleShuffle
+                        it.canToggleRepeat = b.canToggleRepeat
                         it.updateNotification()
                     }
                 }

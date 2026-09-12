@@ -216,7 +216,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
             val isPlayingThis = playback.track != null && playback.isPlaying &&
                 (playingContext?.let { detail.uri.contains(it.name) || detail.name == it.name } == true)
             val shuffling = playback.isShuffling
-            val optionsPending by vm.optionsPending.collectAsState()
+            val canToggleShuffle by vm.canToggleShuffleFlow.collectAsState()
             val context = androidx.compose.ui.platform.LocalContext.current
 
             Row(
@@ -349,7 +349,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
 
                 Spacer(Modifier.weight(1f))
 
-                IconButton(onClick = { vm.toggleShuffle() }, enabled = !optionsPending) {
+                IconButton(onClick = { vm.toggleShuffle() }, enabled = canToggleShuffle) {
                     Icon(
                         Icons.Rounded.Shuffle, stringResource(R.string.shuffle),
                         tint = if (shuffling) accentColor else SpfyWhite,

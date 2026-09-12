@@ -966,7 +966,8 @@ private fun PlayerControls(
     val isPaused by vm.isPausedFlow.collectAsState()
     val isShuffling by vm.isShufflingFlow.collectAsState()
     val repeatMode by vm.repeatModeFlow.collectAsState()
-    val optionsPending by vm.optionsPending.collectAsState()
+    val canToggleShuffle by vm.canToggleShuffleFlow.collectAsState()
+    val canToggleRepeat by vm.canToggleRepeatFlow.collectAsState()
     val nextReady by vm.isNextReady.collectAsState()
     val isCurrentlyStreaming by vm.isStreaming.collectAsState()
     val nextLoading = !nextReady && isCurrentlyStreaming
@@ -984,7 +985,7 @@ private fun PlayerControls(
         verticalAlignment = Alignment.CenterVertically
     ) {
         TonalIconToggle(
-            isShuffling, { vm.toggleShuffle() }, sideBtn, buttonBg, animatedPrimary, enabled = !optionsPending
+            isShuffling, { vm.toggleShuffle() }, sideBtn, buttonBg, animatedPrimary, enabled = canToggleShuffle
         ) {
             Icon(Icons.Rounded.Shuffle, stringResource(R.string.shuffle), modifier = Modifier.size(sideIcon))
         }
@@ -1016,7 +1017,7 @@ private fun PlayerControls(
             }
         }
         TonalIconToggle(
-            repeatMode != "off", { vm.cycleRepeat() }, sideBtn, buttonBg, animatedPrimary, enabled = !optionsPending
+            repeatMode != "off", { vm.cycleRepeat() }, sideBtn, buttonBg, animatedPrimary, enabled = canToggleRepeat
         ) {
             Icon(
                 when (repeatMode) { "track" -> Icons.Rounded.RepeatOne; else -> Icons.Rounded.Repeat },

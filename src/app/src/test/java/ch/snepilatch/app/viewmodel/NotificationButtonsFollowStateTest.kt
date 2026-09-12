@@ -64,6 +64,16 @@ class NotificationButtonsFollowStateTest {
         verify(timeout = 1_000) { rig.service.repeatMode = "context" }
     }
 
+    /** Issue #726: a server restriction reaches the notification, which dims the glyph. */
+    @Test
+    fun restriction_repaintsTheButtonsDimmed() {
+        rig.vm._playback.value = rig.vm._playback.value.copy(canToggleShuffle = false, canToggleRepeatContext = false)
+
+        verify(timeout = 1_000) { rig.service.canToggleShuffle = false }
+        verify(timeout = 1_000) { rig.service.canToggleRepeat = true }
+        verify(timeout = 1_000, atLeast = 1) { rig.service.updateNotification() }
+    }
+
     @Test
     fun likeChange_repaintsTheHeart() {
         rig.vm.currentTrackLiked.value = true

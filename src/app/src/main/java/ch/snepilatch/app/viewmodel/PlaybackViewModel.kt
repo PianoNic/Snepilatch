@@ -1783,12 +1783,19 @@ class PlaybackViewModel : ViewModel() {
         LokiLogger.i(TAG, "[Timing] CMD skipNext sent")
         commandJob = viewModelScope.launch(Dispatchers.IO) {
             try {
+                val p = player ?: return@launch
                 val t0 = System.currentTimeMillis()
-                // Local advance (state report, never skip-capped) — the new track loads via onPlaybackId.
-                // A pressed button walks the machine's skip_next edge, as the web player's forward button
-                // does; the default reason walks advance, which is the natural end and lands elsewhere on
-                // graphs where the two differ (radio, autoplay, smart shuffle).
-                player?.localNext(kotify.api.playerstatus.AdvanceReason.USER_SKIP)
+                if (foreignDeviceActive) {
+                    // Another device holds playback: a local state report would describe this idle
+                    // phone, so tell the active device to skip instead.
+                    p.skipNext()
+                } else {
+                    // Local advance (state report, never skip-capped) — the new track loads via onPlaybackId.
+                    // A pressed button walks the machine's skip_next edge, as the web player's forward button
+                    // does; the default reason walks advance, which is the natural end and lands elsewhere on
+                    // graphs where the two differ (radio, autoplay, smart shuffle).
+                    p.localNext(kotify.api.playerstatus.AdvanceReason.USER_SKIP)
+                }
                 LokiLogger.i(TAG, "[Timing] CMD skipNext API done in ${System.currentTimeMillis() - t0}ms")
             }
             catch (e: CancellationException) { throw e }
@@ -1812,9 +1819,14 @@ class PlaybackViewModel : ViewModel() {
         LokiLogger.i(TAG, "[Timing] CMD skipPrevious sent")
         commandJob = viewModelScope.launch(Dispatchers.IO) {
             try {
+                val p = player ?: return@launch
                 val t0 = System.currentTimeMillis()
-                // Local go-to-previous (state report, never skip-capped) — prev track loads via onPlaybackId.
-                player?.localPrevious(if (forceTrackChange) 0L else pos)
+                if (foreignDeviceActive) {
+                    p.skipPrevious()
+                } else {
+                    // Local go-to-previous (state report, never skip-capped) — prev track loads via onPlaybackId.
+                    p.localPrevious(if (forceTrackChange) 0L else pos)
+                }
                 LokiLogger.i(TAG, "[Timing] CMD skipPrevious API done in ${System.currentTimeMillis() - t0}ms")
             }
             catch (e: CancellationException) { throw e }
@@ -1830,8 +1842,10 @@ class PlaybackViewModel : ViewModel() {
         viewModelScope.launch(Dispatchers.Main) {
             MusicPlaybackService.instance?.syncSeek(positionMs)
         }
-        // Report the seek to Spfy locally (state report, not a seek command)
-        launchWithPlayer("seek") { it.localSeek(positionMs) }
+        launchWithPlayer("seek") { p ->
+            // A remote device needs a real seek command; for this device a state report is enough.
+            if (foreignDeviceActive) p.seek(positionMs.toInt()) else p.localSeek(positionMs)
+        }
     }
 
     fun toggleShuffle() {
@@ -2442,21 +2456,10 @@ class PlaybackViewModel : ViewModel() {
         svc.onPause = { togglePlayPause() }
         svc.onAudioFocusPaused = { handleAudioFocusPaused() }
         svc.onAudioFocusResumed = { handleAudioFocusResumed() }
-        svc.onSkipNext = {
-            viewModelScope.launch(Dispatchers.IO) {
-                try { player?.localNext() }
-                catch (e: CancellationException) { throw e }
-                catch (e: Exception) { LokiLogger.e(TAG, "svc next", e) }
-            }
-        }
+        // Same functions the on-screen buttons call, so a remote device gets its commands here too.
+        svc.onSkipNext = { skipNext() }
         svc.onSkipPrevious = { skipPrevious() }
-        svc.onSeek = { posMs ->
-            viewModelScope.launch(Dispatchers.IO) {
-                try { player?.localSeek(posMs) }
-                catch (e: CancellationException) { throw e }
-                catch (e: Exception) { LokiLogger.e(TAG, "svc seek", e) }
-            }
-        }
+        svc.onSeek = { posMs -> seekTo(posMs) }
     }
 
     /** Like / shuffle / repeat buttons shown in the notification, plus their saved preferences. */

@@ -1118,8 +1118,10 @@ class PlaybackViewModel : ViewModel() {
         // its clock, so while streaming the position is read straight from ExoPlayer (its currentTime)
         // and we never reconcile against the lagging cloud snapshot.
         val posMs = when {
-            isTrackMismatch -> _playback.value.positionMs  // Keep old position during transition
-            isStreamLoading.value -> 0L
+            // A transition or a load in progress keeps the position the UI already shows: a track
+            // change sets 0 itself, and a cold start loads at the saved position, which a cluster
+            // frame in that window must not pull down to 0.
+            isTrackMismatch || isStreamLoading.value -> _playback.value.positionMs
             isStreaming.value -> withContext(Dispatchers.Main) {
                 MusicPlaybackService.instance?.getCurrentPosition()
             } ?: state.position_as_of_timestamp

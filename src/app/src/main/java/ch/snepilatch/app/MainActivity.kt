@@ -10,13 +10,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.playback.MediaButtonReceiver
 import ch.snepilatch.app.playback.MusicPlaybackService
 import ch.snepilatch.app.playback.SessionHolder
@@ -41,7 +41,12 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : ComponentActivity() {
+    private val vm: PlaybackViewModel by viewModels()
     private val pendingDeepLink = MutableStateFlow<Uri?>(null)
+
+    // A resume that follows a pause is a return to the foreground. The first resume is the start,
+    // where initialize already pulls state and devices.
+    private var pausedBefore = false
 
     /**
      * Set when the download notification is tapped. A flow rather than a read of `intent`: the
@@ -70,6 +75,16 @@ class MainActivity : ComponentActivity() {
             intent.removeExtra(DownloadNotifier.EXTRA_OPEN_DOWNLOADS)
             pendingOpenDownloads.value = true
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        pausedBefore = true
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (pausedBefore) vm.resyncOnForeground()
     }
 
     override fun onDestroy() {
@@ -102,7 +117,6 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            val vm: PlaybackViewModel = viewModel()
             val initialized by vm.isInitialized.collectAsState()
             val error by vm.initError.collectAsState()
             val needsLogin by vm.needsLogin.collectAsState()

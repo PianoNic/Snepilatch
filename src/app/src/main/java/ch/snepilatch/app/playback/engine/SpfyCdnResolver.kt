@@ -118,7 +118,7 @@ class SpfyCdnResolver(
 
     /** One license exchange for [stream] with no player, through the same browser-shaped client. */
     suspend fun license(stream: SpfyStream): Long =
-        WidevineLicenser.license(session, stream.licenseUrl, stream.pssh ?: throw IllegalStateException("no pssh"))
+        WidevineLicenser.license(session, stream.licenseUrl, stream.pssh ?: error("no pssh"))
 
     private fun buildLicenseHeaders(): Map<String, String> {
         val headers = mutableMapOf<String, String>()

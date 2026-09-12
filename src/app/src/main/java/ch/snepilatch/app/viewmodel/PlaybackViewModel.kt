@@ -310,6 +310,7 @@ class PlaybackViewModel : ViewModel() {
     val devices: StateFlow<List<DeviceInfo>> = _devices
     val showDevices = MutableStateFlow(false)
     val activeDeviceName = MutableStateFlow<String?>(null)
+
     /** Why the last device switch did not happen; the devices sheet shows it and stays open. */
     val transferError = MutableStateFlow<UiMessage?>(null)
     val ourDeviceId: String? get() = player?.ourDeviceId()
@@ -512,9 +513,7 @@ class PlaybackViewModel : ViewModel() {
                 session = sess
                 val sp = SpfyPlayback(sess)
                 spfyPlayback = sp
-                cdnResolver = SpfyCdnResolver(sess, sp).also { r ->
-                    r.onResolved = { info -> player?.reportStreamResolved(info) }
-                }
+                cdnResolver = spfyResolver(sess, sp)
                 LokiLogger.i(TAG, "Session loaded")
 
                 // Home and library load themselves from HomeViewModel.init / LibraryViewModel.init.
@@ -1487,6 +1486,11 @@ class PlaybackViewModel : ViewModel() {
      * On any failure we reset state and fall back to a plain resume, so the user
      * still gets audio, just slower.
      */
+    /** The resolver reports every stream it resolves to the player, for the playback telemetry. */
+    private fun spfyResolver(sess: Session, sp: SpfyPlayback) = SpfyCdnResolver(sess, sp).also { r ->
+        r.onResolved = { info -> player?.reportStreamResolved(info) }
+    }
+
     private suspend fun coldStartPlay() {
         val p = player ?: return
         if (cdnResolver == null) {
@@ -1517,18 +1521,17 @@ class PlaybackViewModel : ViewModel() {
         coldStartFileId = fileIdDeferred
 
         LokiLogger.i(TAG, "[ColdStart] transfer to self with restore_paused=pause")
-        try {
-            if (!p.transferPlaybackHere(restorePaused = true)) {
-                LokiLogger.w(TAG, "[ColdStart] transfer to self not confirmed, falling back")
-                resetColdStart()
-                fallbackResume()
-                return
-            }
+        val transferred = try {
+            p.transferPlaybackHere(restorePaused = true)
         } catch (e: CancellationException) {
             resetColdStart()
             throw e
         } catch (e: Exception) {
-            LokiLogger.e(TAG, "[ColdStart] transferPlaybackHere failed, falling back", e)
+            LokiLogger.e(TAG, "[ColdStart] transferPlaybackHere failed", e)
+            false
+        }
+        if (!transferred) {
+            LokiLogger.w(TAG, "[ColdStart] transfer to self not confirmed, falling back to resume")
             resetColdStart()
             fallbackResume()
             return

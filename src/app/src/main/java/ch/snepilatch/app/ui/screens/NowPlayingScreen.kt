@@ -377,9 +377,10 @@ fun NowPlayingScreen(
     val skippedBack by vm.skippedBack.collectAsState()
     var buttonSkip by remember { mutableStateOf(0 to 0) }
     val onButtonSkip: (Int) -> Unit = { direction ->
-        buttonSkip = buttonSkip.first + 1 to direction
         // The button restarts past 3 s like the web player's; only a swipe forces the previous track.
-        if (direction > 0) vm.skipPrevious() else vm.skipNext()
+        // The cover strip only moves when the track does.
+        val changesTrack = if (direction > 0) vm.skipPrevious() else { vm.skipNext(); true }
+        if (changesTrack) buttonSkip = buttonSkip.first + 1 to direction
     }
     // While an ad is being skipped we keep the CURRENT song frozen on screen (cover/title/progress)
     // and show a loading spinner (see spinnerActive) — so the ~2.5s ad skip reads as "loading the next

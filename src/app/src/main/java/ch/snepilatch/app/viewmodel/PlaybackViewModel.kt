@@ -3615,6 +3615,19 @@ class PlaybackViewModel : ViewModel() {
         }
     }
 
+    /**
+     * The app came back to the foreground. Everything shown since it left is whatever the dealer
+     * pushed last, so pull the live state and device list once. Not for the first start: initialize
+     * fetches both itself. After auth loss there is nothing to sync against.
+     */
+    fun resyncOnForeground() {
+        if (!isInitialized.value) return
+        launchWithPlayer("resyncOnForeground") {
+            refreshState()
+            loadDevices()
+        }
+    }
+
     // --- Devices ---
 
     fun loadDevices() {

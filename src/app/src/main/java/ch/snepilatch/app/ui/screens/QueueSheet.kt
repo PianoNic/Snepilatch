@@ -68,15 +68,13 @@ fun QueueSheet(vm: PlaybackViewModel) {
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
             )
 
-            playback.track?.let { NowPlayingRow(it) }
-
             if (queue.isEmpty() && playback.track == null) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(stringResource(R.string.queue_empty), color = SpfyLightGray, fontSize = 16.sp)
                 }
                 return@Column
             }
-            QueueList(vm, queue, queuedCount, Modifier.weight(1f))
+            QueueList(vm, playback.track, queue, queuedCount, Modifier.weight(1f))
         }
     }
 }
@@ -125,6 +123,7 @@ private class RowDrag(
 @Composable
 private fun QueueList(
     vm: PlaybackViewModel,
+    nowPlaying: ch.snepilatch.app.data.TrackInfo?,
     queue: List<ch.snepilatch.app.data.TrackInfo>,
     queuedCount: Int,
     modifier: Modifier = Modifier,
@@ -132,6 +131,15 @@ private fun QueueList(
     // Keys ride with their entry, so the preview below can reorder freely without a row's identity
     // following its position. See queueRowKeys for why a positional key is not enough.
     val keyed = remember(queue) { queueRowKeys(queue).zip(queue) }
+    // The row that was tapped last, as key and uri. While the now playing track is that uri, the
+    // now playing item takes the row's key, so the list moves the row up into the slot instead of
+    // fading one out and another in. Any other track gets a key of its own.
+    var tapped by remember { mutableStateOf<Pair<String, String>?>(null) }
+    val nowKey = nowPlaying?.let { track ->
+        val fromTap = tapped?.takeIf { it.second == track.uri }?.first
+        val key = fromTap ?: "now:${track.uri}"
+        if (keyed.any { it.first == key }) "$key#now" else key
+    }
     var dragKey by remember { mutableStateOf<String?>(null) }
     var dragFrom by remember { mutableIntStateOf(-1) }
     var dragDy by remember { mutableFloatStateOf(0f) }
@@ -182,26 +190,44 @@ private fun QueueList(
     )
 
     val upNext = shown.drop(queuedCount)
+
+    fun tap(key: String, track: ch.snepilatch.app.data.TrackInfo, index: Int) {
+        tapped = key to track.uri
+        vm.skipToQueueIndex(index)
+    }
+
+    // Keyed rows plus animateItem: a row that leaves fades out and the rest slide into place, so a
+    // tap or a removal reads as the list moving up rather than being redrawn.
     LazyColumn(modifier, contentPadding = PaddingValues(bottom = 16.dp)) {
+        if (nowPlaying != null && nowKey != null) {
+            item(key = "header-now") { SectionHeader(stringResource(R.string.now_playing), Modifier.animateItem()) }
+            item(key = nowKey) { NowPlayingRow(nowPlaying, Modifier.animateItem()) }
+        }
         if (queuedCount > 0) {
-            item(key = "header-queued") { SectionHeader(stringResource(R.string.queue_next_in_queue)) }
+            item(key = "header-queued") {
+                SectionHeader(stringResource(R.string.queue_next_in_queue), Modifier.animateItem())
+            }
             itemsIndexed(shown.take(queuedCount), key = { _, entry -> entry.first }) { i, entry ->
                 SwipeableQueueRow(
                     entry.second,
                     dragFor(entry.first, entry.second, i),
-                    onClick = { vm.skipToQueueIndex(i) },
+                    onClick = { tap(entry.first, entry.second, i) },
                     onRemove = { vm.removeFromQueue(entry.second) },
+                    modifier = Modifier.animateItem(),
                 )
             }
         }
         if (upNext.isNotEmpty()) {
-            item(key = "header-upnext") { SectionHeader(stringResource(R.string.queue_next_up)) }
+            item(key = "header-upnext") {
+                SectionHeader(stringResource(R.string.queue_next_up), Modifier.animateItem())
+            }
             itemsIndexed(upNext, key = { _, entry -> entry.first }) { i, entry ->
                 SwipeableQueueRow(
                     entry.second,
                     dragFor(entry.first, entry.second, queuedCount + i),
-                    onClick = { vm.skipToQueueIndex(queuedCount + i) },
+                    onClick = { tap(entry.first, entry.second, queuedCount + i) },
                     onRemove = { vm.removeFromQueue(entry.second) },
+                    modifier = Modifier.animateItem(),
                 )
             }
         }
@@ -214,14 +240,16 @@ private fun SwipeableQueueRow(
     drag: RowDrag?,
     onClick: () -> Unit,
     onRemove: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val state = rememberSwipeToDismissBoxState()
     SwipeToDismissBox(
         state = state,
-        modifier = Modifier
+        modifier = modifier
             // The dragged row rides above the rest and follows the finger; everything else
-            // holds still until the drop, so the list cannot reflow under the gesture.
-            .zIndex(if (drag?.dragging == true) 1f else 0f)
+            // holds still until the drop, so the list cannot reflow under the gesture. Rows sit
+            // above the now playing item so a tapped row travelling up passes behind them.
+            .zIndex(if (drag?.dragging == true) 2f else 1f)
             .offset { IntOffset(0, (drag?.offsetY ?: 0f).roundToInt()) },
         onDismiss = { value -> if (value == SwipeToDismissBoxValue.EndToStart) onRemove() },
         // A vertical drag on the grip must not also read as a swipe to delete.
@@ -243,14 +271,19 @@ private fun SwipeableQueueRow(
     }
 }
 
+/** Opaque and above the now playing row, so a tapped row travelling up passes behind it. */
 @Composable
-private fun SectionHeader(title: String) {
+private fun SectionHeader(title: String, modifier: Modifier = Modifier) {
     Text(
         title,
         color = SpfyLightGray,
         fontSize = 14.sp,
         fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        modifier = modifier
+            .zIndex(1f)
+            .fillMaxWidth()
+            .background(SpfyElevated)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
     )
 }
 
@@ -303,16 +336,9 @@ private fun QueueRow(
 }
 
 @Composable
-private fun NowPlayingRow(track: ch.snepilatch.app.data.TrackInfo) {
-    Text(
-        stringResource(R.string.now_playing),
-        color = SpfyLightGray,
-        fontSize = 14.sp,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-    )
+private fun NowPlayingRow(track: ch.snepilatch.app.data.TrackInfo, modifier: Modifier = Modifier) {
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
             .background(SpfyGray.copy(alpha = 0.5f))
             .padding(horizontal = 16.dp, vertical = 10.dp),

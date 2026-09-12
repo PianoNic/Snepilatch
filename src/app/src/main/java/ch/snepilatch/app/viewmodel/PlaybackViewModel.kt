@@ -2817,8 +2817,10 @@ class PlaybackViewModel : ViewModel() {
                 // endpoint below only offers premium MP4_256 on many accounts, which a free CDM
                 // can't license. Cheap: only runs when the cluster hasn't supplied a file id yet.
                 LokiLogger.d(TAG, "SpfyCDN: Waiting for state-machine file ID...")
-                pollFor(15) { latestFileId != null }
-                fileId = latestFileId
+                // Wait for this track's id. The id of the track that was loading when the user skipped
+                // is still there and satisfied a plain null check at once, so the skip played that one.
+                pollFor(15) { fileIdForTrack(null, trackUri) != null }
+                fileId = fileIdForTrack(null, trackUri)
             }
             // Still null: self-resolve. Use the media endpoint only when the file id is
             // licensable for this account (see safeMediaFileId), else metadata/4/track.

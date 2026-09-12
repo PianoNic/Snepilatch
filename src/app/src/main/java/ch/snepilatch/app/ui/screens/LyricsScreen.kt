@@ -61,6 +61,7 @@ fun LyricsScreen(vm: PlaybackViewModel) {
     val isPlayingRaw by vm.isPlayingFlow.collectAsState()
     val isPaused by vm.isPausedFlow.collectAsState()
     val repeatMode by vm.repeatModeFlow.collectAsState()
+    val optionsPending by vm.optionsPending.collectAsState()
     val theme by ThemeController.themeColors.collectAsState()
     val lyrics by lyricsVm.lyrics.collectAsState()
     val isLoading by lyricsVm.isLoading.collectAsState()
@@ -168,7 +169,8 @@ fun LyricsScreen(vm: PlaybackViewModel) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Box(
-                                Modifier.size(36.dp).background(buttonBg, CircleShape).clip(CircleShape).clickable { vm.cycleRepeat() },
+                                Modifier.size(36.dp).background(buttonBg, CircleShape).clip(CircleShape)
+                                    .clickable(enabled = !optionsPending) { vm.cycleRepeat() },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(

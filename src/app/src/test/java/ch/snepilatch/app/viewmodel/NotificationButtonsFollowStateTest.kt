@@ -1,8 +1,6 @@
 package ch.snepilatch.app.viewmodel
 
-import io.mockk.Runs
 import io.mockk.coEvery
-import io.mockk.just
 import io.mockk.verify
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -36,10 +34,7 @@ class NotificationButtonsFollowStateTest {
     @Test
     fun shuffleToggle_repaintsBeforeTheCommandReturns() {
         val commandReturns = CompletableDeferred<Boolean>()
-        coEvery { rig.player.setShuffle("on") } coAnswers {
-            commandReturns.await()
-            Unit
-        }
+        coEvery { rig.player.setShuffle("on") } coAnswers { commandReturns.await() }
 
         rig.vm.toggleShuffle()
 
@@ -61,7 +56,7 @@ class NotificationButtonsFollowStateTest {
 
     @Test
     fun repeatCycle_repaintsWithTheNewMode() {
-        coEvery { rig.player.setRepeat("context") } just Runs
+        coEvery { rig.player.setRepeat("context") } returns true
 
         rig.vm.cycleRepeat()
 

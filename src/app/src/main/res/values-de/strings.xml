@@ -187,6 +187,7 @@
     <string name="search">Suchen</string>
     <string name="back">Zurück</string>
     <string name="clear">Löschen</string>
+    <string name="show_code">Code anzeigen</string>
     <string name="more">Mehr</string>
     <string name="play">Abspielen</string>
     <string name="play_pause">Abspielen/Pause</string>

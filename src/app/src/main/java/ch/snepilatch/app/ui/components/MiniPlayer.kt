@@ -4,8 +4,12 @@ package ch.snepilatch.app.ui.components
 
 import ch.snepilatch.app.ui.theme.SpfyWhite
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,14 +29,24 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -43,6 +57,8 @@ import ch.snepilatch.app.ui.theme.SpfyElevated
 import ch.snepilatch.app.ui.theme.SpfyLightGray
 import ch.snepilatch.app.viewmodel.ThemeController
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 /**
  * Base fill colour of the mini-player card. Shared with the expanding-player morph
@@ -53,14 +69,20 @@ fun miniCardBaseColor(primary: Color): Color = lerp(SpfyElevated, primary, 0.18f
 
 /**
  * The compact now-playing bar — a rounded card around [MiniPlayerContent].
- * Gesture-free: the parent supplies tap/drag via [modifier] so the same bar acts
- * as the collapsed anchor of the expanding player morph (see SpfyApp).
+ * The parent supplies tap/vertical drag via [modifier]; this card owns its horizontal
+ * track switch so the collapsed bar remains the expanding player morph's anchor.
  */
 @Composable
 fun MiniPlayer(
     vm: PlaybackViewModel,
     modifier: Modifier = Modifier
 ) {
+    val scope = rememberCoroutineScope()
+    val settledOffset = remember { Animatable(0f) }
+    val dragOffset = remember { mutableFloatStateOf(0f) }
+    val dragging = remember { mutableStateOf(false) }
+    val trackOffset = remember { derivedStateOf { if (dragging.value) dragOffset.floatValue else settledOffset.value } }
+    var settleJob by remember { mutableStateOf<Job?>(null) }
     val theme by ThemeController.themeColors.collectAsState()
     val animatedCardBg by animateColorAsState(
         miniCardBaseColor(theme.primary),
@@ -69,6 +91,7 @@ fun MiniPlayer(
 
     MiniPlayerContent(
         vm,
+        horizontalOffset = trackOffset,
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 6.dp)
@@ -80,6 +103,53 @@ fun MiniPlayer(
             )
             .clip(RoundedCornerShape(12.dp))
             .background(animatedCardBg)
+            .pointerInput(vm) {
+                val tracker = androidx.compose.ui.input.pointer.util.VelocityTracker()
+                detectHorizontalDragGestures(
+                    onDragStart = {
+                        tracker.resetTracking()
+                        settleJob?.cancel()
+                        dragging.value = true
+                        dragOffset.floatValue = settledOffset.value
+                    },
+                    onHorizontalDrag = { change, dragAmount ->
+                        tracker.addPosition(change.uptimeMillis, change.position)
+                        change.consume()
+                        dragOffset.floatValue = (dragOffset.floatValue + dragAmount)
+                            .coerceIn(-size.width.toFloat(), size.width.toFloat())
+                    },
+                    onDragEnd = {
+                        val width = size.width.toFloat()
+                        val release = dragOffset.floatValue
+                        val velocity = tracker.calculateVelocity().x
+                        val direction = when {
+                            release > width * 0.15f || velocity > 700f -> 1
+                            release < -width * 0.15f || velocity < -700f -> -1
+                            else -> 0
+                        }
+                        settleJob = scope.launch {
+                            settledOffset.snapTo(release)
+                            dragging.value = false
+                            if (direction == 0) {
+                                settledOffset.animateTo(0f, spring(stiffness = 380f))
+                            } else {
+                                settledOffset.animateTo(direction * width, tween(180))
+                                if (direction > 0) vm.skipPrevious(forceTrackChange = true) else vm.skipNext()
+                                settledOffset.snapTo(-direction * width)
+                                settledOffset.animateTo(0f, tween(180))
+                            }
+                        }
+                    },
+                    onDragCancel = {
+                        val release = dragOffset.floatValue
+                        settleJob = scope.launch {
+                            settledOffset.snapTo(release)
+                            dragging.value = false
+                            settledOffset.animateTo(0f, spring(stiffness = 380f))
+                        }
+                    }
+                )
+            }
     )
 }
 
@@ -91,7 +161,8 @@ fun MiniPlayer(
 @Composable
 fun MiniPlayerContent(
     vm: PlaybackViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    horizontalOffset: State<Float>? = null
 ) {
     // Collect only the fields the mini bar draws, each distinctUntilChanged, instead of the whole
     // PlaybackUiState — otherwise the 2Hz positionMs rewrite recomposes this whole bar on every screen
@@ -119,17 +190,31 @@ fun MiniPlayerContent(
                 .padding(start = 10.dp, end = 4.dp, top = 10.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            SpfyImage(
-                url = displayArtUrl,
-                modifier = Modifier.size(44.dp),
-                shape = RoundedCornerShape(8.dp)
-            )
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                Text(displayTitle, color = SpfyWhite, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(displayArtist, color = SpfyLightGray, fontSize = 12.sp,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Box(
+                Modifier
+                    .weight(1f)
+                    .height(44.dp)
+                    .clip(RectangleShape)
+            ) {
+                Row(
+                    Modifier
+                        .matchParentSize()
+                        .graphicsLayer { translationX = horizontalOffset?.value ?: 0f },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SpfyImage(
+                        url = displayArtUrl,
+                        modifier = Modifier.size(44.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(displayTitle, color = SpfyWhite, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(displayArtist, color = SpfyLightGray, fontSize = 12.sp,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
             }
             IconButton(onClick = { if (!spinnerActive) vm.togglePlayPause() }, modifier = Modifier.size(40.dp)) {
                 if (spinnerActive) {

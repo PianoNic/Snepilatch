@@ -298,6 +298,7 @@ class PlaybackViewModel : ViewModel() {
     val queueSheetVisible: StateFlow<Boolean> = _queueSheetVisible
     // Next track info (always available from WebSocket state for mini player swipe)
     val nextTrackPreview = MutableStateFlow<TrackInfo?>(null)
+    val secondNextTrackPreview = MutableStateFlow<TrackInfo?>(null)
     val prevTrackPreview = MutableStateFlow<TrackInfo?>(null)
 
     // Detail state + openers live in DetailViewModel; PlaybackViewModel's deep-link/playback bridges
@@ -1179,6 +1180,7 @@ class PlaybackViewModel : ViewModel() {
 
         // Extract next track info for mini player swipe preview
         nextTrackPreview.value = state.next_tracks.firstOrNull()?.toTrackInfo()
+        secondNextTrackPreview.value = state.next_tracks.getOrNull(1)?.toTrackInfo()
         // prev_tracks runs oldest-first, so the track we'd go back to is the LAST entry.
         prevTrackPreview.value = state.prev_tracks.lastOrNull()?.toTrackInfo()
 
@@ -1792,10 +1794,10 @@ class PlaybackViewModel : ViewModel() {
         }
     }
 
-    fun skipPrevious() {
+    fun skipPrevious(forceTrackChange: Boolean = false) {
         // If we're more than 3s into the track, restart it instead of going to previous.
         // (Same threshold KotifyClient's localPrevious uses; restarting also seeks ExoPlayer.)
-        if (_playback.value.positionMs > PREV_RESTART_THRESHOLD_MS) {
+        if (!forceTrackChange && _playback.value.positionMs > PREV_RESTART_THRESHOLD_MS) {
             seekTo(0)
             return
         }
@@ -1810,7 +1812,7 @@ class PlaybackViewModel : ViewModel() {
             try {
                 val t0 = System.currentTimeMillis()
                 // Local go-to-previous (state report, never skip-capped) — prev track loads via onPlaybackId.
-                player?.localPrevious(pos)
+                player?.localPrevious(if (forceTrackChange) 0L else pos)
                 LokiLogger.i(TAG, "[Timing] CMD skipPrevious API done in ${System.currentTimeMillis() - t0}ms")
             }
             catch (e: CancellationException) { throw e }

@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
@@ -374,6 +375,11 @@ fun NowPlayingScreen(
     val isShuffling by vm.isShufflingFlow.collectAsState()
     val repeatMode by vm.repeatModeFlow.collectAsState()
     val skippedBack by vm.skippedBack.collectAsState()
+    var buttonSkip by remember { mutableStateOf(0 to 0) }
+    val onButtonSkip: (Int) -> Unit = { direction ->
+        buttonSkip = buttonSkip.first + 1 to direction
+        if (direction > 0) vm.skipPrevious(forceTrackChange = true) else vm.skipNext()
+    }
     // While an ad is being skipped we keep the CURRENT song frozen on screen (cover/title/progress)
     // and show a loading spinner (see spinnerActive) — so the ~2.5s ad skip reads as "loading the next
     // track", not an interruption. `track` is unchanged during an ad, so no blanking is needed.
@@ -385,12 +391,9 @@ fun NowPlayingScreen(
     val spinnerActive = streamLoading || isAd
     val theme by ThemeController.themeColors.collectAsState()
 
-    // Prefetch the next track's cover so the slide-in on skip is instant (no load gap).
-    val prefetchCtx = LocalContext.current
     val nextPreview by vm.nextTrackPreview.collectAsState()
-    LaunchedEffect(nextPreview?.albumArt) {
-        ch.snepilatch.app.ui.components.prefetchCover(prefetchCtx, nextPreview?.albumArt)
-    }
+    val secondNextPreview by vm.secondNextTrackPreview.collectAsState()
+    val previousPreview by vm.prevTrackPreview.collectAsState()
 
     val animatedPrimary by animateColorAsState(theme.primary, tween(800), label = "primary")
     val buttonBg = Color.White.copy(alpha = 0.12f)
@@ -448,7 +451,13 @@ fun NowPlayingScreen(
                                 .aspectRatio(1f),
                             shape = RoundedCornerShape(16.dp),
                             trackKey = track?.uri,
-                            forward = !skippedBack
+                            buttonSkip = buttonSkip,
+                            forward = !skippedBack,
+                            onSwipePrevious = { vm.skipPrevious(forceTrackChange = true) },
+                            onSwipeNext = { vm.skipNext() },
+                            previousCoverUrl = previousPreview?.albumArt,
+                            nextCoverUrl = nextPreview?.albumArt,
+                            secondNextCoverUrl = secondNextPreview?.albumArt,
                         )
                     }
 
@@ -536,16 +545,15 @@ fun NowPlayingScreen(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                                track?.albumName?.let {
-                                    Spacer(Modifier.height(2.dp))
-                                    Text(
-                                        it,
-                                        color = SpfyLightGray.copy(alpha = 0.7f),
-                                        fontSize = 11.sp,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    track?.albumName.orEmpty(),
+                                    color = SpfyLightGray.copy(alpha = 0.7f),
+                                    fontSize = 11.sp,
+                                    minLines = 1,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
                             val isLiked by vm.currentTrackLiked.collectAsState()
                             FilledIconToggleButton(
@@ -583,7 +591,7 @@ fun NowPlayingScreen(
 
                         Spacer(Modifier.weight(0.2f))
 
-                        PlayerControls(vm, animatedPrimary, buttonBg, spinnerActive, compact = true)
+                        PlayerControls(vm, animatedPrimary, buttonBg, spinnerActive, compact = true, onSkip = onButtonSkip)
 
                         Spacer(Modifier.weight(0.2f))
 
@@ -686,22 +694,24 @@ fun NowPlayingScreen(
 
                     Spacer(Modifier.weight(0.3f))
 
-                    if (hasCanvas) {
-                        // Invisible placeholder — same size as album art to keep layout stable
-                        Box(Modifier.fillMaxWidth().aspectRatio(1f))
-                    } else {
-                        // Album art — large with rounded corners; the arriving cover slides in from
-                        // the right, or the leaving one slides off left when going back.
-                        ch.snepilatch.app.ui.components.SlidingCoverImage(
-                            url = displayArtUrl,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(1f),
-                            shape = RoundedCornerShape(16.dp),
-                            trackKey = track?.uri,
-                            forward = !skippedBack
-                        )
-                    }
+                    // Keep the cover-sized swipe target over Canvas while leaving the video visible.
+                    ch.snepilatch.app.ui.components.SlidingCoverImage(
+                        url = displayArtUrl,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                            .graphicsLayer { alpha = if (hasCanvas) 0f else 1f },
+                        shape = RoundedCornerShape(16.dp),
+                        trackKey = track?.uri,
+                        buttonSkip = buttonSkip,
+                        forward = !skippedBack,
+                        onSwipePrevious = { vm.skipPrevious(forceTrackChange = true) },
+                        onSwipeNext = { vm.skipNext() },
+                        previousCoverUrl = previousPreview?.albumArt,
+                        nextCoverUrl = nextPreview?.albumArt,
+                        secondNextCoverUrl = secondNextPreview?.albumArt,
+                        clipToFrame = false,
+                    )
 
                     Spacer(Modifier.height(32.dp))
 
@@ -726,16 +736,17 @@ fun NowPlayingScreen(
                                 isPlaying = isPlaying,
                                 modifier = Modifier.clickable { vm.openArtistFromCurrentTrack() }
                             )
-                            track?.albumName?.takeIf { !isAd }?.let {
-                                Spacer(Modifier.height(2.dp))
-                                MarqueeText(
-                                    text = it,
-                                    color = tertiaryText,
-                                    fontSize = 13.sp,
-                                    isPlaying = isPlaying,
-                                    modifier = Modifier.clickable { vm.openAlbumFromCurrentTrack() }
-                                )
-                            }
+                            Spacer(Modifier.height(2.dp))
+                            val albumName = track?.albumName?.takeIf { !isAd }
+                            MarqueeText(
+                                text = albumName.orEmpty(),
+                                color = tertiaryText,
+                                fontSize = 13.sp,
+                                isPlaying = isPlaying,
+                                modifier = Modifier.clickable(enabled = albumName != null) {
+                                    vm.openAlbumFromCurrentTrack()
+                                }
+                            )
                         }
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -787,7 +798,7 @@ fun NowPlayingScreen(
 
                     Spacer(Modifier.weight(0.15f))
 
-                    PlayerControls(vm, animatedPrimary, buttonBg, spinnerActive, compact = false)
+                    PlayerControls(vm, animatedPrimary, buttonBg, spinnerActive, compact = false, onSkip = onButtonSkip)
 
                     Spacer(Modifier.weight(0.2f))
 
@@ -929,8 +940,8 @@ private fun TonalIconToggle(
         colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
             containerColor = buttonBg,
             contentColor = SpfyWhite,
-            checkedContainerColor = buttonBg,
-            checkedContentColor = accent,
+            checkedContainerColor = accent.copy(alpha = 0.45f),
+            checkedContentColor = SpfyWhite,
         ),
     ) { content() }
 }
@@ -945,6 +956,7 @@ private fun PlayerControls(
     buttonBg: Color,
     spinnerActive: Boolean,
     compact: Boolean,
+    onSkip: (Int) -> Unit,
 ) {
     val isPlaying by vm.isPlayingFlow.collectAsState()
     val isPaused by vm.isPausedFlow.collectAsState()
@@ -969,7 +981,7 @@ private fun PlayerControls(
         TonalIconToggle(isShuffling, { vm.toggleShuffle() }, sideBtn, buttonBg, animatedPrimary) {
             Icon(Icons.Rounded.Shuffle, stringResource(R.string.shuffle), modifier = Modifier.size(sideIcon))
         }
-        TonalIconBtn({ vm.skipPrevious() }, skipBtn, buttonBg) {
+        TonalIconBtn({ onSkip(1) }, skipBtn, buttonBg) {
             Icon(Icons.Rounded.SkipPrevious, stringResource(R.string.previous), modifier = Modifier.size(skipIcon))
         }
         FilledIconButton(
@@ -989,7 +1001,7 @@ private fun PlayerControls(
                 )
             }
         }
-        TonalIconBtn({ vm.skipNext() }, skipBtn, buttonBg) {
+        TonalIconBtn({ onSkip(-1) }, skipBtn, buttonBg) {
             if (nextLoading) {
                 LoadingIndicator(color = SpfyWhite, modifier = Modifier.size(nextSpinnerSize))
             } else {
@@ -1302,6 +1314,7 @@ private fun MarqueeText(
         color = color,
         fontSize = fontSize,
         fontWeight = fontWeight,
+        minLines = 1,
         maxLines = 1,
         // Scroll forever while playing (so long titles always reveal their tail), but disable the
         // animation when paused (iterations = 0) so this per-frame marquee loop stops requesting frames.

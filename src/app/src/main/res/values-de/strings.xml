@@ -374,6 +374,8 @@
     <string name="jam_share_link">Link teilen</string>
     <string name="jam_qr_hint">Code scannen oder Link teilen, um beizutreten.</string>
     <string name="jam_end">Jam beenden</string>
+    <string name="offline_playlist_ended">Von dieser Playlist ist nichts weiter heruntergeladen</string>
+    <string name="offline_downloads_ended">Keine weiteren heruntergeladenen Songs</string>
     <string name="jam_listening">Hört zu</string>
     <string name="jam_you">Du</string>
     <string name="jam_controls_locked">Der Host hat Abspielen, Pause und Überspringen für Gäste ausgeschaltet.</string>

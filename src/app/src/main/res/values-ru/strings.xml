@@ -376,6 +376,8 @@
     <string name="jam_share_link">Поделиться ссылкой</string>
     <string name="jam_qr_hint">Отсканируйте код или поделитесь ссылкой, чтобы присоединиться.</string>
     <string name="jam_end">Завершить джем</string>
+    <string name="offline_playlist_ended">Из этого плейлиста больше ничего не загружено</string>
+    <string name="offline_downloads_ended">Больше нет загруженных песен</string>
     <string name="jam_listening">Слушает</string>
     <string name="jam_you">Вы</string>
     <string name="jam_controls_locked">Хост отключил воспроизведение, паузу и пропуск для гостей.</string>

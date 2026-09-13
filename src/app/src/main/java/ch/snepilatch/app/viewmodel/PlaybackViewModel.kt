@@ -409,6 +409,7 @@ class PlaybackViewModel : ViewModel() {
                     LokiLogger.w(TAG, "Reporting ${positionMs}ms after the outage failed: ${e.message}")
                 }
             }
+            override fun showMessage(id: Int) { _errorMessage.tryEmit(UiMessage(id)) }
         },
     )
     private var lastContextUri: String? = null
@@ -2832,7 +2833,7 @@ class PlaybackViewModel : ViewModel() {
         }
         svc.onPlaybackEnded = onEnded@{
             if (isOffline.value) {
-                viewModelScope.launch(Dispatchers.IO) { OfflinePlayer.ended() }
+                viewModelScope.launch(Dispatchers.IO) { offline.trackEnded() }
                 return@onEnded
             }
             // The silent ad clip ending is not a real track end: KotifyClient's engine clocks the

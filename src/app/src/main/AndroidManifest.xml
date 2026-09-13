@@ -70,7 +70,7 @@
         </activity>
 
         <service
-            android:name=".playback.MusicPlaybackService"
+            android:name=".logic.playback.MusicPlaybackService"
             android:exported="true"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
@@ -89,7 +89,7 @@
         </provider>
 
         <receiver
-            android:name=".playback.MediaActionReceiver"
+            android:name=".logic.playback.MediaActionReceiver"
             android:exported="false">
             <intent-filter>
                 <action android:name="ch.snepilatch.app.PREV" />
@@ -103,7 +103,7 @@
         <!-- Cold-launch path for Bluetooth / wired / lockscreen media-button
              presses when the app process is dead. See MediaButtonReceiver. -->
         <receiver
-            android:name=".playback.MediaButtonReceiver"
+            android:name=".logic.playback.MediaButtonReceiver"
             android:exported="true">
             <intent-filter android:priority="1000">
                 <action android:name="android.intent.action.MEDIA_BUTTON" />

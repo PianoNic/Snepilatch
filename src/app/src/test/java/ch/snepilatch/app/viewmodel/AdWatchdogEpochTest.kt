@@ -1,6 +1,6 @@
 package ch.snepilatch.app.viewmodel
 
-import ch.snepilatch.app.playback.SessionHolder
+import ch.snepilatch.app.logic.shared.SessionHolder
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.After
 import org.junit.Assert.assertFalse

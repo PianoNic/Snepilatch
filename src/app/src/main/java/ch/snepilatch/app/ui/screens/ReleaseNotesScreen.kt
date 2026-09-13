@@ -16,10 +16,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
-import ch.snepilatch.app.ui.components.MarkdownText
-import ch.snepilatch.app.ui.components.TightAlertDialog
+import ch.snepilatch.app.ui.shared.MarkdownText
+import ch.snepilatch.app.ui.shared.TightAlertDialog
 import ch.snepilatch.app.ui.theme.*
-import ch.snepilatch.app.util.UpdateService
+import ch.snepilatch.app.logic.shared.UpdateService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request

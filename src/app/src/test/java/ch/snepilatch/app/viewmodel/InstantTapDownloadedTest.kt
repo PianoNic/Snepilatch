@@ -1,8 +1,8 @@
 package ch.snepilatch.app.viewmodel
 
 import ch.snepilatch.app.data.TrackInfo
-import ch.snepilatch.app.playback.AudioSourceResolver
-import ch.snepilatch.app.playback.SessionHolder
+import ch.snepilatch.app.logic.playback.AudioSourceResolver
+import ch.snepilatch.app.logic.shared.SessionHolder
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
@@ -16,6 +16,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
+import ch.snepilatch.app.logic.shared.AppSettings
 
 /**
  * Tapping a track starts an optimistic play a full second before the Connect echo reaches

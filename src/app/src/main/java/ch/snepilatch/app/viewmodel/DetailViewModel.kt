@@ -2,8 +2,8 @@ package ch.snepilatch.app.viewmodel
 
 import androidx.lifecycle.viewModelScope
 import ch.snepilatch.app.data.*
-import ch.snepilatch.app.playback.SessionHolder
-import ch.snepilatch.app.util.LokiLogger
+import ch.snepilatch.app.logic.shared.SessionHolder
+import ch.snepilatch.app.logic.shared.LokiLogger
 import kotify.api.album.Album
 import kotify.api.artist.Artist
 import kotify.api.playlist.Playlist
@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import ch.snepilatch.app.logic.shared.Navigator
+import ch.snepilatch.app.logic.shared.SessionViewModel
 
 /**
  * ViewModel for the shared detail screen (playlist / album / artist / show).

@@ -21,10 +21,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
-import ch.snepilatch.app.download.DownloadFolder
-import ch.snepilatch.app.download.DownloadQueue
-import ch.snepilatch.app.download.Downloads
-import ch.snepilatch.app.ui.components.SpfyImage
+import ch.snepilatch.app.logic.download.DownloadFolder
+import ch.snepilatch.app.logic.download.DownloadQueue
+import ch.snepilatch.app.logic.download.Downloads
+import ch.snepilatch.app.ui.shared.SpfyImage
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 

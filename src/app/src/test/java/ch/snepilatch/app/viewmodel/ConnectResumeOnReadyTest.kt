@@ -1,7 +1,7 @@
 package ch.snepilatch.app.viewmodel
 
 import ch.snepilatch.app.data.TrackInfo
-import ch.snepilatch.app.playback.SessionHolder
+import ch.snepilatch.app.logic.shared.SessionHolder
 import io.mockk.mockk
 import kotify.api.playerconnect.PlayerConnect
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -11,6 +11,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import ch.snepilatch.app.logic.shared.AppSettings
 
 /**
  * A downloaded copy is ready within ~250ms of a tap, long before Connect has switched tracks. The

@@ -72,9 +72,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.R
-import ch.snepilatch.app.ui.components.OverflowAction
-import ch.snepilatch.app.ui.components.OverflowMenu
-import ch.snepilatch.app.ui.components.SpfyImage
+import ch.snepilatch.app.ui.shared.OverflowAction
+import ch.snepilatch.app.ui.shared.OverflowMenu
+import ch.snepilatch.app.ui.shared.SpfyImage
 import ch.snepilatch.app.ui.theme.SnepilatchBlack
 import ch.snepilatch.app.ui.theme.SnepilatchLightGray
 import ch.snepilatch.app.ui.theme.SnepilatchWhite

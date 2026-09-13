@@ -3,8 +3,8 @@ package ch.snepilatch.app.viewmodel
 import androidx.lifecycle.viewModelScope
 import ch.snepilatch.app.data.LibraryItem
 import ch.snepilatch.app.data.toUiLibraryList
-import ch.snepilatch.app.playback.SessionHolder
-import ch.snepilatch.app.util.LokiLogger
+import ch.snepilatch.app.logic.shared.SessionHolder
+import ch.snepilatch.app.logic.shared.LokiLogger
 import kotify.api.album.Album
 import kotify.api.artist.Artist
 import kotify.api.playlist.Playlist
@@ -13,6 +13,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import ch.snepilatch.app.logic.shared.SessionViewModel
 
 /**
  * ViewModel for the "Your Library" screen: the saved list + pagination, plus create/remove.

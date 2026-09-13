@@ -2,8 +2,8 @@ package ch.snepilatch.app.viewmodel
 
 import ch.snepilatch.app.data.PlaybackUiState
 import ch.snepilatch.app.data.TrackInfo
-import ch.snepilatch.app.playback.MusicPlaybackService
-import ch.snepilatch.app.playback.SessionHolder
+import ch.snepilatch.app.logic.playback.MusicPlaybackService
+import ch.snepilatch.app.logic.shared.SessionHolder
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject

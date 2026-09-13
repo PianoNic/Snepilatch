@@ -1,6 +1,6 @@
 package ch.snepilatch.app.viewmodel
 
-import ch.snepilatch.app.util.LokiLogger
+import ch.snepilatch.app.logic.shared.LokiLogger
 import kotify.api.song.SearchResult
 import kotify.api.song.SearchSuggestion
 import kotify.api.song.Song
@@ -8,6 +8,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import ch.snepilatch.app.logic.shared.SessionViewModel
 
 /**
  * ViewModel for the Spfy-style search screen.

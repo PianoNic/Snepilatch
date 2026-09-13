@@ -13,9 +13,9 @@ import kotify.api.podcast.PodcastEpisode
 import kotify.api.podcast.PodcastInfo
 import kotify.api.song.SearchTrack
 import kotify.api.song.TrackDetail
-import ch.snepilatch.app.data.LibraryItem as UiLibraryItem
 import kotify.api.playlist.Library as KLibrary
 import kotify.api.playlist.LibraryItem as KLibraryItem
+import ch.snepilatch.app.data.LibraryItem as UiLibraryItem
 
 /**
  * Spfy returns release dates in several shapes:
@@ -130,7 +130,7 @@ fun QueueTrack.toTrackInfo() = TrackInfo(
     uri = uri,
     name = name ?: "Unknown",
     artist = artistName ?: "Unknown",
-    albumArt = ch.snepilatch.app.util.normalizeSpfyImageUrl(imageUrl),
+    albumArt = ch.snepilatch.app.logic.shared.normalizeSpfyImageUrl(imageUrl),
     albumName = albumName,
     durationMs = durationMs,
     uid = uid,

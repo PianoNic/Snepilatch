@@ -1,0 +1,1569 @@
+package ch.snepilatch.app.logic.playback
+
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
+import coil.request.ImageRequest
+import android.media.audiofx.AudioEffect
+import android.net.ConnectivityManager
+import android.net.Network
+import android.os.Handler
+import android.os.Looper
+import android.support.v4.media.MediaBrowserCompat
+import android.support.v4.media.MediaMetadataCompat
+import android.support.v4.media.session.MediaSessionCompat
+import android.support.v4.media.session.PlaybackStateCompat
+import android.os.Bundle
+import androidx.annotation.OptIn
+import androidx.core.app.NotificationCompat
+import ch.snepilatch.app.BuildConfig
+import ch.snepilatch.app.R
+import ch.snepilatch.app.logic.shared.LokiLogger
+import ch.snepilatch.app.logic.shared.AppSettings
+import androidx.media.MediaBrowserServiceCompat
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.SeekParameters
+import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import ch.snepilatch.app.logic.shared.SessionHolder
+
+class MusicPlaybackService : MediaBrowserServiceCompat() {
+
+    companion object {
+        private const val TAG = "MusicService"
+        private const val CHANNEL_ID = "music_playback"
+
+        /**
+         * How much of a track must be captured to count as a whole one; the tail can be clipped by
+         * the decoder's last partial buffer, so an exact match never lands.
+         *
+         * This is NOT the same threshold as LISTENED_THROUGH_FRACTION in PlaybackViewModel (0.9),
+         * and the two must not be reconciled even though they look like they should agree. That one
+         * asks whether the user heard enough of a track to want it kept; this one asks whether
+         * enough of it exists to write out. Lowering this to match would hand the encoder a partial
+         * capture, putting files that stop early into the user's download folder — with nothing
+         * failing and nothing logged, because from the writer's side a short buffer looks finished.
+         */
+        private const val CAPTURE_COMPLETE_FRACTION = 0.99
+
+        // Separate high-importance channel for error alerts so they pop up (heads-up) instead of
+        // sitting silently like the ongoing playback notification.
+        private const val ALERT_CHANNEL_ID = "snepilatch_alerts"
+
+        private const val NOTIFICATION_ID = 1
+        private const val ALERT_NOTIFICATION_ID = 2
+        var instance: MusicPlaybackService? = null
+            private set
+
+        // True once onCreate has published `instance` (and false after teardown). Lets the Activity
+        // await genuine service readiness instead of guessing with a fixed delay before wiring controls.
+        val serviceReady: MutableStateFlow<Boolean> = MutableStateFlow(false)
+    }
+
+    private var mediaSession: MediaSessionCompat? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    /** Loopback proxy that decrypts Blowfish-encrypted Deezer streams on the fly. */
+    private val deezerProxy = DeezerDecryptProxy()
+    lateinit var player: ExoPlayer
+        private set
+
+    // Taps the decoded PCM in the audio pipeline — the foundation of the waveform-based seamless
+    // infiniPlay. Pass-through; only observes when analyzing is toggled on.
+    private val infiniPlayTap = InfiniPlayAudioTap()
+
+    // EQ headroom: attenuates the decoded PCM so an external EQ (Wavelet & co.) has room to boost into.
+    // Strictly after the tap — the tap must keep seeing the unmodified signal its beat matching needs.
+    private val gainProcessor = GainAudioProcessor()
+
+    // The remix filter: replaces the decoded stream with captured audio spliced at matched beats.
+    // Must sit after the tap and before the gain (see docs/eternal-infiniPlay.md).
+    private val remixProcessor = InfiniPlayRemixProcessor()
+
+    // In-app 10-band EQ on the audio session. Unlike the headroom above it computes its own input
+    // gain from the curve, so the two are never both needed — the UI disables one when the other is on.
+    private val equalizer = EqualizerController()
+    val equalizerSupported: Boolean get() = equalizer.supported
+
+    private data class TrackMetadata(
+        val title: String,
+        val artist: String,
+        val albumArtUrl: String?,
+        var art: Bitmap? = null
+    )
+
+    // The five notification transport PendingIntents never vary (fixed action + request code +
+    // FLAG_IMMUTABLE), so build them once instead of reconstructing all five on every notification
+    // refresh (which happens on every play/pause, position, and metadata update).
+    private fun broadcastIntent(action: String, requestCode: Int) = PendingIntent.getBroadcast(
+        this, requestCode, Intent(action), PendingIntent.FLAG_IMMUTABLE
+    )
+    private val prevIntent by lazy { broadcastIntent("ch.snepilatch.app.PREV", 0) }
+    private val playPauseIntent by lazy { broadcastIntent("ch.snepilatch.app.PLAY_PAUSE", 1) }
+    private val nextIntent by lazy { broadcastIntent("ch.snepilatch.app.NEXT", 2) }
+    private val leftIntent by lazy { broadcastIntent("ch.snepilatch.app.LEFT_ACTION", 3) }
+    private val rightIntent by lazy { broadcastIntent("ch.snepilatch.app.RIGHT_ACTION", 4) }
+
+    private val metadataQueue = mutableListOf<TrackMetadata>()
+    private var currentTitle = ""
+    private var currentArtist = ""
+    private var currentArt: Bitmap? = null
+    private var currentDurationMs: Long = 0L
+    private var idlePositionMs: Long = 0L
+
+    /**
+     * The album-art URL most recently requested by setIdleMetadata. Used to
+     * discard stale background loads when the track changes before art arrives.
+     */
+    private var idleArtUrl: String? = null
+    private var currentAudioSessionId: Int = 0
+    private var openAudioEffectSession = false
+
+    /** Whether startForeground has actually been accepted; see ensureForeground. */
+    private var isForeground = false
+
+    // Callbacks for forwarding controls to Spfy
+    var onPlay: (() -> Unit)? = null
+    var onPause: (() -> Unit)? = null
+    var onSkipNext: (() -> Unit)? = null
+    var onSkipPrevious: (() -> Unit)? = null
+    var onSeek: ((Long) -> Unit)? = null
+    var onTrackTransition: (() -> Unit)? = null
+    var onPlaybackError: ((String) -> Unit)? = null
+    var onPlaybackEnded: (() -> Unit)? = null
+    var onLikeToggle: (() -> Unit)? = null
+    var onShuffleToggle: (() -> Unit)? = null
+    var onRepeatToggle: (() -> Unit)? = null
+
+    /**
+     * Audio focus moved, so tell Spfy where we now stand — and nothing else.
+     *
+     * These are deliberately not [onPlay]/[onPause]: those are wired to a *toggle*, which decides
+     * from UI state rather than from the event, and which drives the local player. ExoPlayer already
+     * owns focus ([setAudioAttributes] with `handleAudioFocus = true`): it suppresses itself on a
+     * transient loss and resumes itself when focus returns. Re-issuing a local resume on top is what
+     * took focus straight back off whatever app had asked for it. All that is left for us is the
+     * report, because Spfy's cloud clock keeps advancing while our audio is muted.
+     */
+    var onAudioFocusPaused: (() -> Unit)? = null
+    var onAudioFocusResumed: (() -> Unit)? = null
+
+    // Notification custom button state
+    var isLiked: Boolean = false
+    var shuffleMode: String = "off"  // "off", "on", "smart"
+    var repeatMode: String = "off"  // "off", "context", "track"
+
+    // The server's toggling restrictions. A custom action cannot be disabled, so a disallowed
+    // button shows a dimmed glyph and its tap is dropped by the view model.
+    var canToggleShuffle: Boolean = true
+    var canToggleRepeat: Boolean = true
+
+    /** The glyph for a like, shuffle or repeat button, from the state above. */
+    private fun buttonIcon(type: String) = when (type) {
+        "like" -> if (isLiked) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline
+        "shuffle" -> when {
+            !canToggleShuffle -> R.drawable.ic_shuffle_disabled
+            shuffleMode == "smart" -> R.drawable.ic_shuffle_smart_on
+            shuffleMode == "on" -> R.drawable.ic_shuffle_on
+            else -> R.drawable.ic_shuffle_off
+        }
+        "repeat" -> when {
+            !canToggleRepeat -> R.drawable.ic_repeat_disabled
+            repeatMode == "track" -> R.drawable.ic_repeat_one
+            repeatMode == "context" -> R.drawable.ic_repeat_on
+            else -> R.drawable.ic_repeat_off
+        }
+        else -> R.drawable.ic_heart_outline
+    }
+
+    // True while the silent ad clip is skipping an ad: the media-session card keeps the previous
+    // track's metadata (no "Skipping ad…") and reports BUFFERING so the system notification shows a
+    // loading spinner, matching the in-app UI. Cleared when the next real track loads.
+    @Volatile private var isAdSkipping = false
+    // Which extra buttons to show: "like", "shuffle", "repeat"
+    var notificationLeftButton: String = "repeat"
+    var notificationRightButton: String = "like"
+
+    // Control-plane keep-awake. ExoPlayer's WAKE_MODE_NETWORK only holds a wake/Wi-Fi lock while the
+    // PLAYER needs the network (i.e. buffering); once a track is buffered it lets the radio sleep. But
+    // we are a Spfy Connect device — the dealer WebSocket and the end-of-track advance run OUTSIDE
+    // ExoPlayer and must stay responsive with the screen off, or the server-driven advance stalls
+    // until the phone is unlocked (Wi-Fi power-save was delaying the control messages). So we hold our
+    // OWN partial wake lock + a high-perf Wi-Fi lock for the whole time we're actively playing,
+    // independent of ExoPlayer's buffer state. Acquired on play, released on pause/stop.
+    private var wakeLock: android.os.PowerManager.WakeLock? = null
+    private var wifiLock: android.net.wifi.WifiManager.WifiLock? = null
+
+    /** Keep the CPU and Wi-Fi radio awake so the dealer socket + advance stay responsive with the screen off. */
+    private fun acquireControlPlaneLocks() {
+        try {
+            if (wakeLock == null) {
+                val pm = getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager
+                wakeLock = pm.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "snepilatch:playback")
+                    .apply { setReferenceCounted(false) }
+            }
+            if (wifiLock == null) {
+                val wm = applicationContext.getSystemService(android.content.Context.WIFI_SERVICE) as android.net.wifi.WifiManager
+                // WIFI_MODE_FULL (not HIGH_PERF): keep Wi-Fi associated so the dealer socket survives
+                // screen-off, but allow the radio to power-save between packets. HIGH_PERF disables
+                // power-save entirely, pinning the radio at full power for the whole playback session —
+                // wasteful heat/battery for a stream that buffers ahead and only gets a tiny dealer
+                // message every ~30s. The PARTIAL_WAKE_LOCK is what actually keeps the socket processing.
+                @Suppress("DEPRECATION")
+                wifiLock = wm.createWifiLock(android.net.wifi.WifiManager.WIFI_MODE_FULL, "snepilatch:wifi")
+                    .apply { setReferenceCounted(false) }
+            }
+            if (wakeLock?.isHeld != true) {
+                wakeLock?.acquire()
+                LokiLogger.i(TAG, "[KeepAwake] partial wake lock acquired")
+            }
+            if (wifiLock?.isHeld != true) {
+                wifiLock?.acquire()
+                LokiLogger.i(TAG, "[KeepAwake] wifi lock acquired")
+            }
+        } catch (e: Exception) {
+            LokiLogger.e(TAG, "[KeepAwake] failed to acquire locks", e)
+        }
+    }
+
+    /** Release the control-plane locks (on pause/stop) so we don't drain the battery when idle. */
+    private fun releaseControlPlaneLocks() {
+        try {
+            if (wifiLock?.isHeld == true) {
+                wifiLock?.release()
+                LokiLogger.i(TAG, "[KeepAwake] wifi lock released")
+            }
+            if (wakeLock?.isHeld == true) {
+                wakeLock?.release()
+                LokiLogger.i(TAG, "[KeepAwake] partial wake lock released")
+            }
+        } catch (e: Exception) {
+            LokiLogger.e(TAG, "[KeepAwake] failed to release locks", e)
+        }
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+
+        createNotificationChannel()
+        deezerProxy.start()
+        registerNetworkCallback()
+
+        val audioAttributes = AudioAttributes.Builder()
+            .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+            .setUsage(C.USAGE_MEDIA)
+            .build()
+
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                30_000,   // min buffer: 30s
+                120_000,  // max buffer: 2 min
+                1_500,    // playback start buffer: 1.5s
+                3_000     // rebuffer: 3s
+            )
+            // Retain up to 3 min of already-played audio. Costs no extra data (it just keeps what was
+            // downloaded) and lets the Eternal InfiniPlay's backward loop-jumps replay instantly instead
+            // of re-fetching from the CDN.
+            .setBackBuffer(180_000, true)
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
+
+        // Custom renderers factory so our PCM tap sits in the audio processor chain and can read the
+        // decoded waveform (for the seamless-infiniPlay engine). It passes audio through untouched.
+        val renderersFactory = object : DefaultRenderersFactory(this) {
+            // enableFloatOutput is deliberately ignored. It only does anything when the decoder
+            // already emits 32-bit float, so it is a no-op for the 16-bit AAC Spfy path and would
+            // apply only to high-bit-depth FLAC — where it would break two things: InfiniPlayAudioTap
+            // captures into a ShortArray, and GainAudioProcessor bypasses itself on any encoding
+            // other than PCM_16BIT, so the EQ headroom would silently stop working. Teach both
+            // ENCODING_PCM_FLOAT first if this is ever wanted.
+            override fun buildAudioSink(
+                context: android.content.Context,
+                enableFloatOutput: Boolean,
+                enableAudioTrackPlaybackParams: Boolean
+            ): AudioSink = DefaultAudioSink.Builder(context)
+                .setAudioProcessors(arrayOf(infiniPlayTap, remixProcessor, gainProcessor))
+                .build()
+        }
+
+        PlaybackCache.init(this)
+
+        player = ExoPlayer.Builder(this, renderersFactory)
+            .setAudioAttributes(audioAttributes, true)
+            .setHandleAudioBecomingNoisy(true)
+            .setLoadControl(loadControl)
+            // Let ExoPlayer manage a wake/Wi-Fi lock for its OWN network needs (buffering). Note this
+            // is scoped to the player — once a track is buffered ExoPlayer releases it and lets the
+            // radio sleep, which is why the dealer control plane needs its own lock (see
+            // acquire/releaseControlPlaneLocks). Requires the WAKE_LOCK permission.
+            .setWakeMode(C.WAKE_MODE_NETWORK)
+            .build()
+
+        player.addListener(object : Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                updateNotification()
+            }
+
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                LokiLogger.e(TAG, "Playback error: ${error.errorCodeName} - ${error.message}", error)
+                onPlaybackError?.invoke(error.errorCodeName ?: "unknown")
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                updateNotification()
+                if (playbackState == Player.STATE_ENDED) {
+                    LokiLogger.i(TAG, "Playback ended (STATE_ENDED)")
+                    onPlaybackEnded?.invoke()
+                }
+            }
+
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                // Pause/resume the remix engine with the session instead of tearing it down — a pause
+                // should hold the remix where it is, not drop out to the muted underlying track.
+                pauseInfiniPlay(!playWhenReady)
+
+                // Keep the control plane (dealer socket + advance) awake for the whole play session,
+                // not just while ExoPlayer is buffering. Released on pause/stop to spare the battery.
+                if (playWhenReady) acquireControlPlaneLocks() else releaseControlPlaneLocks()
+
+                // Follow Auxio convention: open/close audio effect session on play/pause
+                currentAudioSessionId = player.audioSessionId
+                // Re-insert the in-app EQ now that a track is actually running (see syncEqualizer).
+                if (playWhenReady) syncEqualizer()
+                if (playWhenReady) {
+                    if (!openAudioEffectSession) {
+                        LokiLogger.i(TAG, "Opening audio effect session (audioSessionId=$currentAudioSessionId)")
+                        broadcastAudioEffectAction(AudioEffect.ACTION_OPEN_AUDIO_EFFECT_CONTROL_SESSION)
+                        openAudioEffectSession = true
+                    }
+                } else if (openAudioEffectSession) {
+                    LokiLogger.i(TAG, "Closing audio effect session")
+                    broadcastAudioEffectAction(AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION)
+                    openAudioEffectSession = false
+                }
+
+                // Permanent focus loss (a call answered, another app taking over): ExoPlayer clears
+                // playWhenReady and will not come back on its own, which is correct. Report it.
+                val lostOutput = reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS ||
+                    reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY
+                if (!playWhenReady && lostOutput) {
+                    LokiLogger.i(TAG, "Focus lost or output disconnected — reporting pause to Spfy")
+                    onAudioFocusPaused?.invoke()
+                }
+            }
+
+            /**
+             * Transient focus loss and its return, reported to Spfy and nothing more.
+             *
+             * ExoPlayer handles the focus itself — it suppresses playback here and un-suppresses when
+             * focus comes back. The only thing it cannot know is that we are also a Spfy Connect
+             * device whose cloud clock keeps advancing while our audio is muted; left unreported the
+             * track "finishes" server-side and the next one auto-plays over whatever app took focus.
+             *
+             * So this reports and never commands. Driving the local player from here is what made the
+             * app un-shareable: resuming on focus return re-requested focus and took it straight back
+             * off the other app.
+             */
+            override fun onPlaybackSuppressionReasonChanged(playbackSuppressionReason: Int) {
+                if (playbackSuppressionReason == Player.PLAYBACK_SUPPRESSION_REASON_TRANSIENT_AUDIO_FOCUS_LOSS) {
+                    LokiLogger.i(TAG, "Transient focus loss — reporting pause to Spfy")
+                    onAudioFocusPaused?.invoke()
+                } else {
+                    LokiLogger.i(TAG, "Playback no longer suppressed — reporting play to Spfy")
+                    onAudioFocusResumed?.invoke()
+                }
+            }
+
+            /**
+             * A seek invalidates the decoded capture, so stand it down.
+             *
+             * The tap only ever appends what the decoder hands it, and nothing re-anchors it on a
+             * seek: jumping forward leaves a hole, jumping back records a stretch twice. The
+             * completeness check counts frames rather than mapping coverage, so a backward seek can
+             * even reach its threshold with audio audibly repeated — the one way this could write a
+             * wrong file rather than simply refuse. Hooked here rather than at each seekTo so no
+             * caller can miss it: the media session, both Connect sync paths and the infiniPlay jumps
+             * all land on this. The playback cache is byte-exact and unaffected, so a non-DRM track
+             * still saves from there; only Widevine, which has no cache, loses the ability to save
+             * this track — correctly, since what was recorded is not the track.
+             */
+            override fun onPositionDiscontinuity(
+                oldPosition: Player.PositionInfo,
+                newPosition: Player.PositionInfo,
+                reason: Int,
+            ) {
+                // capturedFrames guard: loading a track with a start position is not a seek, but if a
+                // device ever reported one it would arrive before anything was recorded.
+                if (reason == Player.DISCONTINUITY_REASON_SEEK &&
+                    captureUri != null &&
+                    infiniPlayTap.capturedFrames() > 0
+                ) {
+                    LokiLogger.i(TAG, "seek during capture, dropping it for $captureUri")
+                    stopCapture()
+                }
+            }
+
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                // A real track change (skip / auto-advance / new queue) — not our own repeat loop —
+                // means the infiniPlay's captured song is no longer what's playing: tear it down.
+                if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
+                    stopInfiniPlay()
+                    // Drop whatever the outgoing track left in the buffer. The capture is armed back
+                    // in resolveAndPlay, while the old song is still audible, so without this the
+                    // new track's recording would open with the tail of the previous one.
+                    if (infiniPlayTap.recording) infiniPlayTap.resetCapture()
+                }
+                if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && metadataQueue.size > 1) {
+                    // ExoPlayer auto-advanced to next track — swap metadata
+                    metadataQueue.removeAt(0)
+                    val next = metadataQueue.firstOrNull()
+                    if (next != null) {
+                        currentTitle = next.title
+                        currentArtist = next.artist
+                        currentArt = next.art
+                        updateNotification()
+                        LokiLogger.i(TAG, "Auto-transition to: ${next.title} by ${next.artist}")
+                    }
+                    onTrackTransition?.invoke()
+                }
+            }
+
+            override fun onAudioSessionIdChanged(audioSessionId: Int) {
+                LokiLogger.i(TAG, "Audio session ID changed: $currentAudioSessionId -> $audioSessionId, playWhenReady=${player.playWhenReady}, openSession=$openAudioEffectSession")
+                val oldId = currentAudioSessionId
+                currentAudioSessionId = audioSessionId
+                // Rebuild the in-app EQ on the new session and drop the old effect with it.
+                syncEqualizer()
+                if (audioSessionId != 0 && player.playWhenReady) {
+                    if (openAudioEffectSession && oldId != audioSessionId) {
+                        // Session changed mid-play, close old and open new
+                        broadcastAudioEffectAction(AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION)
+                    }
+                    broadcastAudioEffectAction(AudioEffect.ACTION_OPEN_AUDIO_EFFECT_CONTROL_SESSION)
+                    openAudioEffectSession = true
+                }
+            }
+        })
+
+        // MediaSession
+        val sessionIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            this, 0, sessionIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        mediaSession = MediaSessionCompat(this, "KotifyMedia").apply {
+            setSessionActivity(pendingIntent)
+            setCallback(object : MediaSessionCompat.Callback() {
+                override fun onPlay() {
+                    // Only tell Spfy — ExoPlayer will sync via onPlay callback
+                    onPlay?.invoke()
+                }
+
+                override fun onPause() {
+                    // Only tell Spfy — ExoPlayer will sync via onPause callback
+                    onPause?.invoke()
+                }
+
+                override fun onSkipToNext() {
+                    onSkipNext?.invoke()
+                }
+
+                override fun onSkipToPrevious() {
+                    onSkipPrevious?.invoke()
+                }
+
+                override fun onSeekTo(pos: Long) {
+                    // Tell Spfy, and also seek ExoPlayer immediately for responsiveness
+                    player.seekTo(pos)
+                    onSeek?.invoke(pos)
+                    updateNotification()
+                }
+
+                override fun onStop() {
+                    player.stop()
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                }
+
+                override fun onCustomAction(action: String?, extras: Bundle?) {
+                    val buttonType = when (action) {
+                        "LEFT_ACTION" -> notificationLeftButton
+                        "RIGHT_ACTION" -> notificationRightButton
+                        else -> return
+                    }
+                    when (buttonType) {
+                        "like" -> onLikeToggle?.invoke()
+                        "shuffle" -> onShuffleToggle?.invoke()
+                        "repeat" -> onRepeatToggle?.invoke()
+                    }
+                }
+            })
+            isActive = true
+        }
+
+        // Register session token with the system so Wavelet/other apps can discover it
+        sessionToken = mediaSession!!.sessionToken
+
+        instance = this
+        serviceReady.value = true
+
+        // Best effort. See ensureForeground: this is not allowed to throw here.
+        ensureForeground()
+        LokiLogger.i(TAG, "Service created with MediaBrowserServiceCompat")
+    }
+
+    /**
+     * Promote to a foreground service, tolerating a refusal.
+     *
+     * Android 12+ throws `ForegroundServiceStartNotAllowedException` when a service is
+     * created from the background, and a sticky restart after the process dies is
+     * exactly that. Throwing from `onCreate` took the process down, the system restarted
+     * the service, and it threw again: a crash loop where the launcher icon did nothing
+     * and the only way out was force-stopping the app.
+     *
+     * Playback can wait for a user action, which is when the promotion succeeds. A crash
+     * loop cannot recover on its own, so a refusal is logged and the service simply stays
+     * in the background.
+     */
+    private fun ensureForeground() {
+        if (isForeground) return
+        try {
+            startForeground(NOTIFICATION_ID, buildNotification())
+            isForeground = true
+        } catch (e: Exception) {
+            // Caught broadly on purpose: the specific exception is API 31+, and any
+            // failure here has the same correct response, which is to carry on.
+            LokiLogger.w(
+                TAG,
+                "startForeground refused (${e::class.simpleName}: ${e.message}); " +
+                    "staying in the background until playback starts"
+            )
+        }
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Not sticky. A restarted media service arrives with no intent and no media, so
+        // it cannot resume anything, and being recreated in the background is what put
+        // startForeground in an illegal position in the first place.
+        return START_NOT_STICKY
+    }
+
+    var onReady: (() -> Unit)? = null
+
+    /**
+     * Apply the EQ-headroom attenuation, before the media item is prepared so the level is right from
+     * the first frame. [trackLoudnessDb] is the track's measured loudness if we ever have one — nothing
+     * supplies it today (Spfy's manifest `gain_db` is always null and the FLAC path has no Spfy
+     * metadata), so every track takes the flat user-set attenuation.
+     */
+    fun applyHeadroomGain(trackLoudnessDb: Double? = null) {
+        // Only an external equalizer needs this: our own computes its input gain from the curve.
+        val gain = if (AppSettings.eqExternal) {
+            LoudnessNormalization.gainFor(trackLoudnessDb, AppSettings.eqHeadroomDb.value.toDouble())
+        } else {
+            1f
+        }
+        val branch = if (trackLoudnessDb != null) "loudness=${trackLoudnessDb}dB" else "flat"
+        LokiLogger.i(TAG, "Headroom gain=$gain ($branch, eqMode=${AppSettings.eqMode.value})")
+        gainProcessor.setGain(gain)
+    }
+
+    /**
+     * Bring the in-app EQ in line with the settings: attached to the current session when enabled,
+     * released when not. Called on every audio-session change (a stale effect on a dead session is a
+     * real leak), whenever the user flips the toggle, and again when playback starts.
+     *
+     * The last one matters: an effect created while the session has no running AudioTrack isn't
+     * necessarily inserted into AudioFlinger's chain — on this Samsung device it stayed silent until
+     * something re-committed the chain (a volume-key press would do it). Re-creating it once audio is
+     * actually running puts it in the live chain instead.
+     */
+    /**
+     * Debug-only switch that makes the EQ attach as a non-controlling client, to exercise the
+     * "another app owns the effect" path on demand:
+     * `adb shell touch /sdcard/Android/data/<pkg>/files/eq_low_priority`
+     */
+    private val lowPriorityDebug: Boolean
+        get() = BuildConfig.DEBUG && java.io.File(getExternalFilesDir(null), "eq_low_priority").exists()
+
+    fun syncEqualizer() {
+        equalizer.debugLowPriority = lowPriorityDebug
+        if (AppSettings.eqInApp) {
+            // Evict external effect apps first — see broadcastAudioEffectAction for why sharing fails.
+            if (openAudioEffectSession) {
+                broadcastAudioEffectAction(AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION)
+                openAudioEffectSession = false
+            }
+            equalizer.attach(currentAudioSessionId, AppSettings.eqBands.value)
+            // The effect refused to be created on a live session (some Samsung firmware does this).
+            // Drop to Off rather than leave the user with neither our EQ nor their external one: the
+            // else branch below then releases and re-advertises the session for external effect apps.
+            // Off rather than External, so nobody gets silent attenuation with no equalizer attached.
+            if (equalizer.supported && currentAudioSessionId != 0 && !equalizer.attached) {
+                LokiLogger.e(TAG, "EQ unavailable on this device — falling back to external effects")
+                AppSettings.setEqMode(AppSettings.EQ_OFF, this)
+            }
+        } else {
+            equalizer.release()
+            // Hand the session back to Wavelet & co.
+            if (player.playWhenReady && !openAudioEffectSession) {
+                broadcastAudioEffectAction(AudioEffect.ACTION_OPEN_AUDIO_EFFECT_CONTROL_SESSION)
+                openAudioEffectSession = true
+            }
+        }
+    }
+
+    /** Push a changed curve to the live effect (no-op when the EQ is off). */
+    fun setEqCurve(bands: FloatArray) {
+        if (!equalizer.applyCurve(bands)) {
+            LokiLogger.e(TAG, "EQ curve could not be applied — disabling in-app EQ")
+            AppSettings.setEqMode(AppSettings.EQ_OFF, this)
+        }
+    }
+
+    /**
+     * Loads a non-DRM stream. [cacheKey] is the track uri to keep the downloaded bytes under, so a
+     * track listened through can be saved without fetching it again; null for sources that must not
+     * be kept, since a local file is already on disk and Spfy CDN audio goes through playDrmUrl.
+     */
+    fun playUrl(
+        url: String,
+        title: String,
+        artist: String,
+        albumArtUrl: String?,
+        startPlaying: Boolean = true,
+        headers: Map<String, String> = emptyMap(),
+        startPositionMs: Long = 0L,
+        cacheKey: String? = null
+    ) {
+        LokiLogger.i(TAG, "Loading: $title by $artist -> ${url.take(80)} (play=$startPlaying, headers=${headers.keys}, pos=${startPositionMs}ms)")
+        isAdSkipping = false  // a real track is loading — end the ad-skip buffering state
+        applyHeadroomGain()
+        val meta = TrackMetadata(title, artist, albumArtUrl)
+        metadataQueue.clear()
+        metadataQueue.add(meta)
+        currentTitle = title
+        currentArtist = artist
+
+        // Start audio IMMEDIATELY — don't wait for art
+        mainHandler.post {
+            player.playWhenReady = false
+            // Default sources (squid direct URL, Spfy CDN) play from a plain
+            // MediaItem. Sources that gate their stream behind a request header
+            // (the anandserver Qobuz mirror) need those headers on the HTTP data
+            // source, so they go through a dedicated header-injecting MediaSource.
+            // Both accept a start position so resume-from-idle seeks on load.
+            if (headers.isEmpty() && cacheKey == null) {
+                player.setMediaItem(buildMediaItem(url), startPositionMs)
+            } else {
+                player.setMediaSource(buildHeaderedSource(url, headers, cacheKey), startPositionMs)
+            }
+
+            if (startPlaying) {
+                // Register listener BEFORE prepare() so we catch STATE_READY
+                player.addListener(object : Player.Listener {
+                    override fun onPlaybackStateChanged(playbackState: Int) {
+                        if (playbackState == Player.STATE_READY) {
+                            player.removeListener(this)
+                            player.playWhenReady = true
+                            updateNotification()
+                            LokiLogger.i(TAG, "Stream ready, playback started")
+                            onReady?.invoke()
+                        }
+                    }
+                })
+            }
+
+            player.prepare()
+            updateNotification()
+        }
+
+        // Load art in background, update notification when ready
+        serviceScope.launch {
+            val bitmap = albumArtUrl?.let { loadBitmap(it) }
+            meta.art = bitmap
+            currentArt = bitmap
+            mainHandler.post {
+                updateNotification()
+            }
+        }
+    }
+
+    /**
+     * Play the bundled silent clip while an ad is being skipped. This is the native equivalent of
+     * uBlock's 1s-silent-mp4 substitution: KotifyClient signals ads via `onAd` (no ad audio is ever
+     * fetched) and clocks them out in ~1s, advancing to the next real track on its own. Loading the
+     * silent clip here keeps the MediaSession/notification "playing" (no idle gap) and lets the UI
+     * show a "Skipping ad…" placeholder. The next real track's `setMediaItem` replaces this clip.
+     */
+    @OptIn(UnstableApi::class)
+    fun playSilentAd() {
+        LokiLogger.i(TAG, "Ad — playing local silent clip (skipping)")
+        // Keep the previous track's metadata frozen on the card (no "Skipping ad…"); the isAdSkipping
+        // flag makes updatePlaybackState report BUFFERING so the notification shows a loading spinner.
+        isAdSkipping = true
+        // Replaces media3's deprecated `rawresource://` builder. The package must be spelled out:
+        // an authority-less "android.resource:123" re-parses as opaque and loses its path.
+        val uri = android.net.Uri.Builder()
+            .scheme(android.content.ContentResolver.SCHEME_ANDROID_RESOURCE)
+            .authority(packageName)
+            .path(ch.snepilatch.app.R.raw.silent_ad.toString())
+            .build()
+        mainHandler.post {
+            val source = ProgressiveMediaSource.Factory(DefaultDataSource.Factory(this))
+                .createMediaSource(MediaItem.fromUri(uri))
+            player.setMediaSource(source)
+            player.playWhenReady = true
+            player.prepare()
+            updateNotification()
+        }
+    }
+
+    /**
+     * Whether ExoPlayer still holds something [syncPlay] could resume.
+     *
+     * Callers decide between resuming what is loaded and re-resolving the stream from scratch, and
+     * the answer is not the same as "the app thinks it is streaming" — the service can be reclaimed
+     * or the player released while paused, leaving that flag stale.
+     *
+     * Main thread only: ExoPlayer is confined to the thread that created it.
+     */
+    fun hasLoadedMedia(): Boolean = player.mediaItemCount > 0
+
+    fun syncPlay(positionMs: Long) {
+        mainHandler.post {
+            if (player.mediaItemCount > 0) {
+                player.seekTo(positionMs)
+                player.play()
+                updateNotification()
+            } else {
+                // Silence here was a resume that reported itself as succeeding while never asking for
+                // audio, which left nothing in the log to explain a play button that did nothing.
+                LokiLogger.w(TAG, "syncPlay ignored — ExoPlayer holds no media (caller should cold start)")
+            }
+        }
+    }
+
+    fun syncPause() {
+        mainHandler.post {
+            if (player.mediaItemCount > 0) {
+                player.pause()
+                updateNotification()
+            }
+        }
+    }
+
+    // While the Eternal InfiniPlay engine owns the speaker, the true "where are we" is its playhead
+    // (which jumps around), not ExoPlayer's linear muted clock. When set, it overrides the reported
+    // position so the UI scrubber and the Spfy Connect reports jump with the audio.
+    @Volatile private var infiniPlayPositionSource: (() -> Long)? = null
+    fun setInfiniPlayPositionSource(src: (() -> Long)?) { infiniPlayPositionSource = src }
+
+    // Registered by the infiniPlay controller so the service can tear the detached engine down on ANY real
+    // playback change — a skip, an auto-advance, the app being swiped away, or the service dying. Without
+    // this the engine's own AudioTrack keeps playing the old track after a skip / with the app gone.
+    @Volatile private var infiniPlayStopHook: (() -> Unit)? = null
+    fun setInfiniPlayStopHook(hook: (() -> Unit)?) { infiniPlayStopHook = hook }
+    private fun stopInfiniPlay() { infiniPlayStopHook?.invoke() }
+
+    // Pausing should PAUSE the remix (keep the engine, just stop its audio), not tear it down. The
+    // controller registers this; the service calls it when playback is paused/resumed.
+    @Volatile private var infiniPlayPauseHook: ((Boolean) -> Unit)? = null
+    fun setInfiniPlayPauseHook(hook: ((Boolean) -> Unit)?) { infiniPlayPauseHook = hook }
+    private fun pauseInfiniPlay(paused: Boolean) { infiniPlayPauseHook?.invoke(paused) }
+
+    // While remixing, the track no longer has a meaningful linear position/duration, and the system
+    // media notification's seekbar would otherwise fight the engine (and can trigger an auto-advance
+    // when it "reaches the end"). Blank the duration/position so no seekbar is shown.
+    @Volatile private var infiniPlayRemixing = false
+    fun setInfiniPlayRemixing(on: Boolean) {
+        infiniPlayRemixing = on
+        mainHandler.post {
+            updateMediaSessionMetadata()
+            updatePlaybackState()
+        }
+    }
+
+    fun getCurrentPosition(): Long = infiniPlayPositionSource?.invoke() ?: player.currentPosition
+    fun isPlaying(): Boolean = player.isPlaying
+
+    /** Whether the player was told to play, regardless of whether it is still buffering. */
+    fun playWhenReady(): Boolean = player.playWhenReady
+
+    fun syncSeek(positionMs: Long) {
+        mainHandler.post {
+            if (player.mediaItemCount > 0) {
+                player.seekTo(positionMs)
+                updateNotification()
+            }
+        }
+    }
+
+    /**
+     * Toggle infiniPlay seek behaviour. When on, seeks snap to the nearest audio sync frame
+     * ([SeekParameters.CLOSEST_SYNC]) instead of exact-seeking, which avoids re-decoding from a distant
+     * keyframe on every beat jump — far smoother, at the cost of a few ms of position accuracy that's
+     * inaudible for beat matching. Restores exact seeking when off.
+     */
+    fun setInfiniPlaySeekMode(enabled: Boolean) {
+        mainHandler.post {
+            player.setSeekParameters(if (enabled) SeekParameters.CLOSEST_SYNC else SeekParameters.DEFAULT)
+            if (!enabled && !engineOwnsOutput) player.volume = 1f // undo any in-flight jump fade
+        }
+    }
+
+    /** Turn the decoded-PCM waveform capture on/off; allocates the buffer on, frees the ~63MB on off. */
+    fun setInfiniPlayAnalyzing(enabled: Boolean) {
+        if (enabled) {
+            infiniPlayTap.resetCapture()
+            infiniPlayTap.analyzing = true
+        } else {
+            infiniPlayTap.analyzing = false
+            // Only free it if the capture isn't also being kept for saving.
+            if (!infiniPlayTap.recording) infiniPlayTap.releaseBuffer()
+        }
+    }
+
+    /**
+     * A decoded track held in memory, ready to be encoded and written out. [pcm] may be longer than
+     * the audio: only the first [count] samples are real.
+     */
+    class Capture(val pcm: ShortArray, val count: Int, val sampleRate: Int, val channels: Int)
+
+    @Volatile private var captureUri: String? = null
+
+    /**
+     * Keep the decoded PCM of [trackUri] as it plays, so saving it later needs no second fetch.
+     * Replaces any previous capture, so this is called on every track change while the setting is on.
+     *
+     * Refuses a track the buffer cannot hold. Recording costs a ~69MB ShortArray plus a memcpy of
+     * every decoded buffer on the audio thread, and [InfiniPlayAudioTap.capture] stops at the cap, so
+     * a longer track can never reach [CAPTURE_COMPLETE_FRACTION] — it would pay the whole cost to
+     * produce something [completeCapture] then refuses. Callers that hit this fall back to the
+     * playback cache, which has no length limit; only Widevine playback has nowhere else to go.
+     */
+    fun startCapture(trackUri: String, durationMs: Long) {
+        if (durationMs > InfiniPlayAudioTap.MAX_CAPTURE_MS) {
+            LokiLogger.i(
+                TAG,
+                "not capturing $trackUri: ${durationMs / 1000}s is past the " +
+                    "${InfiniPlayAudioTap.MAX_CAPTURE_MS / 1000}s the capture buffer holds"
+            )
+            stopCapture()
+            return
+        }
+        // Already recording this track: leave the buffer alone. resetCapture() zeroes the sample count,
+        // so re-arming mid-track (the user tapping the row that is already playing) would make a track
+        // that did play through look partial, and completeCapture would refuse to save it.
+        if (captureUri == trackUri && infiniPlayTap.recording) return
+        captureUri = trackUri
+        infiniPlayTap.recording = true
+        infiniPlayTap.resetCapture()
+    }
+
+    fun stopCapture() {
+        captureUri = null
+        infiniPlayTap.recording = false
+        if (!infiniPlayTap.analyzing) infiniPlayTap.releaseBuffer()
+    }
+
+    /**
+     * The decoded audio for [trackUri], or null when that isn't the track being captured or it hasn't
+     * played through. Whole track or nothing: writing a partial capture would produce a file that
+     * stops early, which is worse than falling back to a download.
+     */
+    fun captureOf(trackUri: String, durationMs: Long): Capture? {
+        val (rate, channels) = completeCapture(trackUri, durationMs) ?: return null
+        val pcm = infiniPlayTap.snapshotInterleaved()
+        return Capture(pcm, pcm.size, rate, channels)
+    }
+
+    /**
+     * Like [captureOf], but takes the buffer rather than copying it: the next track captures into a
+     * fresh one. For the track-change path, where the finished track is handed to the encoder at the
+     * same moment the capture is re-armed for the incoming one.
+     */
+    fun detachCapture(trackUri: String, durationMs: Long): Capture? {
+        val (rate, channels) = completeCapture(trackUri, durationMs) ?: return null
+        val (pcm, count) = infiniPlayTap.detach()
+        return Capture(pcm, count, rate, channels)
+    }
+
+    /** The capture's format, when [trackUri] is the captured track and it played through. */
+    private fun completeCapture(trackUri: String, durationMs: Long): Pair<Int, Int>? {
+        if (captureUri != trackUri || durationMs <= 0) return null
+        val rate = infiniPlayTap.sampleRate()
+        val channels = infiniPlayTap.channelCount()
+        if (rate <= 0 || channels <= 0) return null
+        val expected = durationMs.toDouble() * rate / 1000
+        if (infiniPlayTap.capturedFrames() < expected * CAPTURE_COMPLETE_FRACTION) return null
+        return rate to channels
+    }
+
+    fun infiniPlaySampleRate(): Int = infiniPlayTap.sampleRate()
+    fun infiniPlayChannels(): Int = infiniPlayTap.channelCount()
+    fun infiniPlayCapturedFrames(): Int = infiniPlayTap.capturedFrames()
+    fun infiniPlaySnapshotMono(): ShortArray = infiniPlayTap.snapshotMono()
+    fun infiniPlaySnapshotInterleaved(): ShortArray = infiniPlayTap.snapshotInterleaved()
+
+    /** Track duration in ms — MUST be called on the main thread. */
+    fun infiniPlayDurationMs(): Long = player.duration
+
+    fun infiniPlaySeekToStart() = mainHandler.post { if (player.mediaItemCount > 0) player.seekTo(0) }
+
+    /** Raw ExoPlayer position (NOT the infiniPlay override) — for the code-side loop guard. Main thread. */
+    fun infiniPlayRawPositionMs(): Long = player.currentPosition
+
+    /**
+     * Hand the speaker to the PCM infiniPlay engine while keeping ExoPlayer's clock alive: mute it and keep
+     * it playing so [getCurrentPosition]'s underlying clock keeps advancing. We do NOT enable repeat here
+     * — the controller loops the muted player in code (seek back near the end), since ExoPlayer's own
+     * repeat sometimes fails to loop and lets the track end.
+     */
+    /** Join/leave the audio chain for the session; call before the capture pass's seek (its flush applies it). */
+    fun setInfiniPlayRemixEngaged(on: Boolean) {
+        remixProcessor.engaged = on
+        if (!on) remixProcessor.setSnapshot(null)
+    }
+
+    /** Hand the audible stream to the remix (or back to normal playback with null). */
+    fun setInfiniPlayRemix(snap: InfiniPlayRemixProcessor.Snapshot?, startFrame: Int = -1) {
+        remixProcessor.setSnapshot(snap, startFrame)
+    }
+
+    /** Where the remix currently is, for the UI playhead. */
+    fun infiniPlayRemixPlayheadMs(): Long = remixProcessor.playheadMs()
+
+    /** Remix-map density, or null when the remix isn't running. */
+    fun infiniPlayRemixBuckets(nBuckets: Int, totalFrames: Int): IntArray? =
+        remixProcessor.jumpBuckets(nBuckets, totalFrames)
+
+    /** How often the remix has landed in each slice, for the remix-map heat. */
+    fun infiniPlayRemixVisits(nBuckets: Int, totalFrames: Int): IntArray? =
+        remixProcessor.visitBuckets(nBuckets, totalFrames)
+
+    fun infiniPlaySilentKeepAlive() = mainHandler.post {
+        engineOwnsOutput = true
+        player.volume = 0f
+        player.playWhenReady = true
+    }
+
+    /**
+     * True while the PCM engine owns the speaker. Every path that raises [ExoPlayer.volume] checks it,
+     * so a stray fade can never bring the muted keep-alive player back up underneath the remix.
+     */
+    @Volatile private var engineOwnsOutput = false
+
+    /** The attenuation normal playback is getting, so the remix can match it instead of blaring. */
+    fun infiniPlayOutputGain(): Float = gainProcessor.gain()
+
+    /** Undo [infiniPlaySilentKeepAlive]: unmute, keeping playback going. */
+    fun infiniPlayRestorePlayback() = mainHandler.post {
+        engineOwnsOutput = false
+        player.volume = 1f
+    }
+
+    /**
+     * Jump for the Eternal InfiniPlay: cut the volume, seek, then fade back in over ~145ms so the seek's
+     * unavoidable decoder-flush gap happens in silence and the new beat eases in — masking the seam a
+     * plain [seekTo] would expose. (A true gapless crossfade isn't possible here: the audio is
+     * Widevine-DRM'd, so we can't decode it to PCM and mix two streams.)
+     */
+    fun infiniPlayJump(positionMs: Long) {
+        mainHandler.post {
+            if (player.mediaItemCount == 0 || engineOwnsOutput) return@post
+            val restore = if (player.volume > 0.1f) player.volume else 1f
+            player.volume = 0f
+            player.seekTo(positionMs)
+            val steps = 8
+            for (i in 1..steps) {
+                mainHandler.postDelayed({ player.volume = restore * (i.toFloat() / steps) }, i * 18L)
+            }
+        }
+    }
+
+    fun stop() {
+        stopInfiniPlay()
+        metadataQueue.clear()
+        currentDurationMs = 0L
+        idlePositionMs = 0L
+        idleArtUrl = null
+        mainHandler.post {
+            player.stop()
+            player.clearMediaItems()
+        }
+    }
+
+    /**
+     * Refresh the media-session text for the CURRENTLY streaming item when its real name/artist
+     * arrive after [playUrl] (cold-start plays with placeholder "Unknown" names before the state
+     * machine resolves the track). Only ever upgrades to a real name — a blank or "Unknown" title is
+     * ignored so a later partial state can't downgrade a good title the notification already shows.
+     */
+    fun refreshStreamingMetadata(title: String, artist: String) {
+        if (player.mediaItemCount == 0) return
+        if (title.isBlank() || title == "Unknown") return
+        if (title == currentTitle && artist == currentArtist) return
+        currentTitle = title
+        currentArtist = artist
+        mainHandler.post {
+            updateNotification()
+        }
+    }
+
+    /**
+     * Push idle metadata to the notification + MediaSession without loading
+     * anything into ExoPlayer. Used right after init to surface whatever
+     * track Spfy Connect's cluster reports as "current", so the system
+     * media notification shows the correct song before the user has pressed
+     * play. Pressing play / next / pause from the notification then runs the
+     * normal cold-start protocol.
+     *
+     * Skipped if a track is already loaded (we don't want to overwrite live
+     * playback metadata).
+     */
+    fun setIdleMetadata(title: String, artist: String, albumArtUrl: String?, durationMs: Long, positionMs: Long) {
+        if (player.mediaItemCount > 0) return
+        currentTitle = title
+        currentArtist = artist
+        currentDurationMs = durationMs
+        idlePositionMs = positionMs
+        // Track the most recent idle art URL so we can ignore stale callbacks
+        // and only render the *current* track's art.
+        val expectedUrl = albumArtUrl
+        idleArtUrl = expectedUrl
+        if (expectedUrl == null) {
+            currentArt = null
+            mainHandler.post {
+                updateNotification()
+            }
+            return
+        }
+        // Update text + duration immediately; load art async and apply only if
+        // it's still the current idle URL when it returns.
+        mainHandler.post {
+            updateNotification()
+        }
+        serviceScope.launch {
+            val bitmap = loadBitmap(expectedUrl)
+            if (idleArtUrl == expectedUrl) {
+                currentArt = bitmap
+                mainHandler.post {
+                    updateNotification()
+                }
+            }
+        }
+    }
+
+    /** The next track's metadata, so the notification can name it before it starts. */
+    @OptIn(UnstableApi::class)
+    fun setNextMetadata(title: String, artist: String, albumArtUrl: String?) {
+        LokiLogger.i(TAG, "Next: $title by $artist")
+        val meta = TrackMetadata(title, artist, albumArtUrl)
+
+        // Keep only the current track's metadata, replace any queued next
+        while (metadataQueue.size > 1) {
+            metadataQueue.removeAt(metadataQueue.lastIndex)
+        }
+        metadataQueue.add(meta)
+
+        // Prefetch album art in background
+        serviceScope.launch {
+            meta.art = albumArtUrl?.let { loadBitmap(it) }
+        }
+
+        // Metadata only. Enqueuing the next track as a second media item let ExoPlayer perform the
+        // boundary itself, on the local file's clock — and only ever for a non-DRM next track, since a
+        // Widevine one needs its own license session and was never enqueued. Spfy then received an
+        // advance that did not line up with the track it believed was playing, refused it, and its
+        // state_conflict reply put us back on the previous track, forever (#636). The state machine
+        // owns the boundary; playPreResolved loads this url through the normal path when we get there.
+        mainHandler.post {
+            staleQueueStart(player.currentMediaItemIndex, player.mediaItemCount)?.let { from ->
+                player.removeMediaItems(from, player.mediaItemCount)
+            }
+        }
+    }
+
+    private fun buildMediaItem(url: String): MediaItem {
+        return MediaItem.Builder()
+            .setMediaId(url)
+            .setUri(url)
+            .build()
+    }
+
+    /**
+     * Play an encrypted Deezer stream. The bytes are Blowfish-encrypted, so we
+     * register them with the loopback [deezerProxy] and hand ExoPlayer the
+     * resulting cleartext localhost URL — no custom DataSource, no DRM config.
+     */
+    fun playDeezer(
+        streamUrl: String,
+        decryptionKey: String,
+        headers: Map<String, String>,
+        title: String,
+        artist: String,
+        albumArtUrl: String?,
+        startPositionMs: Long = 0L
+    ) {
+        val localUrl = deezerProxy.register(streamUrl, decryptionKey, headers)
+        playUrl(localUrl, title, artist, albumArtUrl, startPlaying = true, startPositionMs = startPositionMs)
+    }
+
+    /** Register an encrypted Deezer stream with the proxy; returns a playable local URL. */
+    fun proxyUrlForDeezer(streamUrl: String, decryptionKey: String, headers: Map<String, String>): String =
+        deezerProxy.register(streamUrl, decryptionKey, headers)
+
+    /**
+     * Progressive media source whose HTTP data source sends [headers] on every
+     * request. Used only for stream URLs that are gated behind a request header
+     * (the anandserver Qobuz mirror's X-API-Key) — the default [buildMediaItem]
+     * path is left untouched for header-less sources. Timeouts are generous
+     * because the relay can be slow to first byte.
+     */
+    @OptIn(UnstableApi::class)
+    private fun buildHeaderedSource(
+        url: String,
+        headers: Map<String, String>,
+        cacheKey: String? = null,
+    ): MediaSource {
+        val httpFactory = DefaultHttpDataSource.Factory()
+            .setDefaultRequestProperties(headers)
+            .setAllowCrossProtocolRedirects(true)
+            .setConnectTimeoutMs(30_000)
+            .setReadTimeoutMs(30_000)
+        // Keyed by track uri, not url: a googlevideo url is single-use, so caching against it would
+        // never hit twice and would keep a fresh copy per resolve.
+        val base = buildMediaItem(url)
+        val item = cacheKey?.let { base.buildUpon().setCustomCacheKey(it).build() } ?: base
+        val factory = cacheKey?.let { PlaybackCache.wrap(httpFactory) } ?: httpFactory
+        return ProgressiveMediaSource.Factory(factory).createMediaSource(item)
+    }
+
+    fun buildDrmMediaItem(url: String, licenseUrl: String, licenseHeaders: Map<String, String>): MediaItem {
+        return MediaItem.Builder()
+            .setMediaId(url)
+            .setUri(url)
+            .setDrmConfiguration(
+                MediaItem.DrmConfiguration.Builder(C.WIDEVINE_UUID)
+                    .setLicenseUri(licenseUrl)
+                    .setLicenseRequestHeaders(licenseHeaders)
+                    .build()
+            )
+            .build()
+    }
+
+    /**
+     * Progressive media source that injects a Widevine PSSH (base64 from Spfy's seektable) into
+     * the DRM session. Needed because many Spfy files are cenc-encrypted but embed no Widevine
+     * pssh box, so ExoPlayer's default in-file DRM throws MissingSchemeDataException and plays silent.
+     */
+    @OptIn(UnstableApi::class)
+    private fun buildPsshDrmSource(url: String, licenseUrl: String, licenseHeaders: Map<String, String>, psshBase64: String): MediaSource {
+        val callback = androidx.media3.exoplayer.drm.HttpMediaDrmCallback(licenseUrl, DefaultHttpDataSource.Factory())
+        licenseHeaders.forEach { (k, v) -> callback.setKeyRequestProperty(k, v) }
+        val base = androidx.media3.exoplayer.drm.DefaultDrmSessionManager.Builder()
+            .setUuidAndExoMediaDrmProvider(C.WIDEVINE_UUID, androidx.media3.exoplayer.drm.FrameworkMediaDrm.DEFAULT_PROVIDER)
+            .setMultiSession(true)
+            .build(callback)
+        val psshBytes = android.util.Base64.decode(psshBase64, android.util.Base64.DEFAULT)
+        val injecting = ch.snepilatch.app.logic.playback.engine.PsshInjectingDrmSessionManager(base, psshBytes)
+        return ProgressiveMediaSource.Factory(DefaultDataSource.Factory(this))
+            .setDrmSessionManagerProvider { injecting }
+            .createMediaSource(MediaItem.fromUri(url))
+    }
+
+    @OptIn(UnstableApi::class)
+    @Suppress("LongParameterList")
+    fun playDrmUrl(url: String, licenseUrl: String, licenseHeaders: Map<String, String>,
+                   title: String, artist: String, albumArtUrl: String?,
+                   startPlaying: Boolean = true,
+                   startPositionMs: Long = 0L,
+                   pssh: String? = null) {
+        LokiLogger.i(TAG, "Loading DRM: $title by $artist -> ${url.take(80)} (play=$startPlaying, pos=${startPositionMs}ms, pssh=${pssh != null})")
+        isAdSkipping = false  // a real track is loading — end the ad-skip buffering state
+        applyHeadroomGain()
+        val meta = TrackMetadata(title, artist, albumArtUrl)
+        metadataQueue.clear()
+        metadataQueue.add(meta)
+        currentTitle = title
+        currentArtist = artist
+
+        // Start audio IMMEDIATELY — don't wait for art
+        mainHandler.post {
+            // Seek-on-load: setMediaItem with a startPositionMs makes ExoPlayer prepare,
+            // seek, and reach STATE_READY at that exact position. No post-prepare seek
+            // dance — eliminates the race where the post-ready seek fails to actually
+            // produce audio (the bug in the cold-start sync).
+            if (pssh != null) {
+                player.setMediaSource(buildPsshDrmSource(url, licenseUrl, licenseHeaders, pssh), startPositionMs)
+            } else {
+                player.setMediaItem(buildDrmMediaItem(url, licenseUrl, licenseHeaders), startPositionMs)
+            }
+            player.playWhenReady = startPlaying
+            // Register listener BEFORE prepare() so we catch STATE_READY
+            player.addListener(object : Player.Listener {
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    if (playbackState == Player.STATE_READY) {
+                        player.removeListener(this)
+                        LokiLogger.i(TAG, "DRM stream ready (playWhenReady=$startPlaying, pos=${player.currentPosition}ms)")
+                        onReady?.invoke()
+                    }
+                }
+            })
+            player.prepare()
+            updateNotification()
+        }
+
+        // Load art in background
+        serviceScope.launch {
+            val bitmap = albumArtUrl?.let { loadBitmap(it) }
+            meta.art = bitmap
+            currentArt = bitmap
+            mainHandler.post {
+                updateNotification()
+            }
+        }
+    }
+
+    fun updateMetadata(title: String, artist: String, albumArtUrl: String?) {
+        currentTitle = title
+        currentArtist = artist
+        serviceScope.launch {
+            currentArt = albumArtUrl?.let { loadBitmap(it) }
+            mainHandler.post {
+                updateNotification()
+            }
+        }
+    }
+
+    private fun updateMediaSessionMetadata() {
+        // Prefer ExoPlayer's reported duration when a media item is loaded;
+        // fall back to currentDurationMs which is set by setIdleMetadata so
+        // the system shows the right duration before the song actually loads.
+        val duration = when {
+            infiniPlayRemixing -> 0L // no seekbar in remix mode
+            player.duration > 0 -> player.duration
+            currentDurationMs > 0 -> currentDurationMs
+            else -> 0L
+        }
+        val metadata = MediaMetadataCompat.Builder()
+            .putString(MediaMetadataCompat.METADATA_KEY_TITLE, currentTitle)
+            .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, currentArtist)
+            .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration)
+            .apply { currentArt?.let { putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, it) } }
+            .build()
+        mediaSession?.setMetadata(metadata)
+    }
+
+    private fun updatePlaybackState() {
+        val state = when {
+            // While skipping an ad the silent clip is technically "playing"; report BUFFERING so the
+            // system notification shows a loading spinner instead of a play/pause on a frozen track.
+            isAdSkipping -> PlaybackStateCompat.STATE_BUFFERING
+            player.isPlaying -> PlaybackStateCompat.STATE_PLAYING
+            player.playbackState == Player.STATE_BUFFERING -> PlaybackStateCompat.STATE_BUFFERING
+            player.playWhenReady -> PlaybackStateCompat.STATE_PAUSED
+            else -> PlaybackStateCompat.STATE_PAUSED
+        }
+        var actions = PlaybackStateCompat.ACTION_PLAY or
+            PlaybackStateCompat.ACTION_PAUSE or
+            PlaybackStateCompat.ACTION_PLAY_PAUSE or
+            PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
+            PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
+            PlaybackStateCompat.ACTION_STOP
+        if (!infiniPlayRemixing) actions = actions or PlaybackStateCompat.ACTION_SEEK_TO
+        // In remix mode report an unknown position so the notification shows no seekbar to auto-advance.
+        // With nothing loaded the player sits at 0, so the seekbar takes the idle position instead.
+        val reportedPos = when {
+            infiniPlayRemixing -> PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN
+            player.mediaItemCount == 0 -> idlePositionMs
+            else -> player.currentPosition
+        }
+        val builder = PlaybackStateCompat.Builder()
+            .setActions(actions)
+            .setState(state, reportedPos, 1f)
+
+        // Add custom actions for left and right buttons
+        fun addButtonAction(type: String, actionName: String) {
+            when (type) {
+                "like" -> builder.addCustomAction(actionName, if (isLiked) "Unlike" else "Like", buttonIcon(type))
+                "shuffle" -> builder.addCustomAction(actionName, "Shuffle", buttonIcon(type))
+                "repeat" -> builder.addCustomAction(actionName, "Repeat", buttonIcon(type))
+            }
+        }
+        addButtonAction(notificationLeftButton, "LEFT_ACTION")
+        addButtonAction(notificationRightButton, "RIGHT_ACTION")
+
+        mediaSession?.setPlaybackState(builder.build())
+    }
+
+    fun updateNotification() {
+        // If onCreate was refused, this is where the promotion finally lands: a
+        // notification update follows a real playback change, which is a user action.
+        ensureForeground()
+        updatePlaybackState()
+        updateMediaSessionMetadata()
+        val nm = getSystemService(NotificationManager::class.java)
+        nm.notify(NOTIFICATION_ID, buildNotification())
+    }
+
+    private fun buildNotification(): Notification {
+        val isPlaying = player.isPlaying
+
+        // Actions — prevIntent/playPauseIntent/nextIntent/leftIntent/rightIntent are cached fields.
+        val playPauseIcon = if (isPlaying) R.drawable.ic_pause_rounded else R.drawable.ic_play_arrow_rounded
+
+        fun buttonLabel(type: String) = when (type) {
+            "like" -> if (isLiked) "Unlike" else "Like"
+            "shuffle" -> "Shuffle"
+            "repeat" -> "Repeat"
+            else -> "Like"
+        }
+
+        val sessionToken = mediaSession?.sessionToken
+
+        // Layout: [left] [prev] [play/pause] [next] [right]
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(currentTitle.ifEmpty { "Snepilatch" })
+            .setContentText(currentArtist)
+            .setLargeIcon(currentArt)
+            .setOngoing(isPlaying)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .addAction(buttonIcon(notificationLeftButton), buttonLabel(notificationLeftButton), leftIntent)
+            .addAction(R.drawable.ic_skip_previous_rounded, "Previous", prevIntent)
+            .addAction(playPauseIcon, if (isPlaying) "Pause" else "Play", playPauseIntent)
+            .addAction(R.drawable.ic_skip_next_rounded, "Next", nextIntent)
+            .addAction(buttonIcon(notificationRightButton), buttonLabel(notificationRightButton), rightIntent)
+            .setStyle(
+                androidx.media.app.NotificationCompat.MediaStyle()
+                    .setMediaSession(sessionToken)
+                    .setShowActionsInCompactView(1, 2, 3)
+            )
+            .setContentIntent(mediaSession?.controller?.sessionActivity)
+            .build()
+    }
+
+    private fun createNotificationChannel() {
+        val nm = getSystemService(NotificationManager::class.java)
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            getString(R.string.notif_channel_playback),
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = getString(R.string.notif_channel_playback_desc)
+            setShowBadge(false)
+        }
+        nm.createNotificationChannel(channel)
+
+        // High-importance channel so error alerts surface as a heads-up pop-up.
+        val alertChannel = NotificationChannel(
+            ALERT_CHANNEL_ID,
+            getString(R.string.notif_channel_alerts),
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = getString(R.string.notif_channel_alerts_desc)
+        }
+        nm.createNotificationChannel(alertChannel)
+    }
+
+    /**
+     * Surface an error the user would otherwise miss (e.g. lost session): a heads-up notification
+     * that pops up over any app and opens Snepilatch when tapped, plus an error state on the media
+     * session so the now-playing bar / lockscreen / Android Auto reflect it too. Called from the
+     * ViewModel when [kotify.session.Session.onAuthLost] fires. Cleared by [clearError] on recovery.
+     */
+    fun showError(@androidx.annotation.StringRes titleRes: Int, @androidx.annotation.StringRes messageRes: Int) {
+        val title = getString(titleRes)
+        val message = getString(messageRes)
+        mainHandler.post {
+            val openApp = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            val tapIntent = PendingIntent.getActivity(
+                this, 1, openApp,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            val notification = NotificationCompat.Builder(this, ALERT_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(title)
+                .setContentText(message)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_ERROR)
+                .setAutoCancel(true)
+                .setContentIntent(tapIntent)
+                .build()
+            getSystemService(NotificationManager::class.java).notify(ALERT_NOTIFICATION_ID, notification)
+
+            // Reflect the error on the media surfaces (now-playing bar, lockscreen, Android Auto).
+            mediaSession?.setPlaybackState(
+                PlaybackStateCompat.Builder()
+                    .setState(PlaybackStateCompat.STATE_ERROR, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 0f)
+                    .setErrorMessage(PlaybackStateCompat.ERROR_CODE_AUTHENTICATION_EXPIRED, message)
+                    .build()
+            )
+        }
+    }
+
+    /** Dismiss the error alert and restore the normal media state once the session recovers. */
+    fun clearError() {
+        mainHandler.post {
+            getSystemService(NotificationManager::class.java).cancel(ALERT_NOTIFICATION_ID)
+            updatePlaybackState()
+        }
+    }
+
+    private suspend fun loadBitmap(url: String): Bitmap? {
+        // Spfy's cluster API returns art as `spotify:image:<id>` URIs.
+        // Rewrite to the i.scdn.co CDN URL before requesting.
+        val resolved = if (url.startsWith("spotify:image:")) {
+            "https://i.scdn.co/image/" + url.removePrefix("spotify:image:")
+        } else url
+        // Route through the shared Coil singleton the UI already populated: a repeated URL (idle->play,
+        // prefetch->skip) is a memory-cache hit with no re-fetch or re-decode, size(256) downsamples the
+        // ~1.6MB full-res decode to notification-icon scale, allowHardware(false) yields a software
+        // bitmap MediaMetadata requires, and Coil's OkHttp bounds the request (no indefinite IO hang).
+        return try {
+            val request = ImageRequest.Builder(this)
+                .data(resolved)
+                .size(256)
+                .allowHardware(false)
+                .build()
+            val result = coil.Coil.imageLoader(this).execute(request)
+            (result.drawable as? BitmapDrawable)?.bitmap
+        } catch (e: Exception) {
+            LokiLogger.e(TAG, "Failed to load art: $url", e)
+            null
+        }
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        // App swiped from recents — kill everything
+        stopInfiniPlay()
+        player.stop()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
+    private fun broadcastAudioEffectAction(action: String) {
+        if (currentAudioSessionId == 0) return
+        // While the in-app EQ owns the session, don't invite external effect apps into it. Measured on
+        // a Galaxy (Android 16): once Samsung's SoundAlive attaches after this broadcast, every
+        // DynamicsProcessing write on the same session fails with "invalid parameter operation" — and
+        // two EQs in one chain would double-process anyway. CLOSE always goes out, so they detach.
+        if (action == AudioEffect.ACTION_OPEN_AUDIO_EFFECT_CONTROL_SESSION && AppSettings.eqInApp) {
+            LokiLogger.i(TAG, "Not advertising session $currentAudioSessionId — in-app EQ owns it")
+            return
+        }
+        val pkg = packageName ?: "ch.snepilatch.app"
+        LokiLogger.i(TAG, "Broadcasting $action: pkg=$pkg, sessionId=$currentAudioSessionId")
+        sendBroadcast(
+            Intent(action)
+                .putExtra(AudioEffect.EXTRA_PACKAGE_NAME, pkg)
+                .putExtra(AudioEffect.EXTRA_AUDIO_SESSION, currentAudioSessionId)
+                .putExtra(AudioEffect.EXTRA_CONTENT_TYPE, AudioEffect.CONTENT_TYPE_MUSIC)
+        )
+    }
+
+    override fun onGetRoot(clientPackageName: String, clientUid: Int, rootHints: Bundle?): BrowserRoot? {
+        // Media browsing (Android Auto / Assistant / Wear) is intentionally disabled — deny all
+        // clients. The full browse implementation is archived on the `archive/android-auto` branch.
+        return null
+    }
+
+    override fun onLoadChildren(parentId: String, result: Result<MutableList<MediaBrowserCompat.MediaItem>>) {
+        result.sendResult(mutableListOf())
+    }
+
+    private var connectivityManager: ConnectivityManager? = null
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        private var hadNetwork = false
+        override fun onAvailable(network: Network) {
+            // A new default network arrived. If we already had one, this is a handover (Wi-Fi<->cell)
+            // that silently invalidates the dealer socket — reconnect now instead of waiting for the
+            // keep-alive liveness timeout to notice.
+            if (hadNetwork) {
+                LokiLogger.i(TAG, "Default network changed — reconnecting dealer")
+                SessionHolder.player?.onNetworkChanged()
+            }
+            hadNetwork = true
+        }
+    }
+
+    private fun registerNetworkCallback() {
+        val cm = getSystemService(ConnectivityManager::class.java) ?: return
+        connectivityManager = cm
+        try {
+            cm.registerDefaultNetworkCallback(networkCallback)
+        } catch (e: Exception) {
+            LokiLogger.e(TAG, "registerDefaultNetworkCallback failed", e)
+        }
+    }
+
+    private fun unregisterNetworkCallback() {
+        try {
+            connectivityManager?.unregisterNetworkCallback(networkCallback)
+        } catch (_: Exception) {}
+        connectivityManager = null
+    }
+
+    override fun onDestroy() {
+        stopInfiniPlay()
+        unregisterNetworkCallback()
+        releaseControlPlaneLocks()
+        equalizer.release()
+        if (openAudioEffectSession) {
+            broadcastAudioEffectAction(AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION)
+            openAudioEffectSession = false
+        }
+        mediaSession?.run {
+            isActive = false
+            release()
+        }
+        player.release()
+        deezerProxy.stop()
+        // Do NOT clear SessionHolder here — the VM and MainActivity already
+        // handle explicit user-close teardown. If the service is dying for
+        // other reasons (e.g. low memory) we want the session to stay live
+        // so the next launch can resume.
+        instance = null
+        serviceReady.value = false
+        super.onDestroy()
+    }
+}
+
+/**
+ * Index to start dropping stale queued items from, or null when nothing follows the current one.
+ *
+ * A fixed index of 1 looks right only while the current track is the first item. After ExoPlayer
+ * advances gaplessly the played item stays in the playlist and the current index moves past it, so
+ * trimming from 1 removes the track that is playing and playback ends on the spot (#492).
+ */
+internal fun staleQueueStart(currentIndex: Int, itemCount: Int): Int? =
+    (currentIndex + 1).takeIf { it < itemCount }

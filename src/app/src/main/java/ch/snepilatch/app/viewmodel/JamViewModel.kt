@@ -1,11 +1,12 @@
 package ch.snepilatch.app.viewmodel
 
-import ch.snepilatch.app.playback.SessionHolder
-import ch.snepilatch.app.util.LokiLogger
+import ch.snepilatch.app.logic.shared.SessionHolder
+import ch.snepilatch.app.logic.shared.LokiLogger
 import kotify.api.jam.Jam
 import kotify.api.jam.JamSession
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import ch.snepilatch.app.logic.shared.SessionViewModel
 
 class JamViewModel : SessionViewModel("JamVM") {
 

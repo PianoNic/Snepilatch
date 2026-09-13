@@ -1,6 +1,6 @@
 package ch.snepilatch.app.viewmodel
 
-import ch.snepilatch.app.playback.SessionHolder
+import ch.snepilatch.app.logic.shared.SessionHolder
 import io.mockk.mockk
 import org.junit.After
 import org.junit.Assert.assertSame

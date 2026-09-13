@@ -11,7 +11,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
-import ch.snepilatch.app.viewmodel.ThemeController
+import ch.snepilatch.app.logic.shared.ThemeController
 
 /**
  * The app paints itself dark everywhere, so the Material scheme is dark-only: no dynamic colour and

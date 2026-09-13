@@ -1,7 +1,7 @@
 package ch.snepilatch.app.viewmodel
 
-import ch.snepilatch.app.playback.SessionHolder
-import ch.snepilatch.app.playback.engine.SpfyCdnResolver
+import ch.snepilatch.app.logic.shared.SessionHolder
+import ch.snepilatch.app.logic.playback.engine.SpfyCdnResolver
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi

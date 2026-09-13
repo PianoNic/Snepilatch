@@ -343,6 +343,23 @@ fun libraryItemClick(item: LibraryItem, detailVm: DetailViewModel, vm: PlaybackV
     }
 }
 
+/** The placeholder drawn while a library item has no cover yet. */
+private fun libraryItemIcon(type: String) = when (type) {
+    "artist" -> Icons.Rounded.Person
+    "album" -> Icons.Rounded.Album
+    else -> Icons.AutoMirrored.Rounded.QueueMusic
+}
+
+/** "Playlist · owner" style second line of a library item. */
+private fun libraryItemSubtitle(item: LibraryItem) =
+    "${item.type.replaceFirstChar { it.uppercase() }}${if (item.owner != null) " \u00B7 ${item.owner}" else ""}"
+
+/** The remove confirmation a long press opens: for a downloaded group the download one, else the library one. */
+@Composable
+private fun LibraryRemoveDialogs(item: LibraryItem, downloadedGroup: Boolean, onDismiss: () -> Unit) {
+    if (downloadedGroup) DownloadRemoveDialog(item, onDismiss = onDismiss) else LibraryRemoveDialog(item, onDismiss = onDismiss)
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LibraryGridCard(item: LibraryItem, downloadedGroup: Boolean = false) {
@@ -351,13 +368,7 @@ fun LibraryGridCard(item: LibraryItem, downloadedGroup: Boolean = false) {
     val isArtist = item.type == "artist"
     val removable = item.type != "collection"
     var showRemove by remember { mutableStateOf(false) }
-    if (showRemove && removable) {
-        if (downloadedGroup) {
-            DownloadRemoveDialog(item, onDismiss = { showRemove = false })
-        } else {
-            LibraryRemoveDialog(item, onDismiss = { showRemove = false })
-        }
-    }
+    if (showRemove && removable) LibraryRemoveDialogs(item, downloadedGroup, onDismiss = { showRemove = false })
     Column(
         Modifier
             .fillMaxWidth()
@@ -378,18 +389,14 @@ fun LibraryGridCard(item: LibraryItem, downloadedGroup: Boolean = false) {
                 url = item.imageUrl,
                 modifier = Modifier.fillMaxWidth().aspectRatio(1f),
                 shape = if (isArtist) CircleShape else RoundedCornerShape(8.dp),
-                icon = when (item.type) {
-                    "artist" -> Icons.Rounded.Person
-                    "album" -> Icons.Rounded.Album
-                    else -> Icons.AutoMirrored.Rounded.QueueMusic
-                }
+                icon = libraryItemIcon(item.type)
             )
         }
         Spacer(Modifier.height(8.dp))
         Text(item.name, color = SnepilatchWhite, fontSize = 14.sp, fontWeight = FontWeight.Medium,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(
-            "${item.type.replaceFirstChar { it.uppercase() }}${if (item.owner != null) " \u00B7 ${item.owner}" else ""}",
+            libraryItemSubtitle(item),
             color = SnepilatchLightGray, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
         )
     }
@@ -403,13 +410,7 @@ fun LibraryListItem(item: LibraryItem, downloadedGroup: Boolean = false) {
     val isArtist = item.type == "artist"
     val removable = item.type != "collection"
     var showRemove by remember { mutableStateOf(false) }
-    if (showRemove && removable) {
-        if (downloadedGroup) {
-            DownloadRemoveDialog(item, onDismiss = { showRemove = false })
-        } else {
-            LibraryRemoveDialog(item, onDismiss = { showRemove = false })
-        }
-    }
+    if (showRemove && removable) LibraryRemoveDialogs(item, downloadedGroup, onDismiss = { showRemove = false })
     Row(
         Modifier
             .fillMaxWidth()
@@ -432,11 +433,7 @@ fun LibraryListItem(item: LibraryItem, downloadedGroup: Boolean = false) {
                 url = item.imageUrl,
                 modifier = Modifier.size(56.dp),
                 shape = if (isArtist) CircleShape else RoundedCornerShape(4.dp),
-                icon = when (item.type) {
-                    "artist" -> Icons.Rounded.Person
-                    "album" -> Icons.Rounded.Album
-                    else -> Icons.AutoMirrored.Rounded.QueueMusic
-                }
+                icon = libraryItemIcon(item.type)
             )
         }
         Spacer(Modifier.width(12.dp))
@@ -444,7 +441,7 @@ fun LibraryListItem(item: LibraryItem, downloadedGroup: Boolean = false) {
             Text(item.name, color = SnepilatchWhite, fontSize = 16.sp, fontWeight = FontWeight.Medium,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                "${item.type.replaceFirstChar { it.uppercase() }}${if (item.owner != null) " \u00B7 ${item.owner}" else ""}",
+                libraryItemSubtitle(item),
                 color = SnepilatchLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
             )
         }

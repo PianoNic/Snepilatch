@@ -530,7 +530,11 @@ class PlaybackViewModel : ViewModel() {
         }
 
         tearDownSession()
-        LokiLogger.i(TAG, "Session language: ${AppSettings.effectiveLanguage()} (setting=${AppSettings.appLanguage.value}, device=${java.util.Locale.getDefault()})")
+        LokiLogger.i(
+            TAG,
+            "Session language: ${AppSettings.effectiveLanguage()} " +
+                "(setting=${AppSettings.appLanguage.value}, device=${java.util.Locale.getDefault()})",
+        )
         initJob = initScope.launch {
             try {
                 val sess = Session(SessionConfig(

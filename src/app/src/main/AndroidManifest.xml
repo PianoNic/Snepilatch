@@ -67,6 +67,21 @@
                     android:host="open.spotify.com"
                     android:pathPrefix="/socialsession" />
             </intent-filter>
+
+            <!-- The share sheet's short links (and the jam invite QR code); expanded in the app. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:scheme="https"
+                    android:host="spotify.link" />
+                <data
+                    android:scheme="https"
+                    android:host="spotify.app.link" />
+            </intent-filter>
         </activity>
 
         <service

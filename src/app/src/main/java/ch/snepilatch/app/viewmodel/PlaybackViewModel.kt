@@ -29,6 +29,7 @@ import ch.snepilatch.app.logic.playback.engine.SpfyCdnResolver
 import ch.snepilatch.app.logic.playback.engine.SpfyStream
 import ch.snepilatch.app.data.*
 import kotify.api.artist.Artist
+import kotify.api.common.ShortLink
 import kotify.api.playerconnect.NoActiveDeviceException
 import kotify.api.playerconnect.PlayerConnect
 import kotify.api.playlist.Playlist
@@ -1023,9 +1024,21 @@ class PlaybackViewModel : ViewModel() {
 
     /**
      * Handle a deep link URI from open.spotify.com.
-     * Supported paths: /track/{id}, /album/{id}, /playlist/{id}, /artist/{id}
+     * Supported paths: /track/{id}, /album/{id}, /playlist/{id}, /artist/{id}, /socialsession/{token}.
+     * A spotify.link short link is expanded first and then handled like the long one.
      */
     fun handleDeepLink(uri: android.net.Uri) {
+        if (ShortLink.isShortLink(uri.toString())) {
+            launchWithSession("expandShortLink") { sess ->
+                val long = ShortLink.expand(sess, uri.toString())
+                if (long == null) {
+                    LokiLogger.w(TAG, "Short link did not resolve: $uri")
+                    return@launchWithSession
+                }
+                withContext(Dispatchers.Main) { handleDeepLink(android.net.Uri.parse(long)) }
+            }
+            return
+        }
         val segments = uri.pathSegments ?: return
         if (segments.size < 2) return
         val type = segments[0]

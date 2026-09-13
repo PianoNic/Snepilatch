@@ -5,6 +5,7 @@ import ch.snepilatch.app.logic.shared.JamHolder
 import ch.snepilatch.app.logic.shared.LokiLogger
 import ch.snepilatch.app.logic.shared.SessionHolder
 import ch.snepilatch.app.logic.shared.SessionViewModel
+import kotify.api.common.ShortLink
 import kotify.api.jam.Jam
 import kotify.api.jam.JamSession
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,12 +48,15 @@ class JamViewModel : SessionViewModel("JamVM") {
         error.value = null
         launchWithSessionLoading("joinJam", joining) { sess ->
             val api = Jam(sess)
-            val joined = api.joinFromLink(token)
+            // A pasted or scanned spotify.link short link stands for the long one; the share
+            // token has to come from the long one.
+            val link = ShortLink.expand(sess, token)
+            val joined = link?.let { api.joinFromLink(it) }
             if (joined == null) {
                 error.value = "failed"
                 LokiLogger.w(logTag, "Jam join failed for $token")
             } else {
-                JamHolder.shareToken.value = api.shareTokenOf(token)
+                JamHolder.shareToken.value = api.shareTokenOf(link)
                 JamHolder.session.value = joined
                 LokiLogger.i(logTag, "Joined jam ${joined.sessionId} (${joined.members.size} members)")
             }

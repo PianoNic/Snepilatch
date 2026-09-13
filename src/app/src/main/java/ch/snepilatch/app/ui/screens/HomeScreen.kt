@@ -174,15 +174,7 @@ fun QuickPickGrid(items: List<kotify.api.home.HomeSectionItem>, vm: PlaybackView
                             .weight(1f)
                             .height(48.dp)
                             .clickable {
-                                val id = item.uri.split(":").lastOrNull() ?: return@clickable
-                                when (item.type) {
-                                    "collection" -> detailVm.openLikedSongs()
-                                    "playlist" -> detailVm.openPlaylist(id)
-                                    "album" -> detailVm.openAlbum(id)
-                                    "artist" -> detailVm.openArtist(id)
-                                    "show" -> detailVm.openShow(id, item.owner, item.imageUrl)
-                                    else -> vm.playTrack(item.uri)
-                                }
+                                if (!detailVm.openEntity(item.type, item.uri, item.owner, item.imageUrl)) vm.playTrack(item.uri)
                             },
                         shape = RoundedCornerShape(6.dp),
                         colors = CardDefaults.cardColors(containerColor = SnepilatchGray)
@@ -291,14 +283,7 @@ fun HomeSingleCard(item: kotify.api.home.HomeSectionItem, vm: PlaybackViewModel)
     val detailVm: DetailViewModel = viewModel()
     val (base, glow, counterGlow) = homeCardColors(item)
     val open = {
-        val id = item.uri.substringAfterLast(":")
-        when (item.type) {
-            "collection" -> detailVm.openLikedSongs()
-            "album" -> detailVm.openAlbum(id)
-            "artist" -> detailVm.openArtist(id)
-            "show" -> detailVm.openShow(id, item.owner, item.imageUrl)
-            else -> detailVm.openPlaylist(id)
-        }
+        if (!detailVm.openEntity(item.type, item.uri, item.owner, item.imageUrl)) detailVm.openPlaylist(item.uri.substringAfterLast(":"))
     }
     Card(
         modifier = Modifier
@@ -531,15 +516,7 @@ fun HomeSectionCard(item: kotify.api.home.HomeSectionItem, vm: PlaybackViewModel
         modifier
             .width(140.dp)
             .clickable {
-                val id = item.uri.split(":").lastOrNull() ?: return@clickable
-                when (item.type) {
-                    "collection" -> detailVm.openLikedSongs()
-                    "playlist" -> detailVm.openPlaylist(id)
-                    "album" -> detailVm.openAlbum(id)
-                    "artist" -> detailVm.openArtist(id)
-                    "show" -> detailVm.openShow(id, item.owner, item.imageUrl)
-                    else -> vm.playTrack(item.uri)
-                }
+                if (!detailVm.openEntity(item.type, item.uri, item.owner, item.imageUrl)) vm.playTrack(item.uri)
             },
         horizontalAlignment = if (isArtist) Alignment.CenterHorizontally else Alignment.Start
     ) {

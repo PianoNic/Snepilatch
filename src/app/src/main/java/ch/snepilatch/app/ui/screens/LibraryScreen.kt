@@ -334,31 +334,12 @@ fun LibraryScreen() {
 }
 
 fun libraryItemClick(item: LibraryItem, detailVm: DetailViewModel, vm: PlaybackViewModel? = null) {
-    when (item.type) {
+    if (item.type == "single") {
         // A one-off download has no album or playlist to open, so it is the track itself: play it.
-        "single" -> {
-            val row = Downloads.find(item.uri) ?: return
-            vm?.playTrack(
-                TrackInfo(uri = item.uri, name = row.title, artist = row.artist, albumArt = row.coverUrl)
-            )
-        }
-        "collection" -> detailVm.openLikedSongs()
-        "playlist" -> {
-            val id = item.uri.split(":").lastOrNull() ?: return
-            detailVm.openPlaylist(id)
-        }
-        "album" -> {
-            val id = item.uri.split(":").lastOrNull() ?: return
-            detailVm.openAlbum(id)
-        }
-        "artist" -> {
-            val id = item.uri.split(":").lastOrNull() ?: return
-            detailVm.openArtist(id)
-        }
-        "show" -> {
-            val id = item.uri.split(":").lastOrNull() ?: return
-            detailVm.openShow(id, item.owner, item.imageUrl)
-        }
+        val row = Downloads.find(item.uri) ?: return
+        vm?.playTrack(TrackInfo(uri = item.uri, name = row.title, artist = row.artist, albumArt = row.coverUrl))
+    } else {
+        detailVm.openEntity(item.type, item.uri, item.owner, item.imageUrl)
     }
 }
 

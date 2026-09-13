@@ -148,6 +148,23 @@ class DetailViewModel : SessionViewModel("DetailVM") {
         }
     }
 
+    /**
+     * Opens the page of an item of [type] (collection, playlist, album, artist, show) identified by
+     * [uri]. False when the type has no page, so the caller decides what to do with it instead.
+     */
+    fun openEntity(type: String, uri: String, owner: String? = null, imageUrl: String? = null): Boolean {
+        val id = uri.substringAfterLast(':')
+        when (type) {
+            "collection" -> openLikedSongs()
+            "playlist" -> openPlaylist(id)
+            "album" -> openAlbum(id)
+            "artist" -> openArtist(id)
+            "show" -> openShow(id, owner, imageUrl)
+            else -> return false
+        }
+        return true
+    }
+
     fun openAlbumForTrack(trackUri: String) {
         launchWithSession("openAlbumForTrack") { sess ->
             val trackId = trackUri.removePrefix("spotify:track:")

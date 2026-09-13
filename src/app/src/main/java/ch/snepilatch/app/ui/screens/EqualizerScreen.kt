@@ -32,6 +32,7 @@ import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import ch.snepilatch.app.logic.shared.ThemeController
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import ch.snepilatch.app.ui.shared.SettingToggleRow
 
 private val MAX_DB = EqualizerHeadroom.MAX_GAIN_DB
 private const val GRID_STEP_DB = 6f
@@ -102,25 +103,13 @@ private fun EqualizerHeader(
     onEnabledChange: (Boolean) -> Unit,
     onFlat: () -> Unit
 ) {
-    ListItem(
-        headlineContent = { Text(stringResource(R.string.eq_in_app), color = SnepilatchWhite) },
-        supportingContent = { Text(stringResource(R.string.eq_in_app_desc), color = SnepilatchLightGray) },
-        trailingContent = {
-            // Tint from the album palette like every other toggle; the Material default is the
-            // template's purple, which is what made this one stand out.
-            Switch(
-                checked = enabled,
-                enabled = supported,
-                onCheckedChange = onEnabledChange,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = accent,
-                    checkedTrackColor = accent.copy(alpha = 0.5f),
-                    uncheckedThumbColor = SnepilatchLightGray,
-                    uncheckedTrackColor = SnepilatchLightGray.copy(alpha = 0.3f)
-                )
-            )
-        },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+    SettingToggleRow(
+        title = stringResource(R.string.eq_in_app),
+        checked = enabled,
+        onCheckedChange = onEnabledChange,
+        accent = accent,
+        subtitle = stringResource(R.string.eq_in_app_desc),
+        enabled = supported,
     )
 
     Row(

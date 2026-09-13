@@ -369,7 +369,6 @@
     <string name="jam_link_placeholder">Ссылка на джем</string>
     <string name="jam_join_failed">Не удалось присоединиться. Ссылка могла устареть.</string>
     <string name="jam_not_ready">Ещё подключаемся. Попробуйте через момент.</string>
-    <string name="jam_members">Участников: %1$d</string>
     <string name="join_jam">Присоединиться к джему</string>
     <string name="jam_connected">Подключено к джему</string>
     <string name="jam_of">Джем %1$s</string>

@@ -3,10 +3,10 @@ package ch.snepilatch.app.ui.shared
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -43,6 +46,8 @@ fun JamBanner(jam: JamSession, onClick: () -> Unit, modifier: Modifier = Modifie
     val accent by animateColorAsState(theme.primary, tween(800), label = "jamBanner")
     Row(
         modifier
+            // Sits half way into the mini player's top padding, so the two read as one stack.
+            .offset(y = 3.dp)
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
             .shadow(8.dp, RoundedCornerShape(12.dp), ambientColor = accent, spotColor = accent)
@@ -77,22 +82,42 @@ fun jamTitle(jam: JamSession): String {
  * [ring], the colour behind the avatars, so each one looks cut out over the one below it.
  */
 @Composable
-fun JamAvatars(members: List<JamMember>, size: Dp, ring: Color, modifier: Modifier = Modifier) {
+fun JamAvatars(members: List<JamMember>, size: Dp, ring: Color, modifier: Modifier = Modifier, onInvite: (() -> Unit)? = null) {
     val shown = members.take(3)
     val more = members.size - shown.size
     val step = size * 0.7f
+    val cells = shown.size + if (onInvite != null) 1 else 0
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.width(size + step * (shown.size - 1).coerceAtLeast(0))) {
-            shown.forEachIndexed { index, member ->
-                SpfyImage(
-                    url = member.imageUrl,
-                    modifier = Modifier
+        Box(Modifier.width(size + step * (cells - 1).coerceAtLeast(0))) {
+            // The invite button is the first cell of the stack, cut by the avatar after it like any other.
+            if (onInvite != null) {
+                Box(
+                    Modifier
+                        .size(size)
+                        .background(ring, CircleShape)
+                        .padding(2.dp)
+                        .clip(CircleShape)
+                        .background(SnepilatchWhite.copy(alpha = 0.18f))
+                        .clickable(onClick = onInvite),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Rounded.Add, stringResource(R.string.jam_invite), tint = SnepilatchWhite, modifier = Modifier.size(size * 0.55f))
+                }
+            }
+            val first = if (onInvite != null) 1 else 0
+            shown.forEachIndexed { i, member ->
+                val index = first + i
+                // The ring is the container colour behind the avatar, so nothing is drawn over the picture.
+                Box(
+                    Modifier
                         .offset(x = step * index)
                         .zIndex(index.toFloat())
                         .size(size)
-                        .border(2.dp, ring, CircleShape),
-                    shape = CircleShape
-                )
+                        .background(ring, CircleShape)
+                        .padding(2.dp)
+                ) {
+                    SpfyImage(url = member.imageUrl, modifier = Modifier.fillMaxSize(), shape = CircleShape)
+                }
             }
         }
         if (more > 0) {

@@ -7,6 +7,7 @@ import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -99,7 +100,7 @@ internal fun SyncedLyricsView(lyrics: LyricsData, smoothPosition: State<Long>, i
     }
     val userScrolling = rememberUserScrollLockout(listState)
     val density = LocalDensity.current
-    val anchor = remember(fontSize, density) {
+    val anchor = remember(items, fontSize, density) {
         with(density) {
             ScrollAnchor(
                 abovePx = LyricsStyle.SCROLL_ABOVE_CENTER_PX.dp.toPx(),
@@ -181,15 +182,26 @@ private fun rememberUserScrollLockout(listState: LazyListState): State<Boolean> 
     return locked
 }
 
-/** Puts the active row a little above the middle of the viewport, then corrects once its real height is known. */
+/**
+ * Puts the active row a little above the middle of the viewport, then corrects once its real
+ * height is known. The first scroll (the lyrics just opened, or a new track's arrived) and any
+ * jump of more than [JUMP_LINES] rows (a seek) are instant, the way the web player does it; only
+ * ordinary progression glides (#812).
+ */
 private class ScrollAnchor(private val abovePx: Float, private val estimatedItemPx: Float) {
 
+    private var lastIndex: Int? = null
+
     suspend fun scrollTo(listState: LazyListState, index: Int) {
-        listState.animateScrollToItem(index, -targetTop(listState, index).roundToInt())
-        val info = listState.layoutInfo
-        val item = info.visibleItemsInfo.firstOrNull { it.index == index } ?: return
+        snapshotFlow { listState.layoutInfo.viewportEndOffset - listState.layoutInfo.viewportStartOffset }.first { it > 0 }
+        val jump = lastIndex?.let { abs(index - it) > JUMP_LINES } ?: true
+        lastIndex = index
+        val offset = -targetTop(listState, index).roundToInt()
+        if (jump) listState.scrollToItem(index, offset) else listState.animateScrollToItem(index, offset)
+        val item = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index } ?: return
         val delta = item.offset - targetTop(listState, index)
-        if (abs(delta) > 2f) listState.animateScrollBy(delta)
+        if (abs(delta) <= 2f) return
+        if (jump) listState.scrollBy(delta) else listState.animateScrollBy(delta)
     }
 
     private fun targetTop(listState: LazyListState, index: Int): Float {
@@ -197,6 +209,10 @@ private class ScrollAnchor(private val abovePx: Float, private val estimatedItem
         val itemPx = info.visibleItemsInfo.firstOrNull { it.index == index }?.size?.toFloat() ?: estimatedItemPx
         val viewport = info.viewportEndOffset - info.viewportStartOffset
         return info.viewportStartOffset + (viewport - itemPx) / 2f - abovePx
+    }
+
+    private companion object {
+        const val JUMP_LINES = 4
     }
 }
 

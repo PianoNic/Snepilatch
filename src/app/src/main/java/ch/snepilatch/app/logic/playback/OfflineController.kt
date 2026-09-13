@@ -128,6 +128,7 @@ class OfflineController(private val scope: CoroutineScope, private val hooks: Ho
     suspend fun trackEnded() {
         if (OfflinePlayer.ended()) return
         val fromContext = OfflinePlayer.state.value?.contextUri != null
+        LokiLogger.i(TAG, "The offline list ran out (${if (fromContext) "a playlist" else "the downloads"}), saying so")
         hooks.showMessage(if (fromContext) R.string.offline_playlist_ended else R.string.offline_downloads_ended)
     }
 

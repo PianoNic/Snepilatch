@@ -15,7 +15,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -51,6 +50,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotify.api.lyrics.LyricsData
 import kotify.api.lyrics.SyncedLine
+import ch.snepilatch.app.ui.shared.LikeToggleButton
 
 @Composable
 fun LyricsScreen(vm: PlaybackViewModel) {
@@ -209,26 +209,7 @@ fun LyricsScreen(vm: PlaybackViewModel) {
                             ) {
                                 Icon(Icons.Rounded.SkipNext, stringResource(R.string.next), tint = SnepilatchWhite, modifier = Modifier.size(20.dp))
                             }
-                            FilledIconToggleButton(
-                                checked = isLiked,
-                                onCheckedChange = { _ ->
-                                    val id = track?.uri?.removePrefix("spotify:track:") ?: return@FilledIconToggleButton
-                                    if (isLiked) vm.unlikeSong(id) else vm.likeSong(id)
-                                },
-                                modifier = Modifier.size(36.dp),
-                                colors = IconButtonDefaults.filledIconToggleButtonColors(
-                                    containerColor = buttonBg,
-                                    contentColor = SnepilatchWhite.copy(alpha = 0.7f),
-                                    checkedContainerColor = buttonBg,
-                                    checkedContentColor = animatedPrimary,
-                                ),
-                            ) {
-                                Icon(
-                                    if (isLiked) Icons.Rounded.Favorite else Icons.Filled.FavoriteBorder,
-                                    stringResource(R.string.like),
-                                    modifier = Modifier.size(18.dp),
-                                )
-                            }
+                            LikeToggleButton(isLiked, track?.uri, vm, buttonBg, animatedPrimary, size = 36.dp, iconSize = 18.dp)
                         }
                     }
 

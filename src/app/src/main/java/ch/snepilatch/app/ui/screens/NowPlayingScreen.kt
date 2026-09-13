@@ -16,7 +16,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.*
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -62,6 +61,7 @@ import ch.snepilatch.app.viewmodel.LibraryViewModel
 import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import ch.snepilatch.app.logic.shared.shareSpfyUri
+import ch.snepilatch.app.ui.shared.LikeToggleButton
 
 /**
  * The seek bar + elapsed/duration labels (or the infiniPlay remix timeline), pulled into its own leaf
@@ -565,26 +565,7 @@ fun NowPlayingScreen(
                                 )
                             }
                             val isLiked by vm.currentTrackLiked.collectAsState()
-                            FilledIconToggleButton(
-                                checked = isLiked,
-                                onCheckedChange = { _ ->
-                                    val id = track?.uri?.removePrefix("spotify:track:") ?: return@FilledIconToggleButton
-                                    if (isLiked) vm.unlikeSong(id) else vm.likeSong(id)
-                                },
-                                modifier = Modifier.size(40.dp),
-                                colors = IconButtonDefaults.filledIconToggleButtonColors(
-                                    containerColor = buttonBg,
-                                    contentColor = SnepilatchWhite.copy(alpha = 0.7f),
-                                    checkedContainerColor = buttonBg,
-                                    checkedContentColor = animatedPrimary,
-                                ),
-                            ) {
-                                Icon(
-                                    if (isLiked) Icons.Rounded.Favorite else Icons.Filled.FavoriteBorder,
-                                    stringResource(R.string.like),
-                                    modifier = Modifier.size(24.dp),
-                                )
-                            }
+                            LikeToggleButton(isLiked, track?.uri, vm, buttonBg, animatedPrimary, size = 40.dp, iconSize = 24.dp)
                         }
 
                         Spacer(Modifier.height(8.dp))
@@ -757,26 +738,7 @@ fun NowPlayingScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             val isLiked by vm.currentTrackLiked.collectAsState()
-                            FilledIconToggleButton(
-                                checked = isLiked,
-                                onCheckedChange = { _ ->
-                                    val id = track?.uri?.removePrefix("spotify:track:") ?: return@FilledIconToggleButton
-                                    if (isLiked) vm.unlikeSong(id) else vm.likeSong(id)
-                                },
-                                modifier = Modifier.size(48.dp),
-                                colors = IconButtonDefaults.filledIconToggleButtonColors(
-                                    containerColor = buttonBg,
-                                    contentColor = SnepilatchWhite.copy(alpha = 0.7f),
-                                    checkedContainerColor = buttonBg,
-                                    checkedContentColor = animatedPrimary,
-                                ),
-                            ) {
-                                Icon(
-                                    if (isLiked) Icons.Rounded.Favorite else Icons.Filled.FavoriteBorder,
-                                    stringResource(R.string.like),
-                                    modifier = Modifier.size(28.dp),
-                                )
-                            }
+                            LikeToggleButton(isLiked, track?.uri, vm, buttonBg, animatedPrimary, size = 48.dp, iconSize = 28.dp)
                             NowPlayingMenu(
                                 showMore = showMore,
                                 onShowMore = { showMore = it },

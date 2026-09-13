@@ -8,7 +8,7 @@ import androidx.annotation.StringRes
 import ch.snepilatch.app.R
 import ch.snepilatch.app.data.UiMessage
 import ch.snepilatch.app.logic.download.toTrackInfo
-import ch.snepilatch.app.logic.playback.OfflineMirror
+import ch.snepilatch.app.logic.playback.OfflineController
 import ch.snepilatch.app.logic.playback.OfflinePlayer
 import ch.snepilatch.app.logic.playback.QueueMovePlan
 import ch.snepilatch.app.logic.playback.ResumeLoader
@@ -321,7 +321,7 @@ class PlaybackViewModel : ViewModel() {
         playback = _playback,
         isStreaming = isStreaming,
         getExoPositionMs = { MusicPlaybackService.instance?.getCurrentPosition() },
-        reportPosition = { pos -> player?.reportPosition(pos, _playback.value.isPaused) ?: Unit }
+        reportPosition = { pos -> if (!isOffline.value) player?.reportPosition(pos, _playback.value.isPaused) }
     )
     private var commandJob: Job? = null
     private var userPlayJob: Job? = null  // Cancel an in-flight user-initiated play when another track is tapped
@@ -373,6 +373,26 @@ class PlaybackViewModel : ViewModel() {
     // Playing context (e.g. "Album • Abbey Road" or "Playlist • Chill Vibes")
     data class PlayingContext(val type: String, val name: String, val uri: String? = null)
     val playingContext = MutableStateFlow<PlayingContext?>(null)
+
+    /** The offline engine's side of this model: the state mirror, the network watch, the takeover (#789, #792). */
+    internal val offline = OfflineController(
+        viewModelScope,
+        object : OfflineController.Hooks {
+            override val playback get() = _playback
+            override val queue get() = _queue
+            override val queuedCount get() = _queuedCount
+            override val nextPreview get() = nextTrackPreview
+            override val prevPreview get() = prevTrackPreview
+            override val isOffline get() = this@PlaybackViewModel.isOffline
+            override fun hasSession() = session != null
+            override fun playingContextUri() = playingContext.value?.uri
+            override fun trackChanged(track: TrackInfo) {
+                commitStream(track.uri, AudioSourceResolver.LOCAL_PROVIDER)
+                ThemeController.updateFromArt(track.albumArt)
+            }
+            override fun setTickerRunning(running: Boolean) = if (running) startPositionTicker() else stopPositionTicker()
+        },
+    )
     private var lastContextUri: String? = null
 
     // (is_active_device, has_active_device) at the last device-indicator update. The two booleans
@@ -825,16 +845,17 @@ class PlaybackViewModel : ViewModel() {
         }
 
         pc.onState { state ->
+            if (isOffline.value) return@onState
             val delta = if (lastCommandTs > 0) System.currentTimeMillis() - lastCommandTs else -1
             LokiLogger.i(TAG, "[Timing] WS onState arrived (${delta}ms after CMD '$lastCommandName')")
             viewModelScope.launch { updatePlaybackFromState(state) }
         }
 
-        pc.onTrackChange { event -> handleTrackChange(event) }
+        pc.onTrackChange { event -> if (!isOffline.value) handleTrackChange(event) }
 
-        pc.onPlay { state -> handleRemotePlay(state.position_as_of_timestamp) }
+        pc.onPlay { state -> if (!isOffline.value) handleRemotePlay(state.position_as_of_timestamp) }
 
-        pc.onPause { state -> handleRemotePause(state.position_as_of_timestamp) }
+        pc.onPause { state -> if (!isOffline.value) handleRemotePause(state.position_as_of_timestamp) }
 
         pc.onReconnected {
             viewModelScope.launch(Dispatchers.IO) { resyncAfterReconnect(pc) }
@@ -2074,19 +2095,7 @@ class PlaybackViewModel : ViewModel() {
     )
 
     init {
-        // Offline the engine owns what plays; mirror it into the one state the screens read, so
-        // the mini player, the full player and the position bar need no offline branch (#789).
-        viewModelScope.launch {
-            OfflinePlayer.state.collect { s ->
-                if (s == null || !isOffline.value) return@collect
-                val trackChanged = OfflineMirror.apply(s, _playback, _queue, _queuedCount, nextTrackPreview, prevTrackPreview)
-                if (trackChanged) {
-                    s.current?.let { commitStream(it.uri, AudioSourceResolver.LOCAL_PROVIDER) }
-                    ThemeController.updateFromArt(s.current?.albumArt)
-                }
-                if (s.isPlaying) startPositionTicker() else stopPositionTicker()
-            }
-        }
+        offline.start()
         viewModelScope.launch {
             combine(_playback, currentTrackLiked) { p, liked ->
                 NotificationButtons(
@@ -2757,7 +2766,13 @@ class PlaybackViewModel : ViewModel() {
                 catch (e: Exception) { LokiLogger.e(TAG, "svc trackTransition", e) }
             }
         }
-        svc.onPlaybackError = { errorCode ->
+        svc.onPlaybackError = onError@{ errorCode ->
+            if (isOffline.value) {
+                LokiLogger.w(TAG, "ExoPlayer error $errorCode while offline, treating the track as ended")
+                clearStream()
+                viewModelScope.launch(Dispatchers.IO) { OfflinePlayer.ended() }
+                return@onError
+            }
             // Capture what was playing BEFORE clearing state — the recovery re-resolves this exact
             // track at this position. DRM license failures in particular are usually transient (a
             // throttled license endpoint), so we retry rather than going silent until the user taps.

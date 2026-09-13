@@ -82,6 +82,19 @@ object OfflinePlayer {
         return play(list, list.indexOfFirst { it.uri == track.uri }.coerceAtLeast(0))
     }
 
+    /**
+     * Take over what is already playing, without touching the audio: the signal went while
+     * online, so [tracks] is the playing track followed by what of the queue and its context is on
+     * the phone, and ExoPlayer keeps running whatever it has. Repeat carries over (#792).
+     */
+    fun adopt(tracks: List<TrackInfo>, index: Int, isPlaying: Boolean, durationMs: Long) {
+        val current = tracks.getOrNull(index) ?: return
+        val repeat = _state.value?.repeat ?: "off"
+        _state.value = OfflinePlayback(tracks, index, isPlaying, durationMs, shuffle = false, repeat = repeat)
+        unshuffled = tracks
+        LokiLogger.i(TAG, "Took over ${current.uri} with ${tracks.size - index - 1} downloaded tracks to come")
+    }
+
     /** Move within the current list: same list, same shuffle and repeat, new pointer. */
     private suspend fun playAt(index: Int): Boolean {
         val s = _state.value ?: return false

@@ -2,10 +2,8 @@ package ch.snepilatch.app.viewmodel
 
 import androidx.lifecycle.viewModelScope
 import ch.snepilatch.app.logic.shared.JamHolder
-import ch.snepilatch.app.logic.shared.LokiLogger
 import ch.snepilatch.app.logic.shared.SessionHolder
 import ch.snepilatch.app.logic.shared.SessionViewModel
-import kotify.api.common.ShortLink
 import kotify.api.jam.Jam
 import kotify.api.jam.JamSession
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,8 +13,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
 /**
- * The jam sheet's model. The session itself lives in [JamHolder], fed by the player client's pushes;
- * this only joins, leaves and ends, and derives the invite link.
+ * The jam sheet's model. The session itself lives in [JamHolder], fed by the player client's pushes,
+ * and so does the join; this keeps the sheet's loading and error state, leaves and ends, and derives
+ * the invite link.
  */
 class JamViewModel : SessionViewModel("JamVM") {
 
@@ -27,39 +26,11 @@ class JamViewModel : SessionViewModel("JamVM") {
     val shareLink: StateFlow<String?> = combine(JamHolder.session, JamHolder.shareToken) { s, t -> JamHolder.shareLink(s, t) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, JamHolder.shareLink(JamHolder.session.value, JamHolder.shareToken.value))
 
-    init { JamRoutes.register(this) }
-
-    override fun onCleared() {
-        JamRoutes.unregister(this)
-        super.onCleared()
-    }
-
-    /**
-     * Joining without a registered Connect device returns 200 but does not stick — the membership is
-     * silently dropped and every later command fails. [PlaybackViewModel.initialize] is what calls
-     * `ready()`, so refuse until it has.
-     */
     fun join(linkOrToken: String) {
-        val token = linkOrToken.trim().takeIf { it.isNotBlank() } ?: return
-        if (SessionHolder.player == null) {
-            error.value = "not_ready"
-            return
-        }
+        if (linkOrToken.isBlank()) return
         error.value = null
         launchWithSessionLoading("joinJam", joining) { sess ->
-            val api = Jam(sess)
-            // A pasted or scanned spotify.link short link stands for the long one; the share
-            // token has to come from the long one.
-            val link = ShortLink.expand(sess, token)
-            val joined = link?.let { api.joinFromLink(it) }
-            if (joined == null) {
-                error.value = "failed"
-                LokiLogger.w(logTag, "Jam join failed for $token")
-            } else {
-                JamHolder.shareToken.value = api.shareTokenOf(link)
-                JamHolder.session.value = joined
-                LokiLogger.i(logTag, "Joined jam ${joined.sessionId} (${joined.members.size} members)")
-            }
+            error.value = JamHolder.join(sess, linkOrToken)
         }
     }
 
@@ -84,12 +55,4 @@ class JamViewModel : SessionViewModel("JamVM") {
             if (Jam(sess).end(current.sessionId)) JamHolder.clear()
         }
     }
-}
-
-/** Process-scoped hop so the deep-link handler can reach the live [JamViewModel]. */
-object JamRoutes {
-    @Volatile private var target: JamViewModel? = null
-    fun register(vm: JamViewModel) { target = vm }
-    fun unregister(vm: JamViewModel) { if (target === vm) target = null }
-    fun join(linkOrToken: String) { target?.join(linkOrToken) }
 }

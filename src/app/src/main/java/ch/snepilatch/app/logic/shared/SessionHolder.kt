@@ -5,6 +5,10 @@ import kotify.api.playerconnect.PlayerConnect
 import kotify.api.playlist.PlaylistStore
 import kotify.cdn.SpfyPlayback
 import kotify.session.Session
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Process-scoped holder for the Kotify session and its derived objects.
@@ -23,7 +27,17 @@ import kotify.session.Session
  */
 object SessionHolder {
     @Volatile var session: Session? = null
-    @Volatile var player: PlayerConnect? = null
+
+    // A flow underneath, so an entry point that runs before the device is registered can wait for
+    // it (a jam link on a cold start lands between the session loading and the player's ready()).
+    private val playerFlow = MutableStateFlow<PlayerConnect?>(null)
+    var player: PlayerConnect?
+        get() = playerFlow.value
+        set(value) { playerFlow.value = value }
+
+    /** The player once it is registered, or null when that takes longer than [timeoutMs]. */
+    suspend fun awaitPlayer(timeoutMs: Long): PlayerConnect? =
+        withTimeoutOrNull(timeoutMs) { playerFlow.filterNotNull().first() }
     @Volatile var spfyPlayback: SpfyPlayback? = null
     @Volatile var cdnResolver: SpfyCdnResolver? = null
 

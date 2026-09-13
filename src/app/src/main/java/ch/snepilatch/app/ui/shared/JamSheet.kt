@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.R
+import ch.snepilatch.app.logic.shared.JamHolder
 import ch.snepilatch.app.ui.theme.SnepilatchElevated
 import ch.snepilatch.app.ui.theme.SnepilatchLightGray
 import ch.snepilatch.app.ui.theme.SnepilatchWhite
@@ -81,7 +82,7 @@ fun JamSheet(onDismiss: () -> Unit, jamVm: JamViewModel = viewModel()) {
             if (error != null) {
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    stringResource(if (error == "not_ready") R.string.jam_not_ready else R.string.jam_join_failed),
+                    stringResource(if (error == JamHolder.NOT_READY) R.string.jam_not_ready else R.string.jam_join_failed),
                     color = SnepilatchLightGray,
                     fontSize = 12.sp
                 )

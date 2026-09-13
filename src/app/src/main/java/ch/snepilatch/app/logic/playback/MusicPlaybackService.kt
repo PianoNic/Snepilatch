@@ -650,6 +650,28 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
      * track listened through can be saved without fetching it again; null for sources that must not
      * be kept, since a local file is already on disk and Spfy CDN audio goes through playDrmUrl.
      */
+    /** What every load starts with: the track's metadata becomes the current one. */
+    private fun beginLoad(title: String, artist: String, albumArtUrl: String?): TrackMetadata {
+        isAdSkipping = false  // a real track is loading, so the ad-skip buffering state ends
+        applyHeadroomGain()
+        val meta = TrackMetadata(title, artist, albumArtUrl)
+        metadataQueue.clear()
+        metadataQueue.add(meta)
+        currentTitle = title
+        currentArtist = artist
+        return meta
+    }
+
+    /** Loads the art in the background and refreshes the notification once it is there. */
+    private fun loadArtInto(meta: TrackMetadata) {
+        serviceScope.launch {
+            val bitmap = meta.albumArtUrl?.let { loadBitmap(it) }
+            meta.art = bitmap
+            currentArt = bitmap
+            mainHandler.post { updateNotification() }
+        }
+    }
+
     fun playUrl(
         url: String,
         title: String,
@@ -661,13 +683,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         cacheKey: String? = null
     ) {
         LokiLogger.i(TAG, "Loading: $title by $artist -> ${url.take(80)} (play=$startPlaying, headers=${headers.keys}, pos=${startPositionMs}ms)")
-        isAdSkipping = false  // a real track is loading — end the ad-skip buffering state
-        applyHeadroomGain()
-        val meta = TrackMetadata(title, artist, albumArtUrl)
-        metadataQueue.clear()
-        metadataQueue.add(meta)
-        currentTitle = title
-        currentArtist = artist
+        val meta = beginLoad(title, artist, albumArtUrl)
 
         // Start audio IMMEDIATELY — don't wait for art
         mainHandler.post {
@@ -702,15 +718,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             updateNotification()
         }
 
-        // Load art in background, update notification when ready
-        serviceScope.launch {
-            val bitmap = albumArtUrl?.let { loadBitmap(it) }
-            meta.art = bitmap
-            currentArt = bitmap
-            mainHandler.post {
-                updateNotification()
-            }
-        }
+        loadArtInto(meta)
     }
 
     /**
@@ -1205,13 +1213,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                    startPositionMs: Long = 0L,
                    pssh: String? = null) {
         LokiLogger.i(TAG, "Loading DRM: $title by $artist -> ${url.take(80)} (play=$startPlaying, pos=${startPositionMs}ms, pssh=${pssh != null})")
-        isAdSkipping = false  // a real track is loading — end the ad-skip buffering state
-        applyHeadroomGain()
-        val meta = TrackMetadata(title, artist, albumArtUrl)
-        metadataQueue.clear()
-        metadataQueue.add(meta)
-        currentTitle = title
-        currentArtist = artist
+        val meta = beginLoad(title, artist, albumArtUrl)
 
         // Start audio IMMEDIATELY — don't wait for art
         mainHandler.post {
@@ -1239,15 +1241,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             updateNotification()
         }
 
-        // Load art in background
-        serviceScope.launch {
-            val bitmap = albumArtUrl?.let { loadBitmap(it) }
-            meta.art = bitmap
-            currentArt = bitmap
-            mainHandler.post {
-                updateNotification()
-            }
-        }
+        loadArtInto(meta)
     }
 
     fun updateMetadata(title: String, artist: String, albumArtUrl: String?) {

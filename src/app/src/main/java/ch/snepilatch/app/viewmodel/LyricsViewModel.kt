@@ -1,7 +1,9 @@
 package ch.snepilatch.app.viewmodel
 
+import ch.snepilatch.app.data.TrackInfo
 import kotify.api.lyrics.Lyrics
 import kotify.api.lyrics.LyricsData
+import kotify.api.lyrics.LyricsHint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,16 +28,18 @@ class LyricsViewModel : SessionViewModel("LyricsVM") {
     private var lastTrackUri: String? = null
 
     /**
-     * Fetch lyrics for [trackUri] (a `spotify:track:<id>` URI). De-duplicated:
-     * a repeat call for the same track that already has lyrics does nothing.
+     * Fetch lyrics for [track]. De-duplicated: a repeat call for the same track that already has
+     * lyrics does nothing. The track's title, artist and length go along as the hint the
+     * title-matched providers need, so a free account gets synced lyrics where spfy has none (#808).
      */
-    fun fetch(trackUri: String) {
+    fun fetch(track: TrackInfo) {
+        val trackUri = track.uri
         if (trackUri == lastTrackUri && _lyrics.value != null) return
         lastTrackUri = trackUri
         launchWithSessionLoading("fetch", isLoading) { sess ->
             try {
                 val trackId = trackUri.removePrefix("spotify:track:")
-                _lyrics.value = Lyrics(sess).getLyrics(trackId)
+                _lyrics.value = Lyrics(sess).getLyrics(trackId, lyricsHintFor(track))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -46,3 +50,14 @@ class LyricsViewModel : SessionViewModel("LyricsVM") {
         }
     }
 }
+
+/**
+ * What the title-matched lyrics providers get. The artist is the first one only: a row's artist
+ * text lists every featured name, and a lookup for "A, B, C" misses what a lookup for "A" finds.
+ */
+internal fun lyricsHintFor(track: TrackInfo): LyricsHint = LyricsHint(
+    title = track.name,
+    artist = track.artist.substringBefore(", ").trim(),
+    album = track.albumName?.takeIf { it.isNotBlank() },
+    durationMs = track.durationMs,
+)

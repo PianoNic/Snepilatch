@@ -1,5 +1,6 @@
 package ch.snepilatch.app.viewmodel
 
+import ch.snepilatch.app.data.TrackInfo
 import ch.snepilatch.app.logic.shared.SessionHolder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -7,6 +8,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Before
@@ -34,22 +36,34 @@ class LyricsViewModelTest {
         Dispatchers.resetMain()
     }
 
+    private fun track(id: String) =
+        TrackInfo(uri = "spotify:track:$id", name = "Song", artist = "A, B", albumArt = null, durationMs = 200_000L, albumName = "Album")
+
+    @Test fun theHintCarriesTheFirstArtistAlbumAndLength() {
+        val hint = lyricsHintFor(track("x"))
+        assertEquals("Song", hint.title)
+        assertEquals("A", hint.artist)
+        assertEquals("Album", hint.album)
+        assertEquals(200_000L, hint.durationMs)
+        assertNull(lyricsHintFor(track("x").copy(albumName = "")).album)
+    }
+
     @Test fun startsClean() {
         assertNull(vm.lyrics.value)
         assertFalse(vm.isLoading.value)
     }
 
     @Test fun fetchWithoutSessionIsSafeNoOp() {
-        vm.fetch("spotify:track:abc123")
+        vm.fetch(track("abc123"))
         // No session → the launch returns before touching the loading flag or lyrics.
         assertNull(vm.lyrics.value)
         assertFalse(vm.isLoading.value)
     }
 
     @Test fun repeatedFetchWithoutSessionStaysClean() {
-        vm.fetch("spotify:track:abc123")
-        vm.fetch("spotify:track:abc123")
-        vm.fetch("spotify:track:def456")
+        vm.fetch(track("abc123"))
+        vm.fetch(track("abc123"))
+        vm.fetch(track("def456"))
         assertNull(vm.lyrics.value)
         assertFalse(vm.isLoading.value)
     }

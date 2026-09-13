@@ -106,7 +106,7 @@ fun LyricsScreen(vm: PlaybackViewModel) {
     val lyricsAnimDirection by AppSettings.lyricsAnimDirection.collectAsState()
 
     LaunchedEffect(track?.uri) {
-        track?.uri?.let { lyricsVm.fetch(it) }
+        track?.let { lyricsVm.fetch(it) }
     }
 
     // Smooth position interpolation:

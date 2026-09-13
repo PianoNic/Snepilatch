@@ -52,6 +52,43 @@ import kotify.api.lyrics.LyricsData
 import kotify.api.lyrics.SyncedLine
 import ch.snepilatch.app.ui.shared.LikeToggleButton
 
+/** Spinner while loading, a note and a line when there are no lyrics, the synced view otherwise. */
+@Composable
+private fun LyricsBody(
+    isLoading: Boolean,
+    lyrics: LyricsData?,
+    smoothPosition: MutableState<Long>,
+    accent: Color,
+    isLandscape: Boolean,
+    lyricsAnimDirection: String,
+) {
+    when {
+        isLoading -> {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                LoadingIndicator(color = accent)
+            }
+        }
+        lyrics == null || lyrics.lines.isEmpty() -> {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Rounded.MusicNote, null, tint = SnepilatchLightGray.copy(alpha = 0.5f), modifier = Modifier.size(48.dp))
+                    Spacer(Modifier.height(12.dp))
+                    Text(stringResource(R.string.lyrics_not_available), color = SnepilatchLightGray, fontSize = 16.sp)
+                }
+            }
+        }
+        else -> {
+            SyncedLyricsView(
+                lyrics = lyrics,
+                smoothPosition = smoothPosition,
+                accentColor = accent,
+                isLandscape = isLandscape,
+                lyricsAnimDirection = lyricsAnimDirection
+            )
+        }
+    }
+}
+
 @Composable
 fun LyricsScreen(vm: PlaybackViewModel) {
     val lyricsVm: LyricsViewModel = viewModel()
@@ -220,31 +257,7 @@ fun LyricsScreen(vm: PlaybackViewModel) {
                             .weight(0.6f)
                             .fillMaxHeight()
                     ) {
-                        when {
-                            isLoading -> {
-                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    LoadingIndicator(color = animatedPrimary)
-                                }
-                            }
-                            lyrics == null || lyrics?.lines.isNullOrEmpty() -> {
-                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Icon(Icons.Rounded.MusicNote, null, tint = SnepilatchLightGray.copy(alpha = 0.5f), modifier = Modifier.size(48.dp))
-                                        Spacer(Modifier.height(12.dp))
-                                        Text(stringResource(R.string.lyrics_not_available), color = SnepilatchLightGray, fontSize = 16.sp)
-                                    }
-                                }
-                            }
-                            else -> {
-                                SyncedLyricsView(
-                                    lyrics = lyrics!!,
-                                    smoothPosition = smoothPosition,
-                                    accentColor = animatedPrimary,
-                                    isLandscape = true,
-                                    lyricsAnimDirection = lyricsAnimDirection
-                                )
-                            }
-                        }
+                        LyricsBody(isLoading, lyrics, smoothPosition, animatedPrimary, isLandscape = true, lyricsAnimDirection = lyricsAnimDirection)
                     }
                 }
             } else {
@@ -280,31 +293,7 @@ fun LyricsScreen(vm: PlaybackViewModel) {
                         Spacer(Modifier.size(40.dp))
                     }
 
-                    when {
-                        isLoading -> {
-                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                LoadingIndicator(color = animatedPrimary)
-                            }
-                        }
-                        lyrics == null || lyrics?.lines.isNullOrEmpty() -> {
-                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(Icons.Rounded.MusicNote, null, tint = SnepilatchLightGray.copy(alpha = 0.5f), modifier = Modifier.size(48.dp))
-                                    Spacer(Modifier.height(12.dp))
-                                    Text(stringResource(R.string.lyrics_not_available), color = SnepilatchLightGray, fontSize = 16.sp)
-                                }
-                            }
-                        }
-                        else -> {
-                            SyncedLyricsView(
-                                lyrics = lyrics!!,
-                                smoothPosition = smoothPosition,
-                                accentColor = animatedPrimary,
-                                isLandscape = false,
-                                lyricsAnimDirection = lyricsAnimDirection
-                            )
-                        }
-                    }
+                    LyricsBody(isLoading, lyrics, smoothPosition, animatedPrimary, isLandscape = false, lyricsAnimDirection = lyricsAnimDirection)
                 }
             }
         }

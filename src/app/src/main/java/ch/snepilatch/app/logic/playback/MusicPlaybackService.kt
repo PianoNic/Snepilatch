@@ -46,6 +46,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import ch.snepilatch.app.logic.shared.SessionHolder
+import ch.snepilatch.app.logic.shared.normalizeSpfyImageUrl
 
 class MusicPlaybackService : MediaBrowserServiceCompat() {
 
@@ -1434,11 +1435,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     }
 
     private suspend fun loadBitmap(url: String): Bitmap? {
-        // Spfy's cluster API returns art as `spotify:image:<id>` URIs.
-        // Rewrite to the i.scdn.co CDN URL before requesting.
-        val resolved = if (url.startsWith("spotify:image:")) {
-            "https://i.scdn.co/image/" + url.removePrefix("spotify:image:")
-        } else url
+        val resolved = normalizeSpfyImageUrl(url) ?: url
         // Route through the shared Coil singleton the UI already populated: a repeated URL (idle->play,
         // prefetch->skip) is a memory-cache hit with no re-fetch or re-decode, size(256) downsamples the
         // ~1.6MB full-res decode to notification-icon scale, allowHardware(false) yields a software

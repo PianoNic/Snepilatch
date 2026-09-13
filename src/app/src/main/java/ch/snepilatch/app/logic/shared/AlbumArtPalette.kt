@@ -1,6 +1,7 @@
 package ch.snepilatch.app.logic.shared
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import androidx.compose.ui.graphics.Color
 import ch.snepilatch.app.ui.theme.SnepilatchBlack
@@ -16,20 +17,25 @@ import coil.request.SuccessResult
  *
  * Returns null if the image fails to load or if no usable swatches are produced.
  */
-suspend fun extractThemeColorsFromArt(context: Context, imageUrl: String): ThemeColors? {
-    // Reuse the app's shared Coil singleton (same instance the UI already populated) instead of a
-    // fresh ImageLoader with an empty cache, and downsample to 112px — Palette's internal resize
-    // target (resizeBitmapArea 112x112) — so we skip a wasted full-res software decode per skip.
-    val loader = coil.Coil.imageLoader(context)
+/**
+ * The cover at [imageUrl] and its palette, or null when it cannot be loaded. Goes through the app's
+ * shared Coil singleton (the instance the UI already populated) instead of a fresh loader with an
+ * empty cache, downsampled to 112px, Palette's own resize target, so no full-size decode is wasted.
+ */
+private suspend fun paletteOf(context: Context, imageUrl: String): Pair<Bitmap, Palette>? {
     val request = ImageRequest.Builder(context)
         .data(imageUrl)
         .size(112)
         .allowHardware(false)
         .build()
-    val result = loader.execute(request)
+    val result = coil.Coil.imageLoader(context).execute(request)
     if (result !is SuccessResult) return null
     val bitmap = (result.drawable as? BitmapDrawable)?.bitmap ?: return null
-    val palette = Palette.from(bitmap).generate()
+    return bitmap to Palette.from(bitmap).generate()
+}
+
+suspend fun extractThemeColorsFromArt(context: Context, imageUrl: String): ThemeColors? {
+    val (bitmap, palette) = paletteOf(context, imageUrl) ?: return null
 
     val defaultGray = 0xFFB3B3B3.toInt()
     val candidates = listOfNotNull(
@@ -84,16 +90,7 @@ data class CardColors(val base: Color, val glow: Color, val counterGlow: Color)
  * Returns null if the image fails to load, and the caller falls back to the colour the feed states.
  */
 suspend fun extractCardColorsFromArt(context: Context, imageUrl: String): CardColors? {
-    val loader = coil.Coil.imageLoader(context)
-    val request = ImageRequest.Builder(context)
-        .data(imageUrl)
-        .size(112)
-        .allowHardware(false)
-        .build()
-    val result = loader.execute(request)
-    if (result !is SuccessResult) return null
-    val bitmap = (result.drawable as? BitmapDrawable)?.bitmap ?: return null
-    val palette = Palette.from(bitmap).generate()
+    val (bitmap, palette) = paletteOf(context, imageUrl) ?: return null
     // The card takes its ground from the cover's outer ring, not from a swatch: these covers are
     // built on a solid colour that runs to the edge, and that edge is the colour the card is meant
     // to be. A swatch would pick something out of the photo in the middle instead.
@@ -110,7 +107,7 @@ suspend fun extractCardColorsFromArt(context: Context, imageUrl: String): CardCo
 }
 
 /** The average of the cover's outermost ring, which on a built cover is its background colour. */
-private fun edgeColor(bitmap: android.graphics.Bitmap): Int? {
+private fun edgeColor(bitmap: Bitmap): Int? {
     val w = bitmap.width
     val h = bitmap.height
     val ring = maxOf(2, minOf(w, h) / 20)

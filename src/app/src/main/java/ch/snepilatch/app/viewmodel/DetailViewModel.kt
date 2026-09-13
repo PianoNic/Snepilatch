@@ -12,8 +12,6 @@ import kotify.api.podcast.Podcast
 import kotify.api.radio.Radio
 import kotify.api.song.Song
 import kotify.session.Session
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -188,64 +186,56 @@ class DetailViewModel : SessionViewModel("DetailVM") {
         if (_isLoadingMore.value) return
         if (current.totalCount in 0..current.tracks.size) return
         val uri = current.uri
-        _isLoadingMore.value = true
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val sess = SessionHolder.session ?: return@launch
-                val offset = current.tracks.size
-                if (uri == "spotify:collection:tracks") {
-                    val data = Playlist(sess).getLikedSongs(limit = 50, offset = offset)
-                    val more = data.toDetailData(offset)
-                    _detail.value = current.copy(
-                        tracks = current.tracks + more.tracks,
-                        totalCount = more.totalCount,
-                        loadedOffset = offset + more.tracks.size
-                    )
-                } else if (uri.startsWith("spotify:playlist:")) {
-                    val id = uri.removePrefix("spotify:playlist:")
-                    val info = playlistPage(sess, id, limit = DETAIL_PAGE_SIZE, offset = offset)
-                    val more = info.tracks.map { it.toTrackInfo() }
-                    val newSize = current.tracks.size + more.size
-                    // Server-reported totalTracks is unreliable (PlaylistMapper
-                    // returns 0 when content.totalCount is missing). Use the
-                    // page-shorter-than-limit signal as the authoritative
-                    // "we're at the end" indicator instead.
-                    val newTotalCount = when {
-                        more.size < DETAIL_PAGE_SIZE -> newSize
-                        info.totalTracks > 0 -> info.totalTracks
-                        else -> -1
-                    }
-                    _detail.value = current.copy(
-                        tracks = current.tracks + more,
-                        totalCount = newTotalCount,
-                        loadedOffset = newSize
-                    )
-                } else if (uri.startsWith("spotify:album:")) {
-                    val id = uri.removePrefix("spotify:album:")
-                    val info = Album(sess).getAlbum(id, limit = 50, offset = offset)
-                    val more = info.tracks.map { it.toTrackInfo(info.coverArtUrl) }
-                    _detail.value = current.copy(
-                        tracks = current.tracks + more,
-                        totalCount = info.totalTracks,
-                        loadedOffset = offset + more.size
-                    )
-                } else if (uri.startsWith("spotify:show:")) {
-                    val id = uri.removePrefix("spotify:show:")
-                    val info = Podcast(sess, id).getPodcastInfo(limit = DETAIL_PAGE_SIZE, offset = offset)
-                    val more = info?.episodes?.map { it.toTrackInfo(current.name) } ?: emptyList()
-                    val newSize = current.tracks.size + more.size
-                    // A short page means we've hit the end; otherwise keep the server-reported total.
-                    val newTotalCount = if (more.size < DETAIL_PAGE_SIZE) newSize else (info?.totalEpisodes ?: newSize)
-                    _detail.value = current.copy(
-                        tracks = current.tracks + more,
-                        totalCount = newTotalCount,
-                        loadedOffset = newSize
-                    )
+        launchWithSessionLoading("loadMoreDetail", _isLoadingMore) { sess ->
+            val offset = current.tracks.size
+            if (uri == "spotify:collection:tracks") {
+                val data = Playlist(sess).getLikedSongs(limit = 50, offset = offset)
+                val more = data.toDetailData(offset)
+                _detail.value = current.copy(
+                    tracks = current.tracks + more.tracks,
+                    totalCount = more.totalCount,
+                    loadedOffset = offset + more.tracks.size
+                )
+            } else if (uri.startsWith("spotify:playlist:")) {
+                val id = uri.removePrefix("spotify:playlist:")
+                val info = playlistPage(sess, id, limit = DETAIL_PAGE_SIZE, offset = offset)
+                val more = info.tracks.map { it.toTrackInfo() }
+                val newSize = current.tracks.size + more.size
+                // Server-reported totalTracks is unreliable (PlaylistMapper
+                // returns 0 when content.totalCount is missing). Use the
+                // page-shorter-than-limit signal as the authoritative
+                // "we're at the end" indicator instead.
+                val newTotalCount = when {
+                    more.size < DETAIL_PAGE_SIZE -> newSize
+                    info.totalTracks > 0 -> info.totalTracks
+                    else -> -1
                 }
-            } catch (e: Exception) {
-                LokiLogger.e(logTag, "loadMoreDetail", e)
-            } finally {
-                _isLoadingMore.value = false
+                _detail.value = current.copy(
+                    tracks = current.tracks + more,
+                    totalCount = newTotalCount,
+                    loadedOffset = newSize
+                )
+            } else if (uri.startsWith("spotify:album:")) {
+                val id = uri.removePrefix("spotify:album:")
+                val info = Album(sess).getAlbum(id, limit = 50, offset = offset)
+                val more = info.tracks.map { it.toTrackInfo(info.coverArtUrl) }
+                _detail.value = current.copy(
+                    tracks = current.tracks + more,
+                    totalCount = info.totalTracks,
+                    loadedOffset = offset + more.size
+                )
+            } else if (uri.startsWith("spotify:show:")) {
+                val id = uri.removePrefix("spotify:show:")
+                val info = Podcast(sess, id).getPodcastInfo(limit = DETAIL_PAGE_SIZE, offset = offset)
+                val more = info?.episodes?.map { it.toTrackInfo(current.name) } ?: emptyList()
+                val newSize = current.tracks.size + more.size
+                // A short page means we've hit the end; otherwise keep the server-reported total.
+                val newTotalCount = if (more.size < DETAIL_PAGE_SIZE) newSize else (info?.totalEpisodes ?: newSize)
+                _detail.value = current.copy(
+                    tracks = current.tracks + more,
+                    totalCount = newTotalCount,
+                    loadedOffset = newSize
+                )
             }
         }
     }
@@ -317,17 +307,14 @@ class DetailViewModel : SessionViewModel("DetailVM") {
     }
 
     fun checkDetailSaved(type: String, id: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val sess = SessionHolder.session ?: return@launch
-                detailSaved.value = when (type) {
-                    "album" -> Album(sess).isSaved(id)
-                    "artist" -> Artist(sess).isFollowing(id)
-                    // getPlaylist already returned it; asking again would be a second round trip.
-                    "playlist" -> _detail.value.savedInLibrary
-                    else -> false
-                }
-            } catch (_: Exception) { detailSaved.value = false }
+        launchWithSession("checkDetailSaved", onFailure = { detailSaved.value = false }) { sess ->
+            detailSaved.value = when (type) {
+                "album" -> Album(sess).isSaved(id)
+                "artist" -> Artist(sess).isFollowing(id)
+                // getPlaylist already returned it; asking again would be a second round trip.
+                "playlist" -> _detail.value.savedInLibrary
+                else -> false
+            }
         }
     }
 
@@ -371,19 +358,15 @@ class DetailViewModel : SessionViewModel("DetailVM") {
             totalCount = if (before.totalCount > 0) before.totalCount - 1 else before.totalCount,
             loadedOffset = remaining.size
         )
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                Playlist(sess).removeFromPlaylist(playlistId, listOf(uid))
-                // Our own write leaves the cached pages describing a playlist that no longer exists
-                // in that shape, and the dealer does not necessarily tell us about our own change.
-                SessionHolder.playlistStore?.invalidate(playlistId)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                LokiLogger.e(logTag, "removeFromPlaylist", e)
-                // _detail is a single live slot; don't stomp a playlist the user has since opened.
-                if (_detail.value.uri == before.uri) _detail.value = before
-            }
+        launchWithSession(
+            "removeFromPlaylist",
+            // _detail is a single live slot; don't stomp a playlist the user has since opened.
+            onFailure = { if (_detail.value.uri == before.uri) _detail.value = before },
+        ) { session ->
+            Playlist(session).removeFromPlaylist(playlistId, listOf(uid))
+            // Our own write leaves the cached pages describing a playlist that no longer exists
+            // in that shape, and the dealer does not necessarily tell us about our own change.
+            SessionHolder.playlistStore?.invalidate(playlistId)
         }
     }
 

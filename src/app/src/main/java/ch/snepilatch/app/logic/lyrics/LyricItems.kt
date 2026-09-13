@@ -1,5 +1,6 @@
 package ch.snepilatch.app.logic.lyrics
 
+import kotify.api.lyrics.Syllable
 import kotify.api.lyrics.SyncedLine
 import kotlin.math.max
 
@@ -9,15 +10,23 @@ sealed interface LyricItem {
     val endMs: Long
 }
 
+/** The timed words of one voice: which are lit letter by letter (the long ones), and which runs form one word. */
+class Words(val syllables: List<Syllable>) {
+
+    val emphasised: List<Boolean> =
+        syllables.map { it.text.isNotEmpty() && it.endTimeMs - it.startTimeMs >= LyricsStyle.EMPHASIS_MIN_MS }
+
+    /** Runs of syllable indices that form one word and must not wrap apart. */
+    val runs: List<IntRange> = wordRuns(syllables)
+}
+
 /** A lyric line; [endMs] is the line's own end, or the next line's start when the provider gave none. */
 data class LineItem(val line: SyncedLine, override val startMs: Long, override val endMs: Long) : LyricItem {
 
-    /** Which syllables are lit letter by letter: the long ones. */
-    val emphasised: List<Boolean> =
-        line.syllables.map { it.text.isNotEmpty() && it.endTimeMs - it.startTimeMs >= LyricsStyle.EMPHASIS_MIN_MS }
+    val lead: Words = Words(line.syllables)
 
-    /** Runs of syllable indices that form one word and must not wrap apart. */
-    val words: List<IntRange> = wordRuns(line)
+    /** The backing vocals drawn as the smaller line under the lead, or null when there are none (#814). */
+    val background: Words? = line.background.takeIf { it.isNotEmpty() }?.let { Words(it) }
 }
 
 /** The three interlude dots and the windows each fills in. */
@@ -55,11 +64,11 @@ private fun dotsBetween(gapStart: Long, nextStart: Long): DotsItem {
     return DotsItem(gapStart, nextStart, listOf(gapStart until first, first until second, second until third))
 }
 
-private fun wordRuns(line: SyncedLine): List<IntRange> {
+private fun wordRuns(syllables: List<Syllable>): List<IntRange> {
     val runs = ArrayList<IntRange>()
     var start = 0
-    for (i in 1..line.syllables.size) {
-        if (i == line.syllables.size || !line.syllables[i].isPartOfWord) {
+    for (i in 1..syllables.size) {
+        if (i == syllables.size || !syllables[i].isPartOfWord) {
             runs += start until i
             start = i
         }

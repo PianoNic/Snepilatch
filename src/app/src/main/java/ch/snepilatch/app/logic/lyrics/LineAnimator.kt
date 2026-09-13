@@ -49,35 +49,28 @@ class Motion(
 }
 
 /**
- * Drives every syllable of one line (and the letters of the emphasised ones, plus the glow and
- * fill of a line-synced line) from the playback clock. [step] is called once per frame with the
- * position and the real frame delta; the UI reads the [Motion]s afterwards. Pure, no Compose.
+ * Drives every syllable of one voice (and the letters of the emphasised ones) from the playback
+ * clock. [step] is called once per frame with the position and the real frame delta; the UI reads
+ * the [Motion]s afterwards. Pure, no Compose.
  */
-class LineAnimator(private val item: LineItem) {
+class WordsAnimator(private val spec: Words) {
 
-    val words: List<Motion> = item.line.syllables.map { Motion(LyricsStyle.REST_SCALE, LyricsStyle.REST_LIFT) }
+    val words: List<Motion> = spec.syllables.map { Motion(LyricsStyle.REST_SCALE, LyricsStyle.REST_LIFT) }
 
     /** Per syllable: one motion per letter when emphasised, else null. */
-    val letters: List<List<Motion>?> = item.line.syllables.mapIndexed { i, s ->
-        if (item.emphasised[i]) s.text.map { Motion(LyricsStyle.REST_SCALE, LyricsStyle.REST_LIFT) } else null
+    val letters: List<List<Motion>?> = spec.syllables.mapIndexed { i, s ->
+        if (spec.emphasised[i]) s.text.map { Motion(LyricsStyle.REST_SCALE, LyricsStyle.REST_LIFT) } else null
     }
-    private val letterWindows: List<List<LongRange>> = item.line.syllables.mapIndexed { i, s ->
-        if (item.emphasised[i]) letterWindows(s.startTimeMs, s.endTimeMs, s.text.length) else emptyList()
+    private val letterWindows: List<List<LongRange>> = spec.syllables.mapIndexed { i, s ->
+        if (spec.emphasised[i]) letterWindows(s.startTimeMs, s.endTimeMs, s.text.length) else emptyList()
     }
-
-    /** The whole line's glow and fill, used when the line is synced as one piece. */
-    val lineGlow = Spring(0f, LyricsStyle.LINE_GLOW_FREQUENCY, LyricsStyle.LINE_GLOW_DAMPING)
-    var lineFill: Float = LyricsStyle.FILL_START
-        private set
 
     val asleep: Boolean
-        get() = lineGlow.asleep && words.all { it.asleep } && letters.all { l -> l == null || l.all { it.asleep } }
+        get() = words.all { it.asleep } && letters.all { l -> l == null || l.all { it.asleep } }
 
     fun step(timeMs: Long, dt: Float) {
-        stepLine(timeMs)
-        lineGlow.step(dt)
         for (i in words.indices) {
-            val s = item.line.syllables[i]
+            val s = spec.syllables[i]
             val state = sungStateAt(timeMs, s.startTimeMs, s.endTimeMs)
             val p = progressAt(timeMs, s.startTimeMs, s.endTimeMs)
             val at = splineInput(state, p)
@@ -88,25 +81,10 @@ class LineAnimator(private val item: LineItem) {
         }
     }
 
-    /** Put everything where it would be at [timeMs] with no motion left, for a line composed at rest. */
-    fun snapTo(timeMs: Long) {
-        step(timeMs, 0f)
-        lineGlow.snap(lineGlow.goal)
+    fun settle() {
         words.forEach { it.settle() }
         letters.forEach { l -> l?.forEach { it.settle() } }
     }
-
-    private fun stepLine(timeMs: Long) {
-        val state = sungStateAt(timeMs, item.startMs, item.endMs)
-        val p = progressAt(timeMs, item.startMs, item.endMs)
-        lineGlow.setGoal(if (state == SungState.ACTIVE) LyricsStyle.lineGlow.at(p) else 0f)
-        lineFill = when (state) {
-            SungState.NOT_SUNG -> LyricsStyle.FILL_START
-            SungState.SUNG -> LyricsStyle.FILL_END
-            SungState.ACTIVE -> LyricsStyle.FILL_END * p
-        }
-    }
-
     private fun stepLetters(motions: List<Motion>, windows: List<LongRange>, timeMs: Long, dt: Float, wordState: SungState) {
         val active = windows.indexOfFirst { timeMs in it }
         when {
@@ -157,6 +135,49 @@ class LineAnimator(private val item: LineItem) {
         SungState.NOT_SUNG -> 0f
         SungState.SUNG -> 1f
         SungState.ACTIVE -> progress
+    }
+}
+
+/**
+ * One line's motion: the lead voice, the backing vocals when the line has them, and the glow and
+ * fill of the line as a whole for a line-synced line.
+ */
+class LineAnimator(private val item: LineItem) {
+
+    val lead = WordsAnimator(item.lead)
+    val background: WordsAnimator? = item.background?.let { WordsAnimator(it) }
+
+    val lineGlow = Spring(0f, LyricsStyle.LINE_GLOW_FREQUENCY, LyricsStyle.LINE_GLOW_DAMPING)
+    var lineFill: Float = LyricsStyle.FILL_START
+        private set
+
+    val asleep: Boolean
+        get() = lineGlow.asleep && lead.asleep && background?.asleep != false
+
+    fun step(timeMs: Long, dt: Float) {
+        stepLine(timeMs)
+        lineGlow.step(dt)
+        lead.step(timeMs, dt)
+        background?.step(timeMs, dt)
+    }
+
+    /** Put everything where it would be at [timeMs] with no motion left, for a line composed at rest. */
+    fun snapTo(timeMs: Long) {
+        step(timeMs, 0f)
+        lineGlow.snap(lineGlow.goal)
+        lead.settle()
+        background?.settle()
+    }
+
+    private fun stepLine(timeMs: Long) {
+        val state = sungStateAt(timeMs, item.startMs, item.endMs)
+        val p = progressAt(timeMs, item.startMs, item.endMs)
+        lineGlow.setGoal(if (state == SungState.ACTIVE) LyricsStyle.lineGlow.at(p) else 0f)
+        lineFill = when (state) {
+            SungState.NOT_SUNG -> LyricsStyle.FILL_START
+            SungState.SUNG -> LyricsStyle.FILL_END
+            SungState.ACTIVE -> LyricsStyle.FILL_END * p
+        }
     }
 }
 

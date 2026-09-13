@@ -90,6 +90,11 @@ object LyricsStyle {
     const val DOT_GLOW_BLUR_PX = 6f
     const val DOT_GLOW_OPACITY = 0.9f
 
+    /** Backing vocals: a smaller, lighter line under the lead with a dimmer fill. */
+    const val BACKGROUND_SCALE = 0.75f
+    const val BACKGROUND_FILL_ALPHA = 0.6f
+    const val BACKGROUND_FILL_ALPHA_END = 0.3f
+
     /** A letter's lift is doubled compared to a word's. */
     const val LETTER_LIFT_FACTOR = 2f
 

@@ -12,12 +12,14 @@ import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -70,6 +72,8 @@ import ch.snepilatch.app.logic.lyrics.LineItem
 import ch.snepilatch.app.logic.lyrics.LyricsStyle
 import ch.snepilatch.app.logic.lyrics.Motion
 import ch.snepilatch.app.logic.lyrics.SungState
+import ch.snepilatch.app.logic.lyrics.Words
+import ch.snepilatch.app.logic.lyrics.WordsAnimator
 import ch.snepilatch.app.logic.lyrics.lyricItems
 import ch.snepilatch.app.logic.lyrics.sungStateAt
 import kotlinx.coroutines.delay
@@ -130,7 +134,7 @@ internal fun SyncedLyricsView(lyrics: LyricsData, smoothPosition: State<Long>, i
                             item = item,
                             state = state,
                             blurPx = if (userScrolling.value) 0f else LyricsStyle.blurPx(abs(index - activeIndex)),
-                            wholeLine = !syllableSynced || item.line.syllables.isEmpty(),
+                            wholeLine = !syllableSynced || item.lead.syllables.isEmpty(),
                             fillDirection = lineFillDirection,
                             smoothPosition = smoothPosition,
                             fontSize = fontSize,
@@ -266,6 +270,8 @@ private fun LyricLine(
         fontPx = with(LocalDensity.current) { fontSize.toPx() },
         state = state,
         blurPx = if (state == SungState.ACTIVE) 0f else blurPx,
+        fillAlpha = LyricsStyle.FILL_ALPHA,
+        fillAlphaEnd = if (wholeLine) LyricsStyle.LINE_FILL_ALPHA_END else LyricsStyle.FILL_ALPHA_END,
     )
     Box(
         Modifier
@@ -318,7 +324,29 @@ private fun DriveAnimator(
     }
 }
 
-private class LineLook(val style: TextStyle, val fontPx: Float, val state: SungState, val blurPx: Float)
+/** How a voice's pieces are painted: the text style, the glyph alpha behind and ahead of the fill, the state and blur. */
+private class LineLook(
+    val style: TextStyle,
+    val fontPx: Float,
+    val state: SungState,
+    val blurPx: Float,
+    val fillAlpha: Float,
+    val fillAlphaEnd: Float,
+) {
+    /** The backing vocals' look: three quarters of the size, a lighter weight, a dimmer fill. */
+    fun background(): LineLook = LineLook(
+        style = style.copy(
+            fontSize = style.fontSize * LyricsStyle.BACKGROUND_SCALE,
+            lineHeight = style.lineHeight * LyricsStyle.BACKGROUND_SCALE,
+            fontWeight = FontWeight.SemiBold,
+        ),
+        fontPx = fontPx * LyricsStyle.BACKGROUND_SCALE,
+        state = state,
+        blurPx = blurPx,
+        fillAlpha = LyricsStyle.BACKGROUND_FILL_ALPHA,
+        fillAlphaEnd = LyricsStyle.BACKGROUND_FILL_ALPHA_END,
+    )
+}
 
 /** How a piece glows: shadow blur growth in px, shadow opacity per unit of glow, and how far it lifts. */
 private class GlowSpec(val blurPx: Float, val opacity: Float, val liftFactor: Float) {
@@ -339,19 +367,34 @@ private fun lyricStyle(fontSize: TextUnit) = TextStyle(
     lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None),
 )
 
-/** The words of a syllable-synced line, wrapping like text; the pieces of one word stay together. */
+/** The lead voice of a syllable-synced line, and under it the backing vocals when the line has them. */
 @Composable
 private fun WordsLine(item: LineItem, look: LineLook, animator: LineAnimator, tick: State<Long>) {
+    val background = item.background
+    if (background == null) {
+        WordsFlow(item.lead, look, animator.lead, tick)
+        return
+    }
+    Column {
+        WordsFlow(item.lead, look, animator.lead, tick)
+        Spacer(Modifier.height(1.dp))
+        WordsFlow(background, look.background(), checkNotNull(animator.background), tick)
+    }
+}
+
+/** One voice's words, wrapping like text; the pieces of one word stay together. */
+@Composable
+private fun WordsFlow(spec: Words, look: LineLook, animator: WordsAnimator, tick: State<Long>) {
     val measurer = rememberTextMeasurer()
     val gap = with(LocalDensity.current) {
         remember(look.style) { (measurer.measure("0", look.style).size.width * LyricsStyle.WORD_GAP_CH).toDp() }
     }
     FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
-        for (word in item.words) {
+        for (word in spec.runs) {
             Row {
                 for (i in word) {
                     val origin = pieceOrigin(i, word)
-                    val text = item.line.syllables[i].text
+                    val text = spec.syllables[i].text
                     val letters = animator.letters[i]
                     if (letters == null) {
                         WordPiece(text, look, animator.words[i], tick, origin, GlowSpec.WORD)
@@ -415,7 +458,7 @@ private fun WordPiece(text: String, look: LineLook, motion: Motion, tick: State<
             }
             .drawBehind {
                 tick.value
-                drawPiece(layout, look, motion.fill, motion.glow.position, glow, LyricsStyle.FILL_ALPHA_END, vertical = false)
+                drawPiece(layout, look, motion.fill, motion.glow.position, glow, vertical = false)
             }
     )
 }
@@ -437,7 +480,7 @@ private fun WholeLine(text: String, look: LineLook, animator: LineAnimator, tick
             .drawBehind {
                 tick.value
                 val layout = holder.layout ?: return@drawBehind
-                drawPiece(layout, look, animator.lineFill, animator.lineGlow.position, GlowSpec.LINE, LyricsStyle.LINE_FILL_ALPHA_END, vertical)
+                drawPiece(layout, look, animator.lineFill, animator.lineGlow.position, GlowSpec.LINE, vertical)
             }
     )
 }
@@ -457,11 +500,10 @@ private fun DrawScope.drawPiece(
     fill: Float,
     glow: Float,
     spec: GlowSpec,
-    alphaEnd: Float,
     vertical: Boolean,
 ) {
     if (look.state != SungState.ACTIVE) {
-        val alpha = if (look.state == SungState.SUNG) LyricsStyle.FILL_ALPHA else alphaEnd
+        val alpha = if (look.state == SungState.SUNG) look.fillAlpha else look.fillAlphaEnd
         if (look.blurPx > 0f) {
             drawText(layout, color = Color.Transparent, shadow = Shadow(Color.White.copy(alpha = alpha), Offset.Zero, look.blurPx.dp.toPx()))
         } else {
@@ -474,8 +516,8 @@ private fun DrawScope.drawPiece(
         val alpha = (glow * spec.opacity).coerceIn(0f, MAX_SHADOW_ALPHA)
         drawText(layout, color = Color.Transparent, shadow = Shadow(Color.White.copy(alpha = alpha), Offset.Zero, blur))
     }
-    val sung = Color.White.copy(alpha = LyricsStyle.FILL_ALPHA)
-    val unsung = Color.White.copy(alpha = alphaEnd)
+    val sung = Color.White.copy(alpha = look.fillAlpha)
+    val unsung = Color.White.copy(alpha = look.fillAlphaEnd)
     val extent = if (vertical) size.height else size.width
     val start = extent * fill / 100f
     val end = extent * (fill + LyricsStyle.FILL_BAND) / 100f

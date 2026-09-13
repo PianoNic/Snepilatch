@@ -54,31 +54,16 @@ fun UpdateDialog(
                         containerColor = MaterialTheme.colorScheme.primaryContainer
                     )
                 ) {
-                    Row(
+                    // One line per version, label left and name right: two nightly names never fit
+                    // side by side, and a name broken across lines reads as a typo.
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Column {
-                            Text(stringResource(R.string.current_version), style = MaterialTheme.typography.labelSmall)
-                            Text(
-                                updateInfo.currentVersion,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        Text("→", style = MaterialTheme.typography.titleLarge)
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(stringResource(R.string.new_version), style = MaterialTheme.typography.labelSmall)
-                            Text(
-                                updateInfo.latestVersion,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
+                        VersionLine(stringResource(R.string.current_version), updateInfo.currentVersion, MaterialTheme.colorScheme.onPrimaryContainer)
+                        VersionLine(stringResource(R.string.new_version), updateInfo.latestVersion, MaterialTheme.colorScheme.primary)
                     }
                 }
 
@@ -200,4 +185,23 @@ fun UpdateDialog(
             }
         }
     )
+}
+
+@Composable
+private fun VersionLine(label: String, version: String, color: androidx.compose.ui.graphics.Color) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, style = MaterialTheme.typography.labelLarge)
+        Text(
+            version,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Bold,
+            color = color,
+            maxLines = 1,
+            modifier = Modifier.padding(start = 16.dp)
+        )
+    }
 }

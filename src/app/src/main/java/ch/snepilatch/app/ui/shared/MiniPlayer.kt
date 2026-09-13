@@ -182,6 +182,7 @@ fun MiniPlayerContent(
     val animatedPrimary by animateColorAsState(theme.primary, tween(800), label = "miniPrimary")
     val streamLoading by vm.isStreamLoading.collectAsState()
     val spinnerActive = streamLoading || isAd
+    val jamControls = jamAllowsControls()
 
     Column(modifier.fillMaxWidth()) {
         Row(
@@ -216,27 +217,7 @@ fun MiniPlayerContent(
                     }
                 }
             }
-            IconButton(onClick = { if (!spinnerActive) vm.togglePlayPause() }, modifier = Modifier.size(40.dp)) {
-                if (spinnerActive) {
-                    LoadingIndicator(
-                        color = SnepilatchWhite,
-                        modifier = Modifier.size(20.dp)
-                    )
-                } else {
-                    Icon(
-                        if (isPaused || !isPlaying) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
-                        stringResource(R.string.play_pause), tint = SnepilatchWhite, modifier = Modifier.size(28.dp)
-                    )
-                }
-            }
-            IconButton(onClick = { vm.skipNext() }, modifier = Modifier.size(40.dp)) {
-                Icon(
-                    Icons.Rounded.SkipNext,
-                    stringResource(R.string.next),
-                    tint = SnepilatchWhite,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
+            MiniTransport(vm, spinnerActive = spinnerActive, showPlay = isPaused || !isPlaying, enabled = jamControls)
         }
         if (durationMs > 0) {
             MiniProgressBar(vm, durationMs, animatedPrimary)
@@ -249,6 +230,36 @@ fun MiniPlayerContent(
  * The 2dp progress bar as its own leaf. It — and only it — collects the 2Hz positionFlow, so the
  * interpolator's position ticks recompose this tiny bar instead of the whole MiniPlayerContent body.
  */
+/** Play or pause and next, greyed out while a jam host keeps guests from controlling playback. */
+@Composable
+private fun MiniTransport(vm: PlaybackViewModel, spinnerActive: Boolean, showPlay: Boolean, enabled: Boolean) {
+    IconButton(
+        onClick = { if (!spinnerActive) vm.togglePlayPause() },
+        enabled = enabled,
+        modifier = Modifier.size(40.dp),
+    ) {
+        if (spinnerActive) {
+            LoadingIndicator(
+                color = SnepilatchWhite,
+                modifier = Modifier.size(20.dp)
+            )
+        } else {
+            Icon(
+                if (showPlay) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
+                stringResource(R.string.play_pause), tint = SnepilatchWhite, modifier = Modifier.size(28.dp)
+            )
+        }
+    }
+    IconButton(onClick = { vm.skipNext() }, enabled = enabled, modifier = Modifier.size(40.dp)) {
+        Icon(
+            Icons.Rounded.SkipNext,
+            stringResource(R.string.next),
+            tint = SnepilatchWhite,
+            modifier = Modifier.size(24.dp)
+        )
+    }
+}
+
 @Composable
 private fun MiniProgressBar(vm: PlaybackViewModel, durationMs: Long, color: Color) {
     val positionMs by vm.positionFlow.collectAsState()

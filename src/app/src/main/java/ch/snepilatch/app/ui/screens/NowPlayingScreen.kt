@@ -62,6 +62,8 @@ import ch.snepilatch.app.ui.shared.LikeToggleButton
 import ch.snepilatch.app.ui.shared.PlaylistPickerDialog
 import ch.snepilatch.app.ui.shared.EntityMenuSheet
 import ch.snepilatch.app.ui.shared.MenuAction
+import ch.snepilatch.app.logic.shared.JamHolder
+import ch.snepilatch.app.ui.shared.jamAllowsControls
 
 /**
  * The seek bar + elapsed/duration labels (or the infiniPlay remix timeline), pulled into its own leaf
@@ -840,9 +842,10 @@ private fun AudioDeviceEffect(vm: PlaybackViewModel) {
 
 /** A tonal icon button at a fixed size with the standard player button colours. */
 @Composable
-private fun TonalIconBtn(onClick: () -> Unit, size: Dp, buttonBg: Color, content: @Composable () -> Unit) {
+private fun TonalIconBtn(onClick: () -> Unit, size: Dp, buttonBg: Color, enabled: Boolean = true, content: @Composable () -> Unit) {
     FilledTonalIconButton(
         onClick = onClick,
+        enabled = enabled,
         modifier = Modifier.size(size),
         colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = buttonBg, contentColor = SnepilatchWhite),
     ) { content() }
@@ -894,6 +897,8 @@ private fun PlayerControls(
     val nextReady by vm.isNextReady.collectAsState()
     val isCurrentlyStreaming by vm.isStreaming.collectAsState()
     val nextLoading = !nextReady && isCurrentlyStreaming
+    // A jam whose host turned guest controls off: the transport is shown but does nothing, like the official app.
+    val jamControls = jamAllowsControls()
     val sideBtn = if (compact) 44.dp else 52.dp
     val skipBtn = if (compact) 48.dp else 56.dp
     val playBtn = if (compact) 60.dp else 72.dp
@@ -916,11 +921,12 @@ private fun PlayerControls(
                 modifier = Modifier.size(sideIcon)
             )
         }
-        TonalIconBtn({ onSkip(1) }, skipBtn, buttonBg) {
+        TonalIconBtn({ onSkip(1) }, skipBtn, buttonBg, enabled = jamControls) {
             Icon(Icons.Rounded.SkipPrevious, stringResource(R.string.previous), modifier = Modifier.size(skipIcon))
         }
         FilledIconButton(
             onClick = { if (!spinnerActive) vm.togglePlayPause() },
+            enabled = jamControls,
             colors = IconButtonDefaults.filledIconButtonColors(
                 containerColor = if (spinnerActive) animatedPrimary.copy(alpha = 0.5f) else animatedPrimary,
                 contentColor = SnepilatchWhite,
@@ -936,7 +942,7 @@ private fun PlayerControls(
                 )
             }
         }
-        TonalIconBtn({ onSkip(-1) }, skipBtn, buttonBg) {
+        TonalIconBtn({ onSkip(-1) }, skipBtn, buttonBg, enabled = jamControls) {
             if (nextLoading) {
                 LoadingIndicator(color = SnepilatchWhite, modifier = Modifier.size(nextSpinnerSize))
             } else {
@@ -1103,6 +1109,8 @@ private fun NowPlayingMenu(
         val songRadioLabel = stringResource(R.string.go_to_song_radio)
         val shareLabel = stringResource(R.string.share)
         val joinJamLabel = stringResource(R.string.join_jam)
+        val jamLabel = stringResource(R.string.jam)
+        val inJam = JamHolder.session.collectAsState().value != null
         val showCodeLabel = stringResource(R.string.show_code)
         val shareContext = LocalContext.current
         val downloadCtx = androidx.compose.ui.platform.LocalContext.current
@@ -1155,9 +1163,9 @@ private fun NowPlayingMenu(
                     else -> vm.downloadCurrentTrack(downloadCtx)
                 }
             },
-            MenuAction(Icons.Rounded.Groups, joinJamLabel) {
+            MenuAction(Icons.Rounded.Groups, if (inJam) jamLabel else joinJamLabel) {
                 onShowMore(false)
-                onOpen(NowPlayingOverlay.Jam)
+                if (inJam) vm.openQueue() else onOpen(NowPlayingOverlay.Jam)
             },
             MenuAction(Icons.Rounded.QrCode2, showCodeLabel) {
                 onShowMore(false)

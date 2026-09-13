@@ -1,23 +1,30 @@
 package ch.snepilatch.app.viewmodel
 
-import ch.snepilatch.app.logic.shared.SessionHolder
+import androidx.lifecycle.viewModelScope
+import ch.snepilatch.app.logic.shared.JamHolder
 import ch.snepilatch.app.logic.shared.LokiLogger
+import ch.snepilatch.app.logic.shared.SessionHolder
+import ch.snepilatch.app.logic.shared.SessionViewModel
 import kotify.api.jam.Jam
 import kotify.api.jam.JamSession
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import ch.snepilatch.app.logic.shared.SessionViewModel
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 
+/**
+ * The jam sheet's model. The session itself lives in [JamHolder], fed by the player client's pushes;
+ * this only joins, leaves and ends, and derives the invite link.
+ */
 class JamViewModel : SessionViewModel("JamVM") {
 
-    private val _jam = MutableStateFlow<JamSession?>(null)
-    val jam: StateFlow<JamSession?> = _jam
-
+    val jam: StateFlow<JamSession?> = JamHolder.session
     val joining = MutableStateFlow(false)
     val error = MutableStateFlow<String?>(null)
 
-    /** The link we joined through — [JamSession.sessionId] is not stable, so leaving re-resolves it. */
-    private var shareToken: String? = null
+    val shareLink: StateFlow<String?> = combine(JamHolder.session, JamHolder.shareToken) { s, t -> JamHolder.shareLink(s, t) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, JamHolder.shareLink(JamHolder.session.value, JamHolder.shareToken.value))
 
     init { JamRoutes.register(this) }
 
@@ -39,35 +46,38 @@ class JamViewModel : SessionViewModel("JamVM") {
         }
         error.value = null
         launchWithSessionLoading("joinJam", joining) { sess ->
-            val joined = Jam(sess).joinFromLink(token)
+            val api = Jam(sess)
+            val joined = api.joinFromLink(token)
             if (joined == null) {
                 error.value = "failed"
                 LokiLogger.w(logTag, "Jam join failed for $token")
             } else {
-                shareToken = token
-                _jam.value = joined
+                JamHolder.shareToken.value = api.shareTokenOf(token)
+                JamHolder.session.value = joined
                 LokiLogger.i(logTag, "Joined jam ${joined.sessionId} (${joined.members.size} members)")
             }
         }
     }
 
+    /** Ask the server again; the pushes normally keep the holder current on their own. */
     fun refresh() {
-        val token = shareToken ?: return
-        launchWithSession("refreshJam") { sess ->
-            Jam(sess).getSession(token)?.let { _jam.value = it }
-        }
+        launchWithSession("refreshJam") { SessionHolder.player?.refreshJam() }
     }
 
     fun leave() {
-        val token = shareToken ?: return
+        val current = jam.value ?: return
         launchWithSessionLoading("leaveJam", joining) { sess ->
-            val api = Jam(sess)
-            // Re-read rather than reusing the joined id: a host restarting the jam rotates it.
-            val current = api.getSession(token)
-            val id = current?.sessionId ?: _jam.value?.sessionId
-            if (id != null) api.leave(id)
-            shareToken = null
-            _jam.value = null
+            // The push that follows clears the holder too; clearing here keeps the sheet honest when
+            // the socket is slow.
+            if (Jam(sess).leave(current.sessionId)) JamHolder.clear()
+        }
+    }
+
+    /** Ends the jam for everyone. The server only lets the host do this. */
+    fun end() {
+        val current = jam.value ?: return
+        launchWithSessionLoading("endJam", joining) { sess ->
+            if (Jam(sess).end(current.sessionId)) JamHolder.clear()
         }
     }
 }
@@ -75,9 +85,7 @@ class JamViewModel : SessionViewModel("JamVM") {
 /** Process-scoped hop so the deep-link handler can reach the live [JamViewModel]. */
 object JamRoutes {
     @Volatile private var target: JamViewModel? = null
-
     fun register(vm: JamViewModel) { target = vm }
     fun unregister(vm: JamViewModel) { if (target === vm) target = null }
-
     fun join(linkOrToken: String) { target?.join(linkOrToken) }
 }

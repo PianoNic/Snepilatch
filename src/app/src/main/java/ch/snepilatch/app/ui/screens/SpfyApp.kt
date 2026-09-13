@@ -80,6 +80,8 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import ch.snepilatch.app.ui.shared.PlaylistPickerDialog
 import ch.snepilatch.app.logic.shared.spfyId
+import ch.snepilatch.app.logic.shared.JamHolder
+import ch.snepilatch.app.ui.shared.JamBanner
 
 /** Dp height of the bottom overlay (MiniPlayer + BottomNav). Screens use this for bottom padding. */
 val LocalBottomOverlayHeight = compositionLocalOf { mutableStateOf(0.dp) }
@@ -171,6 +173,8 @@ fun SpfyApp(vm: PlaybackViewModel) {
                     }
                 }
         ) {
+            val jam by JamHolder.session.collectAsState()
+            jam?.let { JamBanner(it, onClick = { vm.openQueue() }) }
             if (hasTrack) {
                 MiniPlayer(
                     vm,

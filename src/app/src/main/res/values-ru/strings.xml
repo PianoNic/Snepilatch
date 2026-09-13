@@ -372,4 +372,12 @@
     <string name="jam_members">Участников: %1$d</string>
     <string name="join_jam">Присоединиться к джему</string>
     <string name="jam_connected">Подключено к джему</string>
+    <string name="jam_of">Джем %1$s</string>
+    <string name="jam_invite">Пригласить друзей в джем</string>
+    <string name="jam_share_link">Поделиться ссылкой</string>
+    <string name="jam_qr_hint">Отсканируйте код или поделитесь ссылкой, чтобы присоединиться.</string>
+    <string name="jam_end">Завершить джем</string>
+    <string name="jam_listening">Слушает</string>
+    <string name="jam_you">Вы</string>
+    <string name="jam_controls_locked">Хост отключил воспроизведение, паузу и пропуск для гостей.</string>
 </resources>

@@ -28,8 +28,8 @@ data class OfflinePlayback(
  * reads, so the player UI needs no offline branch of its own. Process-scoped like
  * [ch.snepilatch.app.logic.shared.SessionHolder], so an offline cold launch reaches it too.
  *
- * #789 is the state and starting a track; transport, the queue, signal loss and the way back to
- * Connect follow (#790 to #793).
+ * #789 is the state and starting a track, #790 the transport; the queue, signal loss and the way
+ * back to Connect follow (#791 to #793).
  */
 object OfflinePlayer {
 
@@ -69,6 +69,41 @@ object OfflinePlayer {
         _state.update { it?.copy(isPlaying = false) }
     }
 
+    /** Pause or resume what is loaded; ExoPlayer keeps the position. */
+    suspend fun togglePlayPause() {
+        val s = _state.value ?: return
+        withContext(Dispatchers.Main) {
+            val svc = service() ?: return@withContext
+            if (s.isPlaying) svc.syncPause() else svc.syncPlay(svc.getCurrentPosition())
+        }
+        _state.update { it?.copy(isPlaying = !s.isPlaying) }
+    }
+
+    suspend fun seekTo(positionMs: Long) {
+        if (_state.value == null) return
+        withContext(Dispatchers.Main) { service()?.syncSeek(positionMs) }
+    }
+
+    /** The next track of the list, if there is one; at the end nothing changes. */
+    suspend fun next(): Boolean {
+        val s = _state.value ?: return false
+        return play(s.tracks, s.index + 1)
+    }
+
+    /**
+     * Back to the start of the current track, or to the previous one when the track has only just
+     * begun, the same threshold the online player uses.
+     */
+    suspend fun previous(): Boolean {
+        val s = _state.value ?: return false
+        val position = withContext(Dispatchers.Main) { service()?.getCurrentPosition() ?: 0L }
+        if (position > PREV_RESTART_THRESHOLD_MS || s.index == 0) {
+            seekTo(0L)
+            return false
+        }
+        return play(s.tracks, s.index - 1)
+    }
+
     fun clear() {
         _state.value = null
     }
@@ -77,4 +112,5 @@ object OfflinePlayer {
         (AudioSourceResolver.localOrNull(uri, title, artist) as? StreamResult.Success)?.info?.url
 
     private const val TAG = "OfflinePlayer"
+    private const val PREV_RESTART_THRESHOLD_MS = 3000L
 }

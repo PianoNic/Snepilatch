@@ -927,9 +927,7 @@ class PlaybackViewModel : ViewModel() {
             return
         }
         LokiLogger.e(TAG, "playbackEnded advance failed with no player, stopping", e)
-        isStreaming.value = false
-        streamProvider.value = null
-        currentStreamUri = null
+        clearStream()
         _playback.value = _playback.value.copy(isPlaying = false, isPaused = true)
         stopPositionTicker()
     }
@@ -1273,9 +1271,7 @@ class PlaybackViewModel : ViewModel() {
         foreignDeviceActive = state.has_active_device && !state.is_active_device
         if (isStreaming.value && foreignDeviceActive) {
             LokiLogger.i(TAG, "Playback transferred to another device — stopping local stream")
-            isStreaming.value = false
-            streamProvider.value = null
-            currentStreamUri = null
+            clearStream()
             stopPositionTicker()
             withContext(Dispatchers.Main) {
                 MusicPlaybackService.instance?.stop()
@@ -1653,9 +1649,7 @@ class PlaybackViewModel : ViewModel() {
                     pssh = stream.pssh,
                 )
             }
-            currentStreamUri = trackUri
-            isStreaming.value = true
-            streamProvider.value = "Spotify CDN"
+            commitStream(trackUri, "Spotify CDN")
             LokiLogger.i(TAG, "[ColdStart] ExoPlayer loading at ${savedPositionAtEntry}ms, will start on STATE_READY")
         } catch (e: Exception) {
             LokiLogger.e(TAG, "[ColdStart] CDN/playDrmUrl failed, falling back to resume", e)
@@ -1813,6 +1807,12 @@ class PlaybackViewModel : ViewModel() {
         currentStreamUri = uri
         isStreaming.value = true
         streamProvider.value = provider
+    }
+
+    private fun clearStream() {
+        isStreaming.value = false
+        streamProvider.value = null
+        currentStreamUri = null
     }
 
     /**
@@ -2745,9 +2745,7 @@ class PlaybackViewModel : ViewModel() {
             val failedUri = currentStreamUri
             val failedPos = _playback.value.positionMs
             LokiLogger.e(TAG, "ExoPlayer error: $errorCode on ${failedUri ?: "?"} @${failedPos}ms — attempting auto-recovery")
-            isStreaming.value = false
-            streamProvider.value = null
-            currentStreamUri = null
+            clearStream()
             viewModelScope.launch(Dispatchers.IO) { recoverFromPlaybackError(failedUri, failedPos) }
         }
         svc.onPlaybackEnded = onEnded@{
@@ -3120,9 +3118,7 @@ class PlaybackViewModel : ViewModel() {
                         pssh = stream.pssh,
                     )
                 }
-                currentStreamUri = trackUri
-                isStreaming.value = true
-                streamProvider.value = "Spotify CDN"
+                commitStream(trackUri, "Spotify CDN")
                 isStreamLoading.value = false
                 LokiLogger.i(TAG, "[Timing] resolveAndPlay DRM loaded in ${System.currentTimeMillis() - resolveStart}ms (${System.currentTimeMillis() - lastCommandTs}ms total from CMD)")
                 preResolveNextTrack()
@@ -3624,9 +3620,7 @@ class PlaybackViewModel : ViewModel() {
                         externalUrl, title, artist, art, startPlaying = !coldStart, headers = emptyMap()
                     )
                 }
-                currentStreamUri = trackUri
-                isStreaming.value = true
-                streamProvider.value = "Podcast (RSS)"
+                commitStream(trackUri, "Podcast (RSS)")
                 LokiLogger.i(TAG, "[Episode] streaming external/RSS url for $trackUri")
                 return
             }
@@ -3645,9 +3639,7 @@ class PlaybackViewModel : ViewModel() {
                         startPlaying = !coldStart, pssh = stream.pssh,
                     )
                 }
-                currentStreamUri = trackUri
-                isStreaming.value = true
-                streamProvider.value = "Spotify CDN"
+                commitStream(trackUri, "Spotify CDN")
                 LokiLogger.i(TAG, "[Episode] hosted DRM loaded in ${System.currentTimeMillis() - resolveStart}ms")
                 return
             }
@@ -3708,9 +3700,7 @@ class PlaybackViewModel : ViewModel() {
                             art,
                             startPlaying = shouldPlay,
                         )
-                        currentStreamUri = uri
-                        isStreaming.value = true
-                        streamProvider.value = result.info.provider
+                        commitStream(uri, result.info.provider)
                         LokiLogger.i(TAG, "Initial stream: ${result.info.provider} (playing=$shouldPlay)")
                     }
                     is StreamResult.Failure -> {

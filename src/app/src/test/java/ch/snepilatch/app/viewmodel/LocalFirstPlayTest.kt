@@ -1,7 +1,7 @@
 package ch.snepilatch.app.viewmodel
 
 import ch.snepilatch.app.data.TrackInfo
-import ch.snepilatch.app.playback.SessionHolder
+import ch.snepilatch.app.logic.shared.SessionHolder
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotify.api.playerconnect.PlayerConnect

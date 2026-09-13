@@ -1,0 +1,73 @@
+package ch.snepilatch.app.logic.playback
+
+import ch.snepilatch.app.data.PlaybackUiState
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+
+/**
+ * Ticks the UI playback position forward every 500ms, reading the authoritative
+ * position from ExoPlayer when streaming locally, and periodically reports the
+ * position back to Spfy Connect so other clients stay in sync.
+ *
+ * Extracted from PlaybackViewModel as a pure refactor — behavior is unchanged.
+ */
+class PositionInterpolator(
+    private val scope: CoroutineScope,
+    private val playback: MutableStateFlow<PlaybackUiState>,
+    private val isStreaming: StateFlow<Boolean>,
+    private val getExoPositionMs: () -> Long?,
+    private val reportPosition: suspend (Long) -> Unit
+) {
+    private var job: Job? = null
+    private var tickCount = 0
+
+    fun start() {
+        // Idempotent: redundant per-state-push starts must not cancel/relaunch the loop (which would
+        // also reset the 30s Connect-report counter). A genuine restart goes through stop() first,
+        // which nulls the job.
+        if (job?.isActive == true) return
+        job = scope.launch {
+            while (true) {
+                delay(TICK_MS)
+                val current = playback.value
+                if (current.isPlaying && !current.isPaused && current.durationMs > 0) {
+                    val newPos = if (isStreaming.value) {
+                        getExoPositionMs() ?: (current.positionMs + TICK_MS)
+                    } else {
+                        current.positionMs + TICK_MS
+                    }
+                    playback.value = current.copy(positionMs = newPos.coerceAtMost(current.durationMs))
+
+                    tickCount++
+                    if (isStreaming.value && tickCount % REPORT_EVERY_N_TICKS == 0) {
+                        launch(Dispatchers.IO) {
+                            try { reportPosition(newPos) } catch (_: Exception) {}
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fun stop() {
+        job?.cancel()
+        job = null
+        tickCount = 0
+    }
+
+    companion object {
+        // 500ms is the authoritative "anchor" cadence — it re-reads ExoPlayer's true position twice a
+        // second. Visual smoothness no longer comes from this tick: the now-playing progress bar
+        // interpolates per display frame via withFrameNanos (see rememberSmoothPositionMs), so the bar
+        // glides at the panel's native refresh rate while this only keeps it honest.
+        private const val TICK_MS = 500L
+
+        // Report to Spfy Connect every 30s (60 * 500ms).
+        private const val REPORT_EVERY_N_TICKS = 60
+    }
+}

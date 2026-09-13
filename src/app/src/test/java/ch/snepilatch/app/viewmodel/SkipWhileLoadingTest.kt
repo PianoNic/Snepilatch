@@ -1,9 +1,9 @@
 package ch.snepilatch.app.viewmodel
 
-import ch.snepilatch.app.playback.AudioSourceResolver
-import ch.snepilatch.app.playback.SessionHolder
-import ch.snepilatch.app.playback.engine.SpfyCdnResolver
-import ch.snepilatch.app.playback.engine.SpfyStream
+import ch.snepilatch.app.logic.playback.AudioSourceResolver
+import ch.snepilatch.app.logic.shared.SessionHolder
+import ch.snepilatch.app.logic.playback.engine.SpfyCdnResolver
+import ch.snepilatch.app.logic.playback.engine.SpfyStream
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -20,6 +20,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
+import ch.snepilatch.app.logic.shared.AppSettings
 
 /**
  * Issue #703: a skip while a track was still loading played the audio of that track. Its file id was

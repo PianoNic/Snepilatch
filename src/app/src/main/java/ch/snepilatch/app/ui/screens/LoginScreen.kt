@@ -34,9 +34,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import ch.snepilatch.app.util.LokiLogger
-import ch.snepilatch.app.util.parseCookieString
-import ch.snepilatch.app.util.saveCookies
+import ch.snepilatch.app.logic.shared.LokiLogger
+import ch.snepilatch.app.logic.shared.parseCookieString
+import ch.snepilatch.app.logic.shared.saveCookies
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 
 @Composable

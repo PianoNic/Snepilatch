@@ -11,10 +11,9 @@
     <ID>CyclomaticComplexMethod:NowPlayingScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun NowPlayingScreen( vm: PlaybackViewModel, /** When false, the screen paints no background of its own — the morphing card * in SpfyApp supplies a card-anchored background that grows with it. */ drawBackground: Boolean = true, /** Per-frame vertical drag (px, down = positive) for finger-tracked collapse; * when set, replaces the standalone swipe-down-to-dismiss. */ onMorphDrag: ((Float) -&gt; Unit)? = null, /** Drag release with vertical velocity (px/s) so the morph can settle. */ onMorphDragEnd: ((Float) -&gt; Unit)? = null )</ID>
     <ID>CyclomaticComplexMethod:PlaybackViewModel.kt$PlaybackViewModel$private suspend fun updatePlaybackFromState(state: PlayerStateData)</ID>
     <ID>CyclomaticComplexMethod:SpfyApp.kt$@Composable fun SpfyApp(vm: PlaybackViewModel)</ID>
-    <ID>Filename:AudioOutputDetector.kt$ch.snepilatch.app.util.AudioOutputDetector.kt</ID>
     <ID>FinalNewline:ExampleUnitTest.kt$ch.snepilatch.app.ExampleUnitTest.kt</ID>
     <ID>FinalNewline:Type.kt$ch.snepilatch.app.ui.theme.Type.kt</ID>
-    <ID>Indentation:AudioOutputDetector.kt$ </ID>
+    <ID>Indentation:AudioOutput.kt$ </ID>
     <ID>Indentation:DetailScreen.kt$ </ID>
     <ID>Indentation:LibraryScreen.kt$ </ID>
     <ID>Indentation:LyricsScreen.kt$ </ID>
@@ -36,12 +35,11 @@
     <ID>LongMethod:PlaybackViewModel.kt$PlaybackViewModel$private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent)</ID>
     <ID>LongMethod:PlaybackViewModel.kt$PlaybackViewModel$private suspend fun updatePlaybackFromState(state: PlayerStateData)</ID>
     <ID>LongMethod:SearchScreen.kt$@Composable fun SearchScreen(vm: PlaybackViewModel, searchVm: SearchViewModel = viewModel())</ID>
-    <ID>LongMethod:SharedComponents.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun TrackRow( track: TrackInfo, vm: PlaybackViewModel, contextUri: String? = null, trackIndex: Int? = null, onRemoveFromPlaylist: (() -&gt; Unit)? = null )</ID>
+    <ID>LongMethod:TrackRow.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun TrackRow( track: TrackInfo, vm: PlaybackViewModel, contextUri: String? = null, trackIndex: Int? = null, onRemoveFromPlaylist: (() -&gt; Unit)? = null )</ID>
     <ID>LongMethod:SpfyApp.kt$@Composable fun SpfyApp(vm: PlaybackViewModel)</ID>
     <ID>LongMethod:UpdateDialog.kt$@Composable fun UpdateDialog( updateInfo: UpdateInfo, onDismiss: () -&gt; Unit )</ID>
     <ID>LongParameterList:MusicPlaybackService.kt$MusicPlaybackService$( url: String, title: String, artist: String, albumArtUrl: String?, startPlaying: Boolean = true, headers: Map&lt;String, String&gt; = emptyMap(), startPositionMs: Long = 0L, cacheKey: String? = null )</ID>
     <ID>LoopWithTooManyJumpStatements:LyricsScreen.kt$for</ID>
-    <ID>MatchingDeclarationName:AudioOutputDetector.kt$AudioOutput</ID>
     <ID>MatchingDeclarationName:ReleaseNotesScreen.kt$ReleaseNote</ID>
     <ID>MaxLineLength:MusicPlaybackService.kt$MusicPlaybackService.&lt;no name provided&gt;$LokiLogger.i(TAG, "Audio session ID changed: $currentAudioSessionId -&gt; $audioSessionId, playWhenReady=${player.playWhenReady}, openSession=$openAudioEffectSession")</ID>
     <ID>MaxLineLength:PlaybackViewModel.kt$PlaybackViewModel$LokiLogger.i(TAG, "[Timing] WS onTrackChange arrived (${delta}ms after CMD '$lastCommandName') -&gt; ${event.current?.uri} fileId=${event.currentFileId}")</ID>
@@ -101,8 +99,6 @@
     <ID>Wrapping:PlaybackViewModel.kt$PlaybackViewModel$(</ID>
     <ID>Wrapping:PlaybackViewModel.kt$PlaybackViewModel$;</ID>
     <ID>Wrapping:ReleaseNotesScreen.kt$(</ID>
-    <ID>Wrapping:SharedComponents.kt$(</ID>
-    <ID>Wrapping:SharedComponents.kt$;</ID>
     <ID>Wrapping:SpfyApp.kt$;</ID>
   </CurrentIssues>
 </SmellBaseline>

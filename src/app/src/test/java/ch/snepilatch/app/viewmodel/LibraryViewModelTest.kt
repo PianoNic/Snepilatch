@@ -1,6 +1,6 @@
 package ch.snepilatch.app.viewmodel
 
-import ch.snepilatch.app.playback.SessionHolder
+import ch.snepilatch.app.logic.shared.SessionHolder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher

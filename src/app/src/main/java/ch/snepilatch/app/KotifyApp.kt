@@ -6,8 +6,8 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
-import ch.snepilatch.app.util.LokiLogger
-import ch.snepilatch.app.viewmodel.AppSettings
+import ch.snepilatch.app.logic.shared.LokiLogger
+import ch.snepilatch.app.logic.shared.AppSettings
 import kotify.utils.LogBackend
 import kotify.utils.Logger
 

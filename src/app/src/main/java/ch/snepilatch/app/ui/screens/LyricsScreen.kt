@@ -41,11 +41,11 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import ch.snepilatch.app.R
-import ch.snepilatch.app.ui.components.SpfyImage
+import ch.snepilatch.app.ui.shared.SpfyImage
 import ch.snepilatch.app.ui.theme.*
-import ch.snepilatch.app.viewmodel.ThemeController
+import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.viewmodel.LyricsViewModel
-import ch.snepilatch.app.viewmodel.AppSettings
+import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch

@@ -1,10 +1,11 @@
 package ch.snepilatch.app.viewmodel
 
-import ch.snepilatch.app.util.LokiLogger
+import ch.snepilatch.app.logic.shared.LokiLogger
 import kotify.api.home.Home
 import kotify.api.home.HomeData
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import ch.snepilatch.app.logic.shared.SessionViewModel
 
 /**
  * ViewModel for the Home feed. Loads the feed in [init] — the old eager load lived in

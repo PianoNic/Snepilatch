@@ -5,6 +5,7 @@ import kotify.api.lyrics.LyricsData
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import ch.snepilatch.app.logic.shared.SessionViewModel
 
 /**
  * ViewModel for the lyrics overlay's content.

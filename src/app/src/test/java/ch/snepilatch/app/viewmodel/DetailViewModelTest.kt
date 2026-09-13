@@ -1,7 +1,7 @@
 package ch.snepilatch.app.viewmodel
 
 import ch.snepilatch.app.data.Screen
-import ch.snepilatch.app.playback.SessionHolder
+import ch.snepilatch.app.logic.shared.SessionHolder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -12,6 +12,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Before
 import org.junit.Test
+import ch.snepilatch.app.logic.shared.Navigator
 
 /**
  * Tests for [DetailViewModel]. Like [SearchViewModelTest]/[LyricsViewModelTest] this doesn't mock the

@@ -7,26 +7,26 @@ import androidx.lifecycle.viewModelScope
 import androidx.annotation.StringRes
 import ch.snepilatch.app.R
 import ch.snepilatch.app.data.UiMessage
-import ch.snepilatch.app.util.LokiLogger
-import ch.snepilatch.app.util.detectActiveAudioOutput
-import ch.snepilatch.app.util.hasInternet
-import ch.snepilatch.app.util.normalizeSpfyImageUrl
-import ch.snepilatch.app.playback.InfiniPlayController
-import ch.snepilatch.app.playback.InfiniPlayViz
-import ch.snepilatch.app.playback.MusicPlaybackService
-import ch.snepilatch.app.playback.PlaybackCache
-import ch.snepilatch.app.playback.PositionInterpolator
-import ch.snepilatch.app.playback.SessionHolder
-import ch.snepilatch.app.download.DownloadFolder
-import ch.snepilatch.app.download.DownloadNotifier
-import ch.snepilatch.app.download.DownloadQueue
-import ch.snepilatch.app.download.Downloads
-import ch.snepilatch.app.download.DownloadOutcome
-import ch.snepilatch.app.download.DownloadRequest
-import ch.snepilatch.app.download.TrackDownloader
-import ch.snepilatch.app.playback.AudioSourceResolver
-import ch.snepilatch.app.playback.engine.SpfyCdnResolver
-import ch.snepilatch.app.playback.engine.SpfyStream
+import ch.snepilatch.app.logic.shared.LokiLogger
+import ch.snepilatch.app.logic.shared.detectActiveAudioOutput
+import ch.snepilatch.app.logic.shared.hasInternet
+import ch.snepilatch.app.logic.shared.normalizeSpfyImageUrl
+import ch.snepilatch.app.logic.playback.InfiniPlayController
+import ch.snepilatch.app.logic.playback.InfiniPlayViz
+import ch.snepilatch.app.logic.playback.MusicPlaybackService
+import ch.snepilatch.app.logic.playback.PlaybackCache
+import ch.snepilatch.app.logic.playback.PositionInterpolator
+import ch.snepilatch.app.logic.shared.SessionHolder
+import ch.snepilatch.app.logic.download.DownloadFolder
+import ch.snepilatch.app.logic.download.DownloadNotifier
+import ch.snepilatch.app.logic.download.DownloadQueue
+import ch.snepilatch.app.logic.download.Downloads
+import ch.snepilatch.app.logic.download.DownloadOutcome
+import ch.snepilatch.app.logic.download.DownloadRequest
+import ch.snepilatch.app.logic.download.TrackDownloader
+import ch.snepilatch.app.logic.playback.AudioSourceResolver
+import ch.snepilatch.app.logic.playback.engine.SpfyCdnResolver
+import ch.snepilatch.app.logic.playback.engine.SpfyStream
 import ch.snepilatch.app.data.*
 import kotify.api.artist.Artist
 import kotify.api.playerconnect.NoActiveDeviceException
@@ -61,6 +61,9 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.cancellation.CancellationException
+import ch.snepilatch.app.logic.shared.AppSettings
+import ch.snepilatch.app.logic.shared.Navigator
+import ch.snepilatch.app.logic.shared.ThemeController
 
 @Suppress("TooManyFunctions") // central view-model; split-by-feature is tracked separately
 class PlaybackViewModel : ViewModel() {
@@ -407,7 +410,7 @@ class PlaybackViewModel : ViewModel() {
         authRecovering = true
         viewModelScope.launch(Dispatchers.IO) {
             val ctx = MusicPlaybackService.instance as? android.content.Context
-            val savedCookies = ctx?.let { ch.snepilatch.app.util.loadCookies(it) }
+            val savedCookies = ctx?.let { ch.snepilatch.app.logic.shared.loadCookies(it) }
             if (savedCookies == null) {
                 surfaceAuthLost()
             } else {
@@ -501,7 +504,7 @@ class PlaybackViewModel : ViewModel() {
      */
     fun setAppLanguage(language: String, context: Context) {
         AppSettings.setAppLanguage(language, context)
-        val cookies = ch.snepilatch.app.util.loadCookies(context) ?: return
+        val cookies = ch.snepilatch.app.logic.shared.loadCookies(context) ?: return
         initJob = null
         tearDownSession()
         initialize(cookies)
@@ -651,7 +654,7 @@ class PlaybackViewModel : ViewModel() {
                     // Retry after cooldown
                     try {
                         val ctx = MusicPlaybackService.instance as? android.content.Context ?: return@launch
-                        val savedCookies = ch.snepilatch.app.util.loadCookies(ctx)
+                        val savedCookies = ch.snepilatch.app.logic.shared.loadCookies(ctx)
                         if (savedCookies != null) {
                             initJob = null
                             initialize(savedCookies)

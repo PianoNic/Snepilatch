@@ -24,12 +24,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
-import ch.snepilatch.app.playback.EqualizerHeadroom
-import ch.snepilatch.app.playback.MusicPlaybackService
+import ch.snepilatch.app.logic.playback.EqualizerHeadroom
+import ch.snepilatch.app.logic.playback.MusicPlaybackService
 import ch.snepilatch.app.ui.theme.*
-import ch.snepilatch.app.viewmodel.AppSettings
+import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
-import ch.snepilatch.app.viewmodel.ThemeController
+import ch.snepilatch.app.logic.shared.ThemeController
 import kotlin.math.abs
 import kotlin.math.roundToInt
 

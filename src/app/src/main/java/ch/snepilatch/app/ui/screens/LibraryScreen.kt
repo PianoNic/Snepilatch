@@ -64,13 +64,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
-import ch.snepilatch.app.download.Downloads
+import ch.snepilatch.app.logic.download.Downloads
 import ch.snepilatch.app.data.LIKED_SONGS_COVER_URL
 import ch.snepilatch.app.data.LibraryItem
 import ch.snepilatch.app.data.TrackInfo
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
-import ch.snepilatch.app.ui.components.SpfyImage
-import ch.snepilatch.app.ui.components.TightAlertDialog
+import ch.snepilatch.app.ui.shared.SpfyImage
+import ch.snepilatch.app.ui.shared.TightAlertDialog
 import ch.snepilatch.app.ui.theme.SnepilatchBlack
 import ch.snepilatch.app.ui.theme.SnepilatchElevated
 import ch.snepilatch.app.ui.theme.SnepilatchGray

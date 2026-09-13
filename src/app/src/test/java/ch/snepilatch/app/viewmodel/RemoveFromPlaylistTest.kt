@@ -3,7 +3,7 @@ package ch.snepilatch.app.viewmodel
 import ch.snepilatch.app.data.DetailData
 import ch.snepilatch.app.data.TrackInfo
 import ch.snepilatch.app.data.isPlaylistOwnedBy
-import ch.snepilatch.app.playback.SessionHolder
+import ch.snepilatch.app.logic.shared.SessionHolder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -15,6 +15,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import ch.snepilatch.app.logic.shared.Navigator
 
 /**
  * Removing is destructive and the app can't undo it, so what gates the action matters more than what

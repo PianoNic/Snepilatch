@@ -11,10 +11,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -52,9 +50,6 @@ import ch.snepilatch.app.ui.shared.DevicesDialog
 import ch.snepilatch.app.ui.shared.MiniPlayer
 import ch.snepilatch.app.ui.shared.MiniPlayerContent
 import ch.snepilatch.app.ui.shared.miniCardBaseColor
-import ch.snepilatch.app.ui.shared.SpfyImage
-import ch.snepilatch.app.ui.shared.TightAlertDialog
-import ch.snepilatch.app.ui.theme.SnepilatchGray
 import ch.snepilatch.app.ui.theme.SnepilatchLightGray
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.logic.shared.ThemeController
@@ -83,6 +78,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.util.lerp
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import ch.snepilatch.app.ui.shared.PlaylistPickerDialog
 
 /** Dp height of the bottom overlay (MiniPlayer + BottomNav). Screens use this for bottom padding. */
 val LocalBottomOverlayHeight = compositionLocalOf { mutableStateOf(0.dp) }
@@ -313,50 +309,16 @@ fun SpfyApp(vm: PlaybackViewModel) {
         val showPicker by vm.showPlaylistPicker.collectAsState()
         if (showPicker) {
             val library by libraryVm.library.collectAsState()
-            val playlists = library.filter { it.type == "playlist" }
-            TightAlertDialog(
-                onDismissRequest = { vm.showPlaylistPicker.value = false },
-                title = { Text(stringResource(R.string.add_to_playlist), color = SnepilatchWhite) },
-                text = {
-                    // TightAlertDialog already wraps `text` in a height-bounded verticalScroll
-                    // Box, which hands its child infinite max height — a LazyColumn there throws
-                    // "measured with an infinity maximum height". Use a plain Column; the dialog
-                    // supplies the scrolling.
-                    Column {
-                        playlists.forEach { playlist ->
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        val trackUris = vm.pendingPlaylistTrackUris.value
-                                        if (trackUris.isEmpty()) return@clickable
-                                        vm.addTracksToPlaylist(playlist.uri.substringAfterLast(":"), trackUris)
-                                        vm.showPlaylistPicker.value = false
-                                    }
-                                    .padding(vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                SpfyImage(
-                                    url = playlist.imageUrl,
-                                    modifier = Modifier.size(44.dp),
-                                    shape = RoundedCornerShape(4.dp)
-                                )
-                                Spacer(Modifier.width(12.dp))
-                                Column {
-                                    Text(playlist.name, color = SnepilatchWhite, fontSize = 14.sp, maxLines = 1)
-                                    playlist.owner?.let { Text(it, color = SnepilatchLightGray, fontSize = 12.sp, maxLines = 1) }
-                                }
-                            }
-                        }
+            PlaylistPickerDialog(
+                playlists = library.filter { it.type == "playlist" },
+                onPick = { playlist ->
+                    val trackUris = vm.pendingPlaylistTrackUris.value
+                    if (trackUris.isNotEmpty()) {
+                        vm.addTracksToPlaylist(playlist.uri.substringAfterLast(":"), trackUris)
+                        vm.showPlaylistPicker.value = false
                     }
                 },
-                containerColor = SnepilatchGray,
-                confirmButton = {},
-                dismissButton = {
-                    TextButton(onClick = { vm.showPlaylistPicker.value = false }) {
-                        Text(stringResource(R.string.cancel), color = SnepilatchLightGray)
-                    }
-                }
+                onDismiss = { vm.showPlaylistPicker.value = false },
             )
         }
     }

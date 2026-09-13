@@ -50,7 +50,6 @@ import ch.snepilatch.app.ui.shared.CoverTrack
 import ch.snepilatch.app.ui.shared.SlidingCoverImage
 import ch.snepilatch.app.ui.shared.SheetNavBarFix
 import ch.snepilatch.app.ui.shared.SpfyImage
-import ch.snepilatch.app.ui.shared.TightAlertDialog
 import ch.snepilatch.app.ui.shared.InfiniPlayTimeline
 import ch.snepilatch.app.ui.shared.rememberSmoothPositionMs
 import ch.snepilatch.app.ui.theme.*
@@ -62,6 +61,7 @@ import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import ch.snepilatch.app.logic.shared.shareSpfyUri
 import ch.snepilatch.app.ui.shared.LikeToggleButton
+import ch.snepilatch.app.ui.shared.PlaylistPickerDialog
 
 /**
  * The seek bar + elapsed/duration labels (or the infiniPlay remix timeline), pulled into its own leaf
@@ -791,52 +791,13 @@ fun NowPlayingScreen(
 
     if (showPlaylistPicker) {
         val libraryItems by libraryVm.library.collectAsState()
-        val playlists = libraryItems.filter { it.type == "playlist" }
-        TightAlertDialog(
-            onDismissRequest = { showPlaylistPicker = false },
-            title = { Text(stringResource(R.string.add_to_playlist), color = SnepilatchWhite) },
-            containerColor = SnepilatchGray,
-            text = {
-                // TightAlertDialog wraps `text` in a height-bounded verticalScroll Box, which
-                // gives its child infinite max height — a LazyColumn there throws "infinity
-                // maximum height". Use a plain Column; the dialog provides the scrolling.
-                Column(Modifier.fillMaxWidth()) {
-                    playlists.forEach { playlist ->
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    track?.uri?.let { uri ->
-                                        val playlistId = playlist.uri.removePrefix("spotify:playlist:")
-                                        vm.addTrackToPlaylist(playlistId, uri)
-                                    }
-                                    showPlaylistPicker = false
-                                }
-                                .padding(vertical = 10.dp, horizontal = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            SpfyImage(
-                                url = playlist.imageUrl,
-                                modifier = Modifier.size(44.dp),
-                                shape = RoundedCornerShape(4.dp)
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Column {
-                                Text(playlist.name, color = SnepilatchWhite, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                playlist.owner?.let {
-                                    Text(it, color = SnepilatchLightGray, fontSize = 12.sp, maxLines = 1)
-                                }
-                            }
-                        }
-                    }
-                }
+        PlaylistPickerDialog(
+            playlists = libraryItems.filter { it.type == "playlist" },
+            onPick = { playlist ->
+                track?.uri?.let { uri -> vm.addTrackToPlaylist(playlist.uri.removePrefix("spotify:playlist:"), uri) }
+                showPlaylistPicker = false
             },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = { showPlaylistPicker = false }) {
-                    Text(stringResource(R.string.cancel), color = SnepilatchLightGray)
-                }
-            }
+            onDismiss = { showPlaylistPicker = false },
         )
     }
 }

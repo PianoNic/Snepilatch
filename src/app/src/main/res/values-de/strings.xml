@@ -367,7 +367,6 @@
     <string name="jam_link_placeholder">Jam-Link</string>
     <string name="jam_join_failed">Beitritt fehlgeschlagen. Der Link ist vielleicht abgelaufen.</string>
     <string name="jam_not_ready">Verbindung wird noch aufgebaut. Gleich nochmal versuchen.</string>
-    <string name="jam_members">%1$d in diesem Jam</string>
     <string name="join_jam">Einem Jam beitreten</string>
     <string name="jam_connected">Mit Jam verbunden</string>
     <string name="jam_of">Jam von %1$s</string>

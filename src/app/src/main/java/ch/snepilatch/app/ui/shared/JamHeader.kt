@@ -11,11 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -39,7 +35,7 @@ import kotify.api.jam.JamSession
 /**
  * The top of the queue sheet while the account is in a jam, laid out like the official app: whose
  * jam it is, the members with an invite button in front, and the way out (leave, or end for the
- * host). Tapping the member count folds the member list open.
+ * host). Tapping the avatar stack folds the member list open.
  */
 @Composable
 fun JamHeader(jam: JamSession, busy: Boolean, onInvite: () -> Unit, onLeave: () -> Unit, onEnd: () -> Unit) {
@@ -60,20 +56,14 @@ fun JamHeader(jam: JamSession, busy: Boolean, onInvite: () -> Unit, onLeave: () 
             }
         }
         Spacer(Modifier.height(4.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            FilledTonalIconButton(onClick = onInvite, modifier = Modifier.size(40.dp)) {
-                Icon(Icons.Rounded.Add, stringResource(R.string.jam_invite), tint = SnepilatchWhite)
-            }
-            Spacer(Modifier.width(8.dp))
-            JamAvatars(jam.members, size = 40.dp, ring = SnepilatchElevated)
-            Spacer(Modifier.width(12.dp))
-            Text(
-                stringResource(R.string.jam_members, jam.members.size),
-                color = SnepilatchLightGray,
-                fontSize = 13.sp,
-                modifier = Modifier.clickable { showMembers = !showMembers }
-            )
-        }
+        // The stack says who is here on its own; tapping it folds the names open.
+        JamAvatars(
+            jam.members,
+            size = 40.dp,
+            ring = SnepilatchElevated,
+            modifier = Modifier.clickable { showMembers = !showMembers },
+            onInvite = onInvite,
+        )
         AnimatedVisibility(showMembers) {
             Column(Modifier.padding(top = 8.dp)) {
                 jam.members.forEach { m ->

@@ -49,7 +49,7 @@ Variant task names are flavor-qualified: `assembleProdDebug` / `assembleDevDebug
 
 **The draft is now the source of the version.** `release-drafter` resolves the next version from the labels on everything merged since the last published release (`feature`/`enhancement` → minor, `bug` → patch), and `nightly.yml` mirrors it. Prereleases don't disturb that resolution (`include-pre-releases` is off), so nightlies can't move the line they're derived from. Two consequences worth knowing: a PR's labels decide the next version, and `build.gradle.kts`'s `versionName` is now only the local/dev fallback — it no longer steers nightlies.
 
-**Known wart:** the drafter runs on both `push` to `main` and `pull_request: closed`, so a squash-merge fires it twice and usually leaves *two* identical drafts. Harmless for the version (nightly sorts and takes the highest), but delete the spare before publishing a release.
+The drafter runs on `push` to `main` only. It used to run on `pull_request: closed` as well, which left two identical drafts after every squash merge and failed outright for PRs from forks, whose runs get a read-only token (#781).
 
 ## Test rig
 

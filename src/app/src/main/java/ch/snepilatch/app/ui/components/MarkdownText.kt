@@ -12,8 +12,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import ch.snepilatch.app.ui.theme.SpfyLightGray
-import ch.snepilatch.app.ui.theme.SpfyWhite
+import ch.snepilatch.app.ui.theme.SnepilatchLightGray
+import ch.snepilatch.app.ui.theme.SnepilatchWhite
 
 /**
  * Enough markdown for a GitHub release body, and no more.
@@ -33,8 +33,8 @@ import ch.snepilatch.app.ui.theme.SpfyWhite
 fun MarkdownText(
     markdown: String,
     modifier: Modifier = Modifier,
-    headingColor: Color = SpfyWhite,
-    bodyColor: Color = SpfyLightGray,
+    headingColor: Color = SnepilatchWhite,
+    bodyColor: Color = SnepilatchLightGray,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         for (line in markdown.lines()) {

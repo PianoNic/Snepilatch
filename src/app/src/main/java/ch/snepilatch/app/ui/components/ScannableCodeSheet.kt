@@ -27,7 +27,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import ch.snepilatch.app.R
 import ch.snepilatch.app.data.TrackInfo
-import ch.snepilatch.app.ui.theme.SpfyWhite
+import ch.snepilatch.app.ui.theme.SnepilatchWhite
 
 /**
  * The scannable code for [track], drawn the way the official app shows it: a black full screen
@@ -51,7 +51,7 @@ fun ScannableCodeSheet(track: TrackInfo, accent: Color, onDismiss: () -> Unit) {
                 .clickable(onClick = onDismiss),
         ) {
             IconButton(onClick = onDismiss, Modifier.statusBarsPadding().padding(8.dp).size(48.dp)) {
-                Icon(Icons.Rounded.Close, stringResource(R.string.close), tint = SpfyWhite, modifier = Modifier.size(28.dp))
+                Icon(Icons.Rounded.Close, stringResource(R.string.close), tint = SnepilatchWhite, modifier = Modifier.size(28.dp))
             }
             Column(Modifier.align(Alignment.Center).fillMaxWidth(CARD_WIDTH_FRACTION)) {
                 SpfyImage(track.albumArt, Modifier.fillMaxWidth().aspectRatio(1f), shape = RectangleShape)

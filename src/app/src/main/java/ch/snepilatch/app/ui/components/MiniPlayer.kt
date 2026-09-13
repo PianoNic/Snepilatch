@@ -2,7 +2,7 @@
 
 package ch.snepilatch.app.ui.components
 
-import ch.snepilatch.app.ui.theme.SpfyWhite
+import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
@@ -53,8 +53,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
-import ch.snepilatch.app.ui.theme.SpfyElevated
-import ch.snepilatch.app.ui.theme.SpfyLightGray
+import ch.snepilatch.app.ui.theme.SnepilatchElevated
+import ch.snepilatch.app.ui.theme.SnepilatchLightGray
 import ch.snepilatch.app.viewmodel.ThemeController
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import kotlinx.coroutines.Job
@@ -65,7 +65,7 @@ import kotlinx.coroutines.launch
  * (PlayerMorph in SpfyApp) so the hand-off from bar to growing card has no
  * colour seam — both must derive the fill from the same tint of the album colour.
  */
-fun miniCardBaseColor(primary: Color): Color = lerp(SpfyElevated, primary, 0.18f)
+fun miniCardBaseColor(primary: Color): Color = lerp(SnepilatchElevated, primary, 0.18f)
 
 /**
  * The compact now-playing bar — a rounded card around [MiniPlayerContent].
@@ -209,9 +209,9 @@ fun MiniPlayerContent(
                     )
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(displayTitle, color = SpfyWhite, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                        Text(displayTitle, color = SnepilatchWhite, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
                             maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(displayArtist, color = SpfyLightGray, fontSize = 12.sp,
+                        Text(displayArtist, color = SnepilatchLightGray, fontSize = 12.sp,
                             maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
@@ -219,13 +219,13 @@ fun MiniPlayerContent(
             IconButton(onClick = { if (!spinnerActive) vm.togglePlayPause() }, modifier = Modifier.size(40.dp)) {
                 if (spinnerActive) {
                     LoadingIndicator(
-                        color = SpfyWhite,
+                        color = SnepilatchWhite,
                         modifier = Modifier.size(20.dp)
                     )
                 } else {
                     Icon(
                         if (isPaused || !isPlaying) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
-                        stringResource(R.string.play_pause), tint = SpfyWhite, modifier = Modifier.size(28.dp)
+                        stringResource(R.string.play_pause), tint = SnepilatchWhite, modifier = Modifier.size(28.dp)
                     )
                 }
             }
@@ -233,7 +233,7 @@ fun MiniPlayerContent(
                 Icon(
                     Icons.Rounded.SkipNext,
                     stringResource(R.string.next),
-                    tint = SpfyWhite,
+                    tint = SnepilatchWhite,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -263,6 +263,6 @@ private fun MiniProgressBar(vm: PlaybackViewModel, durationMs: Long, color: Colo
             .height(2.dp)
             .padding(horizontal = 10.dp),
         color = color,
-        trackColor = SpfyLightGray.copy(alpha = 0.2f),
+        trackColor = SnepilatchLightGray.copy(alpha = 0.2f),
     )
 }

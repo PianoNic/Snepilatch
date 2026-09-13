@@ -48,14 +48,14 @@ fun QueueSheet(vm: PlaybackViewModel) {
     ModalBottomSheet(
         onDismissRequest = { vm.closeQueue() },
         sheetState = sheetState,
-        containerColor = SpfyElevated,
+        containerColor = SnepilatchElevated,
         dragHandle = {
             Box(
                 Modifier
                     .padding(vertical = 12.dp)
                     .width(40.dp)
                     .height(4.dp)
-                    .background(SpfyLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
+                    .background(SnepilatchLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
             )
         }
     ) {
@@ -63,7 +63,7 @@ fun QueueSheet(vm: PlaybackViewModel) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.85f)) {
             Text(
                 stringResource(R.string.queue),
-                color = SpfyWhite,
+                color = SnepilatchWhite,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
@@ -71,7 +71,7 @@ fun QueueSheet(vm: PlaybackViewModel) {
 
             if (queue.isEmpty() && playback.track == null) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Text(stringResource(R.string.queue_empty), color = SpfyLightGray, fontSize = 16.sp)
+                    Text(stringResource(R.string.queue_empty), color = SnepilatchLightGray, fontSize = 16.sp)
                 }
                 return@Column
             }
@@ -260,11 +260,11 @@ private fun SwipeableQueueRow(
             Box(
                 Modifier
                     .fillMaxSize()
-                    .background(SpfyError)
+                    .background(SnepilatchError)
                     .padding(horizontal = 24.dp),
                 contentAlignment = Alignment.CenterEnd
             ) {
-                Icon(Icons.Rounded.Delete, stringResource(R.string.queue_remove), tint = SpfyWhite)
+                Icon(Icons.Rounded.Delete, stringResource(R.string.queue_remove), tint = SnepilatchWhite)
             }
         }
     ) {
@@ -277,13 +277,13 @@ private fun SwipeableQueueRow(
 private fun SectionHeader(title: String, modifier: Modifier = Modifier) {
     Text(
         title,
-        color = SpfyLightGray,
+        color = SnepilatchLightGray,
         fontSize = 14.sp,
         fontWeight = FontWeight.Bold,
         modifier = modifier
             .zIndex(1f)
             .fillMaxWidth()
-            .background(SpfyElevated)
+            .background(SnepilatchElevated)
             .padding(horizontal = 16.dp, vertical = 8.dp)
     )
 }
@@ -300,22 +300,22 @@ private fun QueueRow(
             .onSizeChanged { drag?.onMeasured?.invoke(it.height) }
             // Opaque on purpose: the delete panel sits behind every row, so a transparent row shows
             // it through and the whole list reads as though it were mid-swipe.
-            .background(SpfyElevated)
+            .background(SnepilatchElevated)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         SpfyImage(track.albumArt, Modifier.size(48.dp).clip(RoundedCornerShape(4.dp)))
         Column(Modifier.padding(start = 12.dp).weight(1f)) {
-            Text(track.name, color = SpfyWhite, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(track.artist, color = SpfyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(track.name, color = SnepilatchWhite, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(track.artist, color = SnepilatchLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         // A smart shuffle recommendation, marked so it is not mistaken for a track of the context.
         if (track.isRecommended) {
             Icon(
                 Icons.Rounded.AutoAwesome,
                 stringResource(R.string.shuffle),
-                tint = SpfyLightGray,
+                tint = SnepilatchLightGray,
                 modifier = Modifier.padding(start = 8.dp).size(18.dp)
             )
         }
@@ -323,7 +323,7 @@ private fun QueueRow(
             Icon(
                 Icons.Rounded.DragHandle,
                 stringResource(R.string.queue_reorder),
-                tint = SpfyLightGray,
+                tint = SnepilatchLightGray,
                 modifier = Modifier
                     .padding(start = 8.dp)
                     .size(24.dp)
@@ -350,14 +350,14 @@ private fun NowPlayingRow(track: ch.snepilatch.app.data.TrackInfo, modifier: Mod
     Row(
         modifier
             .fillMaxWidth()
-            .background(SpfyGray.copy(alpha = 0.5f))
+            .background(SnepilatchGray.copy(alpha = 0.5f))
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         SpfyImage(track.albumArt, Modifier.size(48.dp).clip(RoundedCornerShape(4.dp)))
         Column(Modifier.padding(start = 12.dp).weight(1f)) {
-            Text(track.name, color = SpfyWhite, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(track.artist, color = SpfyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(track.name, color = SnepilatchWhite, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(track.artist, color = SnepilatchLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

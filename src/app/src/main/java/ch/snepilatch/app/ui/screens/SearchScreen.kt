@@ -44,6 +44,7 @@ import androidx.compose.material.icons.rounded.PersonAdd
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.IconButton
@@ -74,9 +75,9 @@ import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.components.OverflowAction
 import ch.snepilatch.app.ui.components.OverflowMenu
 import ch.snepilatch.app.ui.components.SpfyImage
-import ch.snepilatch.app.ui.theme.SpfyBlack
-import ch.snepilatch.app.ui.theme.SpfyLightGray
-import ch.snepilatch.app.ui.theme.SpfyWhite
+import ch.snepilatch.app.ui.theme.SnepilatchBlack
+import ch.snepilatch.app.ui.theme.SnepilatchLightGray
+import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import ch.snepilatch.app.viewmodel.DetailRoutes
 import ch.snepilatch.app.viewmodel.SearchViewModel
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
@@ -126,7 +127,7 @@ fun SearchScreen(vm: PlaybackViewModel, searchVm: SearchViewModel = viewModel())
     Column(Modifier.fillMaxSize().padding(top = 12.dp)) {
         Text(
             stringResource(R.string.search_title),
-            color = SpfyWhite,
+            color = SnepilatchWhite,
             fontSize = 26.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -140,21 +141,23 @@ fun SearchScreen(vm: PlaybackViewModel, searchVm: SearchViewModel = viewModel())
                 .padding(horizontal = 16.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .focusRequester(focusRequester),
-            placeholder = { Text(stringResource(R.string.search_field_placeholder), color = SpfyLightGray.copy(alpha = 0.7f)) },
-            leadingIcon = { Icon(Icons.Rounded.Search, null, tint = SpfyBlack) },
+            placeholder = {
+                Text(stringResource(R.string.search_field_placeholder), color = SnepilatchLightGray.copy(alpha = 0.7f))
+            },
+            leadingIcon = { Icon(Icons.Rounded.Search, null, tint = SnepilatchBlack) },
             trailingIcon = {
                 if (query.isNotEmpty()) {
                     IconButton(onClick = { searchVm.updateQuery("") }) {
-                        Icon(Icons.Rounded.Close, stringResource(R.string.search_clear), tint = SpfyBlack)
+                        Icon(Icons.Rounded.Close, stringResource(R.string.search_clear), tint = SnepilatchBlack)
                     }
                 }
             },
             colors = TextFieldDefaults.colors(
-                focusedTextColor = SpfyBlack,
-                unfocusedTextColor = SpfyBlack,
-                cursorColor = SpfyBlack,
-                focusedContainerColor = SpfyWhite,
-                unfocusedContainerColor = SpfyWhite,
+                focusedTextColor = SnepilatchBlack,
+                unfocusedTextColor = SnepilatchBlack,
+                cursorColor = SnepilatchBlack,
+                focusedContainerColor = SnepilatchWhite,
+                unfocusedContainerColor = SnepilatchWhite,
                 focusedIndicatorColor = Color.Transparent,
                 unfocusedIndicatorColor = Color.Transparent
             ),
@@ -186,7 +189,7 @@ fun SearchScreen(vm: PlaybackViewModel, searchVm: SearchViewModel = viewModel())
                 AnimatedVisibility(visible = isSearching, enter = fadeIn(), exit = fadeOut()) {
                     Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                         LoadingIndicator(
-                            color = SpfyWhite,
+                            color = SnepilatchWhite,
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -208,7 +211,7 @@ private fun BrowseCategoriesGrid(onCategoryTap: (String) -> Unit) {
     Column {
         Text(
             stringResource(R.string.search_browse_all),
-            color = SpfyWhite,
+            color = SnepilatchWhite,
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -235,7 +238,7 @@ private fun BrowseCategoriesGrid(onCategoryTap: (String) -> Unit) {
                         .padding(14.dp),
                     contentAlignment = Alignment.BottomStart
                 ) {
-                    Text(cat.name, color = SpfyWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text(cat.name, color = SnepilatchWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -262,15 +265,15 @@ private fun SuggestionsList(
                 Icon(
                     Icons.Rounded.Search,
                     null,
-                    tint = SpfyLightGray,
+                    tint = SnepilatchLightGray,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(Modifier.width(16.dp))
-                Text(sug.text, color = SpfyWhite, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                Text(sug.text, color = SnepilatchWhite, fontSize = 15.sp, modifier = Modifier.weight(1f))
                 Icon(
                     Icons.Rounded.North,
                     null,
-                    tint = SpfyLightGray.copy(alpha = 0.6f),
+                    tint = SnepilatchLightGray.copy(alpha = 0.6f),
                     modifier = Modifier.size(16.dp)
                 )
             }
@@ -513,14 +516,14 @@ private fun TopResultCard(r: UnifiedResult) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(
             stringResource(R.string.search_top_result),
-            color = SpfyWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold,
+            color = SnepilatchWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 8.dp)
         )
         Row(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
-                .background(SpfyLightGray.copy(alpha = 0.10f))
+                .background(SnepilatchLightGray.copy(alpha = 0.10f))
                 .clickable { r.onClick() }
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -533,12 +536,12 @@ private fun TopResultCard(r: UnifiedResult) {
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    r.title, color = SpfyWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold,
+                    r.title, color = SnepilatchWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold,
                     maxLines = 2, overflow = TextOverflow.Ellipsis
                 )
                 if (r.subtitle.isNotBlank()) {
                     Text(
-                        r.subtitle, color = SpfyLightGray, fontSize = 13.sp,
+                        r.subtitle, color = SnepilatchLightGray, fontSize = 13.sp,
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(top = 2.dp)
                     )
@@ -555,10 +558,10 @@ private fun SectionHeader(title: String, onShowAll: () -> Unit) {
         Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(title, color = SpfyWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        Text(title, color = SnepilatchWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
         Text(
             stringResource(R.string.search_show_all),
-            color = SpfyLightGray, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+            color = SnepilatchLightGray, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
             modifier = Modifier.clickable { onShowAll() }
         )
     }
@@ -588,8 +591,8 @@ private fun FilterChipRow(
 
 @Composable
 private fun FilterChip(label: String, isSelected: Boolean, onClick: () -> Unit) {
-    val bg = if (isSelected) Color(0xFF1DB954) else SpfyLightGray.copy(alpha = 0.18f)
-    val fg = if (isSelected) SpfyBlack else SpfyWhite
+    val bg = if (isSelected) MaterialTheme.colorScheme.primary else SnepilatchLightGray.copy(alpha = 0.18f)
+    val fg = if (isSelected) SnepilatchBlack else SnepilatchWhite
     Box(
         Modifier
             .clip(RoundedCornerShape(50))
@@ -636,7 +639,7 @@ private fun ResultRow(
         Column(Modifier.weight(1f)) {
             Text(
                 title,
-                color = SpfyWhite,
+                color = SnepilatchWhite,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
@@ -645,7 +648,7 @@ private fun ResultRow(
             if (subtitle.isNotBlank()) {
                 Text(
                     subtitle,
-                    color = SpfyLightGray,
+                    color = SnepilatchLightGray,
                     fontSize = 13.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis

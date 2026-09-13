@@ -1,6 +1,6 @@
 package ch.snepilatch.app.ui.screens
 
-import ch.snepilatch.app.ui.theme.SpfyWhite
+import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -54,8 +54,8 @@ import ch.snepilatch.app.ui.components.MiniPlayerContent
 import ch.snepilatch.app.ui.components.miniCardBaseColor
 import ch.snepilatch.app.ui.components.SpfyImage
 import ch.snepilatch.app.ui.components.TightAlertDialog
-import ch.snepilatch.app.ui.theme.SpfyGray
-import ch.snepilatch.app.ui.theme.SpfyLightGray
+import ch.snepilatch.app.ui.theme.SnepilatchGray
+import ch.snepilatch.app.ui.theme.SnepilatchLightGray
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.viewmodel.ThemeController
 import ch.snepilatch.app.viewmodel.DetailViewModel
@@ -252,7 +252,7 @@ fun SpfyApp(vm: PlaybackViewModel) {
                     if (isOffline) {
                         Text(
                             stringResource(R.string.offline_banner),
-                            color = SpfyLightGray,
+                            color = SnepilatchLightGray,
                             fontSize = 12.sp,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
@@ -316,7 +316,7 @@ fun SpfyApp(vm: PlaybackViewModel) {
             val playlists = library.filter { it.type == "playlist" }
             TightAlertDialog(
                 onDismissRequest = { vm.showPlaylistPicker.value = false },
-                title = { Text(stringResource(R.string.add_to_playlist), color = SpfyWhite) },
+                title = { Text(stringResource(R.string.add_to_playlist), color = SnepilatchWhite) },
                 text = {
                     // TightAlertDialog already wraps `text` in a height-bounded verticalScroll
                     // Box, which hands its child infinite max height — a LazyColumn there throws
@@ -343,18 +343,18 @@ fun SpfyApp(vm: PlaybackViewModel) {
                                 )
                                 Spacer(Modifier.width(12.dp))
                                 Column {
-                                    Text(playlist.name, color = SpfyWhite, fontSize = 14.sp, maxLines = 1)
-                                    playlist.owner?.let { Text(it, color = SpfyLightGray, fontSize = 12.sp, maxLines = 1) }
+                                    Text(playlist.name, color = SnepilatchWhite, fontSize = 14.sp, maxLines = 1)
+                                    playlist.owner?.let { Text(it, color = SnepilatchLightGray, fontSize = 12.sp, maxLines = 1) }
                                 }
                             }
                         }
                     }
                 },
-                containerColor = SpfyGray,
+                containerColor = SnepilatchGray,
                 confirmButton = {},
                 dismissButton = {
                     TextButton(onClick = { vm.showPlaylistPicker.value = false }) {
-                        Text(stringResource(R.string.cancel), color = SpfyLightGray)
+                        Text(stringResource(R.string.cancel), color = SnepilatchLightGray)
                     }
                 }
             )
@@ -511,11 +511,11 @@ fun LoadingScreen(
                     val progress = ((safeTotal - cooldownSecondsRemaining).toFloat() / safeTotal)
                         .coerceIn(0f, 1f)
 
-                    Icon(Icons.Rounded.CloudOff, null, tint = SpfyLightGray, modifier = Modifier.size(48.dp))
+                    Icon(Icons.Rounded.CloudOff, null, tint = SnepilatchLightGray, modifier = Modifier.size(48.dp))
                     Spacer(Modifier.height(16.dp))
-                    Text(stringResource(R.string.rate_limited), color = SpfyWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.rate_limited), color = SnepilatchWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(8.dp))
-                    Text(stringResource(R.string.retrying_in, cooldownSecondsRemaining), color = SpfyLightGray, fontSize = 14.sp)
+                    Text(stringResource(R.string.retrying_in, cooldownSecondsRemaining), color = SnepilatchLightGray, fontSize = 14.sp)
                     Spacer(Modifier.height(24.dp))
                     LinearProgressIndicator(
                         progress = { progress },
@@ -523,37 +523,37 @@ fun LoadingScreen(
                             .width(200.dp)
                             .height(4.dp)
                             .clip(RoundedCornerShape(2.dp)),
-                        color = SpfyWhite,
-                        trackColor = SpfyLightGray.copy(alpha = 0.2f)
+                        color = SnepilatchWhite,
+                        trackColor = SnepilatchLightGray.copy(alpha = 0.2f)
                     )
                     Spacer(Modifier.height(24.dp))
                     TextButton(onClick = onLogin) {
-                        Text(stringResource(R.string.login_different_account), color = SpfyLightGray, fontSize = 13.sp)
+                        Text(stringResource(R.string.login_different_account), color = SnepilatchLightGray, fontSize = 13.sp)
                     }
                 }
                 error != null -> {
-                    Icon(Icons.Rounded.CloudOff, null, tint = SpfyLightGray, modifier = Modifier.size(48.dp))
+                    Icon(Icons.Rounded.CloudOff, null, tint = SnepilatchLightGray, modifier = Modifier.size(48.dp))
                     Spacer(Modifier.height(16.dp))
-                    Text(stringResource(R.string.connection_failed), color = SpfyWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.connection_failed), color = SnepilatchWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(8.dp))
-                    Text(error.resolve(LocalContext.current), color = SpfyLightGray, fontSize = 13.sp)
+                    Text(error.resolve(LocalContext.current), color = SnepilatchLightGray, fontSize = 13.sp)
                     Spacer(Modifier.height(24.dp))
                     Button(
                         onClick = onRetry,
-                        colors = ButtonDefaults.buttonColors(containerColor = SpfyWhite),
+                        colors = ButtonDefaults.buttonColors(containerColor = SnepilatchWhite),
                         shape = RoundedCornerShape(24.dp)
                     ) {
                         Text(stringResource(R.string.retry), fontWeight = FontWeight.Bold, color = Color.Black)
                     }
                     Spacer(Modifier.height(8.dp))
                     TextButton(onClick = onLogin) {
-                        Text(stringResource(R.string.login_different_account), color = SpfyLightGray, fontSize = 13.sp)
+                        Text(stringResource(R.string.login_different_account), color = SnepilatchLightGray, fontSize = 13.sp)
                     }
                 }
                 else -> {
-                    CircularWavyProgressIndicator(color = SpfyWhite)
+                    CircularWavyProgressIndicator(color = SnepilatchWhite)
                     Spacer(Modifier.height(20.dp))
-                    Text(stringResource(R.string.connecting_to_spfy), color = SpfyLightGray, fontSize = 15.sp)
+                    Text(stringResource(R.string.connecting_to_spfy), color = SnepilatchLightGray, fontSize = 15.sp)
                 }
             }
         }

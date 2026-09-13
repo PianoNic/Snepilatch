@@ -25,7 +25,7 @@ import ch.snepilatch.app.ui.screens.LoadingScreen
 import ch.snepilatch.app.ui.screens.SpfyApp
 import ch.snepilatch.app.ui.screens.SpfyLoginScreen
 import ch.snepilatch.app.ui.theme.SnepilatchTheme
-import ch.snepilatch.app.ui.theme.SpfyBlack
+import ch.snepilatch.app.ui.theme.SnepilatchBlack
 import ch.snepilatch.app.util.UpdateInfo
 import ch.snepilatch.app.util.UpdateService
 import ch.snepilatch.app.util.loadCookies
@@ -208,7 +208,7 @@ class MainActivity : ComponentActivity() {
                 Surface(
                     modifier = Modifier
                         .fillMaxSize(),
-                    color = SpfyBlack
+                    color = SnepilatchBlack
                 ) {
                     // Update dialog
                     if (updateInfo != null) {

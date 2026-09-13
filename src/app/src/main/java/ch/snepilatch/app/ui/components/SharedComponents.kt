@@ -5,7 +5,7 @@ package ch.snepilatch.app.ui.components
 import ch.snepilatch.app.R
 import ch.snepilatch.app.download.DownloadQueue
 import ch.snepilatch.app.download.Downloads
-import ch.snepilatch.app.ui.theme.SpfyWhite
+import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -67,9 +67,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.data.TrackInfo
-import ch.snepilatch.app.ui.theme.SpfyElevated
-import ch.snepilatch.app.ui.theme.SpfyGray
-import ch.snepilatch.app.ui.theme.SpfyLightGray
+import ch.snepilatch.app.ui.theme.SnepilatchElevated
+import ch.snepilatch.app.ui.theme.SnepilatchGray
+import ch.snepilatch.app.ui.theme.SnepilatchLightGray
 import ch.snepilatch.app.util.formatTime
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.viewmodel.ThemeController
@@ -118,7 +118,7 @@ fun ShimmerBox(phase: State<Float>, modifier: Modifier) {
                 val x = phase.value
                 drawRect(
                     Brush.linearGradient(
-                        colors = listOf(SpfyGray, SpfyElevated, SpfyGray),
+                        colors = listOf(SnepilatchGray, SnepilatchElevated, SnepilatchGray),
                         start = Offset(x - 500f, 0f),
                         end = Offset(x, 0f)
                     )
@@ -146,10 +146,10 @@ fun SpfyImage(
     Box(
         modifier
             .clip(shape)
-            .background(SpfyGray),
+            .background(SnepilatchGray),
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, null, tint = SpfyLightGray.copy(alpha = 0.5f), modifier = Modifier.size(32.dp))
+        Icon(icon, null, tint = SnepilatchLightGray.copy(alpha = 0.5f), modifier = Modifier.size(32.dp))
         if (!url.isNullOrEmpty()) {
             val ctx = androidx.compose.ui.platform.LocalContext.current
             AsyncImage(
@@ -262,14 +262,14 @@ fun TrackRow(
         )
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(track.name, color = if (isPlaying) accent else SpfyWhite, fontSize = 15.sp, fontWeight = FontWeight.Medium,
+            Text(track.name, color = if (isPlaying) accent else SnepilatchWhite, fontSize = 15.sp, fontWeight = FontWeight.Medium,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(track.artist, color = SpfyLightGray, fontSize = 13.sp,
+            Text(track.artist, color = SnepilatchLightGray, fontSize = 13.sp,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (isDownloading) {
             if (trackPercent == null) {
-                CircularProgressIndicator(color = accent, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
+                CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
             } else {
                 CircularProgressIndicator(
                     progress = { trackPercent.coerceIn(0, 100) / 100f },
@@ -289,11 +289,11 @@ fun TrackRow(
             Spacer(Modifier.width(6.dp))
         }
         if (track.durationMs > 0) {
-            Text(formatTime(track.durationMs), color = SpfyLightGray, fontSize = 12.sp)
+            Text(formatTime(track.durationMs), color = SnepilatchLightGray, fontSize = 12.sp)
             Spacer(Modifier.width(4.dp))
         }
         IconButton(onClick = { showMenu = true }, modifier = Modifier.size(36.dp)) {
-            Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SpfyLightGray, modifier = Modifier.size(20.dp))
+            Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SnepilatchLightGray, modifier = Modifier.size(20.dp))
         }
     }
 
@@ -306,14 +306,14 @@ fun TrackRow(
         ModalBottomSheet(
             onDismissRequest = { showMenu = false },
             sheetState = sheetState,
-            containerColor = SpfyElevated,
+            containerColor = SnepilatchElevated,
             dragHandle = {
                 Box(
                     Modifier
                         .padding(vertical = 12.dp)
                         .width(40.dp)
                         .height(4.dp)
-                        .background(SpfyLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
+                        .background(SnepilatchLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
                 )
             }
         ) {
@@ -326,12 +326,15 @@ fun TrackRow(
                 SpfyImage(url = track.albumArt, modifier = Modifier.size(48.dp), shape = RoundedCornerShape(8.dp))
                 Spacer(Modifier.width(12.dp))
                 Column {
-                    Text(track.name, color = SpfyWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(track.artist, color = SpfyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        track.name, color = SnepilatchWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(track.artist, color = SnepilatchLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
             Spacer(Modifier.height(8.dp))
-            HorizontalDivider(color = SpfyLightGray.copy(alpha = 0.15f))
+            HorizontalDivider(color = SnepilatchLightGray.copy(alpha = 0.15f))
 
             val shareLabel = stringResource(R.string.share)
             val addToQueueLabel = stringResource(R.string.add_to_queue)
@@ -400,9 +403,9 @@ fun TrackRow(
                         .padding(horizontal = 20.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(icon, null, tint = SpfyWhite, modifier = Modifier.size(24.dp))
+                    Icon(icon, null, tint = SnepilatchWhite, modifier = Modifier.size(24.dp))
                     Spacer(Modifier.width(16.dp))
-                    Text(label, color = SpfyWhite, fontSize = 15.sp)
+                    Text(label, color = SnepilatchWhite, fontSize = 15.sp)
                 }
             }
             Spacer(Modifier.navigationBarsPadding().height(12.dp))
@@ -434,7 +437,7 @@ fun OverflowMenu(
     if (actions.isEmpty()) return
     var showMenu by remember { mutableStateOf(false) }
     IconButton(onClick = { showMenu = true }, modifier = modifier.size(36.dp)) {
-        Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SpfyLightGray, modifier = Modifier.size(20.dp))
+        Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SnepilatchLightGray, modifier = Modifier.size(20.dp))
     }
     if (showMenu) {
         val sheetState = rememberBottomSheetState(
@@ -444,14 +447,14 @@ fun OverflowMenu(
         ModalBottomSheet(
             onDismissRequest = { showMenu = false },
             sheetState = sheetState,
-            containerColor = SpfyElevated,
+            containerColor = SnepilatchElevated,
             dragHandle = {
                 Box(
                     Modifier
                         .padding(vertical = 12.dp)
                         .width(40.dp)
                         .height(4.dp)
-                        .background(SpfyLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
+                        .background(SnepilatchLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
                 )
             }
         ) {
@@ -467,14 +470,14 @@ fun OverflowMenu(
                 )
                 Spacer(Modifier.width(12.dp))
                 Column {
-                    Text(title, color = SpfyWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(title, color = SnepilatchWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (subtitle.isNotBlank()) {
-                        Text(subtitle, color = SpfyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(subtitle, color = SnepilatchLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
             Spacer(Modifier.height(8.dp))
-            HorizontalDivider(color = SpfyLightGray.copy(alpha = 0.15f))
+            HorizontalDivider(color = SnepilatchLightGray.copy(alpha = 0.15f))
             actions.forEach { action ->
                 Row(
                     Modifier
@@ -483,9 +486,9 @@ fun OverflowMenu(
                         .padding(horizontal = 20.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(action.icon, null, tint = SpfyWhite, modifier = Modifier.size(24.dp))
+                    Icon(action.icon, null, tint = SnepilatchWhite, modifier = Modifier.size(24.dp))
                     Spacer(Modifier.width(16.dp))
-                    Text(action.label, color = SpfyWhite, fontSize = 15.sp)
+                    Text(action.label, color = SnepilatchWhite, fontSize = 15.sp)
                 }
             }
             Spacer(Modifier.navigationBarsPadding().height(12.dp))
@@ -498,9 +501,9 @@ fun OverflowMenu(
 @Composable
 fun ProfileInfoItem(label: String, value: String, icon: ImageVector) {
     ListItem(
-        headlineContent = { Text(label, color = SpfyWhite) },
-        supportingContent = { Text(value, color = SpfyLightGray) },
-        leadingContent = { Icon(icon, null, tint = SpfyLightGray) },
+        headlineContent = { Text(label, color = SnepilatchWhite) },
+        supportingContent = { Text(value, color = SnepilatchLightGray) },
+        leadingContent = { Icon(icon, null, tint = SnepilatchLightGray) },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     )
 }

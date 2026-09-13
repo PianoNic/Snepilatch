@@ -2,7 +2,7 @@
 
 package ch.snepilatch.app.ui.components
 
-import ch.snepilatch.app.ui.theme.SpfyWhite
+import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -30,7 +30,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.rememberBottomSheetState
@@ -49,9 +48,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
-import ch.snepilatch.app.ui.theme.SpfyElevated
-import ch.snepilatch.app.ui.theme.SpfyGray
-import ch.snepilatch.app.ui.theme.SpfyLightGray
+import ch.snepilatch.app.ui.theme.SnepilatchElevated
+import ch.snepilatch.app.ui.theme.SnepilatchLightGray
 import ch.snepilatch.app.viewmodel.ThemeController
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 
@@ -82,14 +80,14 @@ fun DevicesDialog(vm: PlaybackViewModel) {
             vm.showDevices.value = false
         },
         sheetState = sheetState,
-        containerColor = SpfyElevated,
+        containerColor = SnepilatchElevated,
         dragHandle = {
             Box(
                 Modifier
                     .padding(vertical = 12.dp)
                     .width(40.dp)
                     .height(4.dp)
-                    .background(SpfyLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
+                    .background(SnepilatchLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
             )
         }
     ) {
@@ -102,7 +100,7 @@ fun DevicesDialog(vm: PlaybackViewModel) {
             // Title
             Text(
                 stringResource(R.string.connect),
-                color = SpfyWhite,
+                color = SnepilatchWhite,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
@@ -123,9 +121,9 @@ fun DevicesDialog(vm: PlaybackViewModel) {
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    LoadingIndicator(color = SpfyWhite, modifier = Modifier.size(24.dp))
+                    LoadingIndicator(color = SnepilatchWhite, modifier = Modifier.size(24.dp))
                     Spacer(Modifier.width(12.dp))
-                    Text(stringResource(R.string.searching_devices), color = SpfyLightGray, fontSize = 14.sp)
+                    Text(stringResource(R.string.searching_devices), color = SnepilatchLightGray, fontSize = 14.sp)
                 }
             }
 
@@ -173,7 +171,7 @@ fun DevicesDialog(vm: PlaybackViewModel) {
                             .padding(horizontal = 20.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.AutoMirrored.Rounded.VolumeDown, null, tint = SpfyLightGray, modifier = Modifier.size(20.dp))
+                        Icon(Icons.AutoMirrored.Rounded.VolumeDown, null, tint = SnepilatchLightGray, modifier = Modifier.size(20.dp))
                         var volumeValue by remember { mutableFloatStateOf(playback.volume.toFloat()) }
                         var dragging by remember { mutableStateOf(false) }
                         // Track external volume changes when the user isn't dragging (equal writes to
@@ -190,13 +188,8 @@ fun DevicesDialog(vm: PlaybackViewModel) {
                                 dragging = false
                             },
                             modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
-                            colors = SliderDefaults.colors(
-                                thumbColor = accentColor,
-                                activeTrackColor = accentColor,
-                                inactiveTrackColor = SpfyGray
-                            )
                         )
-                        Icon(Icons.AutoMirrored.Rounded.VolumeUp, null, tint = SpfyLightGray, modifier = Modifier.size(20.dp))
+                        Icon(Icons.AutoMirrored.Rounded.VolumeUp, null, tint = SnepilatchLightGray, modifier = Modifier.size(20.dp))
                     }
                 }
 
@@ -222,13 +215,13 @@ fun DevicesDialog(vm: PlaybackViewModel) {
                             else -> Icons.Rounded.Computer
                         },
                         null,
-                        tint = SpfyLightGray,
+                        tint = SnepilatchLightGray,
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(Modifier.width(16.dp))
                     Text(
                         if (isOurDevice) stringResource(R.string.this_smartphone) else device.name,
-                        color = SpfyWhite,
+                        color = SnepilatchWhite,
                         fontSize = 16.sp,
                         modifier = Modifier.weight(1f)
                     )

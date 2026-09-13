@@ -1,6 +1,6 @@
 package ch.snepilatch.app.ui.screens
 
-import ch.snepilatch.app.ui.theme.SpfyWhite
+import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -71,10 +71,10 @@ import ch.snepilatch.app.data.TrackInfo
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import ch.snepilatch.app.ui.components.SpfyImage
 import ch.snepilatch.app.ui.components.TightAlertDialog
-import ch.snepilatch.app.ui.theme.SpfyBlack
-import ch.snepilatch.app.ui.theme.SpfyElevated
-import ch.snepilatch.app.ui.theme.SpfyGray
-import ch.snepilatch.app.ui.theme.SpfyLightGray
+import ch.snepilatch.app.ui.theme.SnepilatchBlack
+import ch.snepilatch.app.ui.theme.SnepilatchElevated
+import ch.snepilatch.app.ui.theme.SnepilatchGray
+import ch.snepilatch.app.ui.theme.SnepilatchLightGray
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.LibraryViewModel
@@ -137,13 +137,13 @@ fun LibraryScreen() {
                 .padding(horizontal = 12.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(stringResource(R.string.library_title), color = SpfyWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold,
+            Text(stringResource(R.string.library_title), color = SnepilatchWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f))
             IconButton(onClick = { searchActive = !searchActive; if (!searchActive) searchQuery = "" }) {
-                Icon(Icons.Rounded.Search, stringResource(R.string.search), tint = SpfyWhite, modifier = Modifier.size(24.dp))
+                Icon(Icons.Rounded.Search, stringResource(R.string.search), tint = SnepilatchWhite, modifier = Modifier.size(24.dp))
             }
             IconButton(onClick = { showCreateDialog = true }) {
-                Icon(Icons.Rounded.Add, stringResource(R.string.library_create), tint = SpfyWhite, modifier = Modifier.size(26.dp))
+                Icon(Icons.Rounded.Add, stringResource(R.string.library_create), tint = SnepilatchWhite, modifier = Modifier.size(26.dp))
             }
         }
 
@@ -159,23 +159,23 @@ fun LibraryScreen() {
                 placeholder = {
                     Text(
                         stringResource(R.string.library_search_placeholder),
-                        color = SpfyLightGray.copy(alpha = 0.7f)
+                        color = SnepilatchLightGray.copy(alpha = 0.7f)
                     )
                 },
-                leadingIcon = { Icon(Icons.Rounded.Search, null, tint = SpfyLightGray) },
+                leadingIcon = { Icon(Icons.Rounded.Search, null, tint = SnepilatchLightGray) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Rounded.Close, stringResource(R.string.clear), tint = SpfyLightGray)
+                            Icon(Icons.Rounded.Close, stringResource(R.string.clear), tint = SnepilatchLightGray)
                         }
                     }
                 },
                 colors = TextFieldDefaults.colors(
-                    focusedTextColor = SpfyWhite,
-                    unfocusedTextColor = SpfyWhite,
-                    cursorColor = SpfyWhite,
-                    focusedContainerColor = SpfyGray,
-                    unfocusedContainerColor = SpfyGray,
+                    focusedTextColor = SnepilatchWhite,
+                    unfocusedTextColor = SnepilatchWhite,
+                    cursorColor = SnepilatchWhite,
+                    focusedContainerColor = SnepilatchGray,
+                    unfocusedContainerColor = SnepilatchGray,
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent
                 ),
@@ -210,10 +210,10 @@ fun LibraryScreen() {
                             )
                         },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = SpfyWhite,
-                            selectedLabelColor = SpfyBlack,
-                            containerColor = SpfyGray,
-                            labelColor = SpfyWhite
+                            selectedContainerColor = SnepilatchWhite,
+                            selectedLabelColor = SnepilatchBlack,
+                            containerColor = SnepilatchGray,
+                            labelColor = SnepilatchWhite
                         ),
                         border = null
                     )
@@ -227,10 +227,10 @@ fun LibraryScreen() {
                     },
                     label = { Text(filters[i].second, fontSize = 13.sp) },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = SpfyWhite,
-                        selectedLabelColor = SpfyBlack,
-                        containerColor = SpfyGray,
-                        labelColor = SpfyWhite
+                        selectedContainerColor = SnepilatchWhite,
+                        selectedLabelColor = SnepilatchBlack,
+                        containerColor = SnepilatchGray,
+                        labelColor = SnepilatchWhite
                     ),
                     border = null
                 )
@@ -250,19 +250,19 @@ fun LibraryScreen() {
                     Modifier.clickable { showSortMenu = true }.padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Rounded.SwapVert, stringResource(R.string.library_sort), tint = SpfyLightGray, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Rounded.SwapVert, stringResource(R.string.library_sort), tint = SnepilatchLightGray, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
                     val sortLabel = when (sortMode) {
                         "alpha" -> stringResource(R.string.library_sort_alpha)
                         "type" -> stringResource(R.string.library_sort_by_type)
                         else -> stringResource(R.string.library_sort_recent)
                     }
-                    Text(sortLabel, color = SpfyLightGray, fontSize = 13.sp)
+                    Text(sortLabel, color = SnepilatchLightGray, fontSize = 13.sp)
                 }
                 DropdownMenu(
                     expanded = showSortMenu,
                     onDismissRequest = { showSortMenu = false },
-                    containerColor = SpfyGray
+                    containerColor = SnepilatchGray
                 ) {
                     listOf(
                         "recent" to stringResource(R.string.library_sort_recent),
@@ -270,7 +270,7 @@ fun LibraryScreen() {
                         "type" to stringResource(R.string.library_sort_by_type)
                     ).forEach { (value, label) ->
                         DropdownMenuItem(
-                            text = { Text(label, color = if (sortMode == value) SpfyWhite else SpfyLightGray) },
+                            text = { Text(label, color = if (sortMode == value) SnepilatchWhite else SnepilatchLightGray) },
                             onClick = { sortMode = value; prefs.edit().putString("library_sort", value).apply(); showSortMenu = false }
                         )
                     }
@@ -283,7 +283,7 @@ fun LibraryScreen() {
                 Icon(
                     if (gridView) Icons.AutoMirrored.Rounded.List else Icons.Rounded.GridView,
                     stringResource(R.string.library_toggle_view),
-                    tint = SpfyLightGray,
+                    tint = SnepilatchLightGray,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -405,11 +405,11 @@ fun LibraryGridCard(item: LibraryItem, downloadedGroup: Boolean = false) {
             )
         }
         Spacer(Modifier.height(8.dp))
-        Text(item.name, color = SpfyWhite, fontSize = 14.sp, fontWeight = FontWeight.Medium,
+        Text(item.name, color = SnepilatchWhite, fontSize = 14.sp, fontWeight = FontWeight.Medium,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(
             "${item.type.replaceFirstChar { it.uppercase() }}${if (item.owner != null) " \u00B7 ${item.owner}" else ""}",
-            color = SpfyLightGray, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+            color = SnepilatchLightGray, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
         )
     }
 }
@@ -460,11 +460,11 @@ fun LibraryListItem(item: LibraryItem, downloadedGroup: Boolean = false) {
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(item.name, color = SpfyWhite, fontSize = 16.sp, fontWeight = FontWeight.Medium,
+            Text(item.name, color = SnepilatchWhite, fontSize = 16.sp, fontWeight = FontWeight.Medium,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
                 "${item.type.replaceFirstChar { it.uppercase() }}${if (item.owner != null) " \u00B7 ${item.owner}" else ""}",
-                color = SpfyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+                color = SnepilatchLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -475,20 +475,22 @@ fun CreatePlaylistDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
     var name by remember { mutableStateOf("") }
     TightAlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = SpfyElevated,
-        title = { Text(stringResource(R.string.library_create_playlist), color = SpfyWhite, fontWeight = FontWeight.Bold) },
+        containerColor = SnepilatchElevated,
+        title = {
+            Text(stringResource(R.string.library_create_playlist), color = SnepilatchWhite, fontWeight = FontWeight.Bold)
+        },
         text = {
             TextField(
                 value = name,
                 onValueChange = { name = it },
-                placeholder = { Text(stringResource(R.string.library_playlist_name_hint), color = SpfyLightGray) },
+                placeholder = { Text(stringResource(R.string.library_playlist_name_hint), color = SnepilatchLightGray) },
                 colors = TextFieldDefaults.colors(
-                    focusedTextColor = SpfyWhite,
-                    unfocusedTextColor = SpfyWhite,
-                    cursorColor = SpfyWhite,
-                    focusedContainerColor = SpfyGray,
-                    unfocusedContainerColor = SpfyGray,
-                    focusedIndicatorColor = SpfyWhite,
+                    focusedTextColor = SnepilatchWhite,
+                    unfocusedTextColor = SnepilatchWhite,
+                    cursorColor = SnepilatchWhite,
+                    focusedContainerColor = SnepilatchGray,
+                    unfocusedContainerColor = SnepilatchGray,
+                    focusedIndicatorColor = SnepilatchWhite,
                     unfocusedIndicatorColor = Color.Transparent
                 ),
                 singleLine = true,
@@ -497,11 +499,11 @@ fun CreatePlaylistDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
         },
         confirmButton = {
             TextButton(onClick = { if (name.isNotBlank()) onCreate(name) }) {
-                Text(stringResource(R.string.library_create_button), color = SpfyWhite, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.library_create_button), color = SnepilatchWhite, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel), color = SpfyLightGray) }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel), color = SnepilatchLightGray) }
         }
     )
 }
@@ -516,14 +518,14 @@ private fun DownloadRemoveDialog(item: LibraryItem, onDismiss: () -> Unit) {
     val tracks = remember(item.uri) { Downloads.tracksInGroup(item.uri) }
     TightAlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.remove_download), color = SpfyWhite) },
+        title = { Text(stringResource(R.string.remove_download), color = SnepilatchWhite) },
         text = {
             Text(
                 pluralStringResource(R.plurals.remove_download_message, tracks.size, item.name, tracks.size),
-                color = SpfyLightGray
+                color = SnepilatchLightGray
             )
         },
-        containerColor = SpfyGray,
+        containerColor = SnepilatchGray,
         confirmButton = {
             TextButton(onClick = {
                 tracks.forEach { vm.removeDownload(it.trackUri) }
@@ -534,7 +536,7 @@ private fun DownloadRemoveDialog(item: LibraryItem, onDismiss: () -> Unit) {
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel), color = SpfyLightGray)
+                Text(stringResource(R.string.cancel), color = SnepilatchLightGray)
             }
         }
     )
@@ -545,9 +547,9 @@ private fun LibraryRemoveDialog(item: LibraryItem, onDismiss: () -> Unit) {
     val libraryVm: LibraryViewModel = viewModel()
     TightAlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.library_remove_title), color = SpfyWhite) },
-        text = { Text(stringResource(R.string.library_remove_message, item.name), color = SpfyLightGray) },
-        containerColor = SpfyGray,
+        title = { Text(stringResource(R.string.library_remove_title), color = SnepilatchWhite) },
+        text = { Text(stringResource(R.string.library_remove_message, item.name), color = SnepilatchLightGray) },
+        containerColor = SnepilatchGray,
         confirmButton = {
             TextButton(onClick = {
                 libraryVm.removeFromLibrary(item)
@@ -558,7 +560,7 @@ private fun LibraryRemoveDialog(item: LibraryItem, onDismiss: () -> Unit) {
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel), color = SpfyLightGray)
+                Text(stringResource(R.string.cancel), color = SnepilatchLightGray)
             }
         }
     )

@@ -1,6 +1,9 @@
 package ch.snepilatch.app.data
 
 import androidx.compose.ui.graphics.Color
+import ch.snepilatch.app.ui.theme.SnepilatchBlack
+import ch.snepilatch.app.ui.theme.SnepilatchGray
+import ch.snepilatch.app.ui.theme.SnepilatchLightGray
 
 enum class Screen {
     LOGIN, HOME, SEARCH, LIBRARY, NOW_PLAYING, PLAYLIST_DETAIL, ALBUM_DETAIL,
@@ -119,9 +122,9 @@ data class AccountInfo(
 )
 
 data class ThemeColors(
-    val primary: Color = Color(0xFFB3B3B3),
+    val primary: Color = SnepilatchLightGray,
     val primaryDark: Color = Color(0xFF808080),
-    val surface: Color = Color(0xFF282828),
-    val gradientTop: Color = Color(0xFF282828),
-    val gradientBottom: Color = Color(0xFF121212)
+    val surface: Color = SnepilatchGray,
+    val gradientTop: Color = SnepilatchGray,
+    val gradientBottom: Color = SnepilatchBlack
 )

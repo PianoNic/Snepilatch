@@ -26,9 +26,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import ch.snepilatch.app.ui.theme.SpfyElevated
-import ch.snepilatch.app.ui.theme.SpfyLightGray
-import ch.snepilatch.app.ui.theme.SpfyWhite
+import ch.snepilatch.app.ui.theme.SnepilatchElevated
+import ch.snepilatch.app.ui.theme.SnepilatchLightGray
+import ch.snepilatch.app.ui.theme.SnepilatchWhite
 
 /**
  * The action sheet for a whole entity (playlist, album, artist, show), wherever it is reached from:
@@ -51,7 +51,7 @@ fun EntityMenuSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = SpfyElevated,
+        containerColor = SnepilatchElevated,
     ) {
         SheetNavBarFix()
         Row(
@@ -63,7 +63,7 @@ fun EntityMenuSheet(
             Column {
                 Text(
                     title,
-                    color = SpfyWhite,
+                    color = SnepilatchWhite,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -72,7 +72,7 @@ fun EntityMenuSheet(
                 if (subtitle != null) {
                     Text(
                         subtitle,
-                        color = SpfyLightGray,
+                        color = SnepilatchLightGray,
                         fontSize = 13.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -81,7 +81,7 @@ fun EntityMenuSheet(
             }
         }
         Spacer(Modifier.height(8.dp))
-        HorizontalDivider(color = SpfyLightGray.copy(alpha = 0.15f))
+        HorizontalDivider(color = SnepilatchLightGray.copy(alpha = 0.15f))
         actions.forEach { action ->
             Row(
                 Modifier
@@ -90,9 +90,9 @@ fun EntityMenuSheet(
                     .padding(horizontal = 20.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(action.icon, null, tint = SpfyWhite, modifier = Modifier.size(24.dp))
+                Icon(action.icon, null, tint = SnepilatchWhite, modifier = Modifier.size(24.dp))
                 Spacer(Modifier.width(16.dp))
-                Text(action.label, color = SpfyWhite, fontSize = 15.sp)
+                Text(action.label, color = SnepilatchWhite, fontSize = 15.sp)
             }
         }
         Spacer(Modifier.navigationBarsPadding().height(12.dp))

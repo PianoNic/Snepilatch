@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import ch.snepilatch.app.logic.shared.SessionViewModel
+import ch.snepilatch.app.logic.shared.spfyId
 
 /**
  * ViewModel for the "Your Library" screen: the saved list + pagination, plus create/remove.
@@ -69,7 +70,7 @@ class LibraryViewModel : SessionViewModel("LibraryVM") {
 
     fun removeFromLibrary(item: LibraryItem) {
         launchWithSession("removeFromLibrary") { sess ->
-            val id = item.uri.substringAfterLast(":")
+            val id = spfyId(item.uri)
             when (item.type) {
                 "album" -> Album(sess).removeFromLibrary(id)
                 "artist" -> Artist(sess).unfollow(id)

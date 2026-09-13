@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import ch.snepilatch.app.logic.shared.Navigator
 import ch.snepilatch.app.logic.shared.SessionViewModel
+import ch.snepilatch.app.logic.shared.spfyId
 
 /**
  * ViewModel for the shared detail screen (playlist / album / artist / show).
@@ -142,7 +143,7 @@ class DetailViewModel : SessionViewModel("DetailVM") {
                 LokiLogger.w(logTag, "No radio station for $seedUri")
                 return@launchWithSession
             }
-            openPlaylist(stationUri.substringAfterLast(':'))
+            openPlaylist(spfyId(stationUri))
         }
     }
 
@@ -151,7 +152,7 @@ class DetailViewModel : SessionViewModel("DetailVM") {
      * [uri]. False when the type has no page, so the caller decides what to do with it instead.
      */
     fun openEntity(type: String, uri: String, owner: String? = null, imageUrl: String? = null): Boolean {
-        val id = uri.substringAfterLast(':')
+        val id = spfyId(uri)
         when (type) {
             "collection" -> openLikedSongs()
             "playlist" -> openPlaylist(id)
@@ -168,7 +169,7 @@ class DetailViewModel : SessionViewModel("DetailVM") {
             val trackId = trackUri.removePrefix("spotify:track:")
             val track = Song(sess).getSong(trackId) ?: return@launchWithSession
             val albumUri = track.album.uri.takeIf { it.isNotBlank() } ?: return@launchWithSession
-            openAlbum(albumUri.substringAfterLast(":"))
+            openAlbum(spfyId(albumUri))
         }
     }
 
@@ -177,7 +178,7 @@ class DetailViewModel : SessionViewModel("DetailVM") {
             val trackId = trackUri.removePrefix("spotify:track:")
             val track = Song(sess).getSong(trackId) ?: return@launchWithSession
             val artistUri = track.artists.firstOrNull()?.uri?.takeIf { it.isNotBlank() } ?: return@launchWithSession
-            openArtist(artistUri.substringAfterLast(":"))
+            openArtist(spfyId(artistUri))
         }
     }
 
@@ -296,7 +297,7 @@ class DetailViewModel : SessionViewModel("DetailVM") {
      */
     fun fetchTrackUris(uri: String, onReady: (List<String>) -> Unit) {
         launchWithSession("fetchTrackUris") { sess ->
-            val id = uri.substringAfterLast(":")
+            val id = spfyId(uri)
             val tracks = when {
                 uri.contains(":collection") -> Playlist(sess).getLikedSongs(limit = 50).toDetailData(offset = 0)
                 uri.contains(":album:") -> Album(sess).getAlbum(id, limit = 50).toDetailData(id)

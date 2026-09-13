@@ -12,6 +12,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
+import ch.snepilatch.app.logic.shared.spfyId
 
 /**
  * Resolves audio through ArgonFetch, for when googlevideo refuses the url the InnerTube player
@@ -46,7 +47,7 @@ object ArgonFetchSource {
 
     /** A streamable audio for [trackUri], or null when ArgonFetch cannot resolve it. */
     suspend fun audio(trackUri: String): Audio? = withContext(Dispatchers.IO) {
-        val id = trackUri.substringAfterLast(':')
+        val id = spfyId(trackUri)
         val request = Request.Builder()
             .url("$BASE_URL/api/Fetch/GetResource?url=https://open.spotify.com/track/$id")
             .header("Accept", "application/json")

@@ -90,6 +90,7 @@ import kotify.api.song.SearchTrack
 import kotify.api.song.SearchUser
 import ch.snepilatch.app.logic.shared.shareSpfyUri
 import ch.snepilatch.app.ui.shared.MenuAction
+import ch.snepilatch.app.logic.shared.spfyId
 
 private data class BrowseCategory(val name: String, val color: Color)
 private val browseCategories = listOf(
@@ -338,10 +339,10 @@ private fun SearchArtist.toUnified(vm: PlaybackViewModel, ctx: Context) = Unifie
     subtitle = ctx.getString(R.string.search_subtitle_artist),
     imageUrl = avatarUrl,
     circular = true,
-    onClick = { DetailRoutes.openArtist(idFromUri(uri)) },
+    onClick = { DetailRoutes.openArtist(spfyId(uri)) },
     menu = listOf(
         MenuAction(Icons.Rounded.PersonAdd, "Follow") {
-            vm.followArtist(idFromUri(uri))
+            vm.followArtist(spfyId(uri))
         },
         shareAction(ctx, uri)
     )
@@ -356,7 +357,7 @@ private fun SearchAlbum.toUnified(ctx: Context): UnifiedResult {
         subtitle = listOfNotNull(typeLabel.takeIf { it.isNotBlank() }, artistName).joinToString(" · "),
         imageUrl = coverArtUrl,
         circular = false,
-        onClick = { DetailRoutes.openAlbum(idFromUri(uri)) },
+        onClick = { DetailRoutes.openAlbum(spfyId(uri)) },
         menu = listOf(shareAction(ctx, uri))
     )
 }
@@ -367,10 +368,10 @@ private fun SearchPlaylist.toUnified(vm: PlaybackViewModel, ctx: Context) = Unif
     subtitle = listOfNotNull(ctx.getString(R.string.search_subtitle_playlist), ownerName).joinToString(" · "),
     imageUrl = coverArtUrl,
     circular = false,
-    onClick = { DetailRoutes.openPlaylist(idFromUri(uri)) },
+    onClick = { DetailRoutes.openPlaylist(spfyId(uri)) },
     menu = listOf(
         MenuAction(Icons.Rounded.Add, ctx.getString(R.string.save_to_library)) {
-            vm.savePlaylist(idFromUri(uri))
+            vm.savePlaylist(spfyId(uri))
         },
         shareAction(ctx, uri)
     )
@@ -383,7 +384,7 @@ private fun SearchPodcast.toUnified(ctx: Context) = UnifiedResult(
     imageUrl = coverArtUrl,
     circular = false,
     // Carry publisher + cover art into the show screen — the queryPodcastEpisodes payload lacks them.
-    onClick = { DetailRoutes.openShow(idFromUri(uri), publisher, coverArtUrl) },
+    onClick = { DetailRoutes.openShow(spfyId(uri), publisher, coverArtUrl) },
     menu = listOf(shareAction(ctx, uri))
 )
 
@@ -653,4 +654,4 @@ private fun ResultRow(
     }
 }
 
-private fun idFromUri(uri: String): String = uri.substringAfterLast(':')
+private fun spfyId(uri: String): String = spfyId(uri)

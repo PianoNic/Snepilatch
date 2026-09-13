@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import ch.snepilatch.app.logic.shared.spfyId
 
 /**
  * Waveform-native, seamless Eternal InfiniPlay — no Spfy beats.
@@ -83,7 +84,7 @@ class InfiniPlayController(
 
     fun enable(trackUri: String) {
         disable()
-        val trackId = trackUri.substringAfterLast(":")
+        val trackId = spfyId(trackUri)
         _enabled.value = true
         job = scope.launch(Dispatchers.Default) {
             try {

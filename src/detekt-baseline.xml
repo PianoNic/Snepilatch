@@ -3,19 +3,17 @@
   <ManuallySuppressedIssues/>
   <CurrentIssues>
     <ID>AnnotationOnSeparateLine:MediaButtonReceiver.kt$MediaButtonReceiver$@Suppress("DEPRECATION") intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT)</ID>
-    <ID>BlockCommentInitialStarAlignment:Theme.kt$/* Other default colors to override background = Color(0xFFFFFBFE), surface = Color(0xFFFFFBFE), onPrimary = Color.White, onSecondary = Color.White, onTertiary = Color.White, onBackground = Color(0xFF1C1B1F), onSurface = Color(0xFF1C1B1F), */</ID>
     <ID>BlockCommentInitialStarAlignment:Type.kt$/* Other default text styles to override titleLarge = TextStyle( fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal, fontSize = 22.sp, lineHeight = 28.sp, letterSpacing = 0.sp ), labelSmall = TextStyle( fontFamily = FontFamily.Default, fontWeight = FontWeight.Medium, fontSize = 11.sp, lineHeight = 16.sp, letterSpacing = 0.5.sp ) */</ID>
     <ID>CyclomaticComplexMethod:AccountScreen.kt$@Composable fun AccountScreen(vm: PlaybackViewModel)</ID>
     <ID>CyclomaticComplexMethod:DetailScreen.kt$@Composable fun DetailScreen(vm: PlaybackViewModel)</ID>
     <ID>CyclomaticComplexMethod:LibraryScreen.kt$@Composable fun LibraryScreen()</ID>
     <ID>CyclomaticComplexMethod:LyricsScreen.kt$@Composable fun LyricsScreen(vm: PlaybackViewModel)</ID>
     <ID>CyclomaticComplexMethod:NowPlayingScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun NowPlayingScreen( vm: PlaybackViewModel, /** When false, the screen paints no background of its own — the morphing card * in SpfyApp supplies a card-anchored background that grows with it. */ drawBackground: Boolean = true, /** Per-frame vertical drag (px, down = positive) for finger-tracked collapse; * when set, replaces the standalone swipe-down-to-dismiss. */ onMorphDrag: ((Float) -&gt; Unit)? = null, /** Drag release with vertical velocity (px/s) so the morph can settle. */ onMorphDragEnd: ((Float) -&gt; Unit)? = null )</ID>
-    <ID>CyclomaticComplexMethod:SpfyApp.kt$@Composable fun SpfyApp(vm: PlaybackViewModel)</ID>
-    <ID>CyclomaticComplexMethod:PlaybackViewModel.kt$PlaybackViewModel$private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent)</ID>
     <ID>CyclomaticComplexMethod:PlaybackViewModel.kt$PlaybackViewModel$private suspend fun updatePlaybackFromState(state: PlayerStateData)</ID>
+    <ID>CyclomaticComplexMethod:SharedComponents.kt$@Composable fun SlidingCoverImage( url: String?, modifier: Modifier = Modifier, shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(8.dp), trackKey: Any? = url, forward: Boolean = true, onSwipePrevious: (() -&gt; Unit)? = null, onSwipeNext: (() -&gt; Unit)? = null, previousCoverUrl: String? = null, nextCoverUrl: String? = null, secondNextCoverUrl: String? = null, clipToFrame: Boolean = true, buttonSkip: Pair&lt;Int, Int&gt; = 0 to 0, )</ID>
+    <ID>CyclomaticComplexMethod:SpfyApp.kt$@Composable fun SpfyApp(vm: PlaybackViewModel)</ID>
     <ID>Filename:AudioOutputDetector.kt$ch.snepilatch.app.util.AudioOutputDetector.kt</ID>
     <ID>FinalNewline:ExampleUnitTest.kt$ch.snepilatch.app.ExampleUnitTest.kt</ID>
-    <ID>FinalNewline:Theme.kt$ch.snepilatch.app.ui.theme.Theme.kt</ID>
     <ID>FinalNewline:Type.kt$ch.snepilatch.app.ui.theme.Type.kt</ID>
     <ID>Indentation:AudioOutputDetector.kt$ </ID>
     <ID>Indentation:DetailScreen.kt$ </ID>
@@ -33,33 +31,25 @@
     <ID>LongMethod:LibraryScreen.kt$@Composable fun LibraryScreen()</ID>
     <ID>LongMethod:LyricsScreen.kt$@Composable fun LyricsScreen(vm: PlaybackViewModel)</ID>
     <ID>LongMethod:MainActivity.kt$MainActivity$override fun onCreate(savedInstanceState: Bundle?)</ID>
-    <ID>LongMethod:NowPlayingScreen.kt$@Composable fun PlayerBackground(vm: PlaybackViewModel, modifier: Modifier = Modifier)</ID>
     <ID>LongMethod:NowPlayingScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun NowPlayingScreen( vm: PlaybackViewModel, /** When false, the screen paints no background of its own — the morphing card * in SpfyApp supplies a card-anchored background that grows with it. */ drawBackground: Boolean = true, /** Per-frame vertical drag (px, down = positive) for finger-tracked collapse; * when set, replaces the standalone swipe-down-to-dismiss. */ onMorphDrag: ((Float) -&gt; Unit)? = null, /** Drag release with vertical velocity (px/s) so the morph can settle. */ onMorphDragEnd: ((Float) -&gt; Unit)? = null )</ID>
     <ID>LongMethod:NowPlayingScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun NowPlayingMenu( showMore: Boolean, onShowMore: (Boolean) -&gt; Unit, onOpen: (NowPlayingOverlay) -&gt; Unit, vm: PlaybackViewModel, track: ch.snepilatch.app.data.TrackInfo?, buttonBg: Color )</ID>
-    <ID>LongMethod:SearchScreen.kt$@Composable fun SearchScreen(vm: PlaybackViewModel, searchVm: SearchViewModel = viewModel())</ID>
-    <ID>LongMethod:SharedComponents.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun TrackRow( track: TrackInfo, vm: PlaybackViewModel, contextUri: String? = null, trackIndex: Int? = null, onRemoveFromPlaylist: (() -&gt; Unit)? = null )</ID>
-    <ID>LongMethod:SpfyApp.kt$@Composable fun SpfyApp(vm: PlaybackViewModel)</ID>
     <ID>LongMethod:PlaybackViewModel.kt$PlaybackViewModel$fun initialize(cookies: Map&lt;String, String&gt;)</ID>
-    <ID>LongMethod:PlaybackViewModel.kt$PlaybackViewModel$private suspend fun coldStartPlay()</ID>
     <ID>LongMethod:PlaybackViewModel.kt$PlaybackViewModel$private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent)</ID>
     <ID>LongMethod:PlaybackViewModel.kt$PlaybackViewModel$private suspend fun updatePlaybackFromState(state: PlayerStateData)</ID>
+    <ID>LongMethod:SearchScreen.kt$@Composable fun SearchScreen(vm: PlaybackViewModel, searchVm: SearchViewModel = viewModel())</ID>
+    <ID>LongMethod:SharedComponents.kt$@Composable fun SlidingCoverImage( url: String?, modifier: Modifier = Modifier, shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(8.dp), trackKey: Any? = url, forward: Boolean = true, onSwipePrevious: (() -&gt; Unit)? = null, onSwipeNext: (() -&gt; Unit)? = null, previousCoverUrl: String? = null, nextCoverUrl: String? = null, secondNextCoverUrl: String? = null, clipToFrame: Boolean = true, buttonSkip: Pair&lt;Int, Int&gt; = 0 to 0, )</ID>
+    <ID>LongMethod:SharedComponents.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun TrackRow( track: TrackInfo, vm: PlaybackViewModel, contextUri: String? = null, trackIndex: Int? = null, onRemoveFromPlaylist: (() -&gt; Unit)? = null )</ID>
+    <ID>LongMethod:SpfyApp.kt$@Composable fun SpfyApp(vm: PlaybackViewModel)</ID>
     <ID>LongMethod:UpdateDialog.kt$@Composable fun UpdateDialog( updateInfo: UpdateInfo, onDismiss: () -&gt; Unit )</ID>
-    <ID>LongParameterList:MusicPlaybackService.kt$MusicPlaybackService$(url: String, licenseUrl: String, licenseHeaders: Map&lt;String, String&gt;, title: String, artist: String, albumArtUrl: String?, startPlaying: Boolean = true, startPositionMs: Long = 0L)</ID>
     <ID>LongParameterList:MusicPlaybackService.kt$MusicPlaybackService$( url: String, title: String, artist: String, albumArtUrl: String?, startPlaying: Boolean = true, headers: Map&lt;String, String&gt; = emptyMap(), startPositionMs: Long = 0L, cacheKey: String? = null )</ID>
+    <ID>LongParameterList:SharedComponents.kt$( url: String?, modifier: Modifier = Modifier, shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(8.dp), trackKey: Any? = url, forward: Boolean = true, onSwipePrevious: (() -&gt; Unit)? = null, onSwipeNext: (() -&gt; Unit)? = null, previousCoverUrl: String? = null, nextCoverUrl: String? = null, secondNextCoverUrl: String? = null, clipToFrame: Boolean = true, buttonSkip: Pair&lt;Int, Int&gt; = 0 to 0, )</ID>
     <ID>LoopWithTooManyJumpStatements:LyricsScreen.kt$for</ID>
     <ID>MatchingDeclarationName:AudioOutputDetector.kt$AudioOutput</ID>
     <ID>MatchingDeclarationName:ReleaseNotesScreen.kt$ReleaseNote</ID>
-    <ID>MaxLineLength:DetailScreen.kt$Text(track.name, color = SpfyWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)</ID>
     <ID>MaxLineLength:MusicPlaybackService.kt$MusicPlaybackService.&lt;no name provided&gt;$LokiLogger.i(TAG, "Audio session ID changed: $currentAudioSessionId -&gt; $audioSessionId, playWhenReady=${player.playWhenReady}, openSession=$openAudioEffectSession")</ID>
-    <ID>MaxLineLength:NowPlayingScreen.kt$eqIntent.putExtra(android.media.audiofx.AudioEffect.EXTRA_CONTENT_TYPE, android.media.audiofx.AudioEffect.CONTENT_TYPE_MUSIC)</ID>
-    <ID>MaxLineLength:QueueScreen.kt$LazyColumn</ID>
-    <ID>MaxLineLength:PlaybackViewModel.kt$PlaybackViewModel$?:</ID>
     <ID>MaxLineLength:PlaybackViewModel.kt$PlaybackViewModel$LokiLogger.i(TAG, "[Timing] WS onTrackChange arrived (${delta}ms after CMD '$lastCommandName') -&gt; ${event.current?.uri} fileId=${event.currentFileId}")</ID>
     <ID>MaxLineLength:PlaybackViewModel.kt$PlaybackViewModel$LokiLogger.i(TAG, "[Timing] resolveAndPlay DRM loaded in ${System.currentTimeMillis() - resolveStart}ms (${System.currentTimeMillis() - lastCommandTs}ms total from CMD)")</ID>
-    <ID>MaximumLineLength:DetailScreen.kt$ </ID>
     <ID>MaximumLineLength:MusicPlaybackService.kt$MusicPlaybackService.&lt;no name provided&gt;$ </ID>
-    <ID>MaximumLineLength:NowPlayingScreen.kt$ </ID>
-    <ID>MaximumLineLength:QueueScreen.kt$ </ID>
     <ID>MaximumLineLength:PlaybackViewModel.kt$PlaybackViewModel$ </ID>
     <ID>MultiLineIfElse:BottomNav.kt$Modifier</ID>
     <ID>MultiLineIfElse:BottomNav.kt$Modifier.border(2.dp, SpfyWhite, CircleShape)</ID>
@@ -68,61 +58,38 @@
     <ID>MultiLineIfElse:DetailScreen.kt$detail.followers.toString()</ID>
     <ID>MultiLineIfElse:LibraryScreen.kt$filteredLibrary</ID>
     <ID>MultiLineIfElse:LibraryScreen.kt$filteredLibrary.filter { it.name.contains(searchQuery, ignoreCase = true) || (it.owner?.contains(searchQuery, ignoreCase = true) == true) }</ID>
-    <ID>MultiLineIfElse:LyricsScreen.kt$-1</ID>
     <ID>MultiLineIfElse:LyricsScreen.kt$PaddingValues(top = 40.dp, bottom = 80.dp)</ID>
     <ID>MultiLineIfElse:LyricsScreen.kt$PaddingValues(top = 80.dp, bottom = 300.dp)</ID>
-    <ID>MultiLineIfElse:LyricsScreen.kt$remember(posMs / 100) { lines.indexOfLast { posMs &gt;= it.startTimeMs }.coerceAtLeast(0) }</ID>
     <ID>MultiLineIfElse:MusicPlaybackService.kt$MusicPlaybackService$url</ID>
     <ID>MultiLineIfElse:NowPlayingScreen.kt$seekDragValue</ID>
+    <ID>MultiLineIfElse:PlaybackViewModel.kt$PlaybackViewModel$false</ID>
+    <ID>MultiLineIfElse:PlaybackViewModel.kt$PlaybackViewModel$null</ID>
+    <ID>MultiLineIfElse:PlaybackViewModel.kt$PlaybackViewModel$throw e</ID>
     <ID>MultiLineIfElse:ReleaseNotesScreen.kt$MaterialTheme.colorScheme.primary</ID>
     <ID>MultiLineIfElse:ReleaseNotesScreen.kt$SpfyGray</ID>
     <ID>MultiLineIfElse:SpfyImageUrl.kt$raw</ID>
-    <ID>MultiLineIfElse:PlaybackViewModel.kt$PlaybackViewModel$false</ID>
-    <ID>MultiLineIfElse:PlaybackViewModel.kt$PlaybackViewModel$null</ID>
-    <ID>MultiLineIfElse:PlaybackViewModel.kt$PlaybackViewModel$pt.info</ID>
-    <ID>MultiLineIfElse:PlaybackViewModel.kt$PlaybackViewModel$throw e</ID>
-    <ID>NestedBlockDepth:PlaybackViewModel.kt$PlaybackViewModel$private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent)</ID>
     <ID>NewLineAtEndOfFile:ExampleUnitTest.kt$ch.snepilatch.app.ExampleUnitTest.kt</ID>
-    <ID>NewLineAtEndOfFile:Theme.kt$ch.snepilatch.app.ui.theme.Theme.kt</ID>
     <ID>NewLineAtEndOfFile:Type.kt$ch.snepilatch.app.ui.theme.Type.kt</ID>
     <ID>NoConsecutiveBlankLines:PlaybackViewModel.kt$PlaybackViewModel$ </ID>
     <ID>NoMultipleSpaces:MusicPlaybackService.kt$MusicPlaybackService$ </ID>
-    <ID>NoMultipleSpaces:ReleaseNotesScreen.kt$ </ID>
     <ID>NoMultipleSpaces:PlaybackViewModel.kt$PlaybackViewModel$ </ID>
     <ID>SpacingAroundKeyword:PlaybackViewModel.kt$PlaybackViewModel$catch</ID>
-    <ID>SpacingAroundKeyword:PlaybackViewModel.kt$PlaybackViewModel$finally</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:SessionHolder.kt$SessionHolder$@Volatile var cdnResolver: SpfyCdnResolver? = null</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:SessionHolder.kt$SessionHolder$@Volatile var player: PlayerConnect? = null</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:SessionHolder.kt$SessionHolder$@Volatile var spfyPlayback: SpfyPlayback? = null</ID>
     <ID>SpacingBetweenDeclarationsWithComments:MusicPlaybackService.kt$MusicPlaybackService$// Which extra buttons to show: "like", "shuffle", "repeat"</ID>
-    <ID>SpacingBetweenDeclarationsWithComments:PositionInterpolator.kt$PositionInterpolator.Companion$// Report every 30s (60 * 500ms)</ID>
-    <ID>SpacingBetweenDeclarationsWithComments:PlaybackViewModel.kt$PlaybackViewModel$// Canvas background</ID>
-    <ID>SpacingBetweenDeclarationsWithComments:PlaybackViewModel.kt$PlaybackViewModel$// Content region for CDN resolution</ID>
-    <ID>SpacingBetweenDeclarationsWithComments:PlaybackViewModel.kt$PlaybackViewModel$// Language preference: "system", "en", "de", "ru", "gsw"</ID>
-    <ID>SpacingBetweenDeclarationsWithComments:PlaybackViewModel.kt$PlaybackViewModel$// Lyrics animation direction for line-synced (non word-synced): "vertical" or "horizontal"</ID>
     <ID>SpacingBetweenDeclarationsWithComments:PlaybackViewModel.kt$PlaybackViewModel$// Next track info (always available from WebSocket state for mini player swipe)</ID>
-    <ID>SpacingBetweenDeclarationsWithComments:PlaybackViewModel.kt$PlaybackViewModel$// Notification button preferences: "like", "shuffle", "repeat"</ID>
-    <ID>ThrowsCount:PlaybackViewModel.kt$PlaybackViewModel$fun togglePlayPause()</ID>
     <ID>TooGenericExceptionThrown:ReleaseNotesScreen.kt$throw Exception("HTTP ${response.code}")</ID>
-    <ID>UseCheckOrError:SpfyCdnResolver.kt$SpfyCdnResolver$throw IllegalStateException("No CDN mirrors for fileId=$fileId")</ID>
     <ID>UseCheckOrError:PlaybackViewModel.kt$PlaybackViewModel$throw IllegalStateException("CdnResolver not initialized")</ID>
     <ID>UseCheckOrError:PlaybackViewModel.kt$PlaybackViewModel$throw IllegalStateException("No file ID available")</ID>
+    <ID>UseCheckOrError:SpfyCdnResolver.kt$SpfyCdnResolver$throw IllegalStateException("No CDN mirrors for fileId=$fileId")</ID>
     <ID>VariableNaming:PlaybackViewModel.kt$PlaybackViewModel$// Playback (internal so tests can seed state without going through the // network-dependent initialize/resolve paths) internal val _playback = MutableStateFlow(PlaybackUiState())</ID>
     <ID>VariableNaming:PlaybackViewModel.kt$PlaybackViewModel$private val TAG = "PlaybackVM"</ID>
-    <ID>Wrapping:AccountScreen.kt$(</ID>
     <ID>Wrapping:AccountScreen.kt$;</ID>
     <ID>Wrapping:AccountScreen.kt$Text( if (canvasOn) stringResource(R.string.canvas_on) else stringResource(R.string.canvas_off), color = SpfyLightGray )</ID>
     <ID>Wrapping:AccountScreen.kt$Text( when { isChecking -&gt; stringResource(R.string.checking) upToDate -&gt; stringResource(R.string.up_to_date) else -&gt; stringResource(R.string.tap_to_check) }, color = if (upToDate) animatedPrimary else SpfyLightGray )</ID>
-    <ID>Wrapping:AccountScreen.kt$Text(stringResource(R.string.cancel), color = SpfyLightGray)</ID>
-    <ID>Wrapping:AccountScreen.kt$TextButton(onClick = { showLanguagePicker = false }) { Text(stringResource(R.string.cancel), color = SpfyLightGray) }</ID>
-    <ID>Wrapping:AccountScreen.kt$TextButton(onClick = { showLeftPicker = false }) { Text(stringResource(R.string.cancel), color = SpfyLightGray) }</ID>
-    <ID>Wrapping:AccountScreen.kt$TextButton(onClick = { showRightPicker = false }) { Text(stringResource(R.string.cancel), color = SpfyLightGray) }</ID>
-    <ID>Wrapping:AccountScreen.kt$showLanguagePicker = false</ID>
-    <ID>Wrapping:AccountScreen.kt$showLeftPicker = false</ID>
-    <ID>Wrapping:AccountScreen.kt$showRightPicker = false</ID>
     <ID>Wrapping:DetailScreen.kt$(</ID>
     <ID>Wrapping:DetailScreen.kt$;</ID>
-    <ID>Wrapping:DetailScreen.kt$stripHtml(it)</ID>
     <ID>Wrapping:LibraryScreen.kt$(</ID>
     <ID>Wrapping:LibraryScreen.kt$;</ID>
     <ID>Wrapping:LokiLogger.kt$LokiLogger$(</ID>
@@ -134,14 +101,11 @@
     <ID>Wrapping:MiniPlayer.kt$(</ID>
     <ID>Wrapping:MusicPlaybackService.kt$MusicPlaybackService$(</ID>
     <ID>Wrapping:NowPlayingScreen.kt$;</ID>
-    <ID>Wrapping:NowPlayingScreen.kt$&lt;no name provided&gt;${ vm.updateAudioOutput(audioCtx) }</ID>
-    <ID>Wrapping:NowPlayingScreen.kt$&lt;no name provided&gt;${ vm.updateAudioOutput(audioCtx2) }</ID>
+    <ID>Wrapping:PlaybackViewModel.kt$PlaybackViewModel$(</ID>
+    <ID>Wrapping:PlaybackViewModel.kt$PlaybackViewModel$;</ID>
     <ID>Wrapping:ReleaseNotesScreen.kt$(</ID>
     <ID>Wrapping:SharedComponents.kt$(</ID>
     <ID>Wrapping:SharedComponents.kt$;</ID>
     <ID>Wrapping:SpfyApp.kt$;</ID>
-    <ID>Wrapping:PlaybackViewModel.kt$PlaybackViewModel$(</ID>
-    <ID>Wrapping:PlaybackViewModel.kt$PlaybackViewModel$;</ID>
-    <ID>Wrapping:PlaybackViewModel.kt$PlaybackViewModel$it.key == activeId || it.key == "hobs_$activeId" || "hobs_${it.key}" == activeId</ID>
   </CurrentIssues>
 </SmellBaseline>

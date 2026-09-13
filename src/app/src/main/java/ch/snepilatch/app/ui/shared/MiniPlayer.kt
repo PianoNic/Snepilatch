@@ -219,9 +219,7 @@ fun MiniPlayerContent(
             }
             MiniTransport(vm, spinnerActive = spinnerActive, showPlay = isPaused || !isPlaying, enabled = jamControls)
         }
-        if (durationMs > 0) {
-            MiniProgressBar(vm, durationMs, animatedPrimary)
-        }
+        MiniProgressBar(vm, durationMs, animatedPrimary)
         Spacer(Modifier.height(6.dp))
     }
 }
@@ -268,7 +266,7 @@ private fun MiniProgressBar(vm: PlaybackViewModel, durationMs: Long, color: Colo
     LinearProgressIndicator(
         // Read .value inside the progress lambda (draw phase) so per-frame position updates
         // redraw only this 2dp bar, not this composable's body.
-        progress = { (smoothPos.value.toFloat() / durationMs).coerceIn(0f, 1f) },
+        progress = { if (durationMs > 0) (smoothPos.value.toFloat() / durationMs).coerceIn(0f, 1f) else 0f },
         modifier = Modifier
             .fillMaxWidth()
             .height(2.dp)

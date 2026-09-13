@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.annotation.StringRes
 import ch.snepilatch.app.R
 import ch.snepilatch.app.data.UiMessage
+import ch.snepilatch.app.logic.playback.ResumeLoader
 import ch.snepilatch.app.logic.shared.LokiLogger
 import ch.snepilatch.app.logic.shared.detectActiveAudioOutput
 import ch.snepilatch.app.logic.shared.hasInternet
@@ -32,6 +33,8 @@ import kotify.api.artist.Artist
 import kotify.api.common.ShortLink
 import kotify.api.playerconnect.NoActiveDeviceException
 import kotify.api.playerconnect.PlayerConnect
+import kotify.api.playerstatus.TrackChangeEvent
+import kotify.api.playerstatus.TrackChangeSource
 import kotify.api.playlist.Playlist
 import kotify.api.playerstatus.DeviceInfo
 import kotify.api.playerstatus.PlayerStateData
@@ -190,6 +193,18 @@ class PlaybackViewModel : ViewModel() {
     private var earlyLoadedUri: String? = null
 
     private var coldStartPending = false
+
+    // A hand-back from another device is loading; onReady then skips the Connect resume (#787).
+    @Volatile private var handBackPending = false
+
+    // The position-aware loaders the cold start and a hand-back share. The stream bookkeeping
+    // stays here, reached through the hooks.
+    private val resumeLoader = ResumeLoader(object : ResumeLoader.Hooks {
+        override val cdnResolver: SpfyCdnResolver? get() = this@PlaybackViewModel.cdnResolver
+        override fun markPlayUrl() { playUrlAt = System.currentTimeMillis() }
+        override fun commitStream(uri: String, provider: String?) = this@PlaybackViewModel.commitStream(uri, provider)
+        override fun cacheKeyFor(uri: String, info: StreamInfo): String? = this@PlaybackViewModel.cacheKeyFor(uri, info)
+    })
     private var coldStartFileId: kotlinx.coroutines.CompletableDeferred<String>? = null
 
     // Auto-recovery budget for transient ExoPlayer/DRM errors (e.g. a throttled Widevine license):
@@ -810,43 +825,7 @@ class PlaybackViewModel : ViewModel() {
             viewModelScope.launch { updatePlaybackFromState(state) }
         }
 
-        pc.onTrackChange { event ->
-            val delta = if (lastCommandTs > 0) System.currentTimeMillis() - lastCommandTs else -1
-            LokiLogger.i(TAG, "[Timing] WS onTrackChange arrived (${delta}ms after CMD '$lastCommandName') -> ${event.current?.uri} fileId=${event.currentFileId}")
-            if (adSkipStartTs > 0 && event.current?.uri?.startsWith("spotify:ad:") == false) {
-                LokiLogger.i(TAG, "[AdTiming] post-ad onTrackChange -> real track (+${System.currentTimeMillis() - adSkipStartTs}ms from T0)")
-            }
-            // Set latestFileId from cluster state so resolveAndPlay doesn't wait for onPlaybackId
-            if (event.currentFileId != null) {
-                latestFileId = event.currentFileId
-                latestFileUri = event.current?.uri
-            }
-            // Only auto-resolve when we're already streaming (legit track changes
-            // during active playback), OR when the user just tapped a track to
-            // play (pendingUserPlay). Otherwise the very first WS push on init
-            // runs a futile CDN resolve, eats retries on the fallback path, AND
-            // resets _playback.value.positionMs to 0 — clobbering the saved
-            // snapshot position. The one-shot pendingUserPlay flag distinguishes
-            // a user-initiated play from a passive idle push.
-            // We already started this one from the tap, so the echo is only confirmation. Loading it
-            // again would cancel the in-flight resolve and start over, which is the delay we removed.
-            if (event.current?.uri != null && event.current?.uri == earlyLoadedUri) {
-                earlyLoadedUri = null
-                LokiLogger.i(TAG, "[QueueTap] echo for a track already started, not loading it twice")
-                return@onTrackChange
-            }
-            val userPlay = pendingUserPlay
-            pendingUserPlay = false
-            if (!isStreaming.value && !userPlay) {
-                LokiLogger.d(TAG, "Skipping resolveAndPlay: not streaming (idle WS push)")
-                return@onTrackChange
-            }
-            resolveJob?.cancel()
-            resolveJob = viewModelScope.launch(Dispatchers.IO) {
-                resolveAndPlay(event)
-                if (queueSheetVisible.value) refreshQueue()
-            }
-        }
+        pc.onTrackChange { event -> handleTrackChange(event) }
 
         pc.onPlay { state -> handleRemotePlay(state.position_as_of_timestamp) }
 
@@ -854,6 +833,59 @@ class PlaybackViewModel : ViewModel() {
 
         pc.onReconnected {
             viewModelScope.launch(Dispatchers.IO) { resyncAfterReconnect(pc) }
+        }
+    }
+
+    /**
+     * A track change from the client. While streaming it loads the next track; while idle it is a
+     * passive push, except a state machine change that hands playback to this phone (#787).
+     */
+    private fun handleTrackChange(event: TrackChangeEvent) {
+        val delta = if (lastCommandTs > 0) System.currentTimeMillis() - lastCommandTs else -1
+        LokiLogger.i(TAG, "[Timing] WS onTrackChange arrived (${delta}ms after CMD '$lastCommandName') -> ${event.current?.uri} fileId=${event.currentFileId}")
+        if (adSkipStartTs > 0 && event.current?.uri?.startsWith("spotify:ad:") == false) {
+            LokiLogger.i(TAG, "[AdTiming] post-ad onTrackChange -> real track (+${System.currentTimeMillis() - adSkipStartTs}ms from T0)")
+        }
+        // Set latestFileId from cluster state so resolveAndPlay doesn't wait for onPlaybackId
+        if (event.currentFileId != null) {
+            latestFileId = event.currentFileId
+            latestFileUri = event.current?.uri
+        }
+        // Only auto-resolve when we're already streaming (legit track changes
+        // during active playback), OR when the user just tapped a track to
+        // play (pendingUserPlay). Otherwise the very first WS push on init
+        // runs a futile CDN resolve, eats retries on the fallback path, AND
+        // resets _playback.value.positionMs to 0 — clobbering the saved
+        // snapshot position. The one-shot pendingUserPlay flag distinguishes
+        // a user-initiated play from a passive idle push.
+        // We already started this one from the tap, so the echo is only confirmation. Loading it
+        // again would cancel the in-flight resolve and start over, which is the delay we removed.
+        if (event.current?.uri != null && event.current?.uri == earlyLoadedUri) {
+            earlyLoadedUri = null
+            LokiLogger.i(TAG, "[QueueTap] echo for a track already started, not loading it twice")
+            return
+        }
+        val userPlay = pendingUserPlay
+        pendingUserPlay = false
+        if (!isStreaming.value && !userPlay) {
+            // A state machine pushed to this phone means the server has it playing, the way the
+            // web player creates a fresh context and plays it on every replace_state: another
+            // device handed playback over mid-track, paused or not. The client's engine already runs
+            // from the handed-over position, so the audio is loaded there too. The cold start's own
+            // transfer produces one of these as well and is already loading it (#787).
+            if (event.source == TrackChangeSource.STATE_MACHINE && !coldStartPending) {
+                LokiLogger.i(TAG, "[HandBack] state machine for this phone at ${event.positionMs}ms paused=${event.paused} -> ${event.current?.uri}")
+                resolveJob?.cancel()
+                resolveJob = viewModelScope.launch(Dispatchers.IO) { takeOverHandedPlayback(event) }
+                return
+            }
+            LokiLogger.d(TAG, "Skipping resolveAndPlay: not streaming (idle WS push)")
+            return
+        }
+        resolveJob?.cancel()
+        resolveJob = viewModelScope.launch(Dispatchers.IO) {
+            resolveAndPlay(event)
+            if (queueSheetVisible.value) refreshQueue()
         }
     }
 
@@ -1464,66 +1496,6 @@ class PlaybackViewModel : ViewModel() {
         }
     }
 
-    /** Cold-start play of a downloaded copy, resuming where the user left off. */
-    private suspend fun coldStartLocal(
-        track: TrackInfo,
-        title: String,
-        artist: String,
-        art: String?,
-        startPositionMs: Long,
-    ): Boolean {
-        val local = AudioSourceResolver.localOrNull(track.uri, title, artist) as? StreamResult.Success
-            ?: return false
-        playUrlAt = System.currentTimeMillis()
-        withContext(Dispatchers.Main) {
-            MusicPlaybackService.instance?.playUrl(
-                local.info.url, title, artist, art,
-                startPlaying = true, startPositionMs = startPositionMs
-            )
-        }
-        commitStream(track.uri, AudioSourceResolver.LOCAL_PROVIDER)
-        LokiLogger.i(TAG, "[ColdStart] playing the downloaded copy at ${startPositionMs}ms")
-        return true
-    }
-
-    /**
-     * Cold-start play through the third-party chain, so resume-from-idle behaves like the rest of
-     * the lossless flow rather than dropping to Spfy's Widevine CDN.
-     */
-    private suspend fun coldStartThirdParty(
-        track: TrackInfo,
-        title: String,
-        artist: String,
-        art: String?,
-        startPositionMs: Long,
-    ): Boolean {
-        if (AppSettings.preferredAudioSource.value == null) return false
-        val query = listOf(artist, title).filter { it.isNotBlank() && it != "Unknown" }.joinToString(" ")
-        val result = AudioSourceResolver.byQuery(track.uri, query, title, artist, track.durationMs)
-        if (result !is StreamResult.Success) {
-            LokiLogger.w(TAG, "[ColdStart] lossless resolve failed, falling back to Spfy CDN")
-            return false
-        }
-        val info = result.info
-        playUrlAt = System.currentTimeMillis()
-        withContext(Dispatchers.Main) {
-            val svc = MusicPlaybackService.instance
-            val key = info.decryptionKey
-            if (key != null) {
-                svc?.playDeezer(info.url, key, info.headers, title, artist, art, startPositionMs = startPositionMs)
-            } else {
-                svc?.playUrl(
-                    info.url, title, artist, art,
-                    startPlaying = true, headers = info.headers, startPositionMs = startPositionMs,
-                    cacheKey = cacheKeyFor(track.uri, info),
-                )
-            }
-        }
-        commitStream(track.uri, info.provider)
-        LokiLogger.i(TAG, "[ColdStart] lossless (${info.provider}) loading at ${startPositionMs}ms")
-        return true
-    }
-
     /**
      * Cold-start playback that mirrors the Spfy web player's protocol.
      *
@@ -1621,50 +1593,59 @@ class PlaybackViewModel : ViewModel() {
             fallbackResume()
             return
         }
-        val trackUri = track.uri
-        val title = track.name.ifBlank { "Unknown" }
-        val artist = track.artist.ifBlank { "Unknown" }
-        val art = track.albumArt
-        LokiLogger.i(TAG, "[ColdStart] file id=$fileId for $trackUri — resolving CDN")
-
+        LokiLogger.i(TAG, "[ColdStart] file id=$fileId for ${track.uri} — resolving CDN")
         try {
-            val resolver = cdnResolver ?: throw IllegalStateException("CdnResolver not initialized")
-
-            // A downloaded copy plays from disk whatever the source, and this is the path the first
-            // track after opening the app takes. The Spfy branch below goes straight to the CDN, so
-            // without this a downloaded track streamed on launch and only played locally once it had
-            // been skipped to.
-            if (coldStartLocal(track, title, artist, art, savedPositionAtEntry) ||
-                coldStartThirdParty(track, title, artist, art, savedPositionAtEntry)
-            ) {
-                return
-            }
-
-            val stream = resolver.resolveForFileId(fileId)
-            LokiLogger.i(TAG, "[ColdStart] resolved ${stream.mirrorCount} CDN mirrors")
-
-            // Start ExoPlayer at the right position from the moment it's ready —
-            // no post-prepare seek dance. setMediaItem(item, startPositionMs)
-            // guarantees STATE_READY fires AT that position, and playWhenReady=true
-            // makes audio start immediately. The onReady callback then calls
-            // p.resume() to tell Spfy Connect we're now playing.
-            playUrlAt = System.currentTimeMillis()
-            withContext(Dispatchers.Main) {
-                MusicPlaybackService.instance?.playDrmUrl(
-                    stream.cdnUrl, stream.licenseUrl, stream.licenseHeaders, title, artist, art,
-                    startPlaying = true,
-                    startPositionMs = savedPositionAtEntry,
-                    pssh = stream.pssh,
-                )
-            }
-            commitStream(trackUri, "Spotify CDN")
-            LokiLogger.i(TAG, "[ColdStart] ExoPlayer loading at ${savedPositionAtEntry}ms, will start on STATE_READY")
+            resumeLoader.loadAt(fileId, track, savedPositionAtEntry, "ColdStart")
         } catch (e: Exception) {
             LokiLogger.e(TAG, "[ColdStart] CDN/playDrmUrl failed, falling back to resume", e)
             resetColdStart()
             currentStreamUri = null
             isStreaming.value = false
             fallbackResume()
+        }
+    }
+
+    /**
+     * Another device handed playback to this phone: a state machine track change arrived while
+     * idle. The server already counts this phone as the player and the client's engine runs from
+     * the handed-over position, so only the audio is missing: load it there, playing or paused as
+     * the state says. Unlike the cold start there is no transfer to make and no paused echo to
+     * suppress, and onReady must not send a resume for a player the server already has playing (#787).
+     */
+    private suspend fun takeOverHandedPlayback(event: TrackChangeEvent) {
+        val current = event.current ?: return
+        val fileId = event.currentFileId ?: latestFileId?.takeIf { latestFileUri == current.uri }
+        if (fileId == null) {
+            LokiLogger.w(TAG, "[HandBack] no file id for ${current.uri}, leaving it to the play button")
+            return
+        }
+        val position = event.positionMs ?: _playback.value.positionMs
+        val paused = event.paused == true
+        val art = normalizeSpfyImageUrl(current.imageLargeUrl ?: current.imageUrl)
+        val track = TrackInfo(
+            uri = current.uri, name = current.name.ifBlank { "Unknown" }, artist = current.displayArtist(), albumArt = art,
+            albumName = current.albumName,
+            durationMs = if (current.durationMs > 0) current.durationMs else _playback.value.durationMs
+        )
+        isStreamLoading.value = true
+        // A paused load never reaches onReady, so nothing is left pending for it.
+        handBackPending = !paused
+        _playback.value = _playback.value.copy(track = track, positionMs = position, isPlaying = !paused, isPaused = paused)
+        armCapture(current.uri, track.durationMs)
+        ThemeController.updateFromArt(art)
+        checkLikedState(current.uri)
+        fetchCanvasForTrack(current.uri)
+        try {
+            resumeLoader.loadAt(fileId, track, position, "HandBack", startPlaying = !paused)
+            if (paused) isStreamLoading.value = false
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            LokiLogger.e(TAG, "[HandBack] loading failed, the play button cold starts it", e)
+            handBackPending = false
+            currentStreamUri = null
+            isStreaming.value = false
+            isStreamLoading.value = false
         }
     }
 
@@ -2800,45 +2781,61 @@ class PlaybackViewModel : ViewModel() {
                 catch (e: Exception) { handleAdvanceFailure(e) }
             }
         }
-        svc.onReady = {
-            val now = System.currentTimeMillis()
-            val playUrlToReady = if (playUrlAt > 0) now - playUrlAt else -1L
-            val cmdToReady = if (lastCommandTs > 0) now - lastCommandTs else -1L
-            LokiLogger.i(TAG, "[Timing-CDN] ExoPlayer ready — playUrl→ready=${playUrlToReady}ms, cmd→ready=${cmdToReady}ms")
-            if (currentStreamUri?.startsWith("spotify:ad:") == false) logAdSkipDone()
-            // A track reached STATE_READY — maybe refill the transient-error retry budget.
-            refillRetryBudgetOnReady(currentStreamUri)
+        svc.onReady = { onStreamReady() }
+    }
 
-            if (coldStartPending) {
-                // Cold-start sync: ExoPlayer was loaded with startPositionMs and
-                // playWhenReady=true, so by the time onReady fires audio is already
-                // producing at the right position. We just need to:
-                //   1. Tell Spfy Connect to resume (so other clients show us playing)
-                //   2. Update the UI playing state and start the position ticker
-                //   3. Hide the loading spinner
-                val pos = MusicPlaybackService.instance?.getCurrentPosition() ?: _playback.value.positionMs
-                LokiLogger.i(TAG, "[ColdStart] ExoPlayer producing at ${pos}ms — resuming Spfy Connect")
-                coldStartPending = false
-                // Cold start done: audio is producing and we're about to resume Connect, so real
-                // remote pauses (e.g. from another device) must apply again.
-                suppressRemotePause = false
-                _playback.value = _playback.value.copy(isPlaying = true, isPaused = false, positionMs = pos)
-                startPositionTicker()
-                viewModelScope.launch(Dispatchers.IO) {
-                    try {
-                        fallbackResume()
-                    } finally {
-                        isStreamLoading.value = false
-                    }
+    /** ExoPlayer reached STATE_READY for the current stream. */
+    private fun onStreamReady() {
+        val now = System.currentTimeMillis()
+        val playUrlToReady = if (playUrlAt > 0) now - playUrlAt else -1L
+        val cmdToReady = if (lastCommandTs > 0) now - lastCommandTs else -1L
+        LokiLogger.i(TAG, "[Timing-CDN] ExoPlayer ready — playUrl→ready=${playUrlToReady}ms, cmd→ready=${cmdToReady}ms")
+        if (currentStreamUri?.startsWith("spotify:ad:") == false) logAdSkipDone()
+        // A track reached STATE_READY — maybe refill the transient-error retry budget.
+        refillRetryBudgetOnReady(currentStreamUri)
+
+        if (coldStartPending) {
+            // Cold-start sync: ExoPlayer was loaded with startPositionMs and
+            // playWhenReady=true, so by the time onReady fires audio is already
+            // producing at the right position. We just need to:
+            //   1. Tell Spfy Connect to resume (so other clients show us playing)
+            //   2. Update the UI playing state and start the position ticker
+            //   3. Hide the loading spinner
+            val pos = MusicPlaybackService.instance?.getCurrentPosition() ?: _playback.value.positionMs
+            LokiLogger.i(TAG, "[ColdStart] ExoPlayer producing at ${pos}ms — resuming Spfy Connect")
+            coldStartPending = false
+            // Cold start done: audio is producing and we're about to resume Connect, so real
+            // remote pauses (e.g. from another device) must apply again.
+            suppressRemotePause = false
+            _playback.value = _playback.value.copy(isPlaying = true, isPaused = false, positionMs = pos)
+            startPositionTicker()
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    fallbackResume()
+                } finally {
+                    isStreamLoading.value = false
                 }
-            } else {
-                _playback.value = _playback.value.copy(isPlaying = true, isPaused = false)
-                startPositionTicker()
-                viewModelScope.launch(Dispatchers.IO) {
-                    try {
-                        if (shouldResumeConnectOnReady()) player?.resume()
-                    } catch (_: Exception) {}
-                }
+            }
+        } else {
+            // A stream loaded without playWhenReady (a paused hand-back) is ready but silent; the
+            // state is paused and stays paused, so Connect is told nothing.
+            if (MusicPlaybackService.instance?.playWhenReady() == false) {
+                isStreamLoading.value = false
+                return
+            }
+            _playback.value = _playback.value.copy(isPlaying = true, isPaused = false)
+            startPositionTicker()
+            // A hand-back is already playing as far as the server knows; resuming it again would
+            // only report a state we are not in.
+            val resumeConnect = shouldResumeConnectOnReady() && !handBackPending
+            if (handBackPending) {
+                handBackPending = false
+                isStreamLoading.value = false
+            }
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    if (resumeConnect) player?.resume()
+                } catch (_: Exception) {}
             }
         }
     }

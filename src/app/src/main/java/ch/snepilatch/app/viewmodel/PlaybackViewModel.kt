@@ -487,6 +487,26 @@ class PlaybackViewModel : ViewModel() {
         launchWithPlayer("adoptState") { p -> p.getState()?.let { updatePlaybackFromState(it) } }
     }
 
+    /** Disconnects the running player and drops the holder, so the next init starts from nothing. */
+    private fun tearDownSession() {
+        SessionHolder.player?.let {
+            try { kotlinx.coroutines.runBlocking { it.disconnect() } } catch (_: Exception) {}
+        }
+        SessionHolder.clear()
+    }
+
+    /**
+     * Issue #733: the session asks spfy for its language once, when it is created, so a new app
+     * language rebuilds the session from the saved cookies after the setting has changed.
+     */
+    fun setAppLanguage(language: String, context: Context) {
+        AppSettings.setAppLanguage(language, context)
+        val cookies = ch.snepilatch.app.util.loadCookies(context) ?: return
+        initJob = null
+        tearDownSession()
+        initialize(cookies)
+    }
+
     fun initialize(cookies: Map<String, String>) {
         startInfiniPlayRepeatGuard()
 
@@ -509,15 +529,13 @@ class PlaybackViewModel : ViewModel() {
             return
         }
 
-        // Clean up any leftover from previous session
-        SessionHolder.player?.let {
-            try { kotlinx.coroutines.runBlocking { it.disconnect() } } catch (_: Exception) {}
-        }
-        SessionHolder.clear()
+        tearDownSession()
+        LokiLogger.i(TAG, "Session language: ${AppSettings.effectiveLanguage()} (setting=${AppSettings.appLanguage.value}, device=${java.util.Locale.getDefault()})")
         initJob = initScope.launch {
             try {
                 val sess = Session(SessionConfig(
                     identifier = "kotify-android",
+                    language = AppSettings.effectiveLanguage(),
                     initialCookies = cookies,
                     deviceProfile = kotify.config.DeviceProfile.CHROME_WINDOWS
                 ))

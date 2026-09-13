@@ -511,7 +511,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
                 selected = appLanguage,
                 selectedColor = animatedPrimary,
                 onSelect = {
-                    AppSettings.setAppLanguage(it, audioContext)
+                    vm.setAppLanguage(it, audioContext)
                     showLanguagePicker = false
                 },
                 onDismiss = { showLanguagePicker = false }

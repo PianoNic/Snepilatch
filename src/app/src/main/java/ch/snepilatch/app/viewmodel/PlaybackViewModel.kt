@@ -1430,6 +1430,10 @@ class PlaybackViewModel : ViewModel() {
 
     fun togglePlayPause() {
         commandJob?.cancel()
+        if (isOffline.value) {
+            commandJob = viewModelScope.launch(Dispatchers.IO) { OfflinePlayer.togglePlayPause() }
+            return
+        }
         val action = if (_playback.value.isPaused || !_playback.value.isPlaying) "resume" else "pause"
         lastCommandTs = System.currentTimeMillis()
         lastCommandName = action
@@ -1844,6 +1848,11 @@ class PlaybackViewModel : ViewModel() {
     }
 
     fun skipNext() {
+        if (isOffline.value) {
+            commandJob?.cancel()
+            commandJob = viewModelScope.launch(Dispatchers.IO) { OfflinePlayer.next() }
+            return
+        }
         applyOptimisticSkip(nextTrackPreview.value)
         skippedBack.value = false
         commandJob?.cancel()
@@ -1874,6 +1883,11 @@ class PlaybackViewModel : ViewModel() {
 
     /** True when the track changes, false when the current one restarts instead. */
     fun skipPrevious(forceTrackChange: Boolean = false): Boolean {
+        if (isOffline.value) {
+            commandJob?.cancel()
+            commandJob = viewModelScope.launch(Dispatchers.IO) { OfflinePlayer.previous() }
+            return false
+        }
         // If we're more than 3s into the track, restart it instead of going to previous.
         // (Same threshold KotifyClient's localPrevious uses; restarting also seeks ExoPlayer.)
         if (!forceTrackChange && _playback.value.positionMs > PREV_RESTART_THRESHOLD_MS) {
@@ -1911,6 +1925,10 @@ class PlaybackViewModel : ViewModel() {
         // Reflect the target immediately; ExoPlayer's getCurrentPosition() catches up once the
         // posted seek lands, and the position ticker then reads it straight from the player.
         _playback.value = _playback.value.copy(positionMs = positionMs)
+        if (isOffline.value) {
+            viewModelScope.launch(Dispatchers.IO) { OfflinePlayer.seekTo(positionMs) }
+            return
+        }
         // Seek ExoPlayer on main thread
         viewModelScope.launch(Dispatchers.Main) {
             MusicPlaybackService.instance?.syncSeek(positionMs)

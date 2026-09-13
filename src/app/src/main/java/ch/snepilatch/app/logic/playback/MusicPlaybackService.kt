@@ -7,6 +7,8 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
+import android.net.NetworkCapabilities
+import ch.snepilatch.app.logic.shared.NetworkState
 import coil.request.ImageRequest
 import android.media.audiofx.AudioEffect
 import android.net.ConnectivityManager
@@ -1519,6 +1521,18 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 SessionHolder.player?.onNetworkChanged()
             }
             hadNetwork = true
+        }
+
+        // The offline engine's cue: a validated route is online, losing the default network is not.
+        override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+            NetworkState.set(
+                caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                    caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            )
+        }
+
+        override fun onLost(network: Network) {
+            NetworkState.set(false)
         }
     }
 

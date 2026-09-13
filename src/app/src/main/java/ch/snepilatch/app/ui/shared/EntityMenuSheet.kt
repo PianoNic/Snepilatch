@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -31,18 +32,19 @@ import ch.snepilatch.app.ui.theme.SnepilatchLightGray
 import ch.snepilatch.app.ui.theme.SnepilatchWhite
 
 /**
- * The action sheet for a whole entity (playlist, album, artist, show), wherever it is reached from:
- * a detail header or a home card. The chrome and row layout live here so both open the same sheet
- * rather than two that drift apart.
+ * The action sheet of the app, whatever it is opened for: a track row, the playing track, a search
+ * result, an entity header or a home card. A header of cover, [title] and [subtitle] when there is a
+ * [title], then one row per [MenuAction]. Closing after a row is the action's own business.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EntityMenuSheet(
     imageUrl: String?,
-    title: String,
+    title: String?,
     subtitle: String?,
     actions: List<MenuAction>,
     onDismiss: () -> Unit,
+    circular: Boolean = false,
 ) {
     val sheetState = rememberBottomSheetState(
         initialValue = SheetValue.Hidden,
@@ -52,36 +54,10 @@ fun EntityMenuSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = SnepilatchElevated,
+        dragHandle = { SheetDragHandle() },
     ) {
         SheetNavBarFix()
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            SpfyImage(url = imageUrl, modifier = Modifier.size(48.dp), shape = RoundedCornerShape(8.dp))
-            Spacer(Modifier.width(12.dp))
-            Column {
-                Text(
-                    title,
-                    color = SnepilatchWhite,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (subtitle != null) {
-                    Text(
-                        subtitle,
-                        color = SnepilatchLightGray,
-                        fontSize = 13.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        HorizontalDivider(color = SnepilatchLightGray.copy(alpha = 0.15f))
+        if (title != null) MenuHeader(imageUrl, title, subtitle, circular)
         actions.forEach { action ->
             Row(
                 Modifier
@@ -97,6 +73,25 @@ fun EntityMenuSheet(
         }
         Spacer(Modifier.navigationBarsPadding().height(12.dp))
     }
+}
+
+@Composable
+private fun MenuHeader(imageUrl: String?, title: String, subtitle: String?, circular: Boolean) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        SpfyImage(url = imageUrl, modifier = Modifier.size(48.dp), shape = if (circular) CircleShape else RoundedCornerShape(8.dp))
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text(title, color = SnepilatchWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (!subtitle.isNullOrBlank()) {
+                Text(subtitle, color = SnepilatchLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+    HorizontalDivider(color = SnepilatchLightGray.copy(alpha = 0.15f))
 }
 
 /** One row of an [EntityMenuSheet]: what it looks like, what it says, what it does. */

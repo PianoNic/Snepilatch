@@ -666,83 +666,37 @@ private fun ArtistTrackRow(
             Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SnepilatchLightGray, modifier = Modifier.size(20.dp))
         }
         if (showMenu) {
-            val sheetState = rememberBottomSheetState(
-                initialValue = SheetValue.Hidden,
-                enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+            val menuContext = androidx.compose.ui.platform.LocalContext.current
+            val shareLabel = stringResource(R.string.share)
+            val addQueueLabel = stringResource(R.string.add_to_queue)
+            val addPlaylistLabel = stringResource(R.string.add_to_playlist)
+            val likeLabel = stringResource(R.string.like)
+            val visitAlbumLabel = stringResource(R.string.visit_album)
+            val items = listOf(
+                MenuAction(Icons.AutoMirrored.Rounded.QueueMusic, addQueueLabel) {
+                    vm.addToQueue(track.uri); showMenu = false
+                },
+                MenuAction(Icons.AutoMirrored.Rounded.PlaylistAdd, addPlaylistLabel) {
+                    showMenu = false; vm.showPlaylistPickerForTrack(track.uri)
+                },
+                MenuAction(Icons.Rounded.Favorite, likeLabel) {
+                    vm.likeSong(track.uri.removePrefix("spotify:track:")); showMenu = false
+                },
+                MenuAction(Icons.Rounded.Album, visitAlbumLabel) {
+                    showMenu = false; detailVm.openAlbumForTrack(track.uri)
+                },
+                MenuAction(Icons.Rounded.Share, shareLabel) {
+                    showMenu = false
+                    shareSpfyUri(menuContext, track.uri, shareLabel)
+                }
             )
-            ModalBottomSheet(
-                onDismissRequest = { showMenu = false },
-                sheetState = sheetState,
-                containerColor = SnepilatchElevated,
-                dragHandle = {
-                    Box(
-                        Modifier
-                            .padding(vertical = 12.dp)
-                            .width(40.dp)
-                            .height(4.dp)
-                            .background(SnepilatchLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
-                    )
-                }
-            ) {
-                ch.snepilatch.app.ui.shared.SheetNavBarFix()
-                // Track header
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    SpfyImage(url = track.albumArt, modifier = Modifier.size(48.dp), shape = RoundedCornerShape(8.dp))
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text(
-                        track.name, color = SnepilatchWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    )
-                        Text(track.artist, color = SnepilatchLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-                HorizontalDivider(color = SnepilatchLightGray.copy(alpha = 0.15f))
-
-                val menuContext = androidx.compose.ui.platform.LocalContext.current
-                val shareLabel = stringResource(R.string.share)
-                val addQueueLabel = stringResource(R.string.add_to_queue)
-                val addPlaylistLabel = stringResource(R.string.add_to_playlist)
-                val likeLabel = stringResource(R.string.like)
-                val visitAlbumLabel = stringResource(R.string.visit_album)
-                val items = listOf(
-                    Triple(Icons.AutoMirrored.Rounded.QueueMusic, addQueueLabel) {
-                        vm.addToQueue(track.uri); showMenu = false
-                    },
-                    Triple(Icons.AutoMirrored.Rounded.PlaylistAdd, addPlaylistLabel) {
-                        showMenu = false; vm.showPlaylistPickerForTrack(track.uri)
-                    },
-                    Triple(Icons.Rounded.Favorite, likeLabel) {
-                        vm.likeSong(track.uri.removePrefix("spotify:track:")); showMenu = false
-                    },
-                    Triple(Icons.Rounded.Album, visitAlbumLabel) {
-                        showMenu = false; detailVm.openAlbumForTrack(track.uri)
-                    },
-                    Triple(Icons.Rounded.Share, shareLabel) {
-                        showMenu = false
-                        shareSpfyUri(menuContext, track.uri, shareLabel)
-                    }
-                )
-
-                items.forEach { (icon, label, onClick) ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { onClick() }
-                            .padding(horizontal = 20.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(icon, null, tint = SnepilatchWhite, modifier = Modifier.size(24.dp))
-                        Spacer(Modifier.width(16.dp))
-                        Text(label, color = SnepilatchWhite, fontSize = 15.sp)
-                    }
-                }
-                Spacer(Modifier.navigationBarsPadding().height(12.dp))
-            }
+            EntityMenuSheet(
+                imageUrl = track.albumArt,
+                title = track.name,
+                subtitle = track.artist,
+                actions = items,
+                onDismiss = { showMenu = false },
+            )
         }
     }
 }
@@ -792,80 +746,37 @@ private fun AlbumTrackRow(
             Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SnepilatchLightGray, modifier = Modifier.size(20.dp))
         }
         if (showMenu) {
-            val sheetState = rememberBottomSheetState(
-                initialValue = SheetValue.Hidden,
-                enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+            val menuContext = androidx.compose.ui.platform.LocalContext.current
+            val shareLabel = stringResource(R.string.share)
+            val addQueueLabel = stringResource(R.string.add_to_queue)
+            val addPlaylistLabel = stringResource(R.string.add_to_playlist)
+            val likeLabel = stringResource(R.string.like)
+            val visitArtistLabel = stringResource(R.string.visit_artist)
+            val items = listOf(
+                MenuAction(Icons.AutoMirrored.Rounded.QueueMusic, addQueueLabel) {
+                    vm.addToQueue(track.uri); showMenu = false
+                },
+                MenuAction(Icons.AutoMirrored.Rounded.PlaylistAdd, addPlaylistLabel) {
+                    showMenu = false; vm.showPlaylistPickerForTrack(track.uri)
+                },
+                MenuAction(Icons.Rounded.Favorite, likeLabel) {
+                    vm.likeSong(track.uri.removePrefix("spotify:track:")); showMenu = false
+                },
+                MenuAction(Icons.Rounded.Person, visitArtistLabel) {
+                    showMenu = false; detailVm.openArtistForTrack(track.uri)
+                },
+                MenuAction(Icons.Rounded.Share, shareLabel) {
+                    showMenu = false
+                    shareSpfyUri(menuContext, track.uri, shareLabel)
+                }
             )
-            ModalBottomSheet(
-                onDismissRequest = { showMenu = false },
-                sheetState = sheetState,
-                containerColor = SnepilatchElevated,
-                dragHandle = {
-                    Box(
-                        Modifier
-                            .padding(vertical = 12.dp)
-                            .width(40.dp)
-                            .height(4.dp)
-                            .background(SnepilatchLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
-                    )
-                }
-            ) {
-                ch.snepilatch.app.ui.shared.SheetNavBarFix()
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    SpfyImage(url = track.albumArt, modifier = Modifier.size(48.dp), shape = RoundedCornerShape(8.dp))
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text(
-                        track.name, color = SnepilatchWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    )
-                        Text(track.artist, color = SnepilatchLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-                HorizontalDivider(color = SnepilatchLightGray.copy(alpha = 0.15f))
-                val menuContext = androidx.compose.ui.platform.LocalContext.current
-                val shareLabel = stringResource(R.string.share)
-                val addQueueLabel = stringResource(R.string.add_to_queue)
-                val addPlaylistLabel = stringResource(R.string.add_to_playlist)
-                val likeLabel = stringResource(R.string.like)
-                val visitArtistLabel = stringResource(R.string.visit_artist)
-                val items = listOf(
-                    Triple(Icons.AutoMirrored.Rounded.QueueMusic, addQueueLabel) {
-                        vm.addToQueue(track.uri); showMenu = false
-                    },
-                    Triple(Icons.AutoMirrored.Rounded.PlaylistAdd, addPlaylistLabel) {
-                        showMenu = false; vm.showPlaylistPickerForTrack(track.uri)
-                    },
-                    Triple(Icons.Rounded.Favorite, likeLabel) {
-                        vm.likeSong(track.uri.removePrefix("spotify:track:")); showMenu = false
-                    },
-                    Triple(Icons.Rounded.Person, visitArtistLabel) {
-                        showMenu = false; detailVm.openArtistForTrack(track.uri)
-                    },
-                    Triple(Icons.Rounded.Share, shareLabel) {
-                        showMenu = false
-                        shareSpfyUri(menuContext, track.uri, shareLabel)
-                    }
-                )
-                items.forEach { (icon, label, onClick) ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { onClick() }
-                            .padding(horizontal = 20.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(icon, null, tint = SnepilatchWhite, modifier = Modifier.size(24.dp))
-                        Spacer(Modifier.width(16.dp))
-                        Text(label, color = SnepilatchWhite, fontSize = 15.sp)
-                    }
-                }
-                Spacer(Modifier.navigationBarsPadding().height(12.dp))
-            }
+            EntityMenuSheet(
+                imageUrl = track.albumArt,
+                title = track.name,
+                subtitle = track.artist,
+                actions = items,
+                onDismiss = { showMenu = false },
+            )
         }
     }
 }

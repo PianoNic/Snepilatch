@@ -1516,7 +1516,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             // A new default network arrived. If we already had one, this is a handover (Wi-Fi<->cell)
             // that silently invalidates the dealer socket — reconnect now instead of waiting for the
             // keep-alive liveness timeout to notice.
-            if (hadNetwork) {
+            // Right after the network came back the system may still swap networks (cell first,
+            // Wi-Fi a moment later); the dealer just connected then and reconnects on its own if
+            // that socket dies, so forcing it would only tear down a live one (#793).
+            if (hadNetwork && !NetworkState.justCameBack()) {
                 LokiLogger.i(TAG, "Default network changed — reconnecting dealer")
                 SessionHolder.player?.onNetworkChanged()
             }
@@ -1532,6 +1535,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         }
 
         override fun onLost(network: Network) {
+            // Losing the network is not a handover: the next network is a first one again, and the
+            // dealer reconnects on its own. Forcing it right after a fresh session came up only
+            // tore down a socket that had just connected (#793).
+            hadNetwork = false
             NetworkState.set(false)
         }
     }

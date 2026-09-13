@@ -391,6 +391,13 @@ class PlaybackViewModel : ViewModel() {
                 ThemeController.updateFromArt(track.albumArt)
             }
             override fun setTickerRunning(running: Boolean) = if (running) startPositionTicker() else stopPositionTicker()
+            override fun startSession() = restartSessionFromSavedCookies()
+            override suspend fun awaitPlayer(timeoutMs: Long) = SessionHolder.awaitPlayer(timeoutMs) != null
+            override suspend fun currentPositionMs() = withContext(Dispatchers.Main) {
+                MusicPlaybackService.instance?.getCurrentPosition() ?: _playback.value.positionMs
+            }
+            override suspend fun handBackToConnect(track: TrackInfo, contextUri: String?, positionMs: Long, paused: Boolean) =
+                this@PlaybackViewModel.handBackToConnect(track, contextUri, positionMs, paused)
         },
     )
     private var lastContextUri: String? = null
@@ -448,6 +455,34 @@ class PlaybackViewModel : ViewModel() {
      * seeing the "connection lost" prompt. [initialize] carries its own bounded rate-limit retry, so
      * a truly dead cookie still lands on the sign-in gate after those attempts are exhausted.
      */
+    /** The app started offline and the network is back: the launch path again, from the saved cookies. */
+    private fun restartSessionFromSavedCookies() {
+        val ctx = MusicPlaybackService.instance as? android.content.Context ?: return
+        val cookies = ch.snepilatch.app.logic.shared.loadCookies(ctx) ?: return
+        LokiLogger.i(TAG, "Network back after an offline start, bringing the session up")
+        initJob = null
+        initialize(cookies)
+    }
+
+    /**
+     * Connect adopts what the offline engine was playing: a play command for [track] in
+     * [contextUri], which makes this phone the player with a fresh state machine, then the real
+     * position and pause state reported through the local transport. The audio is already running;
+     * the echo's resolve finds the stream committed and leaves it alone (#793).
+     */
+    internal suspend fun handBackToConnect(track: TrackInfo, contextUri: String?, positionMs: Long, paused: Boolean) {
+        val pc = player ?: return
+        try {
+            pc.playTrack(track.uri, contextUri)
+            pc.localSeek(positionMs)
+            if (paused) pc.localPause(positionMs)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            LokiLogger.e(TAG, "Handing ${track.uri} back to Connect failed", e)
+        }
+    }
+
     private fun recoverAuthOrPromptLogin() {
         if (authRecovering) return
         authRecovering = true
@@ -858,6 +893,7 @@ class PlaybackViewModel : ViewModel() {
         pc.onPause { state -> if (!isOffline.value) handleRemotePause(state.position_as_of_timestamp) }
 
         pc.onReconnected {
+            offline.onDealerReconnected()
             viewModelScope.launch(Dispatchers.IO) { resyncAfterReconnect(pc) }
         }
     }
@@ -1184,6 +1220,7 @@ class PlaybackViewModel : ViewModel() {
     }
 
     private suspend fun updatePlaybackFromState(state: PlayerStateData) {
+        if (isOffline.value) return
         val track = state.track
         val imageUrl = normalizeSpfyImageUrl(
             track?.imageLargeUrl ?: track?.imageUrl ?: track?.imageSmallUrl

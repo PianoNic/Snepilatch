@@ -398,6 +398,17 @@ class PlaybackViewModel : ViewModel() {
             }
             override suspend fun handBackToConnect(track: TrackInfo, contextUri: String?, positionMs: Long, paused: Boolean) =
                 this@PlaybackViewModel.handBackToConnect(track, contextUri, positionMs, paused)
+            override suspend fun reportToConnect(positionMs: Long, paused: Boolean) {
+                val pc = player ?: return
+                try {
+                    pc.localSeek(positionMs)
+                    if (paused) pc.localPause(positionMs)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    LokiLogger.w(TAG, "Reporting ${positionMs}ms after the outage failed: ${e.message}")
+                }
+            }
         },
     )
     private var lastContextUri: String? = null

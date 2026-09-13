@@ -133,6 +133,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     private var currentDurationMs: Long = 0L
     private var idlePositionMs: Long = 0L
 
+    // Whether the cluster is playing on another device while nothing is loaded here; the card
+    // reports this instead of ExoPlayer's state, which is always paused then (#778).
+    private var idlePlaying: Boolean = false
+
     /**
      * The album-art URL most recently requested by setIdleMetadata. Used to
      * discard stale background loads when the track changes before art arrives.
@@ -1020,6 +1024,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         metadataQueue.clear()
         currentDurationMs = 0L
         idlePositionMs = 0L
+        idlePlaying = false
         idleArtUrl = null
         mainHandler.post {
             player.stop()
@@ -1052,15 +1057,20 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
      * play. Pressing play / next / pause from the notification then runs the
      * normal cold-start protocol.
      *
+     * [playing] is whether the cluster is playing that track on another device (a jam host, a
+     * desktop): the card then shows it playing and lets its position run, since ExoPlayer
+     * knows nothing about it.
+     *
      * Skipped if a track is already loaded (we don't want to overwrite live
      * playback metadata).
      */
-    fun setIdleMetadata(title: String, artist: String, albumArtUrl: String?, durationMs: Long, positionMs: Long) {
+    fun setIdleMetadata(title: String, artist: String, albumArtUrl: String?, durationMs: Long, positionMs: Long, playing: Boolean = false) {
         if (player.mediaItemCount > 0) return
         currentTitle = title
         currentArtist = artist
         currentDurationMs = durationMs
         idlePositionMs = positionMs
+        idlePlaying = playing
         // Track the most recent idle art URL so we can ignore stale callbacks
         // and only render the *current* track's art.
         val expectedUrl = albumArtUrl
@@ -1280,7 +1290,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             // While skipping an ad the silent clip is technically "playing"; report BUFFERING so the
             // system notification shows a loading spinner instead of a play/pause on a frozen track.
             isAdSkipping -> PlaybackStateCompat.STATE_BUFFERING
-            player.isPlaying -> PlaybackStateCompat.STATE_PLAYING
+            isPlayingForCard() -> PlaybackStateCompat.STATE_PLAYING
             player.playbackState == Player.STATE_BUFFERING -> PlaybackStateCompat.STATE_BUFFERING
             player.playWhenReady -> PlaybackStateCompat.STATE_PAUSED
             else -> PlaybackStateCompat.STATE_PAUSED
@@ -1327,8 +1337,12 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         nm.notify(NOTIFICATION_ID, buildNotification())
     }
 
+    /** ExoPlayer's state while it holds media, else what the cluster reports for the idle card. */
+    private fun isPlayingForCard(): Boolean =
+        if (player.mediaItemCount == 0) idlePlaying else player.isPlaying
+
     private fun buildNotification(): Notification {
-        val isPlaying = player.isPlaying
+        val isPlaying = isPlayingForCard()
 
         // Actions — prevIntent/playPauseIntent/nextIntent/leftIntent/rightIntent are cached fields.
         val playPauseIcon = if (isPlaying) R.drawable.ic_pause_rounded else R.drawable.ic_play_arrow_rounded

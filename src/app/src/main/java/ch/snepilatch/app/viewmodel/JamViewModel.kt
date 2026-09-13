@@ -26,6 +26,19 @@ class JamViewModel : SessionViewModel("JamVM") {
     val shareLink: StateFlow<String?> = combine(JamHolder.session, JamHolder.shareToken) { s, t -> JamHolder.shareLink(s, t) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, JamHolder.shareLink(JamHolder.session.value, JamHolder.shareToken.value))
 
+    /** The invite sheet's links: short ones once [loadInviteLinks] has them, the long link until then. */
+    val inviteLinks: StateFlow<JamHolder.InviteSheetLinks?> =
+        combine(shareLink, JamHolder.session, JamHolder.inviteLinks) { long, jam, cached -> JamHolder.inviteSheetLinks(long, jam, cached) }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.Eagerly,
+                JamHolder.inviteSheetLinks(shareLink.value, JamHolder.session.value, JamHolder.inviteLinks.value),
+            )
+
+    fun loadInviteLinks() {
+        launchWithSession("inviteLinks") { sess -> JamHolder.loadInviteLinks(sess) }
+    }
+
     fun join(linkOrToken: String) {
         if (linkOrToken.isBlank()) return
         error.value = null

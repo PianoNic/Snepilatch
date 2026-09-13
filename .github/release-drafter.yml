@@ -2,38 +2,54 @@
 name-template: 'v$RESOLVED_VERSION'
 tag-template: 'v$RESOLVED_VERSION'
 
+# Without a bumping label the next version is a patch.
 version-resolver:
-  major:
-    labels:
-      - 'major'
-      - 'breaking'
-  minor:
-    labels:
-      - 'feature'
-      - 'enhancement'
-      - 'minor'
-  patch:
-    labels:
-      - 'bug'
-      - 'bugfix'
-      - 'patch'
-      - 'hotfix'
-      - 'security'
   default: patch
 
 categories:
+  # Left out of the changelog entirely.
+  - type: 'pre-exclude'
+    when:
+      labels:
+        - 'skip-changelog'
+        - 'dependencies'
+
+  # Changelog sections. The bump a label carries lives on its section.
   - title: '🚀 Features'
-    labels:
-      - 'feature'
+    semver-increment: 'minor'
+    when:
+      label: 'feature'
   - title: '✨ Enhancements'
-    labels:
-      - 'enhancement'
+    semver-increment: 'minor'
+    when:
+      label: 'enhancement'
   - title: '🛠️ Refactors'
-    labels:
-      - 'refactor'
+    when:
+      label: 'refactor'
   - title: '🐛 Bug Fixes'
-    labels:
-      - 'bug'
+    semver-increment: 'patch'
+    when:
+      label: 'bug'
+
+  # Labels that only steer the version and have no section of their own.
+  - type: 'version-resolver'
+    semver-increment: 'major'
+    when:
+      labels:
+        - 'major'
+        - 'breaking'
+  - type: 'version-resolver'
+    semver-increment: 'minor'
+    when:
+      label: 'minor'
+  - type: 'version-resolver'
+    semver-increment: 'patch'
+    when:
+      labels:
+        - 'bugfix'
+        - 'patch'
+        - 'hotfix'
+        - 'security'
 
 change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
 change-title-escapes: '\<*_&`'
@@ -46,10 +62,6 @@ template: |
   $CHANGES
 
   **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
-
-exclude-labels:
-  - 'skip-changelog'
-  - 'dependencies'
 
 autolabeler:
   - label: 'feature'

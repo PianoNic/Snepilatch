@@ -4,6 +4,7 @@ import kotify.api.lyrics.Syllable
 import kotify.api.lyrics.SyncedLine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -115,8 +116,24 @@ class LyricItemsTest {
             ),
             0, 3000,
         )
-        assertEquals(listOf(0..1, 2..2), item.words)
-        assertEquals(listOf(false, false, true), item.emphasised)
+        assertEquals(listOf(0..1, 2..2), item.lead.runs)
+        assertEquals(listOf(false, false, true), item.lead.emphasised)
+        assertNull(item.background)
+    }
+
+    @Test fun backingVocals_areAVoiceOfTheirOwn() {
+        val line = SyncedLine(
+            0, 3000, "I'm too hot",
+            listOf(Syllable(0, 1000, "I'm"), Syllable(1000, 2000, "too")),
+            background = listOf(Syllable(2000, 2300, "(Hot"), Syllable(2300, 3000, "damn)")),
+        )
+        val item = LineItem(line, 0, 3000)
+        assertEquals(listOf(0..0, 1..1), item.background!!.runs)
+        val a = LineAnimator(item)
+        a.step(2500, 0f)
+        assertEquals(LyricsStyle.FILL_END, a.background!!.words[0].fill, 0f)
+        assertTrue(a.background!!.words[1].fill > LyricsStyle.FILL_START)
+        assertEquals(LyricsStyle.FILL_END, a.lead.words[1].fill, 0f)
     }
 
     @Test fun letterWindows_splitTheWordMinusItsTailEvenly() {
@@ -148,29 +165,29 @@ class LineAnimatorTest {
     @Test fun aWord_growsPastOneWhileSungAndSettlesAtOne() {
         val a = LineAnimator(item)
         a.snapTo(0)
-        assertEquals(LyricsStyle.REST_SCALE, a.words[0].scale.position, 0f)
-        assertEquals(LyricsStyle.FILL_START, a.words[0].fill, 0f)
+        assertEquals(LyricsStyle.REST_SCALE, a.lead.words[0].scale.position, 0f)
+        assertEquals(LyricsStyle.FILL_START, a.lead.words[0].fill, 0f)
         var peak = 0f
         var t = 1000L
         while (t < 1500) {
             a.step(t, 1f / 60f)
-            peak = maxOf(peak, a.words[0].scale.position)
+            peak = maxOf(peak, a.lead.words[0].scale.position)
             t += 16
         }
-        assertTrue("fill ${a.words[0].fill}", a.words[0].fill > 90f)
+        assertTrue("fill ${a.lead.words[0].fill}", a.lead.words[0].fill > 90f)
         a.run(1500, 4000)
         assertTrue("peak $peak", peak > 1f)
-        assertEquals(1f, a.words[0].scale.position, 0.01f)
-        assertEquals(LyricsStyle.FILL_END, a.words[0].fill, 0f)
-        assertEquals(0f, a.words[0].glow.position, 0.02f)
+        assertEquals(1f, a.lead.words[0].scale.position, 0.01f)
+        assertEquals(LyricsStyle.FILL_END, a.lead.words[0].fill, 0f)
+        assertEquals(0f, a.lead.words[0].glow.position, 0.02f)
     }
 
     @Test fun theLongWord_isLitLetterByLetterAndNeighboursShareTheLift() {
         val a = LineAnimator(item)
-        assertEquals(5, a.letters[1]!!.size)
+        assertEquals(5, a.lead.letters[1]!!.size)
         // Letters share 2250 ms (2500 minus the 250 ms tail): 450 ms each. At 2200 ms the second is lit.
         a.run(1000, 2200)
-        val letters = a.letters[1]!!
+        val letters = a.lead.letters[1]!!
         assertEquals(LyricsStyle.FILL_END, letters[0].fill, 0f)
         assertTrue(letters[1].fill > LyricsStyle.FILL_START && letters[1].fill < LyricsStyle.FILL_END)
         assertEquals(LyricsStyle.FILL_START, letters[2].fill, 0f)

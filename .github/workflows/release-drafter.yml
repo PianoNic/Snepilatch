@@ -1,11 +1,11 @@
 name: Release Drafter
 
+# Push only. A squash merge is a push to main, so a pull_request run on top of it only produced a
+# second identical draft, and for a PR from a fork that run has a read-only token and fails.
 on:
   push:
     branches:
       - main
-  pull_request:
-    types: [closed]
 
 jobs:
   update_release_draft:

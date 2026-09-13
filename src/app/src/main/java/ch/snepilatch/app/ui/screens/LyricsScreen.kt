@@ -8,9 +8,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
@@ -20,19 +17,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
@@ -46,13 +35,10 @@ import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.viewmodel.LyricsViewModel
 import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotify.api.lyrics.LyricsData
-import kotify.api.lyrics.SyncedLine
 import ch.snepilatch.app.ui.shared.LikeToggleButton
 
-/** Spinner while loading, a note and a line when there are no lyrics, the synced view otherwise. */
+/** Spinner while loading, a note and a line when there are no lyrics, the plain or the synced view otherwise. */
 @Composable
 private fun LyricsBody(
     isLoading: Boolean,
@@ -77,15 +63,8 @@ private fun LyricsBody(
                 }
             }
         }
-        else -> {
-            SyncedLyricsView(
-                lyrics = lyrics,
-                smoothPosition = smoothPosition,
-                accentColor = accent,
-                isLandscape = isLandscape,
-                lyricsAnimDirection = lyricsAnimDirection
-            )
-        }
+        lyrics.syncType == "UNSYNCED" -> UnsyncedLyricsView(lyrics, isLandscape)
+        else -> SyncedLyricsView(lyrics, smoothPosition, isLandscape, lyricsAnimDirection)
     }
 }
 
@@ -296,363 +275,6 @@ fun LyricsScreen(vm: PlaybackViewModel) {
                     LyricsBody(isLoading, lyrics, smoothPosition, animatedPrimary, isLandscape = false, lyricsAnimDirection = lyricsAnimDirection)
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun SyncedLyricsView(
-    lyrics: LyricsData,
-    smoothPosition: MutableState<Long>,
-    accentColor: Color,
-    isLandscape: Boolean = false,
-    lyricsAnimDirection: String = "vertical"
-) {
-    val lines = lyrics.lines
-    val syncType = lyrics.syncType
-    val isUnsynced = syncType == "UNSYNCED"
-    val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
-
-    // derivedStateOf so this view recomposes only when the active LINE changes, not every frame:
-    // smoothPosition updates per display frame, but the derived index changes only a few times a
-    // minute. Reading smoothPosition at body level would instead recompose the whole view every frame.
-    val activeIndex by remember(lines, isUnsynced) {
-        derivedStateOf {
-            if (isUnsynced) -1 else lines.indexOfLast { smoothPosition.value >= it.startTimeMs }.coerceAtLeast(0)
-        }
-    }
-
-    var userScrolling by remember { mutableStateOf(false) }
-    var lastUserScroll by remember { mutableLongStateOf(0L) }
-
-    // Auto-scroll only for synced lyrics
-    if (!isUnsynced) {
-        LaunchedEffect(activeIndex) {
-            if (!userScrolling && System.currentTimeMillis() - lastUserScroll > 750) {
-                scope.launch {
-                    listState.animateScrollToItem(
-                        index = (activeIndex - 1).coerceAtLeast(0)
-                    )
-                }
-            }
-        }
-    }
-
-    LaunchedEffect(listState.isScrollInProgress) {
-        if (listState.isScrollInProgress) {
-            userScrolling = true
-            lastUserScroll = System.currentTimeMillis()
-        } else if (userScrolling) {
-            delay(750)
-            userScrolling = false
-        }
-    }
-
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize().padding(horizontal = if (isLandscape) 12.dp else 24.dp),
-        contentPadding = if (isLandscape) PaddingValues(top = 40.dp, bottom = 80.dp)
-                         else PaddingValues(top = 80.dp, bottom = 300.dp)
-    ) {
-        itemsIndexed(lines, key = { i, _ -> i }) { index, line ->
-            if (isUnsynced) {
-                // Unsynced: all lines same brightness, no highlight
-                Text(
-                    text = line.text,
-                    color = Color.White.copy(alpha = 0.85f),
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    lineHeight = 32.sp,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
-                )
-            } else {
-                LyricsLine(
-                    line = line,
-                    syncType = syncType,
-                    isActive = index == activeIndex,
-                    isSung = index < activeIndex,
-                    smoothPosition = smoothPosition,
-                    accentColor = accentColor,
-                    lyricsAnimDirection = lyricsAnimDirection
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun LyricsLine(
-    line: SyncedLine,
-    syncType: String,
-    isActive: Boolean,
-    isSung: Boolean,
-    smoothPosition: MutableState<Long>,
-    accentColor: Color,
-    lyricsAnimDirection: String = "vertical"
-) {
-    if (line.text.isBlank() || line.text == "♪") {
-        if (isActive) InterludeDots(accentColor) else Spacer(Modifier.height(48.dp))
-        return
-    }
-
-    val dimColor = Color.White.copy(alpha = if (isSung) 0.35f else 0.45f)
-    val featherPx = with(LocalDensity.current) { 12.dp.toPx() }
-
-    if (isActive) {
-        when {
-            syncType == "SYLLABLE_SYNCED" && line.syllables.isNotEmpty() -> {
-                SyllableSyncedLine(line, smoothPosition, dimColor, featherPx)
-            }
-            syncType == "LINE_SYNCED" -> {
-                LineSyncedLine(line, smoothPosition, dimColor, featherPx, lyricsAnimDirection)
-            }
-            else -> {
-                // UNSYNCED or fallback — just show bright
-                Text(
-                    text = line.text,
-                    color = Color.White,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    lineHeight = 36.sp,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)
-                )
-            }
-        }
-    } else {
-        Text(
-            text = line.text,
-            color = dimColor,
-            fontSize = 26.sp,
-            fontWeight = FontWeight.Bold,
-            lineHeight = 34.sp,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)
-        )
-    }
-}
-
-// --- SYLLABLE SYNCED: word-by-word highlight ---
-
-@Composable
-private fun SyllableSyncedLine(
-    line: SyncedLine,
-    smoothPosition: MutableState<Long>,
-    dimColor: Color,
-    featherPx: Float
-) {
-    val syllables = line.syllables
-
-    // Build the full text by joining syllables
-    val fullText = buildString {
-        for (syl in syllables) {
-            if (isNotEmpty() && !syl.isPartOfWord) append(" ")
-            append(syl.text)
-        }
-    }
-
-    // Build character offset ranges for each syllable
-    val sylRanges = mutableListOf<Triple<Int, Int, Int>>() // startChar, endChar, sylIndex
-    var charPos = 0
-    for ((idx, syl) in syllables.withIndex()) {
-        if (charPos > 0 && !syl.isPartOfWord) charPos++ // space
-        val start = charPos
-        charPos += syl.text.length
-        sylRanges.add(Triple(start, charPos, idx))
-    }
-
-    var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
-
-    Box(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
-        // Base — dimmed
-        Text(
-            text = fullText,
-            color = dimColor,
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            lineHeight = 36.sp,
-            onTextLayout = { layoutResult = it }
-        )
-        // Overlay — bright, masked per-syllable
-        Text(
-            text = fullText,
-            color = Color.White,
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            lineHeight = 36.sp,
-            modifier = Modifier
-                .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
-                .drawWithContent {
-                    drawContent()
-                    val layout = layoutResult ?: return@drawWithContent
-                    val pos = smoothPosition.value
-
-                    // Find how far through the syllables we are
-                    // Compute a character-level reveal position
-                    var revealChars = 0f
-                    for ((startChar, endChar, sylIdx) in sylRanges) {
-                        val syl = syllables[sylIdx]
-                        val sylDur = (syl.endTimeMs - syl.startTimeMs).coerceAtLeast(1L)
-                        val sylProgress = ((pos - syl.startTimeMs).toFloat() / sylDur).coerceIn(0f, 1f)
-                        if (pos >= syl.endTimeMs) {
-                            revealChars = endChar.toFloat()
-                        } else if (pos >= syl.startTimeMs) {
-                            revealChars = startChar + (endChar - startChar) * sylProgress
-                            break
-                        } else {
-                            break
-                        }
-                    }
-
-                    // Clip per visual line based on revealed characters
-                    val lineCount = layout.lineCount
-                    for (i in 0 until lineCount) {
-                        val lineStart = layout.getLineStart(i)
-                        val lineEnd = layout.getLineEnd(i)
-                        val lineLeft = layout.getLineLeft(i)
-                        val lineRight = layout.getLineRight(i)
-                        val lineTop = layout.getLineTop(i)
-                        val lineBottom = layout.getLineBottom(i)
-                        val lineWidth = lineRight - lineLeft
-
-                        val lineCharsRevealed = (revealChars - lineStart).coerceIn(0f, (lineEnd - lineStart).toFloat())
-                        val lineProgress = if (lineEnd > lineStart) lineCharsRevealed / (lineEnd - lineStart) else 0f
-
-                        clipRect(left = lineLeft, top = lineTop, right = lineRight, bottom = lineBottom) {
-                            val revealX = lineLeft + (lineWidth + featherPx) * lineProgress
-                            drawRect(
-                                brush = Brush.horizontalGradient(
-                                    colors = listOf(Color.Black, Color.Transparent),
-                                    startX = (revealX - featherPx).coerceAtLeast(lineLeft),
-                                    endX = revealX
-                                ),
-                                blendMode = BlendMode.DstIn
-                            )
-                        }
-                    }
-                }
-        )
-    }
-}
-
-// --- LINE SYNCED: top-to-bottom reveal ---
-
-@Composable
-private fun LineSyncedLine(
-    line: SyncedLine,
-    smoothPosition: MutableState<Long>,
-    dimColor: Color,
-    featherPx: Float,
-    animDirection: String = "vertical"
-) {
-    val startMs = line.startTimeMs
-    val durationMs = (line.endTimeMs - line.startTimeMs).coerceAtLeast(1L)
-    var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
-
-    Box(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
-        // Base — dimmed
-        Text(
-            text = line.text,
-            color = dimColor,
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            lineHeight = 36.sp,
-            onTextLayout = { layoutResult = it }
-        )
-        // Overlay — bright, reveal based on direction setting
-        Text(
-            text = line.text,
-            color = Color.White,
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            lineHeight = 36.sp,
-            modifier = Modifier
-                .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
-                .drawWithContent {
-                    drawContent()
-                    val pos = smoothPosition.value
-                    val progress = ((pos - startMs).toFloat() / durationMs).coerceIn(0f, 1f)
-                    if (animDirection == "horizontal") {
-                        val layout = layoutResult ?: return@drawWithContent
-                        val lineCount = layout.lineCount
-                        // Total characters to distribute progress across visual lines
-                        val totalChars = line.text.length.toFloat()
-                        val revealChars = totalChars * progress
-
-                        for (i in 0 until lineCount) {
-                            val lineStart = layout.getLineStart(i)
-                            val lineEnd = layout.getLineEnd(i)
-                            val lineLeft = layout.getLineLeft(i)
-                            val lineRight = layout.getLineRight(i)
-                            val lineTop = layout.getLineTop(i)
-                            val lineBottom = layout.getLineBottom(i)
-                            val lineWidth = lineRight - lineLeft
-                            val lineChars = (lineEnd - lineStart).toFloat()
-
-                            val lineRevealed = (revealChars - lineStart).coerceIn(0f, lineChars)
-                            val lineProgress = if (lineChars > 0) lineRevealed / lineChars else 0f
-
-                            clipRect(left = lineLeft, top = lineTop, right = lineRight, bottom = lineBottom) {
-                                val revealX = lineLeft + (lineWidth + featherPx) * lineProgress
-                                drawRect(
-                                    brush = Brush.horizontalGradient(
-                                        colors = listOf(Color.Black, Color.Transparent),
-                                        startX = (revealX - featherPx).coerceAtLeast(lineLeft),
-                                        endX = revealX
-                                    ),
-                                    blendMode = BlendMode.DstIn
-                                )
-                            }
-                        }
-                    } else {
-                        val revealY = (size.height + featherPx) * progress
-                        drawRect(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(Color.Black, Color.Transparent),
-                                startY = (revealY - featherPx).coerceAtLeast(0f),
-                                endY = revealY
-                            ),
-                            blendMode = BlendMode.DstIn
-                        )
-                    }
-                }
-        )
-    }
-}
-
-@Composable
-private fun InterludeDots(accentColor: Color) {
-    val infiniteTransition = rememberInfiniteTransition(label = "interlude")
-    Row(
-        Modifier.fillMaxWidth().padding(vertical = 24.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        repeat(3) { i ->
-            val dotScale by infiniteTransition.animateFloat(
-                initialValue = 0.6f, targetValue = 1.1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(600, easing = FastOutSlowInEasing),
-                    repeatMode = RepeatMode.Reverse,
-                    initialStartOffset = StartOffset(i * 200)
-                ), label = "dot$i"
-            )
-            val dotAlpha by infiniteTransition.animateFloat(
-                initialValue = 0.35f, targetValue = 1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(600, easing = FastOutSlowInEasing),
-                    repeatMode = RepeatMode.Reverse,
-                    initialStartOffset = StartOffset(i * 200)
-                ), label = "dotAlpha$i"
-            )
-            Box(
-                Modifier.padding(horizontal = 6.dp).size(10.dp)
-                    .graphicsLayer {
-                        scaleX = dotScale
-                        scaleY = dotScale
-                        alpha = dotAlpha
-                    }
-                    .background(accentColor, CircleShape)
-            )
         }
     }
 }

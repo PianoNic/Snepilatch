@@ -34,10 +34,13 @@ import ch.snepilatch.app.ui.theme.SnepilatchElevated
 import ch.snepilatch.app.ui.theme.SnepilatchLightGray
 import ch.snepilatch.app.ui.theme.SnepilatchWhite
 
-/** The official app's invite sheet: a share button for the link and the same link as a QR code. */
+/**
+ * The official app's invite sheet: a share button and a QR code. [shareLink] and [qrLink] are the
+ * two `spotify.link` variants once known, the long link before that.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun JamInviteSheet(link: String, onDismiss: () -> Unit) {
+fun JamInviteSheet(shareLink: String, qrLink: String, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val shareLabel = stringResource(R.string.jam_share_link)
     val sheetState = rememberBottomSheetState(
@@ -55,7 +58,7 @@ fun JamInviteSheet(link: String, onDismiss: () -> Unit) {
             Spacer(Modifier.height(8.dp))
             Text(stringResource(R.string.jam_invite), color = SnepilatchWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(16.dp))
-            Button(onClick = { shareLink(context, link, shareLabel) }) {
+            Button(onClick = { shareLink(context, shareLink, shareLabel) }) {
                 Icon(Icons.Rounded.Share, null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(shareLabel)
@@ -63,7 +66,7 @@ fun JamInviteSheet(link: String, onDismiss: () -> Unit) {
             Spacer(Modifier.height(24.dp))
             HorizontalDivider(color = SnepilatchLightGray.copy(alpha = 0.15f))
             Spacer(Modifier.height(24.dp))
-            QrCode(link, Modifier.size(200.dp).clip(RoundedCornerShape(8.dp)))
+            QrCode(qrLink, Modifier.size(200.dp).clip(RoundedCornerShape(8.dp)))
             Spacer(Modifier.height(12.dp))
             Text(stringResource(R.string.jam_qr_hint), color = SnepilatchLightGray, fontSize = 13.sp)
             Spacer(Modifier.navigationBarsPadding().height(20.dp))

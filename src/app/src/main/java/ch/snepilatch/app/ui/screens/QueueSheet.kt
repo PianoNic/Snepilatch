@@ -62,18 +62,21 @@ fun QueueSheet(vm: PlaybackViewModel) {
             val jamVm: JamViewModel = viewModel()
             val jam by jamVm.jam.collectAsState()
             val jamBusy by jamVm.joining.collectAsState()
-            val shareLink by jamVm.shareLink.collectAsState()
+            val inviteLinks by jamVm.inviteLinks.collectAsState()
             var showInvite by remember { mutableStateOf(false) }
             jam?.let {
                 JamHeader(
                     it,
                     busy = jamBusy,
-                    onInvite = { showInvite = true },
+                    onInvite = {
+                        showInvite = true
+                        jamVm.loadInviteLinks()
+                    },
                     onLeave = { jamVm.leave() },
                     onEnd = { jamVm.end() },
                 )
             }
-            if (showInvite) shareLink?.let { JamInviteSheet(it, onDismiss = { showInvite = false }) }
+            if (showInvite) inviteLinks?.let { JamInviteSheet(it.share, it.qr, onDismiss = { showInvite = false }) }
             Text(
                 stringResource(R.string.queue),
                 color = SnepilatchWhite,

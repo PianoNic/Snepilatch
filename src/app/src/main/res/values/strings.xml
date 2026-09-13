@@ -389,6 +389,8 @@
     <string name="jam_share_link">Share link</string>
     <string name="jam_qr_hint">Scan the code or share the link to join.</string>
     <string name="jam_end">End jam</string>
+    <string name="offline_playlist_ended">Nothing more of this playlist is downloaded</string>
+    <string name="offline_downloads_ended">No more downloaded songs</string>
     <string name="jam_listening">Listening</string>
     <string name="jam_you">You</string>
     <string name="jam_controls_locked">The host has turned off play, pause and skip for guests.</string>

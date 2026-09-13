@@ -1,5 +1,7 @@
 package ch.snepilatch.app.logic.playback
 
+import androidx.annotation.StringRes
+import ch.snepilatch.app.R
 import ch.snepilatch.app.data.PlaybackUiState
 import ch.snepilatch.app.data.TrackInfo
 import ch.snepilatch.app.logic.download.Downloads
@@ -57,6 +59,9 @@ class OfflineController(private val scope: CoroutineScope, private val hooks: Ho
 
         /** Report where the phone is and whether it is paused into the state machine Connect already has. */
         suspend fun reportToConnect(positionMs: Long, paused: Boolean)
+
+        /** The app's snackbar. */
+        fun showMessage(@StringRes id: Int)
     }
 
     private var offlineWatch: Job? = null
@@ -115,6 +120,17 @@ class OfflineController(private val scope: CoroutineScope, private val hooks: Ho
         dealerBack.complete(Unit)
     }
 
+    /**
+     * A downloaded track ran out. The engine plays on when it can; when the list is used up it
+     * stops, and the stop is announced so the silence is not a mystery: nothing more of the
+     * playlist is on the phone, or no more downloads at all (#800).
+     */
+    suspend fun trackEnded() {
+        if (OfflinePlayer.ended()) return
+        val fromContext = OfflinePlayer.state.value?.contextUri != null
+        hooks.showMessage(if (fromContext) R.string.offline_playlist_ended else R.string.offline_downloads_ended)
+    }
+
     /** The engine's state, written into the one playback state and the queue the screens read. */
     private fun mirror(s: OfflinePlayback) {
         val cur = hooks.playback.value
@@ -156,7 +172,7 @@ class OfflineController(private val scope: CoroutineScope, private val hooks: Ho
         takeoverTrackUri = current.uri
         val list = listOf(current) + downloadedToCome(current, hooks.queue.value, takeoverContextUri)
         LokiLogger.w(TAG, "Network gone while on ${current.uri}: the offline engine takes over, ${list.size - 1} downloaded tracks to come")
-        OfflinePlayer.adopt(list, 0, isPlaying = p.isPlaying && !p.isPaused, durationMs = p.durationMs)
+        OfflinePlayer.adopt(list, 0, isPlaying = p.isPlaying && !p.isPaused, durationMs = p.durationMs, contextUri = takeoverContextUri)
     }
 
     /**

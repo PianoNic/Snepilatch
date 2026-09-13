@@ -390,6 +390,8 @@
     <string name="jam_share_link">Link teile</string>
     <string name="jam_qr_hint">Code scanne oder Link teile zum biiträte.</string>
     <string name="jam_end">Jam beände</string>
+    <string name="offline_playlist_ended">Vo dere Playlist isch nüt meh abeglade</string>
+    <string name="offline_downloads_ended">Kei witere abegladeni Songs</string>
     <string name="jam_listening">Lost zue</string>
     <string name="jam_you">Du</string>
     <string name="jam_controls_locked">De Host het Abspile, Pause und Überspringe für Gäst usgschaltet.</string>

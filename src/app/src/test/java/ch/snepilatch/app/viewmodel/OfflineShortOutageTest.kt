@@ -54,6 +54,7 @@ class OfflineShortOutageTest {
         override suspend fun reportToConnect(positionMs: Long, paused: Boolean) {
             reports += positionMs to paused
         }
+        override fun showMessage(id: Int) = Unit
     }
 
     private val hooks = FakeHooks()

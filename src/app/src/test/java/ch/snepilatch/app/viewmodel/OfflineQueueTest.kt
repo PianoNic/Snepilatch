@@ -5,6 +5,7 @@ import ch.snepilatch.app.logic.playback.MusicPlaybackService
 import ch.snepilatch.app.logic.playback.OfflinePlayer
 import io.mockk.every
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -62,16 +63,48 @@ class OfflineQueueTest {
 
     @Test
     fun trackEnd_advancesAndStopsAtTheEnd() {
-        runBlocking { OfflinePlayer.ended() }
+        assertTrue(runBlocking { OfflinePlayer.ended() })
         assertTrue(awaitUntil { current() == "spotify:track:two" })
-        runBlocking { OfflinePlayer.ended() }
+        assertTrue(runBlocking { OfflinePlayer.ended() })
         assertTrue(awaitUntil { current() == "spotify:track:three" })
         assertEquals(emptyList<String>(), queueUris())
 
-        runBlocking { OfflinePlayer.ended() }
+        assertFalse(runBlocking { OfflinePlayer.ended() })
 
         assertTrue(awaitUntil { rig.vm.playback.value.isPaused })
         assertEquals("spotify:track:three", current())
+    }
+
+    @Test
+    fun theStopAtTheEnd_isAnnounced() {
+        runBlocking { OfflinePlayer.play(tracks, 2, contextUri = "spotify:playlist:p") }
+        awaitUntil { current() == "spotify:track:three" }
+        val messages = mutableListOf<Int>()
+        val collector = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined).launch {
+            rig.vm.errorMessage.collect { messages += it.id }
+        }
+
+        runBlocking { rig.vm.offline.trackEnded() }
+
+        assertTrue(awaitUntil { messages.isNotEmpty() })
+        assertEquals(listOf(ch.snepilatch.app.R.string.offline_playlist_ended), messages)
+        collector.cancel()
+    }
+
+    @Test
+    fun theDownloadsListEnding_saysSoToo() {
+        runBlocking { OfflinePlayer.play(tracks, 2) }
+        awaitUntil { current() == "spotify:track:three" }
+        val messages = mutableListOf<Int>()
+        val collector = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined).launch {
+            rig.vm.errorMessage.collect { messages += it.id }
+        }
+
+        runBlocking { rig.vm.offline.trackEnded() }
+
+        assertTrue(awaitUntil { messages.isNotEmpty() })
+        assertEquals(listOf(ch.snepilatch.app.R.string.offline_downloads_ended), messages)
+        collector.cancel()
     }
 
     @Test

@@ -24,6 +24,8 @@ data class OfflinePlayback(
     val shuffle: Boolean = false,
     /** `off`, `context` (the list starts over) or `track`, the same words the cluster uses. */
     val repeat: String = "off",
+    /** The playlist or album the list came from, null for the downloads list itself. */
+    val contextUri: String? = null,
 ) {
     val current: TrackInfo? get() = tracks.getOrNull(index)
 
@@ -60,9 +62,9 @@ object OfflinePlayer {
      * Start [tracks] at [index] from its downloaded copy: a new list, in the order given, with
      * shuffle off. False when that track has no local copy. Repeat carries over, like a setting.
      */
-    suspend fun play(tracks: List<TrackInfo>, index: Int): Boolean {
+    suspend fun play(tracks: List<TrackInfo>, index: Int, contextUri: String? = null): Boolean {
         val repeat = _state.value?.repeat ?: "off"
-        if (!load(tracks, index, shuffle = false, repeat = repeat)) return false
+        if (!load(tracks, index, shuffle = false, repeat = repeat, contextUri = contextUri)) return false
         unshuffled = tracks
         LokiLogger.i(TAG, "Playing the downloaded copy of ${tracks[index].uri} (${index + 1} of ${tracks.size})")
         return true
@@ -79,7 +81,7 @@ object OfflinePlayer {
             .map { it.toTrackInfo() }
             .takeIf { rows -> rows.any { it.uri == track.uri } }
             ?: listOf(track)
-        return play(list, list.indexOfFirst { it.uri == track.uri }.coerceAtLeast(0))
+        return play(list, list.indexOfFirst { it.uri == track.uri }.coerceAtLeast(0), contextUri)
     }
 
     /**
@@ -87,10 +89,10 @@ object OfflinePlayer {
      * online, so [tracks] is the playing track followed by what of the queue and its context is on
      * the phone, and ExoPlayer keeps running whatever it has. Repeat carries over (#792).
      */
-    fun adopt(tracks: List<TrackInfo>, index: Int, isPlaying: Boolean, durationMs: Long) {
+    fun adopt(tracks: List<TrackInfo>, index: Int, isPlaying: Boolean, durationMs: Long, contextUri: String? = null) {
         val current = tracks.getOrNull(index) ?: return
         val repeat = _state.value?.repeat ?: "off"
-        _state.value = OfflinePlayback(tracks, index, isPlaying, durationMs, shuffle = false, repeat = repeat)
+        _state.value = OfflinePlayback(tracks, index, isPlaying, durationMs, shuffle = false, repeat = repeat, contextUri = contextUri)
         unshuffled = tracks
         LokiLogger.i(TAG, "Took over ${current.uri} with ${tracks.size - index - 1} downloaded tracks to come")
     }
@@ -98,12 +100,12 @@ object OfflinePlayer {
     /** Move within the current list: same list, same shuffle and repeat, new pointer. */
     private suspend fun playAt(index: Int): Boolean {
         val s = _state.value ?: return false
-        if (!load(s.tracks, index, s.shuffle, s.repeat)) return false
+        if (!load(s.tracks, index, s.shuffle, s.repeat, s.contextUri)) return false
         LokiLogger.i(TAG, "Now on ${s.tracks[index].uri} (${index + 1} of ${s.tracks.size})")
         return true
     }
 
-    private suspend fun load(tracks: List<TrackInfo>, index: Int, shuffle: Boolean, repeat: String): Boolean {
+    private suspend fun load(tracks: List<TrackInfo>, index: Int, shuffle: Boolean, repeat: String, contextUri: String?): Boolean {
         val track = tracks.getOrNull(index) ?: return false
         val title = track.name.ifBlank { "Unknown" }
         val artist = track.artist.ifBlank { "Unknown" }
@@ -115,7 +117,9 @@ object OfflinePlayer {
             svc.stopCapture()
             svc.playUrl(url, title, artist, track.albumArt, startPlaying = true)
         }
-        _state.value = OfflinePlayback(tracks, index, isPlaying = true, durationMs = track.durationMs, shuffle = shuffle, repeat = repeat)
+        _state.value = OfflinePlayback(
+            tracks, index, isPlaying = true, durationMs = track.durationMs, shuffle = shuffle, repeat = repeat, contextUri = contextUri,
+        )
         return true
     }
 
@@ -128,10 +132,10 @@ object OfflinePlayer {
     /**
      * The file ran out. Repeat track plays it again, otherwise the next track of the list plays;
      * at the end the list starts over under repeat context and stops, paused on the last track,
-     * without it.
+     * without it. False when it stopped, so the caller can say so.
      */
-    suspend fun ended() {
-        val s = _state.value ?: return
+    suspend fun ended(): Boolean {
+        val s = _state.value ?: return false
         val advanced = when {
             s.repeat == "track" -> playAt(s.index)
             s.index + 1 < s.tracks.size -> playAt(s.index + 1)
@@ -139,6 +143,7 @@ object OfflinePlayer {
             else -> false
         }
         if (!advanced) _state.update { it?.copy(isPlaying = false) }
+        return advanced
     }
 
     /** Pause or resume what is loaded; ExoPlayer keeps the position. */

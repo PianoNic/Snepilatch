@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.annotation.StringRes
 import ch.snepilatch.app.R
 import ch.snepilatch.app.data.UiMessage
+import ch.snepilatch.app.logic.playback.OfflinePlayer
 import ch.snepilatch.app.logic.playback.ResumeLoader
 import ch.snepilatch.app.logic.shared.LokiLogger
 import ch.snepilatch.app.logic.shared.detectActiveAudioOutput
@@ -2043,6 +2044,24 @@ class PlaybackViewModel : ViewModel() {
     )
 
     init {
+        // Offline the engine owns what plays; mirror it into the one state the screens read, so
+        // the mini player, the full player and the position bar need no offline branch (#789).
+        viewModelScope.launch {
+            OfflinePlayer.state.collect { s ->
+                if (s == null || !isOffline.value) return@collect
+                val cur = _playback.value
+                val sameTrack = cur.track?.uri == s.current?.uri
+                _playback.value = cur.copy(
+                    track = s.current,
+                    isPlaying = s.isPlaying,
+                    isPaused = !s.isPlaying,
+                    durationMs = s.durationMs,
+                    positionMs = if (sameTrack) cur.positionMs else 0L,
+                )
+                if (!sameTrack) ThemeController.updateFromArt(s.current?.albumArt)
+                if (s.isPlaying) startPositionTicker() else stopPositionTicker()
+            }
+        }
         viewModelScope.launch {
             combine(_playback, currentTrackLiked) { p, liked ->
                 NotificationButtons(
@@ -2096,12 +2115,18 @@ class PlaybackViewModel : ViewModel() {
     }
 
     internal suspend fun startUserPlayback(track: TrackInfo, contextUri: String?, trackIndex: Int? = null) {
-        // Honor the resulting onTrackChange even if we're starting from idle (no local audio yet).
-        pendingUserPlay = true
         if (isOffline.value) {
-            playDownloaded(track.uri, track.name, track.artist, track.albumArt)
+            // No Connect to echo anything back: the offline engine plays it and its state is
+            // mirrored into the playback state below (#789).
+            if (OfflinePlayer.play(listOf(track), 0)) {
+                commitStream(track.uri, AudioSourceResolver.LOCAL_PROVIDER)
+            } else {
+                LokiLogger.w(TAG, "No downloaded copy of ${track.uri} to play offline")
+            }
             return
         }
+        // Honor the resulting onTrackChange even if we're starting from idle (no local audio yet).
+        pendingUserPlay = true
         val pc = player ?: return
         coroutineScope {
             // Instant tap-to-play (always on): self-resolve the tapped track's audio and start
@@ -2738,6 +2763,10 @@ class PlaybackViewModel : ViewModel() {
             viewModelScope.launch(Dispatchers.IO) { recoverFromPlaybackError(failedUri, failedPos) }
         }
         svc.onPlaybackEnded = onEnded@{
+            if (isOffline.value) {
+                OfflinePlayer.ended()
+                return@onEnded
+            }
             // The silent ad clip ending is not a real track end: KotifyClient's engine clocks the
             // ad out and drives the post-ad advance itself. Forcing an advance here would skip a
             // real track. Ignore — the next real track's setMediaItem replaces the clip.
@@ -2817,6 +2846,8 @@ class PlaybackViewModel : ViewModel() {
                 }
             }
         } else {
+            // Offline the index may not have known the length; the open file does.
+            if (isOffline.value) OfflinePlayer.durationKnown(MusicPlaybackService.instance?.loadedDurationMs() ?: 0L)
             // A stream loaded without playWhenReady (a paused hand-back) is ready but silent; the
             // state is paused and stays paused, so Connect is told nothing.
             if (MusicPlaybackService.instance?.playWhenReady() == false) {

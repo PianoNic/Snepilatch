@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import ch.snepilatch.app.data.TrackInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,7 +27,12 @@ data class DownloadedTrack(
     val title: String,
     val artist: String,
     val downloadedAt: Long,
+    /** From the download request; 0 for rows written before it was stored, ExoPlayer fills those in when the file opens. */
+    val durationMs: Long = 0L,
 )
+
+/** The row as the screens and the offline player see it. */
+fun DownloadedTrack.toTrackInfo() = TrackInfo(uri = trackUri, name = title, artist = artist, albumArt = coverUrl, durationMs = durationMs)
 
 /**
  * Index of what has been downloaded. Process-scoped like [ch.snepilatch.app.logic.shared.AppSettings],
@@ -38,7 +44,7 @@ data class DownloadedTrack(
 object Downloads {
 
     private const val DB_NAME = "downloads.db"
-    private const val DB_VERSION = 3
+    private const val DB_VERSION = 4
     private const val TABLE = "downloads"
 
     private var helper: Helper? = null
@@ -94,7 +100,8 @@ object Downloads {
                     size_bytes INTEGER NOT NULL,
                     title TEXT NOT NULL,
                     artist TEXT NOT NULL,
-                    downloaded_at INTEGER NOT NULL
+                    downloaded_at INTEGER NOT NULL,
+                    duration_ms INTEGER NOT NULL DEFAULT 0
                 )
                 """.trimIndent()
             )
@@ -113,6 +120,8 @@ object Downloads {
                 listOf("context_uri", "context_name", "context_type")
                     .forEach { db.execSQL("ALTER TABLE $TABLE ADD COLUMN $it TEXT") }
             }
+            // v4 stores the duration so the offline player and its rows know the length up front.
+            if (oldVersion < 4) db.execSQL("ALTER TABLE $TABLE ADD COLUMN duration_ms INTEGER NOT NULL DEFAULT 0")
         }
 
         /** Sideloading an older build must not crash; the default implementation throws. */
@@ -291,6 +300,7 @@ object Downloads {
         put("title", title)
         put("artist", artist)
         put("downloaded_at", downloadedAt)
+        put("duration_ms", durationMs)
     }
 
     private fun android.database.Cursor.toTrack() = DownloadedTrack(
@@ -307,6 +317,7 @@ object Downloads {
         title = getString(getColumnIndexOrThrow("title")),
         artist = getString(getColumnIndexOrThrow("artist")),
         downloadedAt = getLong(getColumnIndexOrThrow("downloaded_at")),
+        durationMs = getLong(getColumnIndexOrThrow("duration_ms")),
     )
 
     private fun android.database.Cursor.getStringOrNull(column: String): String? =

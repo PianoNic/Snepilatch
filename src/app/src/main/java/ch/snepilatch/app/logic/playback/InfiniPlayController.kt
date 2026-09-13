@@ -151,7 +151,7 @@ class InfiniPlayController(
             _enabled.value = false
             return
         }
-        val durMs = withContext(Dispatchers.Main) { svc.infiniPlayDurationMs() }
+        val durMs = withContext(Dispatchers.Main) { svc.loadedDurationMs() }
         // Go eternal as early as possible: hand off the moment a usable graph exists.
         val captureMs = if (durMs > 0) minOf(durMs / 2, HANDOFF_AFTER_MS) else HANDOFF_AFTER_MS
         val targetFrames = (captureMs * rate / 1000).toInt()

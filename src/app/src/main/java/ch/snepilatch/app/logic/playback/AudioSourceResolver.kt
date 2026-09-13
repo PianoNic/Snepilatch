@@ -8,6 +8,7 @@ import kotify.api.playerstatus.TrackChangeEvent
 import kotify.cdn.CdnPlayback
 import kotify.cdn.StreamInfo
 import kotify.cdn.StreamResult
+import ch.snepilatch.app.logic.shared.spfyId
 
 /**
  * Resolves a track to a playable stream for whichever audio source is selected, so callers never
@@ -57,7 +58,7 @@ object AudioSourceResolver {
     ): StreamResult = localOrNull(trackUri, title, artist)
         ?: youTubeMusic(title, artist, durationMs, source)
         ?: cdn.resolveStreamUrl(
-            trackUri.substringAfterLast(':'),
+            spfyId(trackUri),
             region = AppSettings.effectiveRegion(),
             searchQuery = searchQuery,
             preferredSource = source,

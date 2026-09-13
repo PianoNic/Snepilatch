@@ -59,6 +59,7 @@ import ch.snepilatch.app.logic.shared.SessionHolder
 import ch.snepilatch.app.logic.shared.shareLink
 import ch.snepilatch.app.ui.shared.trackMenuActions
 import ch.snepilatch.app.ui.shared.TrackMenuOptions
+import ch.snepilatch.app.logic.shared.spfyId
 
 /** Header actions share a footprint so save, download and the overflow menu line up. */
 private val HEADER_BUTTON = 40.dp
@@ -166,7 +167,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.clickable {
-                                detail.artistUri?.substringAfterLast(":")?.let { detailVm.openArtist(it) }
+                                detail.artistUri?.let(::spfyId)?.let { detailVm.openArtist(it) }
                             }
                         )
                     }
@@ -230,7 +231,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                 // Save/Follow (albums, playlists & artists)
                 if (detail.type == "album" || detail.type == "playlist" || isArtist) {
                     val saved by detailVm.detailSaved.collectAsState()
-                    val detailId = detail.uri.substringAfterLast(':')
+                    val detailId = spfyId(detail.uri)
                     LaunchedEffect(detail.uri, detail.savedInLibrary) {
                         detailVm.checkDetailSaved(detail.type, detailId)
                     }
@@ -458,7 +459,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                             Modifier
                                 .width(130.dp)
                                 .clickable {
-                                    val id = rel.uri.substringAfterLast(":")
+                                    val id = spfyId(rel.uri)
                                     detailVm.openAlbum(id)
                                 }
                         ) {
@@ -503,7 +504,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                             Modifier
                                 .width(120.dp)
                                 .clickable {
-                                    val id = ra.uri.substringAfterLast(":")
+                                    val id = spfyId(ra.uri)
                                     detailVm.openArtist(id)
                                 },
                             horizontalAlignment = Alignment.CenterHorizontally
@@ -570,7 +571,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                             Modifier
                                 .width(130.dp)
                                 .clickable {
-                                    val id = rel.uri.substringAfterLast(":")
+                                    val id = spfyId(rel.uri)
                                     detailVm.openAlbum(id)
                                 }
                         ) {
@@ -757,7 +758,7 @@ private fun DetailHeaderMenu(
     val artistRadioLabel = stringResource(R.string.go_to_artist_radio)
     val actions = buildList {
         if (!isCollection) {
-            val id = detail.uri.substringAfterLast(":")
+            val id = spfyId(detail.uri)
             add(MenuAction(Icons.Rounded.Share, shareLabel) {
                 onDismiss()
                 shareLink(context, "https://open.spotify.com/$type/$id", shareLabel)
@@ -776,7 +777,7 @@ private fun DetailHeaderMenu(
         if (isAlbum && detail.artistUri != null) {
             add(MenuAction(Icons.Rounded.Person, visitArtistLabel) {
                 onDismiss()
-                DetailRoutes.openArtist(detail.artistUri.substringAfterLast(":"))
+                DetailRoutes.openArtist(spfyId(detail.artistUri))
             })
         }
         // An album seeds with its artist, same as the desktop client — hence "artist radio" there.

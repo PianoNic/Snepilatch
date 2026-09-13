@@ -79,6 +79,7 @@ import androidx.compose.ui.util.lerp
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import ch.snepilatch.app.ui.shared.PlaylistPickerDialog
+import ch.snepilatch.app.logic.shared.spfyId
 
 /** Dp height of the bottom overlay (MiniPlayer + BottomNav). Screens use this for bottom padding. */
 val LocalBottomOverlayHeight = compositionLocalOf { mutableStateOf(0.dp) }
@@ -314,7 +315,7 @@ fun SpfyApp(vm: PlaybackViewModel) {
                 onPick = { playlist ->
                     val trackUris = vm.pendingPlaylistTrackUris.value
                     if (trackUris.isNotEmpty()) {
-                        vm.addTracksToPlaylist(playlist.uri.substringAfterLast(":"), trackUris)
+                        vm.addTracksToPlaylist(spfyId(playlist.uri), trackUris)
                         vm.showPlaylistPicker.value = false
                     }
                 },

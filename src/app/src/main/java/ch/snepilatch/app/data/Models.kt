@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 import ch.snepilatch.app.ui.theme.SnepilatchBlack
 import ch.snepilatch.app.ui.theme.SnepilatchGray
 import ch.snepilatch.app.ui.theme.SnepilatchLightGray
+import ch.snepilatch.app.logic.shared.spfyId
 
 enum class Screen {
     LOGIN, HOME, SEARCH, LIBRARY, NOW_PLAYING, PLAYLIST_DETAIL, ALBUM_DETAIL,
@@ -95,7 +96,7 @@ data class DetailData(
 fun DetailData.isPlaylistOwnedBy(username: String): Boolean =
     type == "playlist" &&
         username.isNotBlank() &&
-        ownerUri?.substringAfterLast(':') == username
+        ownerUri?.let(::spfyId) == username
 
 data class RelatedArtist(
     val uri: String,

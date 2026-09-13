@@ -82,6 +82,7 @@ import ch.snepilatch.app.viewmodel.HomeViewModel
 import ch.snepilatch.app.viewmodel.LibraryViewModel
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import ch.snepilatch.app.logic.shared.shareSpfyUri
+import ch.snepilatch.app.logic.shared.spfyId
 
 // --- Home Screen ---
 
@@ -283,7 +284,7 @@ fun HomeSingleCard(item: kotify.api.home.HomeSectionItem, vm: PlaybackViewModel)
     val detailVm: DetailViewModel = viewModel()
     val (base, glow, counterGlow) = homeCardColors(item)
     val open = {
-        if (!detailVm.openEntity(item.type, item.uri, item.owner, item.imageUrl)) detailVm.openPlaylist(item.uri.substringAfterLast(":"))
+        if (!detailVm.openEntity(item.type, item.uri, item.owner, item.imageUrl)) detailVm.openPlaylist(spfyId(item.uri))
     }
     Card(
         modifier = Modifier
@@ -402,7 +403,7 @@ private fun HomeCardMenu(item: kotify.api.home.HomeSectionItem, vm: PlaybackView
             add(
                 MenuAction(Icons.Rounded.AddCircleOutline, stringResource(R.string.save_to_library)) {
                     showMenu = false
-                    vm.saveToLibrary(item.type, item.uri.substringAfterLast(":"))
+                    vm.saveToLibrary(item.type, spfyId(item.uri))
                 }
             )
         }
@@ -480,7 +481,7 @@ private fun HomeCardLike(item: kotify.api.home.HomeSectionItem, vm: PlaybackView
     val saved = library.any { it.uri == item.uri }
     val liked = tapped ?: saved
     IconButton(onClick = {
-        val id = item.uri.substringAfterLast(":")
+        val id = spfyId(item.uri)
         if (liked) {
             vm.removeFromLibrary(item.type, id) { libraryVm.loadLibrary() }
         } else {

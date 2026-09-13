@@ -48,8 +48,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import ch.snepilatch.app.ui.shared.CoverNeighbours
 import ch.snepilatch.app.ui.shared.CoverTrack
 import ch.snepilatch.app.ui.shared.SlidingCoverImage
-import ch.snepilatch.app.ui.shared.SheetNavBarFix
-import ch.snepilatch.app.ui.shared.SpfyImage
 import ch.snepilatch.app.ui.shared.InfiniPlayTimeline
 import ch.snepilatch.app.ui.shared.rememberSmoothPositionMs
 import ch.snepilatch.app.ui.theme.*
@@ -62,6 +60,8 @@ import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import ch.snepilatch.app.logic.shared.shareSpfyUri
 import ch.snepilatch.app.ui.shared.LikeToggleButton
 import ch.snepilatch.app.ui.shared.PlaylistPickerDialog
+import ch.snepilatch.app.ui.shared.EntityMenuSheet
+import ch.snepilatch.app.ui.shared.MenuAction
 
 /**
  * The seek bar + elapsed/duration labels (or the infiniPlay remix timeline), pulled into its own leaf
@@ -1094,155 +1094,87 @@ private fun NowPlayingMenu(
     }
 
     if (showMore) {
-        val sheetState = rememberBottomSheetState(
-            initialValue = SheetValue.Hidden,
-            enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
-        )
-        ModalBottomSheet(
-            onDismissRequest = { onShowMore(false) },
-            sheetState = sheetState,
-            containerColor = SnepilatchElevated,
-            dragHandle = {
-                Box(
-                    Modifier
-                        .padding(vertical = 12.dp)
-                        .width(40.dp)
-                        .height(4.dp)
-                        .background(SnepilatchLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
-                )
-            }
-        ) {
-            SheetNavBarFix()
-            track?.let { t ->
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    SpfyImage(
-                        url = t.albumArt,
-                        modifier = Modifier.size(48.dp),
-                        shape = RoundedCornerShape(8.dp)
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text(
-                        t.name, color = SnepilatchWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    )
-                        Text(t.artist, color = SnepilatchLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-                HorizontalDivider(color = SnepilatchLightGray.copy(alpha = 0.15f))
-            }
-
-            val shareTrackLabel = stringResource(R.string.share_track_chooser)
-            val lyricsLabel = stringResource(R.string.lyrics)
-            val addQueueLabel = stringResource(R.string.add_to_queue)
-            val addPlaylistLabel = stringResource(R.string.add_to_playlist)
-            val viewQueueLabel = stringResource(R.string.view_queue)
-            val visitAlbumLabel = stringResource(R.string.visit_album)
-            val songRadioLabel = stringResource(R.string.go_to_song_radio)
-            val shareLabel = stringResource(R.string.share)
-            val joinJamLabel = stringResource(R.string.join_jam)
-            val showCodeLabel = stringResource(R.string.show_code)
-            val shareContext = LocalContext.current
-            val downloadCtx = androidx.compose.ui.platform.LocalContext.current
-            // Falls back to title/artist like playback does, so a relinked track's menu label
-            // agrees with what's actually on disk.
-            val downloadedIndex by Downloads.index.collectAsState()
-            // In-flight as well as downloaded, like every track row: isDownloaded is still false while
-            // the fetch runs, so without this the entry looked untouched and a second tap started a
-            // second download of the same track.
-            val inFlight by Downloads.inProgress.collectAsState()
-            val isDownloaded = track?.let { Downloads.isDownloaded(downloadedIndex, it.uri, it.name, it.artist) } == true
-            val isDownloading = track?.uri?.let { it in inFlight } == true
-            val downloadLabel = when {
-                isDownloading -> stringResource(R.string.downloading)
-                isDownloaded -> stringResource(R.string.remove_download)
-                else -> stringResource(R.string.download_track)
-            }
-            val items = listOf(
-                Triple(Icons.Rounded.MusicNote, lyricsLabel) {
-                    onShowMore(false); vm.openLyrics()
-                },
-                Triple(Icons.AutoMirrored.Rounded.QueueMusic, addQueueLabel) {
-                    track?.uri?.let { vm.addToQueue(it) }; onShowMore(false)
-                },
-                Triple(Icons.AutoMirrored.Rounded.PlaylistAdd, addPlaylistLabel) {
-                    onShowMore(false); onOpen(NowPlayingOverlay.PlaylistPicker)
-                },
-                Triple(Icons.AutoMirrored.Rounded.QueueMusic, viewQueueLabel) {
-                    vm.openQueue(); onShowMore(false)
-                },
-                Triple(Icons.Rounded.Album, visitAlbumLabel) {
-                    onShowMore(false); vm.openAlbumFromCurrentTrack()
-                },
-                Triple(Icons.Rounded.Radio, songRadioLabel) {
-                    onShowMore(false)
-                    // Via the router: this menu is built outside a composable that owns a DetailViewModel.
-                    track?.uri?.let { ch.snepilatch.app.viewmodel.DetailRoutes.openRadio(it) }
-                },
-                // Same glyphs as the track rows in SharedComponents: the same track reached two ways
-                // showed two different icons for one state.
-                Triple(
-                    if (isDownloaded) Icons.Rounded.OfflinePin else Icons.Rounded.DownloadForOffline,
-                    downloadLabel,
-                ) {
-                    onShowMore(false)
-                    val uri = track?.uri
-                    when {
-                        uri == null || isDownloading -> Unit
-                        isDownloaded -> vm.removeDownload(uri)
-                        else -> vm.downloadCurrentTrack(downloadCtx)
-                    }
-                },
-                Triple(Icons.Rounded.Groups, joinJamLabel) {
-                    onShowMore(false)
-                    onOpen(NowPlayingOverlay.Jam)
-                },
-                Triple(Icons.Rounded.QrCode2, showCodeLabel) {
-                    onShowMore(false)
-                    onOpen(NowPlayingOverlay.Code)
-                },
-                Triple(Icons.Rounded.Share, shareLabel) {
-                    onShowMore(false)
-                    track?.uri?.let { shareSpfyUri(shareContext, it, shareTrackLabel) }
-                }
-            )
-
-            items.forEach { (icon, label, onClick) ->
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable { onClick() }
-                        .padding(horizontal = 20.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(icon, null, tint = SnepilatchWhite, modifier = Modifier.size(24.dp))
-                    Spacer(Modifier.width(16.dp))
-                    Text(label, color = SnepilatchWhite, fontSize = 15.sp)
-                }
-            }
-
-            // Eternal InfiniPlay toggle — endless, ever-varying playback of the current track. Tinted
-            // Spfy-green while active. Only does something while streaming a track locally.
-            val infiniPlayOn by vm.infiniPlayEnabled.collectAsState()
-            val infiniPlayLabel = stringResource(R.string.infiniplay)
-            val infiniPlayTint = if (infiniPlayOn) Color(0xFF1ED760) else SnepilatchWhite
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clickable { vm.toggleInfiniPlay(); onShowMore(false) }
-                    .padding(horizontal = 20.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Rounded.AllInclusive, null, tint = infiniPlayTint, modifier = Modifier.size(24.dp))
-                Spacer(Modifier.width(16.dp))
-                Text(infiniPlayLabel, color = infiniPlayTint, fontSize = 15.sp)
-            }
-            Spacer(Modifier.navigationBarsPadding().height(12.dp))
+        val shareTrackLabel = stringResource(R.string.share_track_chooser)
+        val lyricsLabel = stringResource(R.string.lyrics)
+        val addQueueLabel = stringResource(R.string.add_to_queue)
+        val addPlaylistLabel = stringResource(R.string.add_to_playlist)
+        val viewQueueLabel = stringResource(R.string.view_queue)
+        val visitAlbumLabel = stringResource(R.string.visit_album)
+        val songRadioLabel = stringResource(R.string.go_to_song_radio)
+        val shareLabel = stringResource(R.string.share)
+        val joinJamLabel = stringResource(R.string.join_jam)
+        val showCodeLabel = stringResource(R.string.show_code)
+        val shareContext = LocalContext.current
+        val downloadCtx = androidx.compose.ui.platform.LocalContext.current
+        // Falls back to title/artist like playback does, so a relinked track's menu label
+        // agrees with what's actually on disk.
+        val downloadedIndex by Downloads.index.collectAsState()
+        // In-flight as well as downloaded, like every track row: isDownloaded is still false while
+        // the fetch runs, so without this the entry looked untouched and a second tap started a
+        // second download of the same track.
+        val inFlight by Downloads.inProgress.collectAsState()
+        val isDownloaded = track?.let { Downloads.isDownloaded(downloadedIndex, it.uri, it.name, it.artist) } == true
+        val isDownloading = track?.uri?.let { it in inFlight } == true
+        val downloadLabel = when {
+            isDownloading -> stringResource(R.string.downloading)
+            isDownloaded -> stringResource(R.string.remove_download)
+            else -> stringResource(R.string.download_track)
         }
+        val items = listOf(
+            MenuAction(Icons.Rounded.MusicNote, lyricsLabel) {
+                onShowMore(false); vm.openLyrics()
+            },
+            MenuAction(Icons.AutoMirrored.Rounded.QueueMusic, addQueueLabel) {
+                track?.uri?.let { vm.addToQueue(it) }; onShowMore(false)
+            },
+            MenuAction(Icons.AutoMirrored.Rounded.PlaylistAdd, addPlaylistLabel) {
+                onShowMore(false); onOpen(NowPlayingOverlay.PlaylistPicker)
+            },
+            MenuAction(Icons.AutoMirrored.Rounded.QueueMusic, viewQueueLabel) {
+                vm.openQueue(); onShowMore(false)
+            },
+            MenuAction(Icons.Rounded.Album, visitAlbumLabel) {
+                onShowMore(false); vm.openAlbumFromCurrentTrack()
+            },
+            MenuAction(Icons.Rounded.Radio, songRadioLabel) {
+                onShowMore(false)
+                // Via the router: this menu is built outside a composable that owns a DetailViewModel.
+                track?.uri?.let { ch.snepilatch.app.viewmodel.DetailRoutes.openRadio(it) }
+            },
+            // Same glyphs as the track rows in SharedComponents: the same track reached two ways
+            // showed two different icons for one state.
+            MenuAction(
+                if (isDownloaded) Icons.Rounded.OfflinePin else Icons.Rounded.DownloadForOffline,
+                downloadLabel,
+            ) {
+                onShowMore(false)
+                val uri = track?.uri
+                when {
+                    uri == null || isDownloading -> Unit
+                    isDownloaded -> vm.removeDownload(uri)
+                    else -> vm.downloadCurrentTrack(downloadCtx)
+                }
+            },
+            MenuAction(Icons.Rounded.Groups, joinJamLabel) {
+                onShowMore(false)
+                onOpen(NowPlayingOverlay.Jam)
+            },
+            MenuAction(Icons.Rounded.QrCode2, showCodeLabel) {
+                onShowMore(false)
+                onOpen(NowPlayingOverlay.Code)
+            },
+            MenuAction(Icons.Rounded.Share, shareLabel) {
+                onShowMore(false)
+                track?.uri?.let { shareSpfyUri(shareContext, it, shareTrackLabel) }
+            }
+        )
+        EntityMenuSheet(
+            imageUrl = track?.albumArt,
+            title = track?.name,
+            subtitle = track?.artist,
+            actions = items,
+            onDismiss = { onShowMore(false) },
+        )
     }
 }
 

@@ -32,6 +32,7 @@ import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.logic.shared.LokiLogger
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import kotlin.math.roundToInt
+import ch.snepilatch.app.ui.shared.SheetDragHandle
 
 /** The queue as a bottom drawer over whatever is showing; the full player stays open underneath. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,15 +50,7 @@ fun QueueSheet(vm: PlaybackViewModel) {
         onDismissRequest = { vm.closeQueue() },
         sheetState = sheetState,
         containerColor = SnepilatchElevated,
-        dragHandle = {
-            Box(
-                Modifier
-                    .padding(vertical = 12.dp)
-                    .width(40.dp)
-                    .height(4.dp)
-                    .background(SnepilatchLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
-            )
-        }
+        dragHandle = { SheetDragHandle() }
     ) {
         SheetNavBarFix()
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.85f)) {

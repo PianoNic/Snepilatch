@@ -4,9 +4,7 @@ import ch.snepilatch.app.R
 import ch.snepilatch.app.logic.download.DownloadQueue
 import ch.snepilatch.app.logic.download.Downloads
 import ch.snepilatch.app.ui.theme.SnepilatchWhite
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,8 +22,6 @@ import androidx.compose.material.icons.rounded.DownloadForOffline
 import androidx.compose.material.icons.rounded.OfflinePin
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material3.*
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Person
@@ -37,14 +33,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.data.TrackInfo
-import ch.snepilatch.app.ui.theme.SnepilatchElevated
 import ch.snepilatch.app.ui.theme.SnepilatchLightGray
 import ch.snepilatch.app.logic.shared.formatTime
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -142,119 +136,73 @@ fun TrackRow(
 
     // Bottom sheet menu
     if (showMenu) {
-        val sheetState = rememberBottomSheetState(
-            initialValue = SheetValue.Hidden,
-            enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
-        )
-        ModalBottomSheet(
-            onDismissRequest = { showMenu = false },
-            sheetState = sheetState,
-            containerColor = SnepilatchElevated,
-            dragHandle = {
-                Box(
-                    Modifier
-                        .padding(vertical = 12.dp)
-                        .width(40.dp)
-                        .height(4.dp)
-                        .background(SnepilatchLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
-                )
-            }
-        ) {
-            SheetNavBarFix()
-            // Track header
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                SpfyImage(url = track.albumArt, modifier = Modifier.size(48.dp), shape = RoundedCornerShape(8.dp))
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text(
-                        track.name, color = SnepilatchWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(track.artist, color = SnepilatchLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-            HorizontalDivider(color = SnepilatchLightGray.copy(alpha = 0.15f))
-
-            val shareLabel = stringResource(R.string.share)
-            val addToQueueLabel = stringResource(R.string.add_to_queue)
-            val addToPlaylistLabel = stringResource(R.string.add_to_playlist)
-            val likeLabel = stringResource(R.string.like)
-            val visitAlbumLabel = stringResource(R.string.visit_album)
-            val visitArtistLabel = stringResource(R.string.visit_artist)
-            val removeFromPlaylistLabel = stringResource(R.string.remove_from_playlist)
-            val songRadioLabel = stringResource(R.string.go_to_song_radio)
-            val downloadLabel = if (isDownloaded) {
-                stringResource(R.string.remove_download)
-            } else {
-                stringResource(R.string.download_track)
-            }
-            val items = listOfNotNull(
-                Triple(
-                    if (isDownloaded) Icons.Rounded.OfflinePin else Icons.Rounded.DownloadForOffline,
-                    downloadLabel,
-                ) {
-                    when {
-                        isDownloading -> Unit
-                        isDownloaded -> vm.removeDownload(track.uri)
-                        else -> vm.downloadTrack(track, context)
-                    }
-                    showMenu = false
-                },
-                Triple(Icons.AutoMirrored.Rounded.QueueMusic, addToQueueLabel) {
-                    vm.addToQueue(track.uri)
-                    showMenu = false
-                },
-                Triple(Icons.AutoMirrored.Rounded.PlaylistAdd, addToPlaylistLabel) {
-                    showMenu = false
-                    vm.showPlaylistPickerForTrack(track.uri)
-                },
-                onRemoveFromPlaylist?.let { remove ->
-                    Triple(Icons.Rounded.PlaylistRemove, removeFromPlaylistLabel) {
-                        showMenu = false
-                        remove()
-                    }
-                },
-                Triple(Icons.Rounded.Favorite, likeLabel) {
-                    vm.likeSong(track.uri.removePrefix("spotify:track:"))
-                    showMenu = false
-                },
-                Triple(Icons.Rounded.Radio, songRadioLabel) {
-                    showMenu = false
-                    detailVm.openRadio(track.uri)
-                },
-                Triple(Icons.Rounded.Album, visitAlbumLabel) {
-                    showMenu = false
-                    detailVm.openAlbumForTrack(track.uri)
-                },
-                Triple(Icons.Rounded.Person, visitArtistLabel) {
-                    showMenu = false
-                    detailVm.openArtistForTrack(track.uri)
-                },
-                Triple(Icons.Rounded.Share, shareLabel) {
-                    showMenu = false
-                    shareSpfyUri(context, track.uri, shareLabel)
-                }
-            )
-
-            items.forEach { (icon, label, onClick) ->
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable { onClick() }
-                        .padding(horizontal = 20.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(icon, null, tint = SnepilatchWhite, modifier = Modifier.size(24.dp))
-                    Spacer(Modifier.width(16.dp))
-                    Text(label, color = SnepilatchWhite, fontSize = 15.sp)
-                }
-            }
-            Spacer(Modifier.navigationBarsPadding().height(12.dp))
+        val shareLabel = stringResource(R.string.share)
+        val addToQueueLabel = stringResource(R.string.add_to_queue)
+        val addToPlaylistLabel = stringResource(R.string.add_to_playlist)
+        val likeLabel = stringResource(R.string.like)
+        val visitAlbumLabel = stringResource(R.string.visit_album)
+        val visitArtistLabel = stringResource(R.string.visit_artist)
+        val removeFromPlaylistLabel = stringResource(R.string.remove_from_playlist)
+        val songRadioLabel = stringResource(R.string.go_to_song_radio)
+        val downloadLabel = if (isDownloaded) {
+            stringResource(R.string.remove_download)
+        } else {
+            stringResource(R.string.download_track)
         }
+        val items = listOfNotNull(
+            MenuAction(
+                if (isDownloaded) Icons.Rounded.OfflinePin else Icons.Rounded.DownloadForOffline,
+                downloadLabel,
+            ) {
+                when {
+                    isDownloading -> Unit
+                    isDownloaded -> vm.removeDownload(track.uri)
+                    else -> vm.downloadTrack(track, context)
+                }
+                showMenu = false
+            },
+            MenuAction(Icons.AutoMirrored.Rounded.QueueMusic, addToQueueLabel) {
+                vm.addToQueue(track.uri)
+                showMenu = false
+            },
+            MenuAction(Icons.AutoMirrored.Rounded.PlaylistAdd, addToPlaylistLabel) {
+                showMenu = false
+                vm.showPlaylistPickerForTrack(track.uri)
+            },
+            onRemoveFromPlaylist?.let { remove ->
+                MenuAction(Icons.Rounded.PlaylistRemove, removeFromPlaylistLabel) {
+                    showMenu = false
+                    remove()
+                }
+            },
+            MenuAction(Icons.Rounded.Favorite, likeLabel) {
+                vm.likeSong(track.uri.removePrefix("spotify:track:"))
+                showMenu = false
+            },
+            MenuAction(Icons.Rounded.Radio, songRadioLabel) {
+                showMenu = false
+                detailVm.openRadio(track.uri)
+            },
+            MenuAction(Icons.Rounded.Album, visitAlbumLabel) {
+                showMenu = false
+                detailVm.openAlbumForTrack(track.uri)
+            },
+            MenuAction(Icons.Rounded.Person, visitArtistLabel) {
+                showMenu = false
+                detailVm.openArtistForTrack(track.uri)
+            },
+            MenuAction(Icons.Rounded.Share, shareLabel) {
+                showMenu = false
+                shareSpfyUri(context, track.uri, shareLabel)
+            }
+        )
+        EntityMenuSheet(
+            imageUrl = track.albumArt,
+            title = track.name,
+            subtitle = track.artist,
+            actions = items,
+            onDismiss = { showMenu = false },
+        )
     }
 }
 

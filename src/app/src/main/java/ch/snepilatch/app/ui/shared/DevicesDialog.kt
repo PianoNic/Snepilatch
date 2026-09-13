@@ -3,10 +3,8 @@
 package ch.snepilatch.app.ui.shared
 
 import ch.snepilatch.app.ui.theme.SnepilatchWhite
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,7 +14,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeDown
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
@@ -81,15 +78,7 @@ fun DevicesDialog(vm: PlaybackViewModel) {
         },
         sheetState = sheetState,
         containerColor = SnepilatchElevated,
-        dragHandle = {
-            Box(
-                Modifier
-                    .padding(vertical = 12.dp)
-                    .width(40.dp)
-                    .height(4.dp)
-                    .background(SnepilatchLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
-            )
-        }
+        dragHandle = { SheetDragHandle() }
     ) {
         SheetNavBarFix()
         Column(

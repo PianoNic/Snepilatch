@@ -72,7 +72,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.R
-import ch.snepilatch.app.ui.shared.OverflowAction
 import ch.snepilatch.app.ui.shared.OverflowMenu
 import ch.snepilatch.app.ui.shared.SpfyImage
 import ch.snepilatch.app.ui.theme.SnepilatchBlack
@@ -90,6 +89,7 @@ import kotify.api.song.SearchTopResult
 import kotify.api.song.SearchTrack
 import kotify.api.song.SearchUser
 import ch.snepilatch.app.logic.shared.shareSpfyUri
+import ch.snepilatch.app.ui.shared.MenuAction
 
 private data class BrowseCategory(val name: String, val color: Color)
 private val browseCategories = listOf(
@@ -294,11 +294,11 @@ private data class UnifiedResult(
     val imageUrl: String?,
     val circular: Boolean,
     val onClick: () -> Unit,
-    val menu: List<OverflowAction> = emptyList()
+    val menu: List<MenuAction> = emptyList()
 )
 
 /** Share action for any spfy entity. */
-private fun shareAction(ctx: Context, uri: String) = OverflowAction(Icons.Rounded.Share, ctx.getString(R.string.share)) {
+private fun shareAction(ctx: Context, uri: String) = MenuAction(Icons.Rounded.Share, ctx.getString(R.string.share)) {
     shareSpfyUri(ctx, uri, ctx.getString(R.string.share))
 }
 
@@ -313,19 +313,19 @@ private fun SearchTrack.toUnified(vm: PlaybackViewModel, ctx: Context) = Unified
     // whether the auto-save capture buffer can hold the track. toTrackInfo() carries both.
     onClick = { vm.playTrack(toTrackInfo()) },
     menu = listOf(
-        OverflowAction(Icons.AutoMirrored.Rounded.QueueMusic, ctx.getString(R.string.add_to_queue)) {
+        MenuAction(Icons.AutoMirrored.Rounded.QueueMusic, ctx.getString(R.string.add_to_queue)) {
             vm.addToQueue(uri)
         },
-        OverflowAction(Icons.AutoMirrored.Rounded.PlaylistAdd, ctx.getString(R.string.add_to_playlist)) {
+        MenuAction(Icons.AutoMirrored.Rounded.PlaylistAdd, ctx.getString(R.string.add_to_playlist)) {
             vm.showPlaylistPickerForTrack(uri)
         },
-        OverflowAction(Icons.Rounded.Favorite, ctx.getString(R.string.like)) {
+        MenuAction(Icons.Rounded.Favorite, ctx.getString(R.string.like)) {
             vm.likeSong(uri.removePrefix("spotify:track:"))
         },
-        OverflowAction(Icons.Rounded.Album, ctx.getString(R.string.visit_album)) {
+        MenuAction(Icons.Rounded.Album, ctx.getString(R.string.visit_album)) {
             DetailRoutes.openAlbumForTrack(uri)
         },
-        OverflowAction(Icons.Rounded.Person, ctx.getString(R.string.visit_artist)) {
+        MenuAction(Icons.Rounded.Person, ctx.getString(R.string.visit_artist)) {
             DetailRoutes.openArtistForTrack(uri)
         },
         shareAction(ctx, uri)
@@ -340,7 +340,7 @@ private fun SearchArtist.toUnified(vm: PlaybackViewModel, ctx: Context) = Unifie
     circular = true,
     onClick = { DetailRoutes.openArtist(idFromUri(uri)) },
     menu = listOf(
-        OverflowAction(Icons.Rounded.PersonAdd, "Follow") {
+        MenuAction(Icons.Rounded.PersonAdd, "Follow") {
             vm.followArtist(idFromUri(uri))
         },
         shareAction(ctx, uri)
@@ -369,7 +369,7 @@ private fun SearchPlaylist.toUnified(vm: PlaybackViewModel, ctx: Context) = Unif
     circular = false,
     onClick = { DetailRoutes.openPlaylist(idFromUri(uri)) },
     menu = listOf(
-        OverflowAction(Icons.Rounded.Add, ctx.getString(R.string.save_to_library)) {
+        MenuAction(Icons.Rounded.Add, ctx.getString(R.string.save_to_library)) {
             vm.savePlaylist(idFromUri(uri))
         },
         shareAction(ctx, uri)
@@ -614,7 +614,7 @@ private fun ResultRow(
     subtitle: String,
     imageUrl: String?,
     circular: Boolean = false,
-    menu: List<OverflowAction> = emptyList(),
+    menu: List<MenuAction> = emptyList(),
     onClick: () -> Unit
 ) {
     Row(

@@ -54,6 +54,9 @@ class OfflineController(private val scope: CoroutineScope, private val hooks: Ho
          * touching the audio that is already running.
          */
         suspend fun handBackToConnect(track: TrackInfo, contextUri: String?, positionMs: Long, paused: Boolean)
+
+        /** Report where the phone is and whether it is paused into the state machine Connect already has. */
+        suspend fun reportToConnect(positionMs: Long, paused: Boolean)
     }
 
     private var offlineWatch: Job? = null
@@ -64,6 +67,9 @@ class OfflineController(private val scope: CoroutineScope, private val hooks: Ho
 
     /** The context playback came from when the engine took over, for the way back. */
     private var takeoverContextUri: String? = null
+
+    /** The track Connect had this phone on when the engine took over; while it is still the one playing, Connect needs no play command. */
+    private var takeoverTrackUri: String? = null
 
     fun start() {
         scope.launch { OfflinePlayer.state.collect { s -> if (s != null && hooks.isOffline.value) mirror(s) } }
@@ -85,7 +91,27 @@ class OfflineController(private val scope: CoroutineScope, private val hooks: Ho
         }
     }
 
+    /**
+     * The dealer is back. When the engine is still on the very track Connect had this phone on,
+     * the server's state machine is as valid as before the outage: drop offline mode here, before
+     * the reconnect resync runs, and let it pick up as it always did. Only the position and the
+     * pause state are reported, in case they moved meanwhile. No play command, nothing restarted,
+     * the queue kept (#801). A takeover that moved on, or an offline start, still needs the play
+     * command in [tryHandBack].
+     */
     fun onDealerReconnected() {
+        val s = OfflinePlayer.state.value
+        val sameTrack = takeoverTrackUri != null && s?.current?.uri == takeoverTrackUri
+        if (hooks.isOffline.value && sameTrack) {
+            LokiLogger.i(TAG, "Dealer back on ${s?.current?.uri}, the track Connect already has, no hand-back needed")
+            handBack?.cancel()
+            hooks.isOffline.value = false
+            val paused = s?.isPlaying == false
+            OfflinePlayer.clear()
+            takeoverTrackUri = null
+            takeoverContextUri = null
+            scope.launch(Dispatchers.IO) { hooks.reportToConnect(hooks.currentPositionMs(), paused) }
+        }
         dealerBack.complete(Unit)
     }
 
@@ -127,6 +153,7 @@ class OfflineController(private val scope: CoroutineScope, private val hooks: Ho
             LokiLogger.w(TAG, "Network gone with nothing playing, offline with downloads only")
             return
         }
+        takeoverTrackUri = current.uri
         val list = listOf(current) + downloadedToCome(current, hooks.queue.value, takeoverContextUri)
         LokiLogger.w(TAG, "Network gone while on ${current.uri}: the offline engine takes over, ${list.size - 1} downloaded tracks to come")
         OfflinePlayer.adopt(list, 0, isPlaying = p.isPlaying && !p.isPaused, durationMs = p.durationMs)
@@ -162,6 +189,8 @@ class OfflineController(private val scope: CoroutineScope, private val hooks: Ho
         if (hadSession && withTimeoutOrNull(DEALER_WAIT_MS) { dealerBack.await() } == null) {
             LokiLogger.w(TAG, "Dealer not back within ${DEALER_WAIT_MS}ms, handing back anyway")
         }
+        // The dealer's return may have settled it already, see onDealerReconnected.
+        if (!hooks.isOffline.value) return true
         val s = OfflinePlayer.state.value
         val current = s?.current
         val position = hooks.currentPositionMs()
@@ -175,6 +204,7 @@ class OfflineController(private val scope: CoroutineScope, private val hooks: Ho
         }
         OfflinePlayer.clear()
         takeoverContextUri = null
+        takeoverTrackUri = null
         return true
     }
 

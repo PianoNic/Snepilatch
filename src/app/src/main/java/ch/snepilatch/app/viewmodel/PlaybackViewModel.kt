@@ -64,6 +64,7 @@ import kotlin.coroutines.cancellation.CancellationException
 import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.logic.shared.Navigator
 import ch.snepilatch.app.logic.shared.ThemeController
+import ch.snepilatch.app.logic.shared.launchWith
 
 @Suppress("TooManyFunctions") // central view-model; split-by-feature is tracked separately
 class PlaybackViewModel : ViewModel() {
@@ -990,18 +991,13 @@ class PlaybackViewModel : ViewModel() {
         tag: String,
         @StringRes errorMessage: Int? = null,
         block: suspend (Session) -> Unit
-    ): Job =
-        viewModelScope.launch(Dispatchers.IO) {
-            val sess = session ?: return@launch
-            try {
-                block(sess)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                LokiLogger.e(TAG, tag, e)
-                errorMessage?.let { _errorMessage.tryEmit(UiMessage(it)) }
-            }
-        }
+    ): Job = launchWith(
+        TAG,
+        tag,
+        { session },
+        onFailure = { errorMessage?.let { _errorMessage.tryEmit(UiMessage(it)) } },
+        block = block,
+    )
 
     /**
      * Same shape as [launchWithSession] but receives the live [PlayerConnect].
@@ -1009,16 +1005,7 @@ class PlaybackViewModel : ViewModel() {
      * need to touch the session object directly.
      */
     private fun launchWithPlayer(tag: String, block: suspend (PlayerConnect) -> Unit): Job =
-        viewModelScope.launch(Dispatchers.IO) {
-            val pc = player ?: return@launch
-            try {
-                block(pc)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                LokiLogger.e(TAG, tag, e)
-            }
-        }
+        launchWith(TAG, tag, { player }, block = block)
 
     fun showLogin() {
         needsLogin.value = true

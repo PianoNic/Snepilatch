@@ -22,8 +22,6 @@ import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.logic.shared.UpdateService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.Request
-import org.json.JSONArray
 
 data class ReleaseNote(
     val version: String,
@@ -141,14 +139,7 @@ fun ReleaseNotesDialog(onDismiss: () -> Unit) {
 }
 
 private suspend fun fetchReleaseNotes(context: android.content.Context): List<ReleaseNote> {
-    val client = UpdateService.client
-    val request = Request.Builder()
-        .url("https://api.github.com/repos/PianoNic/Snepilatch/releases")
-        .header("Accept", "application/vnd.github+json")
-        .build()
-    val response = client.newCall(request).execute()
-    if (!response.isSuccessful) throw Exception("HTTP ${response.code}")
-    val json = JSONArray(response.body?.string() ?: "[]")
+    val json = UpdateService.fetchReleases()
     val notes = mutableListOf<ReleaseNote>()
     for (i in 0 until json.length()) {
         val obj = json.getJSONObject(i)

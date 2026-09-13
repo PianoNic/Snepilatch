@@ -41,6 +41,17 @@ object UpdateService {
 
     internal val client = OkHttpClient()
 
+    /** The repo's releases, newest first, as GitHub lists them. Throws on a failed request; call on IO. */
+    internal fun fetchReleases(): JSONArray {
+        val request = Request.Builder()
+            .url(GITHUB_API_URL)
+            .header("Accept", "application/vnd.github+json")
+            .build()
+        val response = client.newCall(request).execute()
+        if (!response.isSuccessful) throw java.io.IOException("HTTP ${response.code}")
+        return JSONArray(response.body?.string() ?: "[]")
+    }
+
     suspend fun checkForUpdates(
         context: Context,
         channel: UpdateChannel = UpdateChannel.STABLE
@@ -49,15 +60,7 @@ object UpdateService {
             val currentVersion = context.packageManager
                 .getPackageInfo(context.packageName, 0).versionName ?: return@withContext null
 
-            val request = Request.Builder()
-                .url(GITHUB_API_URL)
-                .header("Accept", "application/vnd.github+json")
-                .build()
-
-            val response = client.newCall(request).execute()
-            if (!response.isSuccessful) return@withContext null
-
-            val releases = JSONArray(response.body?.string() ?: return@withContext null)
+            val releases = fetchReleases()
             val json = (0 until releases.length())
                 .map { releases.getJSONObject(it) }
                 .firstOrNull { release ->

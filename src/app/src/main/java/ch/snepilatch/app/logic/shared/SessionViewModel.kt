@@ -1,13 +1,9 @@
 package ch.snepilatch.app.logic.shared
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import kotify.session.Session
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
 
 /**
  * Base for the feature ViewModels that only read the Kotify [Session] from [SessionHolder]
@@ -20,18 +16,12 @@ import kotlinx.coroutines.launch
  */
 abstract class SessionViewModel(protected val logTag: String) : ViewModel() {
 
-    /** Launch [block] on IO with a non-null session; rethrows cancellation, logs other failures. */
-    protected fun launchWithSession(op: String, block: suspend (Session) -> Unit): Job =
-        viewModelScope.launch(Dispatchers.IO) {
-            val sess = SessionHolder.session ?: return@launch
-            try {
-                block(sess)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                LokiLogger.e(logTag, op, e)
-            }
-        }
+    /** Launch [block] on IO with a non-null session; rethrows cancellation, logs other failures to [onFailure]. */
+    protected fun launchWithSession(
+        op: String,
+        onFailure: (Exception) -> Unit = {},
+        block: suspend (Session) -> Unit
+    ): Job = launchWith(logTag, op, { SessionHolder.session }, onFailure = onFailure, block = block)
 
     /** [launchWithSession] that flips [loading] true around the block and always resets it. */
     protected fun launchWithSessionLoading(
@@ -39,17 +29,12 @@ abstract class SessionViewModel(protected val logTag: String) : ViewModel() {
         loading: MutableStateFlow<Boolean>,
         block: suspend (Session) -> Unit
     ): Job =
-        viewModelScope.launch(Dispatchers.IO) {
-            val sess = SessionHolder.session ?: return@launch
-            loading.value = true
-            try {
-                block(sess)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                LokiLogger.e(logTag, op, e)
-            } finally {
-                loading.value = false
-            }
-        }
+        launchWith(
+            logTag,
+            op,
+            { SessionHolder.session },
+            before = { loading.value = true },
+            after = { loading.value = false },
+            block = block,
+        )
 }

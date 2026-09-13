@@ -13,6 +13,8 @@ import org.junit.Test
 /**
  * Issue #701: after the app was killed mid-track the restored snapshot position reached the now
  * playing screen but never the notification, which sat at 0 until playback resumed.
+ * Issue #778: while another device plays (a jam host), the card showed the track as paused because
+ * only the position reached the service, never whether the cluster was playing.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class IdleNotificationPositionTest {
@@ -29,23 +31,40 @@ class IdleNotificationPositionTest {
     @After
     fun tearDown() = rig.uninstall()
 
+    private fun state(playing: Boolean, activeElsewhere: Boolean) = PlayerStateData(
+        is_playing = playing, is_paused = !playing,
+        track = PlayerTrack(
+            uri = "spotify:track:test", uid = "uid", provider = "context", name = "Test", artistName = "Tester",
+            artistUri = null, albumName = null, albumUri = null, durationMs = 200_000L, isExplicit = false,
+            imageUrl = null, imageSmallUrl = null, imageLargeUrl = null, contextUri = null,
+        ),
+        position_as_of_timestamp = 42_000L, timestamp = 1_700_000_000_000L, duration = 200_000L,
+        play_origin = null, is_active_device = false, has_active_device = activeElsewhere,
+    )
+
     @Test
     fun restoredPausedSnapshot_pushesItsPositionToTheIdleNotification() {
-        coEvery { rig.player.getState() } returns PlayerStateData(
-            is_playing = false, is_paused = true,
-            track = PlayerTrack(
-                uri = "spotify:track:test", uid = "uid", provider = "context", name = "Test", artistName = "Tester",
-                artistUri = null, albumName = null, albumUri = null, durationMs = 200_000L, isExplicit = false,
-                imageUrl = null, imageSmallUrl = null, imageLargeUrl = null, contextUri = null,
-            ),
-            position_as_of_timestamp = 42_000L, timestamp = 1_700_000_000_000L, duration = 200_000L,
-            play_origin = null, is_active_device = false, has_active_device = false,
-        )
+        coEvery { rig.player.getState() } returns state(playing = false, activeElsewhere = false)
 
         rig.vm.resyncOnForeground()
 
         verify(timeout = 2_000) {
-            rig.service.setIdleMetadata(title = "Test", artist = any(), albumArtUrl = any(), durationMs = 200_000L, positionMs = 42_000L)
+            rig.service.setIdleMetadata(
+                title = "Test", artist = any(), albumArtUrl = any(), durationMs = 200_000L, positionMs = 42_000L, playing = false,
+            )
+        }
+    }
+
+    @Test
+    fun anotherDevicePlaying_tellsTheIdleNotificationItIsPlaying() {
+        coEvery { rig.player.getState() } returns state(playing = true, activeElsewhere = true)
+
+        rig.vm.resyncOnForeground()
+
+        verify(timeout = 2_000) {
+            rig.service.setIdleMetadata(
+                title = "Test", artist = any(), albumArtUrl = any(), durationMs = 200_000L, positionMs = any(), playing = true,
+            )
         }
     }
 }

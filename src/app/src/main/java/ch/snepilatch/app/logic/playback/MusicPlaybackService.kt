@@ -944,7 +944,8 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     fun infiniPlaySnapshotInterleaved(): ShortArray = infiniPlayTap.snapshotInterleaved()
 
     /** Track duration in ms — MUST be called on the main thread. */
-    fun infiniPlayDurationMs(): Long = player.duration
+    /** ExoPlayer's duration of what is loaded; negative (TIME_UNSET) until it knows. */
+    fun loadedDurationMs(): Long = player.duration
 
     fun infiniPlaySeekToStart() = mainHandler.post { if (player.mediaItemCount > 0) player.seekTo(0) }
 

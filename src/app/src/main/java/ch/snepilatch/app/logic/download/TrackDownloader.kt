@@ -411,6 +411,7 @@ object TrackDownloader {
             title = request.title,
             artist = request.artist,
             downloadedAt = System.currentTimeMillis(),
+            durationMs = request.durationMs,
         )
         Downloads.put(record)
         LokiLogger.i(TAG, "downloaded '${request.title}' as .$finalExtension from ${info.provider}")

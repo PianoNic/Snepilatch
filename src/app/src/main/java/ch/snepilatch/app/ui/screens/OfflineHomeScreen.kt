@@ -15,8 +15,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
-import ch.snepilatch.app.data.TrackInfo
 import ch.snepilatch.app.logic.download.Downloads
+import ch.snepilatch.app.logic.download.toTrackInfo
 import ch.snepilatch.app.ui.shared.TrackRow
 import ch.snepilatch.app.ui.theme.SnepilatchLightGray
 import ch.snepilatch.app.ui.theme.SnepilatchWhite
@@ -25,9 +25,7 @@ import ch.snepilatch.app.viewmodel.PlaybackViewModel
 @Composable
 fun OfflineHomeScreen(vm: PlaybackViewModel) {
     val stored by Downloads.rows.collectAsState()
-    val tracks = stored.map {
-        TrackInfo(uri = it.trackUri, name = it.title, artist = it.artist, albumArt = it.coverUrl)
-    }
+    val tracks = stored.map { it.toTrackInfo() }
 
     if (tracks.isEmpty()) {
         Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {

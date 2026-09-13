@@ -370,4 +370,12 @@
     <string name="jam_members">%1$d in diesem Jam</string>
     <string name="join_jam">Einem Jam beitreten</string>
     <string name="jam_connected">Mit Jam verbunden</string>
+    <string name="jam_of">Jam von %1$s</string>
+    <string name="jam_invite">Freunde zum Jam einladen</string>
+    <string name="jam_share_link">Link teilen</string>
+    <string name="jam_qr_hint">Code scannen oder Link teilen, um beizutreten.</string>
+    <string name="jam_end">Jam beenden</string>
+    <string name="jam_listening">Hört zu</string>
+    <string name="jam_you">Du</string>
+    <string name="jam_controls_locked">Der Host hat Abspielen, Pause und Überspringen für Gäste ausgeschaltet.</string>
 </resources>

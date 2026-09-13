@@ -386,4 +386,12 @@
     <string name="jam_members">%1$d i dem Jam</string>
     <string name="join_jam">Emene Jam biitrete</string>
     <string name="jam_connected">Mit em Jam verbunde</string>
+    <string name="jam_of">Jam vo %1$s</string>
+    <string name="jam_invite">Fründ zum Jam iilade</string>
+    <string name="jam_share_link">Link teile</string>
+    <string name="jam_qr_hint">Code scanne oder Link teile zum biiträte.</string>
+    <string name="jam_end">Jam beände</string>
+    <string name="jam_listening">Lost zue</string>
+    <string name="jam_you">Du</string>
+    <string name="jam_controls_locked">De Host het Abspile, Pause und Überspringe für Gäst usgschaltet.</string>
 </resources>

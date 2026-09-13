@@ -33,6 +33,10 @@ import ch.snepilatch.app.logic.shared.LokiLogger
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import kotlin.math.roundToInt
 import ch.snepilatch.app.ui.shared.SheetDragHandle
+import ch.snepilatch.app.ui.shared.JamHeader
+import ch.snepilatch.app.ui.shared.JamInviteSheet
+import ch.snepilatch.app.viewmodel.JamViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 /** The queue as a bottom drawer over whatever is showing; the full player stays open underneath. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,6 +58,22 @@ fun QueueSheet(vm: PlaybackViewModel) {
     ) {
         SheetNavBarFix()
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.85f)) {
+            // In a jam the queue is the jam's queue, so the jam sits on top of it like in the official app.
+            val jamVm: JamViewModel = viewModel()
+            val jam by jamVm.jam.collectAsState()
+            val jamBusy by jamVm.joining.collectAsState()
+            val shareLink by jamVm.shareLink.collectAsState()
+            var showInvite by remember { mutableStateOf(false) }
+            jam?.let {
+                JamHeader(
+                    it,
+                    busy = jamBusy,
+                    onInvite = { showInvite = true },
+                    onLeave = { jamVm.leave() },
+                    onEnd = { jamVm.end() },
+                )
+            }
+            if (showInvite) shareLink?.let { JamInviteSheet(it, onDismiss = { showInvite = false }) }
             Text(
                 stringResource(R.string.queue),
                 color = SnepilatchWhite,

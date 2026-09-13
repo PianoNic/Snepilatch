@@ -65,6 +65,7 @@ import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.logic.shared.Navigator
 import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.logic.shared.launchWith
+import ch.snepilatch.app.logic.shared.JamHolder
 
 @Suppress("TooManyFunctions") // central view-model; split-by-feature is tracked separately
 class PlaybackViewModel : ViewModel() {
@@ -493,6 +494,7 @@ class PlaybackViewModel : ViewModel() {
 
     /** Disconnects the running player and drops the holder, so the next init starts from nothing. */
     private fun tearDownSession() {
+        JamHolder.clear()
         SessionHolder.player?.let {
             try { kotlinx.coroutines.runBlocking { it.disconnect() } } catch (_: Exception) {}
         }
@@ -588,6 +590,8 @@ class PlaybackViewModel : ViewModel() {
                 // Same device id as last launch, so this registration replaces the one the previous
                 // process could not remove when it was killed (see AppSettings.persistedDeviceId).
                 pc.setPersistedDeviceId(AppSettings.persistedDeviceId())
+                // Before ready(): the registration's own current-session fetch is the first update.
+                pc.onJamUpdate { JamHolder.apply(it, pc.jamShareToken) }
                 pc.ready()
                 // Assigning through the property setter publishes the player to
                 // SessionHolder — session/spfyPlayback/cdnResolver are already

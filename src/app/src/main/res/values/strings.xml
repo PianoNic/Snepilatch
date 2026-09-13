@@ -385,4 +385,12 @@
     <string name="jam_members">%1$d in this jam</string>
     <string name="join_jam">Join a jam</string>
     <string name="jam_connected">Connected to jam</string>
+    <string name="jam_of">%1$s\'s Jam</string>
+    <string name="jam_invite">Invite friends to the jam</string>
+    <string name="jam_share_link">Share link</string>
+    <string name="jam_qr_hint">Scan the code or share the link to join.</string>
+    <string name="jam_end">End jam</string>
+    <string name="jam_listening">Listening</string>
+    <string name="jam_you">You</string>
+    <string name="jam_controls_locked">The host has turned off play, pause and skip for guests.</string>
 </resources>

@@ -27,6 +27,7 @@ import ch.snepilatch.app.logic.download.Downloads
 import ch.snepilatch.app.ui.shared.SpfyImage
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
+import ch.snepilatch.app.ui.shared.SettingRow
 
 /**
  * What downloading is doing right now: tracks in flight, where the files go, and how much space they
@@ -117,23 +118,11 @@ fun DownloadsScreen(vm: PlaybackViewModel) {
 /** Where the files go and how much room they take. */
 @Composable
 private fun StorageSummary(folder: android.net.Uri?, count: Int, totalMb: Int) {
-    ListItem(
-        headlineContent = { Text(stringResource(R.string.download_folder), color = SnepilatchWhite) },
-        supportingContent = {
-            Text(
-                folder?.let { readableFolder(it) } ?: stringResource(R.string.download_folder_none),
-                color = SnepilatchLightGray
-            )
-        },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+    SettingRow(
+        title = stringResource(R.string.download_folder),
+        subtitle = folder?.let { readableFolder(it) } ?: stringResource(R.string.download_folder_none),
     )
-    ListItem(
-        headlineContent = {
-            Text(stringResource(R.string.downloads_summary, count, totalMb), color = SnepilatchWhite)
-        },
-        leadingContent = { Icon(Icons.Rounded.CloudDone, null, tint = SnepilatchLightGray) },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-    )
+    SettingRow(title = stringResource(R.string.downloads_summary, count, totalMb), icon = Icons.Rounded.CloudDone)
 }
 
 @Composable

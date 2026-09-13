@@ -33,7 +33,6 @@ import ch.snepilatch.app.BuildConfig
 import ch.snepilatch.app.R
 import ch.snepilatch.app.logic.download.DownloadFolder
 import ch.snepilatch.app.logic.download.Downloads
-import ch.snepilatch.app.ui.shared.ProfileInfoItem
 import ch.snepilatch.app.ui.shared.TightAlertDialog
 import ch.snepilatch.app.ui.shared.UpdateDialog
 import ch.snepilatch.app.ui.theme.*
@@ -46,6 +45,8 @@ import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import ch.snepilatch.app.ui.shared.SettingRow
+import ch.snepilatch.app.ui.shared.SettingToggleRow
 
 @Composable
 fun AccountScreen(vm: PlaybackViewModel) {
@@ -126,20 +127,20 @@ fun AccountScreen(vm: PlaybackViewModel) {
         val dots = stringResource(R.string.placeholder_dots)
         val premiumLabel = stringResource(R.string.premium)
         val freeLabel = stringResource(R.string.plan_free)
-        ProfileInfoItem(
-            stringResource(R.string.username),
-            account.displayName.ifEmpty { account.username.ifEmpty { dots } },
-            Icons.Rounded.Person
+        SettingRow(
+            title = stringResource(R.string.username),
+            subtitle = account.displayName.ifEmpty { account.username.ifEmpty { dots } },
+            icon = Icons.Rounded.Person,
         )
-        ProfileInfoItem(
-            stringResource(R.string.user_id),
-            account.username.ifEmpty { dots },
-            Icons.Rounded.Badge
+        SettingRow(
+            title = stringResource(R.string.user_id),
+            subtitle = account.username.ifEmpty { dots },
+            icon = Icons.Rounded.Badge,
         )
-        ProfileInfoItem(
-            stringResource(R.string.plan),
-            if (account.isPremium) premiumLabel else freeLabel,
-            Icons.Rounded.CreditCard
+        SettingRow(
+            title = stringResource(R.string.plan),
+            subtitle = if (account.isPremium) premiumLabel else freeLabel,
+            icon = Icons.Rounded.CreditCard,
         )
 
         Spacer(Modifier.height(24.dp))
@@ -156,13 +157,11 @@ fun AccountScreen(vm: PlaybackViewModel) {
             AppSettings.SOURCE_YTM -> stringResource(R.string.audio_source_ytm)
             else -> stringResource(R.string.lossless_off_spfy)
         }
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.audio_source), color = SnepilatchWhite) },
-            supportingContent = { Text(sourceLabel, color = SnepilatchLightGray) },
-            leadingContent = { Icon(Icons.Rounded.MusicNote, null, tint = SnepilatchLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            modifier = Modifier.clickable { showSourcePicker = true }
+        SettingRow(
+            title = stringResource(R.string.audio_source),
+            subtitle = sourceLabel,
+            icon = Icons.Rounded.MusicNote,
+            onClick = { showSourcePicker = true },
         )
         if (showSourcePicker) {
             RadioPickerDialog(
@@ -201,13 +200,11 @@ fun AccountScreen(vm: PlaybackViewModel) {
         } else {
             currentRegion
         }
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.content_region), color = SnepilatchWhite) },
-            supportingContent = { Text(regionLabel, color = SnepilatchLightGray) },
-            leadingContent = { Icon(Icons.Rounded.Language, null, tint = SnepilatchLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            modifier = Modifier.clickable { showRegionPicker = true }
+        SettingRow(
+            title = stringResource(R.string.content_region),
+            subtitle = regionLabel,
+            icon = Icons.Rounded.Language,
+            onClick = { showRegionPicker = true },
         )
         if (showRegionPicker) {
             val regionOptions = listOf(
@@ -237,12 +234,10 @@ fun AccountScreen(vm: PlaybackViewModel) {
         }
 
         // Connect to device (Playback)
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.connect_to_device), color = SnepilatchWhite) },
-            leadingContent = { Icon(Icons.Rounded.Devices, null, tint = SnepilatchLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            modifier = Modifier.clickable { vm.loadDevices(); vm.showDevices.value = true }
+        SettingRow(
+            title = stringResource(R.string.connect_to_device),
+            icon = Icons.Rounded.Devices,
+            onClick = { vm.loadDevices(); vm.showDevices.value = true },
         )
 
         Spacer(Modifier.height(24.dp))
@@ -252,22 +247,15 @@ fun AccountScreen(vm: PlaybackViewModel) {
         // Music, or the reverse. Spfy is absent because its stream is Widevine and cannot be saved.
         val downloadSource by AppSettings.downloadSource.collectAsState()
         var showDownloadSourcePicker by remember { mutableStateOf(false) }
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.download_source), color = SnepilatchWhite) },
-            supportingContent = {
-                Text(
-                    if (downloadSource == AppSettings.SOURCE_LOSSLESS) {
-                        stringResource(R.string.download_source_lossless)
-                    } else {
-                        stringResource(R.string.download_source_ytm)
-                    },
-                    color = SnepilatchLightGray
-                )
+        SettingRow(
+            title = stringResource(R.string.download_source),
+            subtitle = if (downloadSource == AppSettings.SOURCE_LOSSLESS) {
+                stringResource(R.string.download_source_lossless)
+            } else {
+                stringResource(R.string.download_source_ytm)
             },
-            leadingContent = { Icon(Icons.Rounded.Download, null, tint = SnepilatchLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            modifier = Modifier.clickable { showDownloadSourcePicker = true }
+            icon = Icons.Rounded.Download,
+            onClick = { showDownloadSourcePicker = true },
         )
         if (showDownloadSourcePicker) {
             RadioPickerDialog(
@@ -294,25 +282,13 @@ fun AccountScreen(vm: PlaybackViewModel) {
         }
 
         val autoSave by AppSettings.autoSaveListened.collectAsState()
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.auto_save_listened), color = SnepilatchWhite) },
-            supportingContent = {
-                Text(stringResource(R.string.auto_save_listened_desc), color = SnepilatchLightGray)
-            },
-            leadingContent = { Icon(Icons.Rounded.DownloadForOffline, null, tint = SnepilatchLightGray) },
-            trailingContent = {
-                Switch(
-                    checked = autoSave,
-                    onCheckedChange = { AppSettings.setAutoSaveListened(it, audioContext) },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = animatedPrimary,
-                        checkedTrackColor = animatedPrimary.copy(alpha = 0.5f),
-                        uncheckedThumbColor = SnepilatchLightGray,
-                        uncheckedTrackColor = SnepilatchLightGray.copy(alpha = 0.3f)
-                    )
-                )
-            },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+        SettingToggleRow(
+            title = stringResource(R.string.auto_save_listened),
+            checked = autoSave,
+            onCheckedChange = { AppSettings.setAutoSaveListened(it, audioContext) },
+            accent = animatedPrimary,
+            subtitle = stringResource(R.string.auto_save_listened_desc),
+            icon = Icons.Rounded.DownloadForOffline,
         )
 
         ListItem(
@@ -332,40 +308,26 @@ fun AccountScreen(vm: PlaybackViewModel) {
         val folderPicker = rememberLauncherForActivityResult(
             ActivityResultContracts.OpenDocumentTree()
         ) { picked -> if (picked != null) DownloadFolder.setFolder(picked, audioContext) }
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.download_folder), color = SnepilatchWhite) },
-            supportingContent = {
-                Text(
-                    downloadFolder?.let { readableFolder(it) }
-                        ?: stringResource(R.string.download_folder_none),
-                    color = SnepilatchLightGray
-                )
-            },
-            leadingContent = { Icon(Icons.Rounded.Folder, null, tint = SnepilatchLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            modifier = Modifier.clickable { folderPicker.launch(null) }
+        SettingRow(
+            title = stringResource(R.string.download_folder),
+            subtitle = downloadFolder?.let { readableFolder(it) }
+                ?: stringResource(R.string.download_folder_none),
+            icon = Icons.Rounded.Folder,
+            onClick = { folderPicker.launch(null) },
         )
 
         // Storage limit: 0 = unlimited.
         val downloadCapGb by AppSettings.downloadCapGb.collectAsState()
         var showCapDialog by remember { mutableStateOf(false) }
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.storage_limit), color = SnepilatchWhite) },
-            supportingContent = {
-                Text(
-                    if (downloadCapGb > 0f) {
-                        stringResource(R.string.storage_limit_value, downloadCapGb)
-                    } else {
-                        stringResource(R.string.storage_limit_unlimited)
-                    },
-                    color = SnepilatchLightGray
-                )
+        SettingRow(
+            title = stringResource(R.string.storage_limit),
+            subtitle = if (downloadCapGb > 0f) {
+                stringResource(R.string.storage_limit_value, downloadCapGb)
+            } else {
+                stringResource(R.string.storage_limit_unlimited)
             },
-            leadingContent = { Icon(Icons.Rounded.Storage, null, tint = SnepilatchLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            modifier = Modifier.clickable { showCapDialog = true }
+            icon = Icons.Rounded.Storage,
+            onClick = { showCapDialog = true },
         )
         if (showCapDialog) {
             TextInputDialog(
@@ -390,13 +352,11 @@ fun AccountScreen(vm: PlaybackViewModel) {
         } else {
             stringResource(R.string.storage_policy_stop)
         }
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.storage_policy), color = SnepilatchWhite) },
-            supportingContent = { Text(capPolicyLabel, color = SnepilatchLightGray) },
-            leadingContent = { Icon(Icons.Rounded.DeleteSweep, null, tint = SnepilatchLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            modifier = Modifier.clickable { showCapPolicyPicker = true }
+        SettingRow(
+            title = stringResource(R.string.storage_policy),
+            subtitle = capPolicyLabel,
+            icon = Icons.Rounded.DeleteSweep,
+            onClick = { showCapPolicyPicker = true },
         )
         if (showCapPolicyPicker) {
             RadioPickerDialog(
@@ -436,13 +396,11 @@ fun AccountScreen(vm: PlaybackViewModel) {
             AppSettings.EQ_EXTERNAL -> stringResource(R.string.eq_mode_external_at, headroomDb.toInt())
             else -> stringResource(R.string.state_off)
         }
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.equalizer), color = SnepilatchWhite) },
-            supportingContent = { Text(eqModeLabel, color = SnepilatchLightGray) },
-            leadingContent = { Icon(Icons.Rounded.GraphicEq, null, tint = SnepilatchLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            modifier = Modifier.clickable { showEqPicker = true }
+        SettingRow(
+            title = stringResource(R.string.equalizer),
+            subtitle = eqModeLabel,
+            icon = Icons.Rounded.GraphicEq,
+            onClick = { showEqPicker = true },
         )
         if (showEqPicker) {
             RadioPickerDialog(
@@ -490,13 +448,11 @@ fun AccountScreen(vm: PlaybackViewModel) {
             )
         }
         val currentLanguageLabel = languages.find { it.first == appLanguage }?.second ?: systemDefaultLabel
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.language), color = SnepilatchWhite) },
-            supportingContent = { Text(currentLanguageLabel, color = SnepilatchLightGray) },
-            leadingContent = { Icon(Icons.Rounded.Language, null, tint = SnepilatchLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            modifier = Modifier.clickable { showLanguagePicker = true }
+        SettingRow(
+            title = stringResource(R.string.language),
+            subtitle = currentLanguageLabel,
+            icon = Icons.Rounded.Language,
+            onClick = { showLanguagePicker = true },
         )
         if (showLanguagePicker) {
             RadioPickerDialog(
@@ -515,13 +471,11 @@ fun AccountScreen(vm: PlaybackViewModel) {
         val lyricsAnim by AppSettings.lyricsAnimDirection.collectAsState()
         var showLyricsPicker by remember { mutableStateOf(false) }
         val lyricsLabel = if (lyricsAnim == "horizontal") stringResource(R.string.lyrics_horizontal) else stringResource(R.string.lyrics_vertical)
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.lyrics_animation), color = SnepilatchWhite) },
-            supportingContent = { Text(lyricsLabel, color = SnepilatchLightGray) },
-            leadingContent = { Icon(Icons.Rounded.MusicNote, null, tint = SnepilatchLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            modifier = Modifier.clickable { showLyricsPicker = true }
+        SettingRow(
+            title = stringResource(R.string.lyrics_animation),
+            subtitle = lyricsLabel,
+            icon = Icons.Rounded.MusicNote,
+            onClick = { showLyricsPicker = true },
         )
         if (showLyricsPicker) {
             RadioPickerDialog(
@@ -542,52 +496,24 @@ fun AccountScreen(vm: PlaybackViewModel) {
 
         // Canvas background
         val canvasOn by AppSettings.canvasEnabled.collectAsState()
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.canvas_background), color = SnepilatchWhite) },
-            supportingContent = { Text(
-                if (canvasOn) stringResource(R.string.canvas_on) else stringResource(R.string.canvas_off),
-                color = SnepilatchLightGray
-            ) },
-            leadingContent = { Icon(Icons.Rounded.PlayCircle, null, tint = SnepilatchLightGray) },
-            trailingContent = {
-                Switch(
-                    checked = canvasOn,
-                    onCheckedChange = { vm.setCanvasEnabled(it, audioContext) },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = animatedPrimary,
-                        checkedTrackColor = animatedPrimary.copy(alpha = 0.5f),
-                        uncheckedThumbColor = SnepilatchLightGray,
-                        uncheckedTrackColor = SnepilatchLightGray.copy(alpha = 0.3f)
-                    )
-                )
-            },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+        SettingToggleRow(
+            title = stringResource(R.string.canvas_background),
+            checked = canvasOn,
+            onCheckedChange = { vm.setCanvasEnabled(it, audioContext) },
+            accent = animatedPrimary,
+            subtitle = if (canvasOn) stringResource(R.string.canvas_on) else stringResource(R.string.canvas_off),
+            icon = Icons.Rounded.PlayCircle,
         )
 
         // Player background style: album-colour gradient vs. the fluid Kawarp album-art warp.
         val gradientBg by AppSettings.playerGradientBg.collectAsState()
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.gradient_background), color = SnepilatchWhite) },
-            supportingContent = {
-                Text(
-                    stringResource(if (gradientBg) R.string.gradient_bg_on else R.string.gradient_bg_off),
-                    color = SnepilatchLightGray
-                )
-            },
-            leadingContent = { Icon(Icons.Rounded.Gradient, null, tint = SnepilatchLightGray) },
-            trailingContent = {
-                Switch(
-                    checked = gradientBg,
-                    onCheckedChange = { AppSettings.setPlayerGradientBg(it, audioContext) },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = animatedPrimary,
-                        checkedTrackColor = animatedPrimary.copy(alpha = 0.5f),
-                        uncheckedThumbColor = SnepilatchLightGray,
-                        uncheckedTrackColor = SnepilatchLightGray.copy(alpha = 0.3f)
-                    )
-                )
-            },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+        SettingToggleRow(
+            title = stringResource(R.string.gradient_background),
+            checked = gradientBg,
+            onCheckedChange = { AppSettings.setPlayerGradientBg(it, audioContext) },
+            accent = animatedPrimary,
+            subtitle = stringResource(if (gradientBg) R.string.gradient_bg_on else R.string.gradient_bg_off),
+            icon = Icons.Rounded.Gradient,
         )
 
         Spacer(Modifier.height(24.dp))
@@ -623,13 +549,11 @@ fun AccountScreen(vm: PlaybackViewModel) {
         // Left notification button
         val leftButton by AppSettings.notificationLeftButton.collectAsState()
         var showLeftPicker by remember { mutableStateOf(false) }
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.notification_left_button), color = SnepilatchWhite) },
-            supportingContent = { Text(buttonLabel(leftButton), color = SnepilatchLightGray) },
-            leadingContent = { Icon(Icons.Rounded.Notifications, null, tint = SnepilatchLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            modifier = Modifier.clickable { showLeftPicker = true }
+        SettingRow(
+            title = stringResource(R.string.notification_left_button),
+            subtitle = buttonLabel(leftButton),
+            icon = Icons.Rounded.Notifications,
+            onClick = { showLeftPicker = true },
         )
         if (showLeftPicker) {
             RadioPickerDialog(
@@ -647,13 +571,11 @@ fun AccountScreen(vm: PlaybackViewModel) {
         // Right notification button
         val rightButton by AppSettings.notificationRightButton.collectAsState()
         var showRightPicker by remember { mutableStateOf(false) }
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.notification_right_button), color = SnepilatchWhite) },
-            supportingContent = { Text(buttonLabel(rightButton), color = SnepilatchLightGray) },
-            leadingContent = { Icon(Icons.Rounded.Notifications, null, tint = SnepilatchLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            modifier = Modifier.clickable { showRightPicker = true }
+        SettingRow(
+            title = stringResource(R.string.notification_right_button),
+            subtitle = buttonLabel(rightButton),
+            icon = Icons.Rounded.Notifications,
+            onClick = { showRightPicker = true },
         )
         if (showRightPicker) {
             RadioPickerDialog(
@@ -671,11 +593,10 @@ fun AccountScreen(vm: PlaybackViewModel) {
         Spacer(Modifier.height(24.dp))
         AccountSectionHeader(stringResource(R.string.about))
 
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.app_version), color = SnepilatchWhite) },
-            supportingContent = { Text(BuildConfig.VERSION_NAME, color = SnepilatchLightGray) },
-            leadingContent = { Icon(Icons.Rounded.Info, null, tint = SnepilatchLightGray) },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+        SettingRow(
+            title = stringResource(R.string.app_version),
+            subtitle = BuildConfig.VERSION_NAME,
+            icon = Icons.Rounded.Info,
         )
 
         // Update channel
@@ -686,13 +607,11 @@ fun AccountScreen(vm: PlaybackViewModel) {
         } else {
             stringResource(R.string.update_channel_stable)
         }
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.update_channel), color = SnepilatchWhite) },
-            supportingContent = { Text(updateChannelLabel, color = SnepilatchLightGray) },
-            leadingContent = { Icon(Icons.Rounded.SystemUpdate, null, tint = SnepilatchLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            modifier = Modifier.clickable { showUpdateChannelPicker = true }
+        SettingRow(
+            title = stringResource(R.string.update_channel),
+            subtitle = updateChannelLabel,
+            icon = Icons.Rounded.SystemUpdate,
+            onClick = { showUpdateChannelPicker = true },
         )
         if (showUpdateChannelPicker) {
             RadioPickerDialog(
@@ -774,13 +693,11 @@ fun AccountScreen(vm: PlaybackViewModel) {
         // Release Notes
         var showReleaseNotes by remember { mutableStateOf(false) }
 
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.release_notes), color = SnepilatchWhite) },
-            supportingContent = { Text(stringResource(R.string.view_changelog), color = SnepilatchLightGray) },
-            leadingContent = { Icon(Icons.Rounded.Description, null, tint = SnepilatchLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            modifier = Modifier.clickable { showReleaseNotes = true }
+        SettingRow(
+            title = stringResource(R.string.release_notes),
+            subtitle = stringResource(R.string.view_changelog),
+            icon = Icons.Rounded.Description,
+            onClick = { showReleaseNotes = true },
         )
 
         if (showReleaseNotes) {
@@ -791,18 +708,11 @@ fun AccountScreen(vm: PlaybackViewModel) {
         // without anything baked into the build. Empty = disabled (the default).
         val lokiEndpoint by AppSettings.lokiEndpoint.collectAsState()
         var showLokiDialog by remember { mutableStateOf(false) }
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.debug_logging), color = SnepilatchWhite) },
-            supportingContent = {
-                Text(
-                    lokiEndpoint.ifBlank { stringResource(R.string.debug_logging_off) },
-                    color = SnepilatchLightGray
-                )
-            },
-            leadingContent = { Icon(Icons.Rounded.BugReport, null, tint = SnepilatchLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            modifier = Modifier.clickable { showLokiDialog = true }
+        SettingRow(
+            title = stringResource(R.string.debug_logging),
+            subtitle = lokiEndpoint.ifBlank { stringResource(R.string.debug_logging_off) },
+            icon = Icons.Rounded.BugReport,
+            onClick = { showLokiDialog = true },
         )
         if (showLokiDialog) {
             TextInputDialog(

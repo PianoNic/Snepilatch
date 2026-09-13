@@ -58,6 +58,8 @@ import ch.snepilatch.app.viewmodel.DetailRoutes
 import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import ch.snepilatch.app.logic.shared.SessionHolder
+import ch.snepilatch.app.logic.shared.shareSpfyUri
+import ch.snepilatch.app.logic.shared.shareLink
 
 /** Header actions share a footprint so save, download and the overflow menu line up. */
 private val HEADER_BUTTON = 40.dp
@@ -722,12 +724,7 @@ private fun ArtistTrackRow(
                     },
                     Triple(Icons.Rounded.Share, shareLabel) {
                         showMenu = false
-                        val id = track.uri.removePrefix("spotify:track:")
-                        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(android.content.Intent.EXTRA_TEXT, "https://open.spotify.com/track/$id")
-                        }
-                        menuContext.startActivity(android.content.Intent.createChooser(intent, shareLabel))
+                        shareSpfyUri(menuContext, track.uri, shareLabel)
                     }
                 )
 
@@ -851,12 +848,7 @@ private fun AlbumTrackRow(
                     },
                     Triple(Icons.Rounded.Share, shareLabel) {
                         showMenu = false
-                        val id = track.uri.removePrefix("spotify:track:")
-                        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(android.content.Intent.EXTRA_TEXT, "https://open.spotify.com/track/$id")
-                        }
-                        menuContext.startActivity(android.content.Intent.createChooser(intent, shareLabel))
+                        shareSpfyUri(menuContext, track.uri, shareLabel)
                     }
                 )
                 items.forEach { (icon, label, onClick) ->
@@ -896,11 +888,7 @@ private fun DetailHeaderMenu(
             val id = detail.uri.substringAfterLast(":")
             add(MenuAction(Icons.Rounded.Share, shareLabel) {
                 onDismiss()
-                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                    this.type = "text/plain"
-                    putExtra(android.content.Intent.EXTRA_TEXT, "https://open.spotify.com/$type/$id")
-                }
-                context.startActivity(android.content.Intent.createChooser(intent, shareLabel))
+                shareLink(context, "https://open.spotify.com/$type/$id", shareLabel)
             })
         }
         if (hasTracks && !isArtist) {

@@ -89,6 +89,7 @@ import kotify.api.song.SearchSuggestion
 import kotify.api.song.SearchTopResult
 import kotify.api.song.SearchTrack
 import kotify.api.song.SearchUser
+import ch.snepilatch.app.logic.shared.shareSpfyUri
 
 private data class BrowseCategory(val name: String, val color: Color)
 private val browseCategories = listOf(
@@ -296,16 +297,9 @@ private data class UnifiedResult(
     val menu: List<OverflowAction> = emptyList()
 )
 
-/** Share action for any Spfy entity: turns spotify:track:ID into an open.spotify.com link. */
-private fun shareAction(ctx: Context, uri: String) = OverflowAction(
-    Icons.Rounded.Share, ctx.getString(R.string.share)
-) {
-    val path = uri.removePrefix("spotify:").replace(':', '/')
-    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(android.content.Intent.EXTRA_TEXT, "https://open.spotify.com/$path")
-    }
-    ctx.startActivity(android.content.Intent.createChooser(intent, ctx.getString(R.string.share)))
+/** Share action for any spfy entity. */
+private fun shareAction(ctx: Context, uri: String) = OverflowAction(Icons.Rounded.Share, ctx.getString(R.string.share)) {
+    shareSpfyUri(ctx, uri, ctx.getString(R.string.share))
 }
 
 private fun SearchTrack.toUnified(vm: PlaybackViewModel, ctx: Context) = UnifiedResult(

@@ -53,6 +53,7 @@ import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import ch.snepilatch.app.logic.shared.shareSpfyUri
 
 /**
  * [onRemoveFromPlaylist] adds a "Remove from this Playlist" entry. Passed in because only the caller
@@ -235,12 +236,7 @@ fun TrackRow(
                 },
                 Triple(Icons.Rounded.Share, shareLabel) {
                     showMenu = false
-                    val id = track.uri.removePrefix("spotify:track:")
-                    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                        type = "text/plain"
-                        putExtra(android.content.Intent.EXTRA_TEXT, "https://open.spotify.com/track/$id")
-                    }
-                    context.startActivity(android.content.Intent.createChooser(intent, shareLabel))
+                    shareSpfyUri(context, track.uri, shareLabel)
                 }
             )
 

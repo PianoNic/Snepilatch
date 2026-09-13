@@ -61,6 +61,7 @@ import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.viewmodel.LibraryViewModel
 import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
+import ch.snepilatch.app.logic.shared.shareSpfyUri
 
 /**
  * The seek bar + elapsed/duration labels (or the infiniPlay remix timeline), pulled into its own leaf
@@ -898,17 +899,6 @@ private fun InfoPill(icon: androidx.compose.ui.graphics.vector.ImageVector, text
  * Qobuz, …); when nothing is streaming locally ([provider] == null — idle, or playing on a remote
  * Connect device) it shows a dimmed "No CDN" idle state instead of vanishing.
  */
-/** Share the current track as an open.spotify.com link via the system chooser. */
-private fun shareTrack(context: android.content.Context, trackUri: String?, chooserLabel: String) {
-    trackUri?.removePrefix("spotify:track:")?.let { id ->
-        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(android.content.Intent.EXTRA_TEXT, "https://open.spotify.com/track/$id")
-        }
-        context.startActivity(android.content.Intent.createChooser(intent, chooserLabel))
-    }
-}
-
 /** Keep the audio-output name current while the player is shown (registers an AudioDeviceCallback). */
 @Composable
 private fun AudioDeviceEffect(vm: PlaybackViewModel) {
@@ -1109,7 +1099,7 @@ private fun PlayerBottomBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(rightSpacing)
         ) {
-            TonalIconBtn({ shareTrack(context, track?.uri, shareTrackLabel) }, actionBtn, buttonBg) {
+            TonalIconBtn({ track?.uri?.let { shareSpfyUri(context, it, shareTrackLabel) } }, actionBtn, buttonBg) {
                 Icon(Icons.Rounded.Share, stringResource(R.string.share), modifier = Modifier.size(actionIcon))
             }
             TonalIconBtn({ vm.openQueue() }, actionBtn, buttonBg) {
@@ -1294,7 +1284,7 @@ private fun NowPlayingMenu(
                 },
                 Triple(Icons.Rounded.Share, shareLabel) {
                     onShowMore(false)
-                    shareTrack(shareContext, track?.uri, shareTrackLabel)
+                    track?.uri?.let { shareSpfyUri(shareContext, it, shareTrackLabel) }
                 }
             )
 

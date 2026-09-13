@@ -81,6 +81,7 @@ import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.HomeViewModel
 import ch.snepilatch.app.viewmodel.LibraryViewModel
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
+import ch.snepilatch.app.logic.shared.shareSpfyUri
 
 // --- Home Screen ---
 
@@ -437,13 +438,7 @@ private fun HomeCardMenu(item: kotify.api.home.HomeSectionItem, vm: PlaybackView
         add(
             MenuAction(Icons.Rounded.Share, shareLabel) {
                 showMenu = false
-                val parts = item.uri.split(":")
-                val link = "https://open.spotify.com/${parts.getOrNull(1)}/${parts.lastOrNull()}"
-                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                    type = "text/plain"
-                    putExtra(android.content.Intent.EXTRA_TEXT, link)
-                }
-                context.startActivity(android.content.Intent.createChooser(intent, shareLabel))
+                shareSpfyUri(context, item.uri, shareLabel)
             }
         )
     }

@@ -7,8 +7,12 @@ import androidx.lifecycle.viewModelScope
 import androidx.annotation.StringRes
 import ch.snepilatch.app.R
 import ch.snepilatch.app.data.UiMessage
+import ch.snepilatch.app.logic.download.toTrackInfo
+import ch.snepilatch.app.logic.playback.OfflineMirror
 import ch.snepilatch.app.logic.playback.OfflinePlayer
+import ch.snepilatch.app.logic.playback.QueueMovePlan
 import ch.snepilatch.app.logic.playback.ResumeLoader
+import ch.snepilatch.app.logic.playback.planQueueMove
 import ch.snepilatch.app.logic.shared.LokiLogger
 import ch.snepilatch.app.logic.shared.detectActiveAudioOutput
 import ch.snepilatch.app.logic.shared.hasInternet
@@ -1971,6 +1975,10 @@ class PlaybackViewModel : ViewModel() {
      * here too.
      */
     fun toggleShuffle() {
+        if (isOffline.value) {
+            OfflinePlayer.toggleShuffle()
+            return
+        }
         val p = _playback.value
         val modes = buildList {
             if (p.shuffleMode == "off" || p.canToggleShuffle) add("off")
@@ -1989,6 +1997,10 @@ class PlaybackViewModel : ViewModel() {
 
     /** The web player's cycle: off, context, track, off, skipping a mode the server disallows. */
     fun cycleRepeat() {
+        if (isOffline.value) {
+            OfflinePlayer.cycleRepeat()
+            return
+        }
         val p = _playback.value
         val was = p.repeatMode
         val next = when (was) {
@@ -2067,16 +2079,11 @@ class PlaybackViewModel : ViewModel() {
         viewModelScope.launch {
             OfflinePlayer.state.collect { s ->
                 if (s == null || !isOffline.value) return@collect
-                val cur = _playback.value
-                val sameTrack = cur.track?.uri == s.current?.uri
-                _playback.value = cur.copy(
-                    track = s.current,
-                    isPlaying = s.isPlaying,
-                    isPaused = !s.isPlaying,
-                    durationMs = s.durationMs,
-                    positionMs = if (sameTrack) cur.positionMs else 0L,
-                )
-                if (!sameTrack) ThemeController.updateFromArt(s.current?.albumArt)
+                val trackChanged = OfflineMirror.apply(s, _playback, _queue, _queuedCount, nextTrackPreview, prevTrackPreview)
+                if (trackChanged) {
+                    s.current?.let { commitStream(it.uri, AudioSourceResolver.LOCAL_PROVIDER) }
+                    ThemeController.updateFromArt(s.current?.albumArt)
+                }
                 if (s.isPlaying) startPositionTicker() else stopPositionTicker()
             }
         }
@@ -2134,11 +2141,9 @@ class PlaybackViewModel : ViewModel() {
 
     internal suspend fun startUserPlayback(track: TrackInfo, contextUri: String?, trackIndex: Int? = null) {
         if (isOffline.value) {
-            // No Connect to echo anything back: the offline engine plays it and its state is
-            // mirrored into the playback state below (#789).
-            if (OfflinePlayer.play(listOf(track), 0)) {
-                commitStream(track.uri, AudioSourceResolver.LOCAL_PROVIDER)
-            } else {
+            // No Connect to echo anything back: the offline engine plays it, with the list the row
+            // came from as the queue, and its state is mirrored into the playback state (#789, #791).
+            if (!OfflinePlayer.playFromDownloads(track, contextUri)) {
                 LokiLogger.w(TAG, "No downloaded copy of ${track.uri} to play offline")
             }
             return
@@ -2257,6 +2262,10 @@ class PlaybackViewModel : ViewModel() {
     }
 
     fun skipToQueueIndex(index: Int) {
+        if (isOffline.value) {
+            viewModelScope.launch(Dispatchers.IO) { OfflinePlayer.jumpTo(index) }
+            return
+        }
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val p = player ?: return@launch
@@ -2352,6 +2361,10 @@ class PlaybackViewModel : ViewModel() {
      * did something, and a refresh follows to reconcile with whatever the server actually did.
      */
     fun removeFromQueue(track: TrackInfo) {
+        if (isOffline.value) {
+            OfflinePlayer.remove(track)
+            return
+        }
         val qid = track.qid ?: run {
             LokiLogger.w(TAG, "No qid on ${track.name}, cannot address it for removal")
             return
@@ -2376,58 +2389,32 @@ class PlaybackViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Move a queue entry to [toDisplayedIndex], the position the drag ended on.
-     *
-     * Two translations happen here. The displayed list hides the delimiter and anything flagged, so
-     * the server's index comes from whichever entry currently occupies the target row rather than
-     * from the row number. And the move is clamped to the entry's own section, mirroring what the
-     * server does, so the local list cannot show an order the server would refuse to store.
-     */
+    /** Move a queue entry to [toDisplayedIndex], the position the drag ended on; see [planQueueMove]. */
     fun moveQueueEntry(track: TrackInfo, toDisplayedIndex: Int) {
-        // Every exit is logged: a move that quietly does nothing looks exactly like a broken drag.
-        val qid = track.qid ?: run {
-            LokiLogger.w(TAG, "Queue move: ${track.name} has no qid, nothing to address")
+        if (isOffline.value) {
+            OfflinePlayer.move(track, toDisplayedIndex)
             return
         }
         val list = _queue.value
-        val from = list.indexOfFirst { it.qid == qid }
-        if (from < 0) {
-            LokiLogger.w(TAG, "Queue move: ${track.name} is no longer in the list")
-            return
-        }
-
         val queued = _queuedCount.value
-        val section = if (from < queued) 0..(queued - 1) else queued..list.lastIndex
-        if (section.isEmpty()) {
-            LokiLogger.w(TAG, "Queue move: ${track.name} sits in an empty section, from=$from queued=$queued")
-            return
+        val plan = when (val planned = planQueueMove(list, queued, track, toDisplayedIndex)) {
+            is QueueMovePlan.Skip -> {
+                LokiLogger.w(TAG, "Queue move: ${planned.reason}")
+                return
+            }
+            is QueueMovePlan.Move -> planned
         }
-        val target = toDisplayedIndex.coerceIn(section)
-        if (target == from) {
-            LokiLogger.i(
-                TAG,
-                "Queue move: ${track.name} asked for $toDisplayedIndex, clamped to $target inside " +
-                    "$section, so it is already there. queued=$queued size=${list.size}"
-            )
-            return
-        }
-
-        val rawTarget = list[target].queueIndex ?: run {
-            LokiLogger.w(TAG, "Queue move: no server index on the row at $target")
-            return
-        }
-        LokiLogger.i(TAG, "Queue move: ${track.name} $from -> $target (server $rawTarget), queued=$queued")
-        _queue.value = list.toMutableList().apply { add(target, removeAt(from)) }
+        LokiLogger.i(TAG, "Queue move: ${track.name} ${plan.from} -> ${plan.target} (server ${plan.rawTarget}), queued=$queued")
+        _queue.value = list.toMutableList().apply { add(plan.target, removeAt(plan.from)) }
 
         launchWithPlayer("moveQueueEntry") { pc ->
             val moved = try {
-                pc.moveInQueue(qid, rawTarget)
+                pc.moveInQueue(plan.qid, plan.rawTarget)
             } catch (e: Exception) {
                 LokiLogger.e(TAG, "moveQueueEntry ${track.name}", e)
                 false
             }
-            LokiLogger.i(TAG, "Queue move ${track.name} to $target (server $rawTarget): $moved")
+            LokiLogger.i(TAG, "Queue move ${track.name} to ${plan.target} (server ${plan.rawTarget}): $moved")
             // Only resync when the server disagrees, so a good drag does not rebuild the list.
             if (!moved) refreshQueue()
         }
@@ -2782,7 +2769,7 @@ class PlaybackViewModel : ViewModel() {
         }
         svc.onPlaybackEnded = onEnded@{
             if (isOffline.value) {
-                OfflinePlayer.ended()
+                viewModelScope.launch(Dispatchers.IO) { OfflinePlayer.ended() }
                 return@onEnded
             }
             // The silent ad clip ending is not a real track end: KotifyClient's engine clocks the

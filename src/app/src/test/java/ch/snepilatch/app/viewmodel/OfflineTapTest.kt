@@ -74,7 +74,7 @@ class OfflineTapTest {
         OfflinePlayer.localFile = { _, _, _ -> "content://tree/Music/fatal.opus" }
         runBlocking { rig.vm.startUserPlayback(track, contextUri = null) }
 
-        OfflinePlayer.ended()
+        runBlocking { OfflinePlayer.ended() }
 
         assertFalse(rig.vm.playback.value.isPlaying)
         assertTrue(rig.vm.playback.value.isPaused)

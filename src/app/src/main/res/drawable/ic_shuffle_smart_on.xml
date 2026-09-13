@@ -5,21 +5,21 @@
     android:viewportHeight="960">
     <group android:translateY="960">
         <path
-            android:fillColor="#1DB954"
+            android:fillColor="#FFFFFF"
             android:pathData="M600-160q-17 0-28.5-11.5T560-200q0-17 11.5-28.5T600-240h64l-99-99q-12-12-11.5-28.5T566-396q12-12 28.5-12t28.5 12l97 98v-62q0-17 11.5-28.5T760-400q17 0 28.5 11.5T800-360v160q0 17-11.5 28.5T760-160H600ZM171-732q-11-11-11-28t11-28q11-11 27.5-11t28.5 11l168 167q11 11 11.5 27.5T395-565q-11 11-28 11t-28-11L171-732Z" />
         <path
-            android:strokeColor="#1DB954"
+            android:strokeColor="#FFFFFF"
             android:strokeWidth="80"
             android:strokeLineCap="round"
             android:pathData="M172,-172 L549,-549" />
         <path
-            android:fillColor="#1DB954"
-            android:strokeColor="#1DB954"
+            android:fillColor="#FFFFFF"
+            android:strokeColor="#FFFFFF"
             android:strokeWidth="53"
             android:strokeLineJoin="round"
             android:pathData="M627.9,-854.8 L714.0,-779.5 L815.8,-831.7 L770.8,-726.6 L851.9,-646.0 L738.0,-656.3 L686.4,-554.2 L661.0,-665.7 L548.0,-683.3 L646.2,-741.9 Z" />
         <path
-            android:fillColor="#1DB954"
+            android:fillColor="#FFFFFF"
             android:pathData="M480,-100m-40,0a40,40 0 1,0 80,0a40,40 0 1,0 -80,0Z" />
     </group>
 </vector>

@@ -3,6 +3,7 @@ package ch.snepilatch.app.util
 import android.content.Context
 import android.graphics.drawable.BitmapDrawable
 import androidx.compose.ui.graphics.Color
+import ch.snepilatch.app.ui.theme.SnepilatchBlack
 import androidx.palette.graphics.Palette
 import ch.snepilatch.app.data.ThemeColors
 import coil.request.ImageRequest
@@ -48,7 +49,7 @@ suspend fun extractThemeColorsFromArt(context: Context, imageUrl: String): Theme
         primaryDark = Color(primary).copy(alpha = 0.7f),
         surface = Color(darkMuted),
         gradientTop = Color(muted).copy(alpha = 0.8f),
-        gradientBottom = Color(0xFF121212)
+        gradientBottom = SnepilatchBlack
     )
 }
 

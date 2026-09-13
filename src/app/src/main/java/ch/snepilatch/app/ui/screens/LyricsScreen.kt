@@ -148,14 +148,14 @@ fun LyricsScreen(vm: PlaybackViewModel) {
 
                         Text(
                             track?.name ?: "",
-                            color = SpfyWhite,
+                            color = SnepilatchWhite,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1
                         )
                         Text(
                             track?.artist ?: "",
-                            color = SpfyLightGray,
+                            color = SnepilatchLightGray,
                             fontSize = 11.sp,
                             maxLines = 1
                         )
@@ -176,7 +176,7 @@ fun LyricsScreen(vm: PlaybackViewModel) {
                                 Icon(
                                     when (repeatMode) { "track" -> Icons.Rounded.RepeatOne; else -> Icons.Rounded.Repeat },
                                     stringResource(R.string.repeat),
-                                    tint = if (repeatMode != "off") animatedPrimary else SpfyWhite.copy(alpha = 0.7f),
+                                    tint = if (repeatMode != "off") animatedPrimary else SnepilatchWhite.copy(alpha = 0.7f),
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -184,7 +184,7 @@ fun LyricsScreen(vm: PlaybackViewModel) {
                                 Modifier.size(36.dp).background(buttonBg, CircleShape).clip(CircleShape).clickable { vm.skipPrevious() },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Rounded.SkipPrevious, stringResource(R.string.previous), tint = SpfyWhite, modifier = Modifier.size(20.dp))
+                                Icon(Icons.Rounded.SkipPrevious, stringResource(R.string.previous), tint = SnepilatchWhite, modifier = Modifier.size(20.dp))
                             }
                             Box(
                                 Modifier
@@ -195,11 +195,11 @@ fun LyricsScreen(vm: PlaybackViewModel) {
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (streamLoading) {
-                                    LoadingIndicator(color = SpfyWhite, modifier = Modifier.size(20.dp))
+                                    LoadingIndicator(color = SnepilatchWhite, modifier = Modifier.size(20.dp))
                                 } else {
                                     Icon(
                                         if (isPaused || !isPlayingRaw) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
-                                        stringResource(R.string.play_pause), tint = SpfyWhite, modifier = Modifier.size(26.dp)
+                                        stringResource(R.string.play_pause), tint = SnepilatchWhite, modifier = Modifier.size(26.dp)
                                     )
                                 }
                             }
@@ -207,7 +207,7 @@ fun LyricsScreen(vm: PlaybackViewModel) {
                                 Modifier.size(36.dp).background(buttonBg, CircleShape).clip(CircleShape).clickable { vm.skipNext() },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Rounded.SkipNext, stringResource(R.string.next), tint = SpfyWhite, modifier = Modifier.size(20.dp))
+                                Icon(Icons.Rounded.SkipNext, stringResource(R.string.next), tint = SnepilatchWhite, modifier = Modifier.size(20.dp))
                             }
                             FilledIconToggleButton(
                                 checked = isLiked,
@@ -218,7 +218,7 @@ fun LyricsScreen(vm: PlaybackViewModel) {
                                 modifier = Modifier.size(36.dp),
                                 colors = IconButtonDefaults.filledIconToggleButtonColors(
                                     containerColor = buttonBg,
-                                    contentColor = SpfyWhite.copy(alpha = 0.7f),
+                                    contentColor = SnepilatchWhite.copy(alpha = 0.7f),
                                     checkedContainerColor = buttonBg,
                                     checkedContentColor = animatedPrimary,
                                 ),
@@ -248,9 +248,9 @@ fun LyricsScreen(vm: PlaybackViewModel) {
                             lyrics == null || lyrics?.lines.isNullOrEmpty() -> {
                                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Icon(Icons.Rounded.MusicNote, null, tint = SpfyLightGray.copy(alpha = 0.5f), modifier = Modifier.size(48.dp))
+                                        Icon(Icons.Rounded.MusicNote, null, tint = SnepilatchLightGray.copy(alpha = 0.5f), modifier = Modifier.size(48.dp))
                                         Spacer(Modifier.height(12.dp))
-                                        Text(stringResource(R.string.lyrics_not_available), color = SpfyLightGray, fontSize = 16.sp)
+                                        Text(stringResource(R.string.lyrics_not_available), color = SnepilatchLightGray, fontSize = 16.sp)
                                     }
                                 }
                             }
@@ -290,11 +290,11 @@ fun LyricsScreen(vm: PlaybackViewModel) {
                                 .clickable { vm.goBack() },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Rounded.KeyboardArrowDown, stringResource(R.string.close), tint = SpfyWhite, modifier = Modifier.size(24.dp))
+                            Icon(Icons.Rounded.KeyboardArrowDown, stringResource(R.string.close), tint = SnepilatchWhite, modifier = Modifier.size(24.dp))
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(track?.name ?: "", color = SpfyWhite, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                            Text(track?.artist ?: "", color = SpfyLightGray, fontSize = 12.sp, maxLines = 1)
+                            Text(track?.name ?: "", color = SnepilatchWhite, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                            Text(track?.artist ?: "", color = SnepilatchLightGray, fontSize = 12.sp, maxLines = 1)
                         }
                         Spacer(Modifier.size(40.dp))
                     }
@@ -308,9 +308,9 @@ fun LyricsScreen(vm: PlaybackViewModel) {
                         lyrics == null || lyrics?.lines.isNullOrEmpty() -> {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(Icons.Rounded.MusicNote, null, tint = SpfyLightGray.copy(alpha = 0.5f), modifier = Modifier.size(48.dp))
+                                    Icon(Icons.Rounded.MusicNote, null, tint = SnepilatchLightGray.copy(alpha = 0.5f), modifier = Modifier.size(48.dp))
                                     Spacer(Modifier.height(12.dp))
-                                    Text(stringResource(R.string.lyrics_not_available), color = SpfyLightGray, fontSize = 16.sp)
+                                    Text(stringResource(R.string.lyrics_not_available), color = SnepilatchLightGray, fontSize = 16.sp)
                                 }
                             }
                         }

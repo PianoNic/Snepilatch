@@ -35,7 +35,7 @@ data class ReleaseNote(
 @Composable
 private fun ReleaseNoteCard(note: ReleaseNote, isLatest: Boolean) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = SpfyElevated),
+        colors = CardDefaults.cardColors(containerColor = SnepilatchElevated),
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(Modifier.padding(16.dp)) {
@@ -44,7 +44,7 @@ private fun ReleaseNoteCard(note: ReleaseNote, isLatest: Boolean) {
                 Card(
                     colors = CardDefaults.cardColors(
                         containerColor = if (isLatest) MaterialTheme.colorScheme.primary
-                        else SpfyGray
+                        else SnepilatchGray
                     ),
                     shape = RoundedCornerShape(12.dp)
                 ) {
@@ -53,7 +53,7 @@ private fun ReleaseNoteCard(note: ReleaseNote, isLatest: Boolean) {
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (isLatest) MaterialTheme.colorScheme.onPrimary else SpfyLightGray
+                        color = if (isLatest) MaterialTheme.colorScheme.onPrimary else SnepilatchLightGray
                     )
                 }
                 if (isLatest) {
@@ -74,7 +74,7 @@ private fun ReleaseNoteCard(note: ReleaseNote, isLatest: Boolean) {
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                Text(note.date, color = SpfyLightGray, fontSize = 12.sp)
+                Text(note.date, color = SnepilatchLightGray, fontSize = 12.sp)
             }
 
             Spacer(Modifier.height(12.dp))
@@ -82,7 +82,7 @@ private fun ReleaseNoteCard(note: ReleaseNote, isLatest: Boolean) {
             // Title
             Text(
                 note.title,
-                color = SpfyWhite,
+                color = SnepilatchWhite,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -115,15 +115,15 @@ fun ReleaseNotesDialog(onDismiss: () -> Unit) {
 
     TightAlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = SpfyDarkGray,
-        title = { Text(stringResource(R.string.release_notes), color = SpfyWhite) },
+        containerColor = SnepilatchElevated,
+        title = { Text(stringResource(R.string.release_notes), color = SnepilatchWhite) },
         text = {
             Box(Modifier.heightIn(max = 500.dp)) {
                 when {
                     isLoading -> Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                        LoadingIndicator(color = SpfyLightGray)
+                        LoadingIndicator(color = SnepilatchLightGray)
                     }
-                    error != null -> Text(stringResource(R.string.release_load_failed_short, error ?: ""), color = SpfyLightGray)
+                    error != null -> Text(stringResource(R.string.release_load_failed_short, error ?: ""), color = SnepilatchLightGray)
                     else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         itemsIndexed(releases) { index, note ->
                             ReleaseNoteCard(note, isLatest = index == 0)
@@ -134,7 +134,7 @@ fun ReleaseNotesDialog(onDismiss: () -> Unit) {
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.close), color = SpfyLightGray)
+                Text(stringResource(R.string.close), color = SnepilatchLightGray)
             }
         }
     )

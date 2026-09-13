@@ -123,7 +123,7 @@ private fun PlaybackProgress(
             colors = SliderDefaults.colors(
                 thumbColor = animatedPrimary,
                 activeTrackColor = animatedPrimary,
-                inactiveTrackColor = SpfyWhite.copy(alpha = 0.15f)
+                inactiveTrackColor = SnepilatchWhite.copy(alpha = 0.15f)
             ),
             modifier = Modifier.fillMaxWidth()
         )
@@ -344,7 +344,7 @@ private fun AlbumBackdrop(gradient: Boolean, top: Color, mid: Color, artUrl: Str
     if (gradient) {
         Box(
             Modifier.fillMaxSize().background(
-                androidx.compose.ui.graphics.Brush.verticalGradient(listOf(top, mid, Color(0xFF121212)))
+                androidx.compose.ui.graphics.Brush.verticalGradient(listOf(top, mid, SnepilatchBlack))
             )
         )
     } else {
@@ -415,8 +415,8 @@ fun NowPlayingScreen(
     val canvasOn by AppSettings.canvasEnabled.collectAsState()
     val hasCanvas = canvasOn && canvasVideoUrl != null
     // Brighter text in canvas mode for readability over video
-    val secondaryText = if (hasCanvas) SpfyWhite.copy(alpha = 0.85f) else SpfyLightGray
-    val tertiaryText = if (hasCanvas) SpfyWhite.copy(alpha = 0.65f) else SpfyLightGray.copy(alpha = 0.7f)
+    val secondaryText = if (hasCanvas) SnepilatchWhite.copy(alpha = 0.85f) else SnepilatchLightGray
+    val tertiaryText = if (hasCanvas) SnepilatchWhite.copy(alpha = 0.65f) else SnepilatchLightGray.copy(alpha = 0.7f)
 
     Box(Modifier.fillMaxSize()) {
         // Background (Canvas video, or album colour + blurred art + scrim). Skipped
@@ -482,7 +482,7 @@ fun NowPlayingScreen(
                                 modifier = Modifier.size(38.dp),
                                 colors = IconButtonDefaults.filledTonalIconButtonColors(
                                     containerColor = buttonBg,
-                                    contentColor = SpfyWhite,
+                                    contentColor = SnepilatchWhite,
                                 ),
                             ) {
                                 Icon(Icons.Rounded.KeyboardArrowDown, stringResource(R.string.close), modifier = Modifier.size(24.dp))
@@ -497,7 +497,7 @@ fun NowPlayingScreen(
                             ) {
                                 Text(
                                     ctx?.let { stringResource(R.string.now_playing_playing_from, it.type) } ?: stringResource(R.string.now_playing),
-                                    color = SpfyLightGray,
+                                    color = SnepilatchLightGray,
                                     fontSize = 10.sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -505,7 +505,7 @@ fun NowPlayingScreen(
                                 ctx?.let {
                                     Text(
                                         it.name,
-                                        color = SpfyWhite,
+                                        color = SnepilatchWhite,
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         maxLines = 1,
@@ -539,7 +539,7 @@ fun NowPlayingScreen(
                             Column(Modifier.weight(1f).padding(end = 8.dp)) {
                                 Text(
                                     displayTitle,
-                                    color = SpfyWhite,
+                                    color = SnepilatchWhite,
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1,
@@ -548,7 +548,7 @@ fun NowPlayingScreen(
                                 Spacer(Modifier.height(2.dp))
                                 Text(
                                     displayArtist,
-                                    color = SpfyLightGray,
+                                    color = SnepilatchLightGray,
                                     fontSize = 13.sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -556,7 +556,7 @@ fun NowPlayingScreen(
                                 Spacer(Modifier.height(2.dp))
                                 Text(
                                     track?.albumName.orEmpty(),
-                                    color = SpfyLightGray.copy(alpha = 0.7f),
+                                    color = SnepilatchLightGray.copy(alpha = 0.7f),
                                     fontSize = 11.sp,
                                     minLines = 1,
                                     maxLines = 1,
@@ -573,7 +573,7 @@ fun NowPlayingScreen(
                                 modifier = Modifier.size(40.dp),
                                 colors = IconButtonDefaults.filledIconToggleButtonColors(
                                     containerColor = buttonBg,
-                                    contentColor = SpfyWhite.copy(alpha = 0.7f),
+                                    contentColor = SnepilatchWhite.copy(alpha = 0.7f),
                                     checkedContainerColor = buttonBg,
                                     checkedContentColor = animatedPrimary,
                                 ),
@@ -593,7 +593,7 @@ fun NowPlayingScreen(
                         PlaybackProgress(
                             vm = vm,
                             animatedPrimary = animatedPrimary,
-                            timeColor = SpfyLightGray,
+                            timeColor = SnepilatchLightGray,
                             timeFontSize = 11.sp,
                         )
 
@@ -653,7 +653,7 @@ fun NowPlayingScreen(
                                 modifier = Modifier.size(44.dp),
                                 colors = IconButtonDefaults.filledTonalIconButtonColors(
                                     containerColor = buttonBg,
-                                    contentColor = SpfyWhite,
+                                    contentColor = SnepilatchWhite,
                                 ),
                             ) {
                                 Icon(Icons.Rounded.KeyboardArrowDown, stringResource(R.string.close), modifier = Modifier.size(28.dp))
@@ -678,7 +678,7 @@ fun NowPlayingScreen(
                                 ctx?.let {
                                     Text(
                                         it.name,
-                                        color = SpfyWhite,
+                                        color = SnepilatchWhite,
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         maxLines = 1,
@@ -693,7 +693,7 @@ fun NowPlayingScreen(
                                 modifier = Modifier.size(44.dp),
                                 colors = IconButtonDefaults.filledTonalIconButtonColors(
                                     containerColor = buttonBg,
-                                    contentColor = SpfyWhite,
+                                    contentColor = SnepilatchWhite,
                                 ),
                             ) {
                                 Icon(Icons.Rounded.Tune, stringResource(R.string.equalizer), modifier = Modifier.size(22.dp))
@@ -726,7 +726,7 @@ fun NowPlayingScreen(
                         Column(Modifier.weight(1f).padding(end = 12.dp)) {
                             MarqueeText(
                                 text = displayTitle,
-                                color = SpfyWhite,
+                                color = SnepilatchWhite,
                                 fontSize = 22.sp,
                                 isPlaying = isPlaying,
                                 fontWeight = FontWeight.Bold
@@ -765,7 +765,7 @@ fun NowPlayingScreen(
                                 modifier = Modifier.size(48.dp),
                                 colors = IconButtonDefaults.filledIconToggleButtonColors(
                                     containerColor = buttonBg,
-                                    contentColor = SpfyWhite.copy(alpha = 0.7f),
+                                    contentColor = SnepilatchWhite.copy(alpha = 0.7f),
                                     checkedContainerColor = buttonBg,
                                     checkedContentColor = animatedPrimary,
                                 ),
@@ -831,8 +831,8 @@ fun NowPlayingScreen(
         val playlists = libraryItems.filter { it.type == "playlist" }
         TightAlertDialog(
             onDismissRequest = { showPlaylistPicker = false },
-            title = { Text(stringResource(R.string.add_to_playlist), color = SpfyWhite) },
-            containerColor = SpfyGray,
+            title = { Text(stringResource(R.string.add_to_playlist), color = SnepilatchWhite) },
+            containerColor = SnepilatchGray,
             text = {
                 // TightAlertDialog wraps `text` in a height-bounded verticalScroll Box, which
                 // gives its child infinite max height — a LazyColumn there throws "infinity
@@ -859,9 +859,9 @@ fun NowPlayingScreen(
                             )
                             Spacer(Modifier.width(12.dp))
                             Column {
-                                Text(playlist.name, color = SpfyWhite, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(playlist.name, color = SnepilatchWhite, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 playlist.owner?.let {
-                                    Text(it, color = SpfyLightGray, fontSize = 12.sp, maxLines = 1)
+                                    Text(it, color = SnepilatchLightGray, fontSize = 12.sp, maxLines = 1)
                                 }
                             }
                         }
@@ -871,7 +871,7 @@ fun NowPlayingScreen(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showPlaylistPicker = false }) {
-                    Text(stringResource(R.string.cancel), color = SpfyLightGray)
+                    Text(stringResource(R.string.cancel), color = SnepilatchLightGray)
                 }
             }
         )
@@ -888,8 +888,8 @@ private fun InfoPill(icon: androidx.compose.ui.graphics.vector.ImageVector, text
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
-        Icon(icon, null, tint = SpfyWhite, modifier = Modifier.size(9.dp))
-        Text(text, color = SpfyWhite, fontSize = 9.sp, maxLines = 1)
+        Icon(icon, null, tint = SnepilatchWhite, modifier = Modifier.size(9.dp))
+        Text(text, color = SnepilatchWhite, fontSize = 9.sp, maxLines = 1)
     }
 }
 
@@ -931,7 +931,7 @@ private fun TonalIconBtn(onClick: () -> Unit, size: Dp, buttonBg: Color, content
     FilledTonalIconButton(
         onClick = onClick,
         modifier = Modifier.size(size),
-        colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = buttonBg, contentColor = SpfyWhite),
+        colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = buttonBg, contentColor = SnepilatchWhite),
     ) { content() }
 }
 
@@ -952,9 +952,9 @@ private fun TonalIconToggle(
         modifier = Modifier.size(size),
         colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
             containerColor = buttonBg,
-            contentColor = SpfyWhite,
+            contentColor = SnepilatchWhite,
             checkedContainerColor = accent.copy(alpha = 0.45f),
-            checkedContentColor = SpfyWhite,
+            checkedContentColor = SnepilatchWhite,
         ),
     ) { content() }
 }
@@ -1010,12 +1010,12 @@ private fun PlayerControls(
             onClick = { if (!spinnerActive) vm.togglePlayPause() },
             colors = IconButtonDefaults.filledIconButtonColors(
                 containerColor = if (spinnerActive) animatedPrimary.copy(alpha = 0.5f) else animatedPrimary,
-                contentColor = SpfyWhite,
+                contentColor = SnepilatchWhite,
             ),
             modifier = Modifier.size(playBtn),
         ) {
             if (spinnerActive) {
-                LoadingIndicator(color = SpfyWhite, modifier = Modifier.size(playSpinnerSize))
+                LoadingIndicator(color = SnepilatchWhite, modifier = Modifier.size(playSpinnerSize))
             } else {
                 Icon(
                     if (isPaused || !isPlaying) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
@@ -1025,7 +1025,7 @@ private fun PlayerControls(
         }
         TonalIconBtn({ onSkip(-1) }, skipBtn, buttonBg) {
             if (nextLoading) {
-                LoadingIndicator(color = SpfyWhite, modifier = Modifier.size(nextSpinnerSize))
+                LoadingIndicator(color = SnepilatchWhite, modifier = Modifier.size(nextSpinnerSize))
             } else {
                 Icon(Icons.Rounded.SkipNext, stringResource(R.string.next), modifier = Modifier.size(skipIcon))
             }
@@ -1088,9 +1088,9 @@ private fun PlayerBottomBar(
                 modifier = Modifier.size(actionBtn),
                 colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
                     containerColor = buttonBg,
-                    contentColor = SpfyWhite,
+                    contentColor = SnepilatchWhite,
                     checkedContainerColor = animatedPrimary,
-                    checkedContentColor = SpfyWhite,
+                    checkedContentColor = SnepilatchWhite,
                 ),
             ) {
                 Icon(outIcon, stringResource(R.string.audio_output), modifier = Modifier.size(actionIcon))
@@ -1151,8 +1151,8 @@ private fun SourcePill(provider: String?) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
-        Icon(icon, null, tint = SpfyWhite.copy(alpha = fgAlpha), modifier = Modifier.size(9.dp))
-        Text(label, color = SpfyWhite.copy(alpha = fgAlpha), fontSize = 9.sp, maxLines = 1)
+        Icon(icon, null, tint = SnepilatchWhite.copy(alpha = fgAlpha), modifier = Modifier.size(9.dp))
+        Text(label, color = SnepilatchWhite.copy(alpha = fgAlpha), fontSize = 9.sp, maxLines = 1)
     }
 }
 
@@ -1174,7 +1174,7 @@ private fun NowPlayingMenu(
         modifier = Modifier.size(44.dp),
         colors = IconButtonDefaults.filledTonalIconButtonColors(
             containerColor = buttonBg,
-            contentColor = SpfyWhite,
+            contentColor = SnepilatchWhite,
         ),
     ) {
         Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), modifier = Modifier.size(22.dp))
@@ -1188,14 +1188,14 @@ private fun NowPlayingMenu(
         ModalBottomSheet(
             onDismissRequest = { onShowMore(false) },
             sheetState = sheetState,
-            containerColor = SpfyElevated,
+            containerColor = SnepilatchElevated,
             dragHandle = {
                 Box(
                     Modifier
                         .padding(vertical = 12.dp)
                         .width(40.dp)
                         .height(4.dp)
-                        .background(SpfyLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
+                        .background(SnepilatchLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
                 )
             }
         ) {
@@ -1212,12 +1212,15 @@ private fun NowPlayingMenu(
                     )
                     Spacer(Modifier.width(12.dp))
                     Column {
-                        Text(t.name, color = SpfyWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(t.artist, color = SpfyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                        t.name, color = SnepilatchWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                        Text(t.artist, color = SnepilatchLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 Spacer(Modifier.height(8.dp))
-                HorizontalDivider(color = SpfyLightGray.copy(alpha = 0.15f))
+                HorizontalDivider(color = SnepilatchLightGray.copy(alpha = 0.15f))
             }
 
             val shareTrackLabel = stringResource(R.string.share_track_chooser)
@@ -1303,9 +1306,9 @@ private fun NowPlayingMenu(
                         .padding(horizontal = 20.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(icon, null, tint = SpfyWhite, modifier = Modifier.size(24.dp))
+                    Icon(icon, null, tint = SnepilatchWhite, modifier = Modifier.size(24.dp))
                     Spacer(Modifier.width(16.dp))
-                    Text(label, color = SpfyWhite, fontSize = 15.sp)
+                    Text(label, color = SnepilatchWhite, fontSize = 15.sp)
                 }
             }
 
@@ -1313,7 +1316,7 @@ private fun NowPlayingMenu(
             // Spfy-green while active. Only does something while streaming a track locally.
             val infiniPlayOn by vm.infiniPlayEnabled.collectAsState()
             val infiniPlayLabel = stringResource(R.string.infiniplay)
-            val infiniPlayTint = if (infiniPlayOn) Color(0xFF1ED760) else SpfyWhite
+            val infiniPlayTint = if (infiniPlayOn) Color(0xFF1ED760) else SnepilatchWhite
             Row(
                 Modifier
                     .fillMaxWidth()

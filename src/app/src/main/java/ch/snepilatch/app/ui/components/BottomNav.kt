@@ -1,6 +1,6 @@
 package ch.snepilatch.app.ui.components
 
-import ch.snepilatch.app.ui.theme.SpfyWhite
+import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -35,8 +35,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
 import ch.snepilatch.app.data.Screen
-import ch.snepilatch.app.ui.theme.SpfyBlack
-import ch.snepilatch.app.ui.theme.SpfyLightGray
+import ch.snepilatch.app.ui.theme.SnepilatchBlack
+import ch.snepilatch.app.ui.theme.SnepilatchLightGray
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import coil.compose.AsyncImage
 import dev.chrisbanes.haze.HazeState
@@ -54,9 +54,9 @@ fun BottomNav(screen: Screen, vm: PlaybackViewModel, hazeState: HazeState) {
             .hazeEffect(
                 state = hazeState,
                 style = HazeStyle(
-                    backgroundColor = SpfyBlack,
+                    backgroundColor = SnepilatchBlack,
                     blurRadius = 24.dp,
-                    tints = listOf(HazeTint(SpfyBlack.copy(alpha = 0.7f)))
+                    tints = listOf(HazeTint(SnepilatchBlack.copy(alpha = 0.7f)))
                 )
             )
     ) {
@@ -82,7 +82,7 @@ fun BottomNav(screen: Screen, vm: PlaybackViewModel, hazeState: HazeState) {
             val accountDesc = stringResource(R.string.account_image)
             items.forEach { nav ->
                 val selected = screen == nav.s
-                val tint = if (selected) SpfyWhite else SpfyLightGray
+                val tint = if (selected) SnepilatchWhite else SnepilatchLightGray
                 Column(
                     Modifier
                         .weight(1f)
@@ -102,7 +102,7 @@ fun BottomNav(screen: Screen, vm: PlaybackViewModel, hazeState: HazeState) {
                                 .size(32.dp)
                                 .clip(CircleShape)
                                 .then(
-                                    if (selected) Modifier.border(2.dp, SpfyWhite, CircleShape)
+                                    if (selected) Modifier.border(2.dp, SnepilatchWhite, CircleShape)
                                     else Modifier
                                 ),
                             contentScale = ContentScale.Crop

@@ -71,7 +71,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
                 Modifier
                     .size(120.dp)
                     .clip(CircleShape)
-                    .background(SpfyGray),
+                    .background(SnepilatchGray),
                 contentAlignment = Alignment.Center
             ) {
                 if (account.profileImageUrl != null) {
@@ -82,7 +82,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
                         contentScale = ContentScale.Crop
                     )
                 } else {
-                    Icon(Icons.Rounded.Person, null, tint = SpfyLightGray, modifier = Modifier.size(64.dp))
+                    Icon(Icons.Rounded.Person, null, tint = SnepilatchLightGray, modifier = Modifier.size(64.dp))
                 }
             }
 
@@ -90,7 +90,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
 
             Text(
                 account.displayName.ifEmpty { account.username.ifEmpty { stringResource(R.string.loading_dots) } },
-                color = SpfyWhite,
+                color = SnepilatchWhite,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -98,7 +98,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
             Spacer(Modifier.height(6.dp))
             Text(
                 stringResource(R.string.followers_playlists, account.followers, account.playlistCount),
-                color = SpfyLightGray,
+                color = SnepilatchLightGray,
                 fontSize = 13.sp
             )
 
@@ -157,10 +157,10 @@ fun AccountScreen(vm: PlaybackViewModel) {
             else -> stringResource(R.string.lossless_off_spfy)
         }
         ListItem(
-            headlineContent = { Text(stringResource(R.string.audio_source), color = SpfyWhite) },
-            supportingContent = { Text(sourceLabel, color = SpfyLightGray) },
-            leadingContent = { Icon(Icons.Rounded.MusicNote, null, tint = SpfyLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            headlineContent = { Text(stringResource(R.string.audio_source), color = SnepilatchWhite) },
+            supportingContent = { Text(sourceLabel, color = SnepilatchLightGray) },
+            leadingContent = { Icon(Icons.Rounded.MusicNote, null, tint = SnepilatchLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { showSourcePicker = true }
         )
@@ -185,7 +185,6 @@ fun AccountScreen(vm: PlaybackViewModel) {
                     )
                 ),
                 selected = audioSource ?: SOURCE_SPOTIFY_UI,
-                selectedColor = animatedPrimary,
                 onSelect = { picked ->
                     AppSettings.setPreferredAudioSource(picked.takeIf { it != SOURCE_SPOTIFY_UI }, audioContext)
                     showSourcePicker = false
@@ -203,10 +202,10 @@ fun AccountScreen(vm: PlaybackViewModel) {
             currentRegion
         }
         ListItem(
-            headlineContent = { Text(stringResource(R.string.content_region), color = SpfyWhite) },
-            supportingContent = { Text(regionLabel, color = SpfyLightGray) },
-            leadingContent = { Icon(Icons.Rounded.Language, null, tint = SpfyLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            headlineContent = { Text(stringResource(R.string.content_region), color = SnepilatchWhite) },
+            supportingContent = { Text(regionLabel, color = SnepilatchLightGray) },
+            leadingContent = { Icon(Icons.Rounded.Language, null, tint = SnepilatchLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { showRegionPicker = true }
         )
@@ -229,7 +228,6 @@ fun AccountScreen(vm: PlaybackViewModel) {
                 title = stringResource(R.string.content_region),
                 options = regionOptions.map { RadioOption(it.first, it.second, it.first) },
                 selected = currentRegion,
-                selectedColor = animatedPrimary,
                 onSelect = {
                     AppSettings.setContentRegion(it, audioContext)
                     showRegionPicker = false
@@ -240,9 +238,9 @@ fun AccountScreen(vm: PlaybackViewModel) {
 
         // Connect to device (Playback)
         ListItem(
-            headlineContent = { Text(stringResource(R.string.connect_to_device), color = SpfyWhite) },
-            leadingContent = { Icon(Icons.Rounded.Devices, null, tint = SpfyLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            headlineContent = { Text(stringResource(R.string.connect_to_device), color = SnepilatchWhite) },
+            leadingContent = { Icon(Icons.Rounded.Devices, null, tint = SnepilatchLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { vm.loadDevices(); vm.showDevices.value = true }
         )
@@ -255,7 +253,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
         val downloadSource by AppSettings.downloadSource.collectAsState()
         var showDownloadSourcePicker by remember { mutableStateOf(false) }
         ListItem(
-            headlineContent = { Text(stringResource(R.string.download_source), color = SpfyWhite) },
+            headlineContent = { Text(stringResource(R.string.download_source), color = SnepilatchWhite) },
             supportingContent = {
                 Text(
                     if (downloadSource == AppSettings.SOURCE_LOSSLESS) {
@@ -263,11 +261,11 @@ fun AccountScreen(vm: PlaybackViewModel) {
                     } else {
                         stringResource(R.string.download_source_ytm)
                     },
-                    color = SpfyLightGray
+                    color = SnepilatchLightGray
                 )
             },
-            leadingContent = { Icon(Icons.Rounded.Download, null, tint = SpfyLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.Download, null, tint = SnepilatchLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { showDownloadSourcePicker = true }
         )
@@ -287,7 +285,6 @@ fun AccountScreen(vm: PlaybackViewModel) {
                     )
                 ),
                 selected = downloadSource,
-                selectedColor = animatedPrimary,
                 onSelect = { picked ->
                     AppSettings.setDownloadSource(picked, audioContext)
                     showDownloadSourcePicker = false
@@ -298,11 +295,11 @@ fun AccountScreen(vm: PlaybackViewModel) {
 
         val autoSave by AppSettings.autoSaveListened.collectAsState()
         ListItem(
-            headlineContent = { Text(stringResource(R.string.auto_save_listened), color = SpfyWhite) },
+            headlineContent = { Text(stringResource(R.string.auto_save_listened), color = SnepilatchWhite) },
             supportingContent = {
-                Text(stringResource(R.string.auto_save_listened_desc), color = SpfyLightGray)
+                Text(stringResource(R.string.auto_save_listened_desc), color = SnepilatchLightGray)
             },
-            leadingContent = { Icon(Icons.Rounded.DownloadForOffline, null, tint = SpfyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.DownloadForOffline, null, tint = SnepilatchLightGray) },
             trailingContent = {
                 Switch(
                     checked = autoSave,
@@ -310,8 +307,8 @@ fun AccountScreen(vm: PlaybackViewModel) {
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = animatedPrimary,
                         checkedTrackColor = animatedPrimary.copy(alpha = 0.5f),
-                        uncheckedThumbColor = SpfyLightGray,
-                        uncheckedTrackColor = SpfyLightGray.copy(alpha = 0.3f)
+                        uncheckedThumbColor = SnepilatchLightGray,
+                        uncheckedTrackColor = SnepilatchLightGray.copy(alpha = 0.3f)
                     )
                 )
             },
@@ -319,13 +316,13 @@ fun AccountScreen(vm: PlaybackViewModel) {
         )
 
         ListItem(
-            headlineContent = { Text(stringResource(R.string.manage_downloads), color = SpfyWhite) },
+            headlineContent = { Text(stringResource(R.string.manage_downloads), color = SnepilatchWhite) },
             supportingContent = {
                 val count by Downloads.downloaded.collectAsState()
-                Text(stringResource(R.string.downloads_count, count.size), color = SpfyLightGray)
+                Text(stringResource(R.string.downloads_count, count.size), color = SnepilatchLightGray)
             },
-            leadingContent = { Icon(Icons.Rounded.LibraryMusic, null, tint = SpfyLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.LibraryMusic, null, tint = SnepilatchLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { vm.navigateTo(ch.snepilatch.app.data.Screen.DOWNLOADS) }
         )
@@ -336,16 +333,16 @@ fun AccountScreen(vm: PlaybackViewModel) {
             ActivityResultContracts.OpenDocumentTree()
         ) { picked -> if (picked != null) DownloadFolder.setFolder(picked, audioContext) }
         ListItem(
-            headlineContent = { Text(stringResource(R.string.download_folder), color = SpfyWhite) },
+            headlineContent = { Text(stringResource(R.string.download_folder), color = SnepilatchWhite) },
             supportingContent = {
                 Text(
                     downloadFolder?.let { readableFolder(it) }
                         ?: stringResource(R.string.download_folder_none),
-                    color = SpfyLightGray
+                    color = SnepilatchLightGray
                 )
             },
-            leadingContent = { Icon(Icons.Rounded.Folder, null, tint = SpfyLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.Folder, null, tint = SnepilatchLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { folderPicker.launch(null) }
         )
@@ -354,7 +351,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
         val downloadCapGb by AppSettings.downloadCapGb.collectAsState()
         var showCapDialog by remember { mutableStateOf(false) }
         ListItem(
-            headlineContent = { Text(stringResource(R.string.storage_limit), color = SpfyWhite) },
+            headlineContent = { Text(stringResource(R.string.storage_limit), color = SnepilatchWhite) },
             supportingContent = {
                 Text(
                     if (downloadCapGb > 0f) {
@@ -362,11 +359,11 @@ fun AccountScreen(vm: PlaybackViewModel) {
                     } else {
                         stringResource(R.string.storage_limit_unlimited)
                     },
-                    color = SpfyLightGray
+                    color = SnepilatchLightGray
                 )
             },
-            leadingContent = { Icon(Icons.Rounded.Storage, null, tint = SpfyLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.Storage, null, tint = SnepilatchLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { showCapDialog = true }
         )
@@ -394,10 +391,10 @@ fun AccountScreen(vm: PlaybackViewModel) {
             stringResource(R.string.storage_policy_stop)
         }
         ListItem(
-            headlineContent = { Text(stringResource(R.string.storage_policy), color = SpfyWhite) },
-            supportingContent = { Text(capPolicyLabel, color = SpfyLightGray) },
-            leadingContent = { Icon(Icons.Rounded.DeleteSweep, null, tint = SpfyLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            headlineContent = { Text(stringResource(R.string.storage_policy), color = SnepilatchWhite) },
+            supportingContent = { Text(capPolicyLabel, color = SnepilatchLightGray) },
+            leadingContent = { Icon(Icons.Rounded.DeleteSweep, null, tint = SnepilatchLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { showCapPolicyPicker = true }
         )
@@ -417,7 +414,6 @@ fun AccountScreen(vm: PlaybackViewModel) {
                     )
                 ),
                 selected = capPolicy,
-                selectedColor = animatedPrimary,
                 onSelect = {
                     AppSettings.setDownloadCapPolicy(it, audioContext)
                     showCapPolicyPicker = false
@@ -441,10 +437,10 @@ fun AccountScreen(vm: PlaybackViewModel) {
             else -> stringResource(R.string.state_off)
         }
         ListItem(
-            headlineContent = { Text(stringResource(R.string.equalizer), color = SpfyWhite) },
-            supportingContent = { Text(eqModeLabel, color = SpfyLightGray) },
-            leadingContent = { Icon(Icons.Rounded.GraphicEq, null, tint = SpfyLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            headlineContent = { Text(stringResource(R.string.equalizer), color = SnepilatchWhite) },
+            supportingContent = { Text(eqModeLabel, color = SnepilatchLightGray) },
+            leadingContent = { Icon(Icons.Rounded.GraphicEq, null, tint = SnepilatchLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { showEqPicker = true }
         )
@@ -457,7 +453,6 @@ fun AccountScreen(vm: PlaybackViewModel) {
                     RadioOption(AppSettings.EQ_EXTERNAL, stringResource(R.string.eq_mode_external), stringResource(R.string.eq_mode_external_desc))
                 ),
                 selected = eqMode,
-                selectedColor = animatedPrimary,
                 onSelect = { picked ->
                     AppSettings.setEqMode(picked, audioContext)
                     showEqPicker = false
@@ -474,7 +469,6 @@ fun AccountScreen(vm: PlaybackViewModel) {
                 onValueChange = { AppSettings.setEqHeadroomDb(it.toInt().toFloat(), audioContext) },
                 valueRange = -18f..0f,
                 steps = 17,
-                colors = SliderDefaults.colors(thumbColor = animatedPrimary, activeTrackColor = animatedPrimary),
                 modifier = Modifier.padding(horizontal = 24.dp)
             )
         }
@@ -497,10 +491,10 @@ fun AccountScreen(vm: PlaybackViewModel) {
         }
         val currentLanguageLabel = languages.find { it.first == appLanguage }?.second ?: systemDefaultLabel
         ListItem(
-            headlineContent = { Text(stringResource(R.string.language), color = SpfyWhite) },
-            supportingContent = { Text(currentLanguageLabel, color = SpfyLightGray) },
-            leadingContent = { Icon(Icons.Rounded.Language, null, tint = SpfyLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            headlineContent = { Text(stringResource(R.string.language), color = SnepilatchWhite) },
+            supportingContent = { Text(currentLanguageLabel, color = SnepilatchLightGray) },
+            leadingContent = { Icon(Icons.Rounded.Language, null, tint = SnepilatchLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { showLanguagePicker = true }
         )
@@ -509,7 +503,6 @@ fun AccountScreen(vm: PlaybackViewModel) {
                 title = stringResource(R.string.language),
                 options = languages.map { RadioOption(it.first, it.second) },
                 selected = appLanguage,
-                selectedColor = animatedPrimary,
                 onSelect = {
                     vm.setAppLanguage(it, audioContext)
                     showLanguagePicker = false
@@ -523,10 +516,10 @@ fun AccountScreen(vm: PlaybackViewModel) {
         var showLyricsPicker by remember { mutableStateOf(false) }
         val lyricsLabel = if (lyricsAnim == "horizontal") stringResource(R.string.lyrics_horizontal) else stringResource(R.string.lyrics_vertical)
         ListItem(
-            headlineContent = { Text(stringResource(R.string.lyrics_animation), color = SpfyWhite) },
-            supportingContent = { Text(lyricsLabel, color = SpfyLightGray) },
-            leadingContent = { Icon(Icons.Rounded.MusicNote, null, tint = SpfyLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            headlineContent = { Text(stringResource(R.string.lyrics_animation), color = SnepilatchWhite) },
+            supportingContent = { Text(lyricsLabel, color = SnepilatchLightGray) },
+            leadingContent = { Icon(Icons.Rounded.MusicNote, null, tint = SnepilatchLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { showLyricsPicker = true }
         )
@@ -539,7 +532,6 @@ fun AccountScreen(vm: PlaybackViewModel) {
                     RadioOption("horizontal", stringResource(R.string.lyrics_horizontal))
                 ),
                 selected = lyricsAnim,
-                selectedColor = animatedPrimary,
                 onSelect = {
                     AppSettings.setLyricsAnimDirection(it, audioContext)
                     showLyricsPicker = false
@@ -551,12 +543,12 @@ fun AccountScreen(vm: PlaybackViewModel) {
         // Canvas background
         val canvasOn by AppSettings.canvasEnabled.collectAsState()
         ListItem(
-            headlineContent = { Text(stringResource(R.string.canvas_background), color = SpfyWhite) },
+            headlineContent = { Text(stringResource(R.string.canvas_background), color = SnepilatchWhite) },
             supportingContent = { Text(
                 if (canvasOn) stringResource(R.string.canvas_on) else stringResource(R.string.canvas_off),
-                color = SpfyLightGray
+                color = SnepilatchLightGray
             ) },
-            leadingContent = { Icon(Icons.Rounded.PlayCircle, null, tint = SpfyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.PlayCircle, null, tint = SnepilatchLightGray) },
             trailingContent = {
                 Switch(
                     checked = canvasOn,
@@ -564,8 +556,8 @@ fun AccountScreen(vm: PlaybackViewModel) {
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = animatedPrimary,
                         checkedTrackColor = animatedPrimary.copy(alpha = 0.5f),
-                        uncheckedThumbColor = SpfyLightGray,
-                        uncheckedTrackColor = SpfyLightGray.copy(alpha = 0.3f)
+                        uncheckedThumbColor = SnepilatchLightGray,
+                        uncheckedTrackColor = SnepilatchLightGray.copy(alpha = 0.3f)
                     )
                 )
             },
@@ -575,14 +567,14 @@ fun AccountScreen(vm: PlaybackViewModel) {
         // Player background style: album-colour gradient vs. the fluid Kawarp album-art warp.
         val gradientBg by AppSettings.playerGradientBg.collectAsState()
         ListItem(
-            headlineContent = { Text(stringResource(R.string.gradient_background), color = SpfyWhite) },
+            headlineContent = { Text(stringResource(R.string.gradient_background), color = SnepilatchWhite) },
             supportingContent = {
                 Text(
                     stringResource(if (gradientBg) R.string.gradient_bg_on else R.string.gradient_bg_off),
-                    color = SpfyLightGray
+                    color = SnepilatchLightGray
                 )
             },
-            leadingContent = { Icon(Icons.Rounded.Gradient, null, tint = SpfyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.Gradient, null, tint = SnepilatchLightGray) },
             trailingContent = {
                 Switch(
                     checked = gradientBg,
@@ -590,8 +582,8 @@ fun AccountScreen(vm: PlaybackViewModel) {
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = animatedPrimary,
                         checkedTrackColor = animatedPrimary.copy(alpha = 0.5f),
-                        uncheckedThumbColor = SpfyLightGray,
-                        uncheckedTrackColor = SpfyLightGray.copy(alpha = 0.3f)
+                        uncheckedThumbColor = SnepilatchLightGray,
+                        uncheckedTrackColor = SnepilatchLightGray.copy(alpha = 0.3f)
                     )
                 )
             },
@@ -632,10 +624,10 @@ fun AccountScreen(vm: PlaybackViewModel) {
         val leftButton by AppSettings.notificationLeftButton.collectAsState()
         var showLeftPicker by remember { mutableStateOf(false) }
         ListItem(
-            headlineContent = { Text(stringResource(R.string.notification_left_button), color = SpfyWhite) },
-            supportingContent = { Text(buttonLabel(leftButton), color = SpfyLightGray) },
-            leadingContent = { Icon(Icons.Rounded.Notifications, null, tint = SpfyLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            headlineContent = { Text(stringResource(R.string.notification_left_button), color = SnepilatchWhite) },
+            supportingContent = { Text(buttonLabel(leftButton), color = SnepilatchLightGray) },
+            leadingContent = { Icon(Icons.Rounded.Notifications, null, tint = SnepilatchLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { showLeftPicker = true }
         )
@@ -644,7 +636,6 @@ fun AccountScreen(vm: PlaybackViewModel) {
                 title = stringResource(R.string.notification_button_left),
                 options = notifRadioOptions,
                 selected = leftButton,
-                selectedColor = animatedPrimary,
                 onSelect = {
                     AppSettings.setNotificationLeftButton(it, audioContext)
                     showLeftPicker = false
@@ -657,10 +648,10 @@ fun AccountScreen(vm: PlaybackViewModel) {
         val rightButton by AppSettings.notificationRightButton.collectAsState()
         var showRightPicker by remember { mutableStateOf(false) }
         ListItem(
-            headlineContent = { Text(stringResource(R.string.notification_right_button), color = SpfyWhite) },
-            supportingContent = { Text(buttonLabel(rightButton), color = SpfyLightGray) },
-            leadingContent = { Icon(Icons.Rounded.Notifications, null, tint = SpfyLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            headlineContent = { Text(stringResource(R.string.notification_right_button), color = SnepilatchWhite) },
+            supportingContent = { Text(buttonLabel(rightButton), color = SnepilatchLightGray) },
+            leadingContent = { Icon(Icons.Rounded.Notifications, null, tint = SnepilatchLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { showRightPicker = true }
         )
@@ -669,7 +660,6 @@ fun AccountScreen(vm: PlaybackViewModel) {
                 title = stringResource(R.string.notification_button_right),
                 options = notifRadioOptions,
                 selected = rightButton,
-                selectedColor = animatedPrimary,
                 onSelect = {
                     AppSettings.setNotificationRightButton(it, audioContext)
                     showRightPicker = false
@@ -682,9 +672,9 @@ fun AccountScreen(vm: PlaybackViewModel) {
         AccountSectionHeader(stringResource(R.string.about))
 
         ListItem(
-            headlineContent = { Text(stringResource(R.string.app_version), color = SpfyWhite) },
-            supportingContent = { Text(BuildConfig.VERSION_NAME, color = SpfyLightGray) },
-            leadingContent = { Icon(Icons.Rounded.Info, null, tint = SpfyLightGray) },
+            headlineContent = { Text(stringResource(R.string.app_version), color = SnepilatchWhite) },
+            supportingContent = { Text(BuildConfig.VERSION_NAME, color = SnepilatchLightGray) },
+            leadingContent = { Icon(Icons.Rounded.Info, null, tint = SnepilatchLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
         )
 
@@ -697,10 +687,10 @@ fun AccountScreen(vm: PlaybackViewModel) {
             stringResource(R.string.update_channel_stable)
         }
         ListItem(
-            headlineContent = { Text(stringResource(R.string.update_channel), color = SpfyWhite) },
-            supportingContent = { Text(updateChannelLabel, color = SpfyLightGray) },
-            leadingContent = { Icon(Icons.Rounded.SystemUpdate, null, tint = SpfyLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            headlineContent = { Text(stringResource(R.string.update_channel), color = SnepilatchWhite) },
+            supportingContent = { Text(updateChannelLabel, color = SnepilatchLightGray) },
+            leadingContent = { Icon(Icons.Rounded.SystemUpdate, null, tint = SnepilatchLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { showUpdateChannelPicker = true }
         )
@@ -720,7 +710,6 @@ fun AccountScreen(vm: PlaybackViewModel) {
                     )
                 ),
                 selected = updateChannelPref,
-                selectedColor = animatedPrimary,
                 onSelect = {
                     AppSettings.setUpdateChannel(it, audioContext)
                     showUpdateChannelPicker = false
@@ -737,14 +726,14 @@ fun AccountScreen(vm: PlaybackViewModel) {
         var upToDate by remember { mutableStateOf(false) }
 
         ListItem(
-            headlineContent = { Text(stringResource(R.string.check_for_updates), color = SpfyWhite) },
+            headlineContent = { Text(stringResource(R.string.check_for_updates), color = SnepilatchWhite) },
             supportingContent = { Text(
                 when {
                     isChecking -> stringResource(R.string.checking)
                     upToDate -> stringResource(R.string.up_to_date)
                     else -> stringResource(R.string.tap_to_check)
                 },
-                color = if (upToDate) animatedPrimary else SpfyLightGray
+                color = if (upToDate) animatedPrimary else SnepilatchLightGray
             ) },
             leadingContent = {
                 if (isChecking) {
@@ -753,10 +742,10 @@ fun AccountScreen(vm: PlaybackViewModel) {
                         color = animatedPrimary
                     )
                 } else {
-                    Icon(Icons.Rounded.SystemUpdate, null, tint = SpfyLightGray)
+                    Icon(Icons.Rounded.SystemUpdate, null, tint = SnepilatchLightGray)
                 }
             },
-            trailingContent = { if (!isChecking) Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            trailingContent = { if (!isChecking) Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable(enabled = !isChecking) {
                 isChecking = true
@@ -786,10 +775,10 @@ fun AccountScreen(vm: PlaybackViewModel) {
         var showReleaseNotes by remember { mutableStateOf(false) }
 
         ListItem(
-            headlineContent = { Text(stringResource(R.string.release_notes), color = SpfyWhite) },
-            supportingContent = { Text(stringResource(R.string.view_changelog), color = SpfyLightGray) },
-            leadingContent = { Icon(Icons.Rounded.Description, null, tint = SpfyLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            headlineContent = { Text(stringResource(R.string.release_notes), color = SnepilatchWhite) },
+            supportingContent = { Text(stringResource(R.string.view_changelog), color = SnepilatchLightGray) },
+            leadingContent = { Icon(Icons.Rounded.Description, null, tint = SnepilatchLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { showReleaseNotes = true }
         )
@@ -803,15 +792,15 @@ fun AccountScreen(vm: PlaybackViewModel) {
         val lokiEndpoint by AppSettings.lokiEndpoint.collectAsState()
         var showLokiDialog by remember { mutableStateOf(false) }
         ListItem(
-            headlineContent = { Text(stringResource(R.string.debug_logging), color = SpfyWhite) },
+            headlineContent = { Text(stringResource(R.string.debug_logging), color = SnepilatchWhite) },
             supportingContent = {
                 Text(
                     lokiEndpoint.ifBlank { stringResource(R.string.debug_logging_off) },
-                    color = SpfyLightGray
+                    color = SnepilatchLightGray
                 )
             },
-            leadingContent = { Icon(Icons.Rounded.BugReport, null, tint = SpfyLightGray) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            leadingContent = { Icon(Icons.Rounded.BugReport, null, tint = SnepilatchLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable { showLokiDialog = true }
         )
@@ -833,7 +822,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
         AccountSectionHeader(stringResource(R.string.special_thanks))
 
         ListItem(
-            headlineContent = { Text("Cinnabar 🧼", color = SpfyWhite) },
+            headlineContent = { Text("Cinnabar 🧼", color = SnepilatchWhite) },
             leadingContent = {
                 AsyncImage(
                     model = "https://cdn.discordapp.com/avatars/823656705350565898/0167b0e2080d52dfa1f0a964a17828bb.webp?size=1024",
@@ -846,7 +835,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
         )
 
         ListItem(
-            headlineContent = { Text("MyDrift", color = SpfyWhite) },
+            headlineContent = { Text("MyDrift", color = SnepilatchWhite) },
             leadingContent = {
                 AsyncImage(
                     model = "https://cdn.discordapp.com/avatars/679006161554505729/2a9c7c72d662df626e9e740cf427c15e.webp?size=1024",
@@ -864,7 +853,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
         ListItem(
             headlineContent = { Text(stringResource(R.string.log_out), color = Color(0xFFE57373)) },
             leadingContent = { Icon(Icons.AutoMirrored.Rounded.ExitToApp, null, tint = Color(0xFFE57373)) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SpfyLightGray) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.clickable {
                 clearCookies(context)
@@ -876,10 +865,10 @@ fun AccountScreen(vm: PlaybackViewModel) {
 
 @Composable
 private fun AccountSectionHeader(title: String) {
-    HorizontalDivider(color = SpfyGray, modifier = Modifier.padding(horizontal = 16.dp))
+    HorizontalDivider(color = SnepilatchGray, modifier = Modifier.padding(horizontal = 16.dp))
     Text(
         title,
-        color = SpfyWhite,
+        color = SnepilatchWhite,
         fontSize = 16.sp,
         fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp)
@@ -898,29 +887,26 @@ private fun TextInputDialog(
     onDismiss: () -> Unit
 ) {
     var value by remember { mutableStateOf(initialValue) }
-    val confirmColor = MaterialTheme.colorScheme.primary
     TightAlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title, color = SpfyWhite) },
+        title = { Text(title, color = SnepilatchWhite) },
         text = {
             Column {
                 if (description != null) {
-                    Text(description, color = SpfyLightGray, fontSize = 13.sp)
+                    Text(description, color = SnepilatchLightGray, fontSize = 13.sp)
                     Spacer(Modifier.height(12.dp))
                 }
                 OutlinedTextField(
                     value = value,
                     onValueChange = { value = it },
-                    placeholder = { Text(placeholder, color = SpfyLightGray.copy(alpha = 0.7f)) },
+                    placeholder = { Text(placeholder, color = SnepilatchLightGray.copy(alpha = 0.7f)) },
                     singleLine = true,
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = keyboardType),
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = SpfyWhite,
-                        unfocusedTextColor = SpfyWhite,
-                        cursorColor = confirmColor,
-                        focusedBorderColor = confirmColor,
-                        unfocusedBorderColor = SpfyLightGray
+                        focusedTextColor = SnepilatchWhite,
+                        unfocusedTextColor = SnepilatchWhite,
+                        unfocusedBorderColor = SnepilatchLightGray
                     )
                 )
             }
@@ -950,17 +936,16 @@ private fun RadioPickerDialog(
     description: String? = null,
     options: List<RadioOption>,
     selected: String,
-    selectedColor: Color,
     onSelect: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
     TightAlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title, color = SpfyWhite) },
+        title = { Text(title, color = SnepilatchWhite) },
         text = {
             Column {
                 if (description != null) {
-                    Text(description, color = SpfyLightGray, fontSize = 13.sp)
+                    Text(description, color = SnepilatchLightGray, fontSize = 13.sp)
                     Spacer(Modifier.height(12.dp))
                 }
                 options.forEach { opt ->
@@ -974,29 +959,25 @@ private fun RadioPickerDialog(
                         RadioButton(
                             selected = selected == opt.value,
                             onClick = { onSelect(opt.value) },
-                            colors = RadioButtonDefaults.colors(
-                                selectedColor = selectedColor,
-                                unselectedColor = SpfyLightGray
-                            )
                         )
                         Spacer(Modifier.width(8.dp))
                         if (opt.supportingText != null) {
                             Column {
-                                Text(opt.label, color = SpfyWhite, fontSize = 15.sp)
-                                Text(opt.supportingText, color = SpfyLightGray, fontSize = 12.sp)
+                                Text(opt.label, color = SnepilatchWhite, fontSize = 15.sp)
+                                Text(opt.supportingText, color = SnepilatchLightGray, fontSize = 12.sp)
                             }
                         } else {
-                            Text(opt.label, color = SpfyWhite, fontSize = 15.sp)
+                            Text(opt.label, color = SnepilatchWhite, fontSize = 15.sp)
                         }
                     }
                 }
             }
         },
-        containerColor = SpfyGray,
+        containerColor = SnepilatchGray,
         confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel), color = SpfyLightGray)
+                Text(stringResource(R.string.cancel), color = SnepilatchLightGray)
             }
         }
     )

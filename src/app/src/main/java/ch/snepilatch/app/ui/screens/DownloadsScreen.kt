@@ -59,39 +59,39 @@ fun DownloadsScreen(vm: PlaybackViewModel) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = { vm.goBack() }) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back), tint = SpfyWhite)
+                Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back), tint = SnepilatchWhite)
             }
             Text(
                 stringResource(R.string.downloads),
-                color = SpfyWhite,
+                color = SnepilatchWhite,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f)
             )
             if (stored.isNotEmpty()) {
                 TextButton(onClick = { confirmClearAll = true }) {
-                    Text(stringResource(R.string.remove_all), color = SpfyLightGray)
+                    Text(stringResource(R.string.remove_all), color = SnepilatchLightGray)
                 }
             }
         }
 
         StorageSummary(folder = folder, count = stored.size, totalMb = totalMb)
 
-        HorizontalDivider(color = SpfyLightGray.copy(alpha = 0.15f))
+        HorizontalDivider(color = SnepilatchLightGray.copy(alpha = 0.15f))
         Row(
             Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 stringResource(R.string.downloads_active),
-                color = SpfyLightGray,
+                color = SnepilatchLightGray,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f).padding(vertical = 12.dp)
             )
             if (queue.any { !it.running }) {
                 TextButton(onClick = { DownloadQueue.clearFinished() }) {
-                    Text(stringResource(R.string.downloads_clear_finished), color = SpfyLightGray)
+                    Text(stringResource(R.string.downloads_clear_finished), color = SnepilatchLightGray)
                 }
             }
         }
@@ -99,7 +99,7 @@ fun DownloadsScreen(vm: PlaybackViewModel) {
         if (queue.isEmpty()) {
             Text(
                 stringResource(R.string.downloads_idle),
-                color = SpfyLightGray,
+                color = SnepilatchLightGray,
                 fontSize = 14.sp,
                 modifier = Modifier.padding(horizontal = 20.dp)
             )
@@ -118,20 +118,20 @@ fun DownloadsScreen(vm: PlaybackViewModel) {
 @Composable
 private fun StorageSummary(folder: android.net.Uri?, count: Int, totalMb: Int) {
     ListItem(
-        headlineContent = { Text(stringResource(R.string.download_folder), color = SpfyWhite) },
+        headlineContent = { Text(stringResource(R.string.download_folder), color = SnepilatchWhite) },
         supportingContent = {
             Text(
                 folder?.let { readableFolder(it) } ?: stringResource(R.string.download_folder_none),
-                color = SpfyLightGray
+                color = SnepilatchLightGray
             )
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     )
     ListItem(
         headlineContent = {
-            Text(stringResource(R.string.downloads_summary, count, totalMb), color = SpfyWhite)
+            Text(stringResource(R.string.downloads_summary, count, totalMb), color = SnepilatchWhite)
         },
-        leadingContent = { Icon(Icons.Rounded.CloudDone, null, tint = SpfyLightGray) },
+        leadingContent = { Icon(Icons.Rounded.CloudDone, null, tint = SnepilatchLightGray) },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     )
 }
@@ -142,7 +142,7 @@ private fun QueuedDownload(job: DownloadQueue.QueueEntry, onCancel: () -> Unit) 
     // percentage to report and spins rather than filling a ring stuck at zero.
     val reencode = job.type == DownloadQueue.TYPE_REENCODE
     ListItem(
-        headlineContent = { Text(job.name, color = SpfyWhite, maxLines = 1) },
+        headlineContent = { Text(job.name, color = SnepilatchWhite, maxLines = 1) },
         supportingContent = {
             Text(
                 when {
@@ -157,7 +157,7 @@ private fun QueuedDownload(job: DownloadQueue.QueueEntry, onCancel: () -> Unit) 
                     job.total > 1 -> stringResource(R.string.downloading_count, job.done, job.total)
                     else -> stringResource(R.string.downloading)
                 },
-                color = SpfyLightGray
+                color = SnepilatchLightGray
             )
         },
         leadingContent = {
@@ -189,13 +189,13 @@ private fun QueuedDownload(job: DownloadQueue.QueueEntry, onCancel: () -> Unit) 
                         Icon(
                             if (job.paused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
                             stringResource(if (job.paused) R.string.resume else R.string.pause),
-                            tint = SpfyLightGray,
+                            tint = SnepilatchLightGray,
                         )
                     }
                 }
                 if (job.running) {
                     IconButton(onClick = onCancel) {
-                        Icon(Icons.Rounded.Close, stringResource(R.string.cancel), tint = SpfyLightGray)
+                        Icon(Icons.Rounded.Close, stringResource(R.string.cancel), tint = SnepilatchLightGray)
                     }
                 }
             }
@@ -208,17 +208,17 @@ private fun QueuedDownload(job: DownloadQueue.QueueEntry, onCancel: () -> Unit) 
 private fun ClearAllDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = SpfyGray,
-        title = { Text(stringResource(R.string.remove_all), color = SpfyWhite) },
-        text = { Text(stringResource(R.string.remove_all_confirm), color = SpfyLightGray) },
+        containerColor = SnepilatchGray,
+        title = { Text(stringResource(R.string.remove_all), color = SnepilatchWhite) },
+        text = { Text(stringResource(R.string.remove_all_confirm), color = SnepilatchLightGray) },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text(stringResource(R.string.remove_all), color = SpfyWhite)
+                Text(stringResource(R.string.remove_all), color = SnepilatchWhite)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel), color = SpfyLightGray)
+                Text(stringResource(R.string.cancel), color = SnepilatchLightGray)
             }
         }
     )

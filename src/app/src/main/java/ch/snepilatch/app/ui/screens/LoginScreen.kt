@@ -1,8 +1,8 @@
 package ch.snepilatch.app.ui.screens
 
 import ch.snepilatch.app.R
-import ch.snepilatch.app.ui.theme.SpfyBlack
-import ch.snepilatch.app.ui.theme.SpfyWhite
+import ch.snepilatch.app.ui.theme.SnepilatchBlack
+import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
@@ -44,7 +44,7 @@ fun SpfyLoginScreen(vm: PlaybackViewModel) {
     Column(
         Modifier
             .fillMaxSize()
-            .background(SpfyBlack)
+            .background(SnepilatchBlack)
             .statusBarsPadding()
     ) {
         Row(
@@ -54,10 +54,10 @@ fun SpfyLoginScreen(vm: PlaybackViewModel) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = { vm.needsLogin.value = false }) {
-                Icon(Icons.Rounded.Close, stringResource(R.string.close), tint = SpfyWhite)
+                Icon(Icons.Rounded.Close, stringResource(R.string.close), tint = SnepilatchWhite)
             }
             Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.login_title), color = SpfyWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.login_title), color = SnepilatchWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         }
 
         AndroidView(

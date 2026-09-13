@@ -18,8 +18,8 @@ import ch.snepilatch.app.R
 import ch.snepilatch.app.data.TrackInfo
 import ch.snepilatch.app.download.Downloads
 import ch.snepilatch.app.ui.components.TrackRow
-import ch.snepilatch.app.ui.theme.SpfyLightGray
-import ch.snepilatch.app.ui.theme.SpfyWhite
+import ch.snepilatch.app.ui.theme.SnepilatchLightGray
+import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 
 @Composable
@@ -33,7 +33,7 @@ fun OfflineHomeScreen(vm: PlaybackViewModel) {
         Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
             Text(
                 stringResource(R.string.offline_no_downloads),
-                color = SpfyLightGray,
+                color = SnepilatchLightGray,
                 fontSize = 15.sp,
                 textAlign = TextAlign.Center
             )
@@ -48,7 +48,7 @@ fun OfflineHomeScreen(vm: PlaybackViewModel) {
         item {
             Text(
                 stringResource(R.string.offline_while_youre_offline),
-                color = SpfyWhite,
+                color = SnepilatchWhite,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)

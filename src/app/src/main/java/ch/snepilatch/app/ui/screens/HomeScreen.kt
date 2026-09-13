@@ -14,7 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import ch.snepilatch.app.R
 import ch.snepilatch.app.data.LIKED_SONGS_COVER_URL
-import ch.snepilatch.app.ui.theme.SpfyWhite
+import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.animation.core.LinearEasing
@@ -72,8 +72,8 @@ import ch.snepilatch.app.ui.components.ShimmerBox
 import ch.snepilatch.app.ui.components.EntityMenuSheet
 import ch.snepilatch.app.ui.components.MenuAction
 import ch.snepilatch.app.ui.components.SpfyImage
-import ch.snepilatch.app.ui.theme.SpfyCardBg
-import ch.snepilatch.app.ui.theme.SpfyLightGray
+import ch.snepilatch.app.ui.theme.SnepilatchGray
+import ch.snepilatch.app.ui.theme.SnepilatchLightGray
 import ch.snepilatch.app.util.CardColors
 import ch.snepilatch.app.util.extractCardColorsFromArt
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -102,7 +102,7 @@ fun HomeScreen(vm: PlaybackViewModel) {
         item {
             Text(
                 homeData?.greeting ?: stringResource(R.string.greeting_fallback),
-                color = SpfyWhite,
+                color = SnepilatchWhite,
                 fontSize = 26.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -122,7 +122,7 @@ fun HomeScreen(vm: PlaybackViewModel) {
                 item {
                     Text(
                         section.title,
-                        color = SpfyWhite,
+                        color = SnepilatchWhite,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 10.dp)
@@ -184,7 +184,7 @@ fun QuickPickGrid(items: List<kotify.api.home.HomeSectionItem>, vm: PlaybackView
                                 }
                             },
                         shape = RoundedCornerShape(6.dp),
-                        colors = CardDefaults.cardColors(containerColor = SpfyCardBg)
+                        colors = CardDefaults.cardColors(containerColor = SnepilatchGray)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             SpfyImage(
@@ -194,7 +194,7 @@ fun QuickPickGrid(items: List<kotify.api.home.HomeSectionItem>, vm: PlaybackView
                             )
                             Text(
                                 homeLabel(item),
-                                color = SpfyWhite,
+                                color = SnepilatchWhite,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 2,
@@ -267,7 +267,7 @@ private fun homeCardColors(item: kotify.api.home.HomeSectionItem): CardColors {
         item.accentColor
             ?.let { hex -> runCatching { Color(android.graphics.Color.parseColor(hex)) }.getOrNull() }
             ?.let { lerp(it, Color.Black, 0.3f) }
-    } ?: SpfyCardBg
+    } ?: SnepilatchGray
     val art = homeArt(item)
     val context = LocalContext.current
     val palette by produceState<CardColors?>(null, art) {
@@ -345,14 +345,14 @@ fun HomeSingleCard(item: kotify.api.home.HomeSectionItem, vm: PlaybackViewModel)
                 Column(Modifier.weight(1f).padding(top = 6.dp)) {
                     Text(
                         homeLabel(item),
-                        color = SpfyWhite,
+                        color = SnepilatchWhite,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                     item.owner?.takeIf { it.isNotBlank() }?.let { owner ->
-                        Text(owner, color = SpfyLightGray, fontSize = 13.sp, maxLines = 1)
+                        Text(owner, color = SnepilatchLightGray, fontSize = 13.sp, maxLines = 1)
                     }
                 }
                 HomeCardMenu(item, vm)
@@ -386,7 +386,7 @@ private fun HomeCardActions(item: kotify.api.home.HomeSectionItem, vm: PlaybackV
             Modifier
                 .size(44.dp)
                 .clip(CircleShape)
-                .background(SpfyWhite)
+                .background(SnepilatchWhite)
                 .clickable { if (isThis) vm.togglePlayPause() else vm.playTrack(item.uri) },
             contentAlignment = Alignment.Center
         ) {
@@ -407,7 +407,7 @@ private fun HomeCardMenu(item: kotify.api.home.HomeSectionItem, vm: PlaybackView
     val context = LocalContext.current
     var showMenu by remember { mutableStateOf(false) }
     IconButton(onClick = { showMenu = true }, modifier = Modifier.size(40.dp)) {
-        Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SpfyWhite, modifier = Modifier.size(26.dp))
+        Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SnepilatchWhite, modifier = Modifier.size(26.dp))
     }
     if (!showMenu) return
     val shareLabel = stringResource(R.string.share)
@@ -476,12 +476,12 @@ private fun HomeCardMeta(item: kotify.api.home.HomeSectionItem) {
     Text(
         buildAnnotatedString {
             if (count != null) {
-                withStyle(SpanStyle(color = SpfyWhite, fontWeight = FontWeight.Bold)) { append(count) }
+                withStyle(SpanStyle(color = SnepilatchWhite, fontWeight = FontWeight.Bold)) { append(count) }
             }
             if (count != null && shown != null) append(" • ")
             if (shown != null) append(shown)
         },
-        color = SpfyLightGray,
+        color = SnepilatchLightGray,
         fontSize = 13.sp,
         maxLines = 2,
         overflow = TextOverflow.Ellipsis
@@ -511,7 +511,7 @@ private fun HomeCardLike(item: kotify.api.home.HomeSectionItem, vm: PlaybackView
         Icon(
             if (liked) Icons.Rounded.CheckCircle else Icons.Rounded.AddCircleOutline,
             stringResource(R.string.save_to_library),
-            tint = SpfyWhite,
+            tint = SnepilatchWhite,
             modifier = Modifier.size(30.dp)
         )
     }
@@ -557,7 +557,7 @@ fun HomeSectionCard(item: kotify.api.home.HomeSectionItem, vm: PlaybackViewModel
         Spacer(Modifier.height(8.dp))
         Text(
             homeLabel(item),
-            color = SpfyWhite,
+            color = SnepilatchWhite,
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 2,
@@ -569,7 +569,7 @@ fun HomeSectionCard(item: kotify.api.home.HomeSectionItem, vm: PlaybackViewModel
         if (subtitle != null) {
             Text(
                 subtitle,
-                color = SpfyLightGray,
+                color = SnepilatchLightGray,
                 fontSize = 11.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

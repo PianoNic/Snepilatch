@@ -35,13 +35,13 @@ fun JamSheet(onDismiss: () -> Unit, jamVm: JamViewModel = viewModel()) {
 
     LaunchedEffect(jam?.sessionId) { if (jam != null) jamVm.refresh() }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = SpfyElevated) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = SnepilatchElevated) {
         SheetNavBarFix()
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.Groups, null, tint = SpfyWhite, modifier = Modifier.size(24.dp))
+                Icon(Icons.Rounded.Groups, null, tint = SnepilatchWhite, modifier = Modifier.size(24.dp))
                 Spacer(Modifier.width(12.dp))
-                Text(stringResource(R.string.jam), color = SpfyWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.jam), color = SnepilatchWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
             }
             Spacer(Modifier.height(12.dp))
 
@@ -77,20 +77,20 @@ private fun JamJoinForm(
     error: String?,
     onJoin: () -> Unit
 ) {
-    Text(stringResource(R.string.jam_paste_hint), color = SpfyLightGray, fontSize = 13.sp)
+    Text(stringResource(R.string.jam_paste_hint), color = SnepilatchLightGray, fontSize = 13.sp)
     Spacer(Modifier.height(8.dp))
     OutlinedTextField(
         value = link,
         onValueChange = onLinkChange,
         singleLine = true,
-        placeholder = { Text(stringResource(R.string.jam_link_placeholder), color = SpfyLightGray) },
+        placeholder = { Text(stringResource(R.string.jam_link_placeholder), color = SnepilatchLightGray) },
         modifier = Modifier.fillMaxWidth()
     )
     if (error != null) {
         Spacer(Modifier.height(6.dp))
         Text(
             stringResource(if (error == "not_ready") R.string.jam_not_ready else R.string.jam_join_failed),
-            color = SpfyLightGray,
+            color = SnepilatchLightGray,
             fontSize = 12.sp
         )
     }
@@ -106,7 +106,7 @@ private fun JamJoinForm(
 
 @Composable
 private fun JamMembers(session: JamSession, joining: Boolean, onLeave: () -> Unit) {
-    Text(stringResource(R.string.jam_members, session.members.size), color = SpfyLightGray, fontSize = 13.sp)
+    Text(stringResource(R.string.jam_members, session.members.size), color = SnepilatchLightGray, fontSize = 13.sp)
     Spacer(Modifier.height(8.dp))
     session.members.forEach { m ->
         Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -115,13 +115,13 @@ private fun JamMembers(session: JamSession, joining: Boolean, onLeave: () -> Uni
             Column(Modifier.weight(1f)) {
                 Text(
                     m.displayName.ifBlank { m.username },
-                    color = SpfyWhite,
+                    color = SnepilatchWhite,
                     fontSize = 15.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 if (m.id == session.sessionOwnerId) {
-                    Text(stringResource(R.string.jam_host), color = SpfyLightGray, fontSize = 12.sp)
+                    Text(stringResource(R.string.jam_host), color = SnepilatchLightGray, fontSize = 12.sp)
                 }
             }
         }
@@ -133,6 +133,6 @@ private fun JamMembers(session: JamSession, joining: Boolean, onLeave: () -> Uni
         shape = RoundedCornerShape(24.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Text(stringResource(R.string.jam_leave), color = SpfyWhite)
+        Text(stringResource(R.string.jam_leave), color = SnepilatchWhite)
     }
 }

@@ -32,7 +32,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
-import ch.snepilatch.app.ui.theme.SpfyGray
+import ch.snepilatch.app.ui.theme.SnepilatchGray
 import coil.Coil
 import coil.request.ImageRequest
 import coil.request.SuccessResult
@@ -108,14 +108,14 @@ fun SlidingCoverImage(
     ) {
         strip.covers.forEachIndexed { index, cover ->
             Image(
-                painter = painters[cover] ?: ColorPainter(SpfyGray),
+                painter = painters[cover] ?: ColorPainter(SnepilatchGray),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .matchParentSize()
                     .graphicsLayer { translationX = strip.translation + (index - 1) * (size.width + gap) }
                     .clip(shape)
-                    .background(SpfyGray),
+                    .background(SnepilatchGray),
             )
         }
     }

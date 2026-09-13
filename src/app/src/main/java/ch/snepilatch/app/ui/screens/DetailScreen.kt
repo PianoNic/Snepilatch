@@ -75,7 +75,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
 
     if (isLoading) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            LoadingIndicator(color = SpfyLightGray)
+            LoadingIndicator(color = SnepilatchLightGray)
         }
         return
     }
@@ -95,7 +95,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                     Modifier
                         .fillMaxSize()
                         .background(Brush.verticalGradient(
-                            listOf(Color.Transparent, SpfyBlack),
+                            listOf(Color.Transparent, SnepilatchBlack),
                             startY = if (isArtist) 400f else 150f
                         ))
                 )
@@ -109,12 +109,12 @@ fun DetailScreen(vm: PlaybackViewModel) {
                         .clickable { vm.goBack() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back), tint = SpfyWhite, modifier = Modifier.size(20.dp))
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back), tint = SnepilatchWhite, modifier = Modifier.size(20.dp))
                 }
                 Column(Modifier.align(Alignment.BottomStart).padding(16.dp)) {
                     Text(
                         detail.name,
-                        color = SpfyWhite,
+                        color = SnepilatchWhite,
                         fontSize = if (isArtist) 36.sp else 26.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -128,7 +128,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                     val desc = remember(detail.description) { detail.description?.let { stripHtml(it) } }
                     if (desc != null) {
-                        Text(desc, color = SpfyLightGray, fontSize = 13.sp, maxLines = 2)
+                        Text(desc, color = SnepilatchLightGray, fontSize = 13.sp, maxLines = 2)
                         Spacer(Modifier.height(4.dp))
                     }
                     // Owner · songs · duration all on one line
@@ -146,7 +146,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                         meta.add(stringResource(R.string.detail_minutes, totalMin.toInt()))
                     }
                     if (meta.isNotEmpty()) {
-                        Text(meta.joinToString(" · "), color = SpfyLightGray, fontSize = 13.sp)
+                        Text(meta.joinToString(" · "), color = SnepilatchLightGray, fontSize = 13.sp)
                     }
                 }
             }
@@ -160,7 +160,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                     if (detail.artistName != null) {
                         Text(
                             detail.artistName!!,
-                            color = SpfyWhite,
+                            color = SnepilatchWhite,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.clickable {
@@ -172,7 +172,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                     val summary = remember(detail.description) { detail.description?.let { stripHtml(it) } }
                     val meta = listOfNotNull(detail.albumType, detail.releaseDate, summary).joinToString(" · ")
                     if (meta.isNotBlank()) {
-                        Text(meta, color = SpfyLightGray, fontSize = 13.sp)
+                        Text(meta, color = SnepilatchLightGray, fontSize = 13.sp)
                     }
                 }
             }
@@ -183,10 +183,10 @@ fun DetailScreen(vm: PlaybackViewModel) {
             item {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                     if (detail.publisher != null) {
-                        Text(detail.publisher!!, color = SpfyWhite, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        Text(detail.publisher!!, color = SnepilatchWhite, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     }
                     if (detail.description != null) {
-                        Text(detail.description!!, color = SpfyLightGray, fontSize = 13.sp)
+                        Text(detail.description!!, color = SnepilatchLightGray, fontSize = 13.sp)
                     }
                 }
             }
@@ -202,7 +202,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                 }
                 Text(
                     stringResource(R.string.detail_monthly_listeners, formatted),
-                    color = SpfyLightGray,
+                    color = SnepilatchLightGray,
                     fontSize = 13.sp,
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 0.dp)
                 )
@@ -237,9 +237,9 @@ fun DetailScreen(vm: PlaybackViewModel) {
                         OutlinedButton(
                             onClick = { detailVm.toggleDetailSaved(detail.type, detailId) },
                             colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = SpfyWhite
+                                contentColor = SnepilatchWhite
                             ),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, SpfyLightGray),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, SnepilatchLightGray),
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
                             modifier = Modifier.height(32.dp)
                         ) {
@@ -254,7 +254,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                             checked = saved,
                             onCheckedChange = { detailVm.toggleDetailSaved(detail.type, detailId) },
                             colors = IconButtonDefaults.iconToggleButtonColors(
-                                contentColor = SpfyWhite,
+                                contentColor = SnepilatchWhite,
                                 checkedContentColor = accentColor,
                             ),
                             modifier = Modifier.size(HEADER_BUTTON),
@@ -321,7 +321,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                             else -> Icon(
                                 Icons.Rounded.DownloadForOffline,
                                 stringResource(R.string.download_all),
-                                tint = SpfyLightGray,
+                                tint = SnepilatchLightGray,
                                 modifier = Modifier.size(HEADER_ICON)
                             )
                         }
@@ -337,7 +337,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                 ) {
                     Icon(
                         Icons.Rounded.MoreVert, stringResource(R.string.more),
-                        tint = SpfyLightGray, modifier = Modifier.size(HEADER_ICON)
+                        tint = SnepilatchLightGray, modifier = Modifier.size(HEADER_ICON)
                     )
                 }
                 if (showHeaderMenu) {
@@ -359,7 +359,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                             Icons.Rounded.Shuffle
                         },
                         stringResource(R.string.shuffle),
-                        tint = if (shuffling) accentColor else SpfyWhite,
+                        tint = if (shuffling) accentColor else SnepilatchWhite,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -396,7 +396,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
             item {
                 Text(
                     stringResource(R.string.popular),
-                    color = SpfyWhite,
+                    color = SnepilatchWhite,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
@@ -428,7 +428,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
         if (isLoadingMore) {
             item {
                 Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                    LoadingIndicator(color = SpfyLightGray, modifier = Modifier.size(24.dp))
+                    LoadingIndicator(color = SnepilatchLightGray, modifier = Modifier.size(24.dp))
                 }
             }
         }
@@ -439,7 +439,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                 Spacer(Modifier.height(16.dp))
                 Text(
                     stringResource(R.string.popular_releases),
-                    color = SpfyWhite,
+                    color = SnepilatchWhite,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -466,11 +466,11 @@ fun DetailScreen(vm: PlaybackViewModel) {
                                 shape = RoundedCornerShape(8.dp)
                             )
                             Spacer(Modifier.height(6.dp))
-                            Text(rel.name, color = SpfyWhite, fontSize = 13.sp, fontWeight = FontWeight.Medium,
+                            Text(rel.name, color = SnepilatchWhite, fontSize = 13.sp, fontWeight = FontWeight.Medium,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(
                                 listOfNotNull(rel.year, rel.albumType).joinToString(" · "),
-                                color = SpfyLightGray, fontSize = 11.sp, maxLines = 1
+                                color = SnepilatchLightGray, fontSize = 11.sp, maxLines = 1
                             )
                         }
                     }
@@ -484,7 +484,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                 Spacer(Modifier.height(16.dp))
                 Text(
                     stringResource(R.string.fans_also_like),
-                    color = SpfyWhite,
+                    color = SnepilatchWhite,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -512,7 +512,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                                 shape = CircleShape
                             )
                             Spacer(Modifier.height(8.dp))
-                            Text(ra.name, color = SpfyWhite, fontSize = 13.sp,
+                            Text(ra.name, color = SnepilatchWhite, fontSize = 13.sp,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                 modifier = Modifier.fillMaxWidth())
@@ -529,14 +529,14 @@ fun DetailScreen(vm: PlaybackViewModel) {
                 Spacer(Modifier.height(16.dp))
                 Text(
                     stringResource(R.string.about),
-                    color = SpfyWhite,
+                    color = SnepilatchWhite,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
                 Text(
                     bio,
-                    color = SpfyLightGray,
+                    color = SnepilatchLightGray,
                     fontSize = 14.sp,
                     maxLines = 4,
                     overflow = TextOverflow.Ellipsis,
@@ -551,7 +551,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                 Spacer(Modifier.height(16.dp))
                 Text(
                     stringResource(R.string.more_by, detail.artistName ?: stringResource(R.string.unknown)),
-                    color = SpfyWhite,
+                    color = SnepilatchWhite,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -578,11 +578,11 @@ fun DetailScreen(vm: PlaybackViewModel) {
                                 shape = RoundedCornerShape(8.dp)
                             )
                             Spacer(Modifier.height(6.dp))
-                            Text(rel.name, color = SpfyWhite, fontSize = 13.sp, fontWeight = FontWeight.Medium,
+                            Text(rel.name, color = SnepilatchWhite, fontSize = 13.sp, fontWeight = FontWeight.Medium,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(
                                 listOfNotNull(rel.year, rel.albumType).joinToString(" · "),
-                                color = SpfyLightGray, fontSize = 11.sp, maxLines = 1
+                                color = SnepilatchLightGray, fontSize = 11.sp, maxLines = 1
                             )
                         }
                     }
@@ -596,7 +596,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                 Spacer(Modifier.height(24.dp))
                 Text(
                     detail.copyright!!,
-                    color = SpfyLightGray.copy(alpha = 0.6f),
+                    color = SnepilatchLightGray.copy(alpha = 0.6f),
                     fontSize = 11.sp,
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
@@ -629,7 +629,7 @@ private fun ArtistTrackRow(
     ) {
         Text(
             "$number",
-            color = if (isPlaying) accent else SpfyLightGray,
+            color = if (isPlaying) accent else SnepilatchLightGray,
             fontSize = 15.sp,
             modifier = Modifier.width(28.dp)
         )
@@ -643,7 +643,7 @@ private fun ArtistTrackRow(
         Column(Modifier.weight(1f)) {
             Text(
                 track.name,
-                color = if (isPlaying) accent else SpfyWhite,
+                color = if (isPlaying) accent else SnepilatchWhite,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
@@ -654,13 +654,13 @@ private fun ArtistTrackRow(
                     val num = playcount.toLong()
                     String.format("%,d", num)
                 } catch (_: Exception) { playcount }
-                Text(formatted, color = SpfyLightGray, fontSize = 12.sp)
+                Text(formatted, color = SnepilatchLightGray, fontSize = 12.sp)
             }
         }
         // 3-dot menu
         var showMenu by remember { mutableStateOf(false) }
         IconButton(onClick = { showMenu = true }, modifier = Modifier.size(36.dp)) {
-            Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SpfyLightGray, modifier = Modifier.size(20.dp))
+            Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SnepilatchLightGray, modifier = Modifier.size(20.dp))
         }
         if (showMenu) {
             val sheetState = rememberBottomSheetState(
@@ -670,14 +670,14 @@ private fun ArtistTrackRow(
             ModalBottomSheet(
                 onDismissRequest = { showMenu = false },
                 sheetState = sheetState,
-                containerColor = SpfyElevated,
+                containerColor = SnepilatchElevated,
                 dragHandle = {
                     Box(
                         Modifier
                             .padding(vertical = 12.dp)
                             .width(40.dp)
                             .height(4.dp)
-                            .background(SpfyLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
+                            .background(SnepilatchLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
                     )
                 }
             ) {
@@ -690,12 +690,15 @@ private fun ArtistTrackRow(
                     SpfyImage(url = track.albumArt, modifier = Modifier.size(48.dp), shape = RoundedCornerShape(8.dp))
                     Spacer(Modifier.width(12.dp))
                     Column {
-                        Text(track.name, color = SpfyWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(track.artist, color = SpfyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                        track.name, color = SnepilatchWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                        Text(track.artist, color = SnepilatchLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 Spacer(Modifier.height(8.dp))
-                HorizontalDivider(color = SpfyLightGray.copy(alpha = 0.15f))
+                HorizontalDivider(color = SnepilatchLightGray.copy(alpha = 0.15f))
 
                 val menuContext = androidx.compose.ui.platform.LocalContext.current
                 val shareLabel = stringResource(R.string.share)
@@ -735,9 +738,9 @@ private fun ArtistTrackRow(
                             .padding(horizontal = 20.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(icon, null, tint = SpfyWhite, modifier = Modifier.size(24.dp))
+                        Icon(icon, null, tint = SnepilatchWhite, modifier = Modifier.size(24.dp))
                         Spacer(Modifier.width(16.dp))
-                        Text(label, color = SpfyWhite, fontSize = 15.sp)
+                        Text(label, color = SnepilatchWhite, fontSize = 15.sp)
                     }
                 }
                 Spacer(Modifier.navigationBarsPadding().height(12.dp))
@@ -770,7 +773,7 @@ private fun AlbumTrackRow(
         Column(Modifier.weight(1f)) {
             Text(
                 track.name,
-                color = if (isPlaying) accent else SpfyWhite,
+                color = if (isPlaying) accent else SnepilatchWhite,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
@@ -779,7 +782,7 @@ private fun AlbumTrackRow(
             if (track.artist.isNotBlank()) {
                 Text(
                     track.artist,
-                    color = SpfyLightGray,
+                    color = SnepilatchLightGray,
                     fontSize = 13.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -788,7 +791,7 @@ private fun AlbumTrackRow(
         }
         var showMenu by remember { mutableStateOf(false) }
         IconButton(onClick = { showMenu = true }, modifier = Modifier.size(36.dp)) {
-            Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SpfyLightGray, modifier = Modifier.size(20.dp))
+            Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SnepilatchLightGray, modifier = Modifier.size(20.dp))
         }
         if (showMenu) {
             val sheetState = rememberBottomSheetState(
@@ -798,14 +801,14 @@ private fun AlbumTrackRow(
             ModalBottomSheet(
                 onDismissRequest = { showMenu = false },
                 sheetState = sheetState,
-                containerColor = SpfyElevated,
+                containerColor = SnepilatchElevated,
                 dragHandle = {
                     Box(
                         Modifier
                             .padding(vertical = 12.dp)
                             .width(40.dp)
                             .height(4.dp)
-                            .background(SpfyLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
+                            .background(SnepilatchLightGray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
                     )
                 }
             ) {
@@ -817,12 +820,15 @@ private fun AlbumTrackRow(
                     SpfyImage(url = track.albumArt, modifier = Modifier.size(48.dp), shape = RoundedCornerShape(8.dp))
                     Spacer(Modifier.width(12.dp))
                     Column {
-                        Text(track.name, color = SpfyWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(track.artist, color = SpfyLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                        track.name, color = SnepilatchWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                        Text(track.artist, color = SnepilatchLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 Spacer(Modifier.height(8.dp))
-                HorizontalDivider(color = SpfyLightGray.copy(alpha = 0.15f))
+                HorizontalDivider(color = SnepilatchLightGray.copy(alpha = 0.15f))
                 val menuContext = androidx.compose.ui.platform.LocalContext.current
                 val shareLabel = stringResource(R.string.share)
                 val addQueueLabel = stringResource(R.string.add_to_queue)
@@ -860,9 +866,9 @@ private fun AlbumTrackRow(
                             .padding(horizontal = 20.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(icon, null, tint = SpfyWhite, modifier = Modifier.size(24.dp))
+                        Icon(icon, null, tint = SnepilatchWhite, modifier = Modifier.size(24.dp))
                         Spacer(Modifier.width(16.dp))
-                        Text(label, color = SpfyWhite, fontSize = 15.sp)
+                        Text(label, color = SnepilatchWhite, fontSize = 15.sp)
                     }
                 }
                 Spacer(Modifier.navigationBarsPadding().height(12.dp))

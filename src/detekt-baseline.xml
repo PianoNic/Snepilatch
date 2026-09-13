@@ -49,7 +49,7 @@
     <ID>MaximumLineLength:MusicPlaybackService.kt$MusicPlaybackService.&lt;no name provided&gt;$ </ID>
     <ID>MaximumLineLength:PlaybackViewModel.kt$PlaybackViewModel$ </ID>
     <ID>MultiLineIfElse:BottomNav.kt$Modifier</ID>
-    <ID>MultiLineIfElse:BottomNav.kt$Modifier.border(2.dp, SpfyWhite, CircleShape)</ID>
+    <ID>MultiLineIfElse:BottomNav.kt$Modifier.border(2.dp, SnepilatchWhite, CircleShape)</ID>
     <ID>MultiLineIfElse:DetailScreen.kt$String.format("%,d", detail.followers)</ID>
     <ID>MultiLineIfElse:DetailScreen.kt$String.format("%.1fM", detail.followers!! / 1_000_000.0)</ID>
     <ID>MultiLineIfElse:DetailScreen.kt$detail.followers.toString()</ID>
@@ -63,7 +63,7 @@
     <ID>MultiLineIfElse:PlaybackViewModel.kt$PlaybackViewModel$null</ID>
     <ID>MultiLineIfElse:PlaybackViewModel.kt$PlaybackViewModel$throw e</ID>
     <ID>MultiLineIfElse:ReleaseNotesScreen.kt$MaterialTheme.colorScheme.primary</ID>
-    <ID>MultiLineIfElse:ReleaseNotesScreen.kt$SpfyGray</ID>
+    <ID>MultiLineIfElse:ReleaseNotesScreen.kt$SnepilatchGray</ID>
     <ID>MultiLineIfElse:SpfyImageUrl.kt$raw</ID>
     <ID>NewLineAtEndOfFile:ExampleUnitTest.kt$ch.snepilatch.app.ExampleUnitTest.kt</ID>
     <ID>NewLineAtEndOfFile:Type.kt$ch.snepilatch.app.ui.theme.Type.kt</ID>
@@ -83,8 +83,8 @@
     <ID>VariableNaming:PlaybackViewModel.kt$PlaybackViewModel$// Playback (internal so tests can seed state without going through the // network-dependent initialize/resolve paths) internal val _playback = MutableStateFlow(PlaybackUiState())</ID>
     <ID>VariableNaming:PlaybackViewModel.kt$PlaybackViewModel$private val TAG = "PlaybackVM"</ID>
     <ID>Wrapping:AccountScreen.kt$;</ID>
-    <ID>Wrapping:AccountScreen.kt$Text( if (canvasOn) stringResource(R.string.canvas_on) else stringResource(R.string.canvas_off), color = SpfyLightGray )</ID>
-    <ID>Wrapping:AccountScreen.kt$Text( when { isChecking -&gt; stringResource(R.string.checking) upToDate -&gt; stringResource(R.string.up_to_date) else -&gt; stringResource(R.string.tap_to_check) }, color = if (upToDate) animatedPrimary else SpfyLightGray )</ID>
+    <ID>Wrapping:AccountScreen.kt$Text( if (canvasOn) stringResource(R.string.canvas_on) else stringResource(R.string.canvas_off), color = SnepilatchLightGray )</ID>
+    <ID>Wrapping:AccountScreen.kt$Text( when { isChecking -&gt; stringResource(R.string.checking) upToDate -&gt; stringResource(R.string.up_to_date) else -&gt; stringResource(R.string.tap_to_check) }, color = if (upToDate) animatedPrimary else SnepilatchLightGray )</ID>
     <ID>Wrapping:DetailScreen.kt$(</ID>
     <ID>Wrapping:DetailScreen.kt$;</ID>
     <ID>Wrapping:LibraryScreen.kt$(</ID>

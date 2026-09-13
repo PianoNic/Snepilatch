@@ -270,6 +270,9 @@ object AppSettings {
             .edit().putString("lyrics_anim_direction", direction).apply()
     }
 
+    /** The language spfy is asked for: the picked app language, or the device's when it follows the system. */
+    fun effectiveLanguage(): String = spfyLanguage(appLanguage.value, java.util.Locale.getDefault().language)
+
     fun setAppLanguage(language: String, context: Context) {
         appLanguage.value = language
         prefs(context)
@@ -365,4 +368,14 @@ object AppSettings {
         prefs(context)
             .edit().putBoolean("canvas_enabled", enabled).apply()
     }
+}
+
+/**
+ * The language tag spfy serves for an app language setting. spfy has no Swiss German, so that picks
+ * the German it does serve; "system" follows the device language.
+ */
+internal fun spfyLanguage(setting: String, systemLanguage: String): String = when (setting) {
+    "system" -> systemLanguage
+    "gsw" -> "de"
+    else -> setting
 }

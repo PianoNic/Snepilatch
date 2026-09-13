@@ -12,7 +12,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.rounded.DownloadForOffline
 import androidx.compose.material.icons.rounded.OfflinePin
-import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -24,7 +23,6 @@ import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.rounded.AddCircleOutline
-import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Radio
@@ -58,8 +56,9 @@ import ch.snepilatch.app.viewmodel.DetailRoutes
 import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import ch.snepilatch.app.logic.shared.SessionHolder
-import ch.snepilatch.app.logic.shared.shareSpfyUri
 import ch.snepilatch.app.logic.shared.shareLink
+import ch.snepilatch.app.ui.shared.trackMenuActions
+import ch.snepilatch.app.ui.shared.TrackMenuOptions
 
 /** Header actions share a footprint so save, download and the overflow menu line up. */
 private val HEADER_BUTTON = 40.dp
@@ -666,29 +665,10 @@ private fun ArtistTrackRow(
             Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SnepilatchLightGray, modifier = Modifier.size(20.dp))
         }
         if (showMenu) {
-            val menuContext = androidx.compose.ui.platform.LocalContext.current
-            val shareLabel = stringResource(R.string.share)
-            val addQueueLabel = stringResource(R.string.add_to_queue)
-            val addPlaylistLabel = stringResource(R.string.add_to_playlist)
-            val likeLabel = stringResource(R.string.like)
-            val visitAlbumLabel = stringResource(R.string.visit_album)
-            val items = listOf(
-                MenuAction(Icons.AutoMirrored.Rounded.QueueMusic, addQueueLabel) {
-                    vm.addToQueue(track.uri); showMenu = false
-                },
-                MenuAction(Icons.AutoMirrored.Rounded.PlaylistAdd, addPlaylistLabel) {
-                    showMenu = false; vm.showPlaylistPickerForTrack(track.uri)
-                },
-                MenuAction(Icons.Rounded.Favorite, likeLabel) {
-                    vm.likeSong(track.uri.removePrefix("spotify:track:")); showMenu = false
-                },
-                MenuAction(Icons.Rounded.Album, visitAlbumLabel) {
-                    showMenu = false; detailVm.openAlbumForTrack(track.uri)
-                },
-                MenuAction(Icons.Rounded.Share, shareLabel) {
-                    showMenu = false
-                    shareSpfyUri(menuContext, track.uri, shareLabel)
-                }
+            val items = trackMenuActions(
+                track, vm, detailVm,
+                close = { showMenu = false },
+                options = TrackMenuOptions(visitArtist = false),
             )
             EntityMenuSheet(
                 imageUrl = track.albumArt,
@@ -746,29 +726,10 @@ private fun AlbumTrackRow(
             Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SnepilatchLightGray, modifier = Modifier.size(20.dp))
         }
         if (showMenu) {
-            val menuContext = androidx.compose.ui.platform.LocalContext.current
-            val shareLabel = stringResource(R.string.share)
-            val addQueueLabel = stringResource(R.string.add_to_queue)
-            val addPlaylistLabel = stringResource(R.string.add_to_playlist)
-            val likeLabel = stringResource(R.string.like)
-            val visitArtistLabel = stringResource(R.string.visit_artist)
-            val items = listOf(
-                MenuAction(Icons.AutoMirrored.Rounded.QueueMusic, addQueueLabel) {
-                    vm.addToQueue(track.uri); showMenu = false
-                },
-                MenuAction(Icons.AutoMirrored.Rounded.PlaylistAdd, addPlaylistLabel) {
-                    showMenu = false; vm.showPlaylistPickerForTrack(track.uri)
-                },
-                MenuAction(Icons.Rounded.Favorite, likeLabel) {
-                    vm.likeSong(track.uri.removePrefix("spotify:track:")); showMenu = false
-                },
-                MenuAction(Icons.Rounded.Person, visitArtistLabel) {
-                    showMenu = false; detailVm.openArtistForTrack(track.uri)
-                },
-                MenuAction(Icons.Rounded.Share, shareLabel) {
-                    showMenu = false
-                    shareSpfyUri(menuContext, track.uri, shareLabel)
-                }
+            val items = trackMenuActions(
+                track, vm, detailVm,
+                close = { showMenu = false },
+                options = TrackMenuOptions(visitAlbum = false),
             )
             EntityMenuSheet(
                 imageUrl = track.albumArt,

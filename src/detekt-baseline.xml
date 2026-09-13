@@ -10,7 +10,6 @@
     <ID>CyclomaticComplexMethod:LyricsScreen.kt$@Composable fun LyricsScreen(vm: PlaybackViewModel)</ID>
     <ID>CyclomaticComplexMethod:NowPlayingScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun NowPlayingScreen( vm: PlaybackViewModel, /** When false, the screen paints no background of its own — the morphing card * in SpfyApp supplies a card-anchored background that grows with it. */ drawBackground: Boolean = true, /** Per-frame vertical drag (px, down = positive) for finger-tracked collapse; * when set, replaces the standalone swipe-down-to-dismiss. */ onMorphDrag: ((Float) -&gt; Unit)? = null, /** Drag release with vertical velocity (px/s) so the morph can settle. */ onMorphDragEnd: ((Float) -&gt; Unit)? = null )</ID>
     <ID>CyclomaticComplexMethod:PlaybackViewModel.kt$PlaybackViewModel$private suspend fun updatePlaybackFromState(state: PlayerStateData)</ID>
-    <ID>CyclomaticComplexMethod:SharedComponents.kt$@Composable fun SlidingCoverImage( url: String?, modifier: Modifier = Modifier, shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(8.dp), trackKey: Any? = url, forward: Boolean = true, onSwipePrevious: (() -&gt; Unit)? = null, onSwipeNext: (() -&gt; Unit)? = null, previousCoverUrl: String? = null, nextCoverUrl: String? = null, secondNextCoverUrl: String? = null, clipToFrame: Boolean = true, buttonSkip: Pair&lt;Int, Int&gt; = 0 to 0, )</ID>
     <ID>CyclomaticComplexMethod:SpfyApp.kt$@Composable fun SpfyApp(vm: PlaybackViewModel)</ID>
     <ID>Filename:AudioOutputDetector.kt$ch.snepilatch.app.util.AudioOutputDetector.kt</ID>
     <ID>FinalNewline:ExampleUnitTest.kt$ch.snepilatch.app.ExampleUnitTest.kt</ID>
@@ -37,12 +36,10 @@
     <ID>LongMethod:PlaybackViewModel.kt$PlaybackViewModel$private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent)</ID>
     <ID>LongMethod:PlaybackViewModel.kt$PlaybackViewModel$private suspend fun updatePlaybackFromState(state: PlayerStateData)</ID>
     <ID>LongMethod:SearchScreen.kt$@Composable fun SearchScreen(vm: PlaybackViewModel, searchVm: SearchViewModel = viewModel())</ID>
-    <ID>LongMethod:SharedComponents.kt$@Composable fun SlidingCoverImage( url: String?, modifier: Modifier = Modifier, shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(8.dp), trackKey: Any? = url, forward: Boolean = true, onSwipePrevious: (() -&gt; Unit)? = null, onSwipeNext: (() -&gt; Unit)? = null, previousCoverUrl: String? = null, nextCoverUrl: String? = null, secondNextCoverUrl: String? = null, clipToFrame: Boolean = true, buttonSkip: Pair&lt;Int, Int&gt; = 0 to 0, )</ID>
     <ID>LongMethod:SharedComponents.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun TrackRow( track: TrackInfo, vm: PlaybackViewModel, contextUri: String? = null, trackIndex: Int? = null, onRemoveFromPlaylist: (() -&gt; Unit)? = null )</ID>
     <ID>LongMethod:SpfyApp.kt$@Composable fun SpfyApp(vm: PlaybackViewModel)</ID>
     <ID>LongMethod:UpdateDialog.kt$@Composable fun UpdateDialog( updateInfo: UpdateInfo, onDismiss: () -&gt; Unit )</ID>
     <ID>LongParameterList:MusicPlaybackService.kt$MusicPlaybackService$( url: String, title: String, artist: String, albumArtUrl: String?, startPlaying: Boolean = true, headers: Map&lt;String, String&gt; = emptyMap(), startPositionMs: Long = 0L, cacheKey: String? = null )</ID>
-    <ID>LongParameterList:SharedComponents.kt$( url: String?, modifier: Modifier = Modifier, shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(8.dp), trackKey: Any? = url, forward: Boolean = true, onSwipePrevious: (() -&gt; Unit)? = null, onSwipeNext: (() -&gt; Unit)? = null, previousCoverUrl: String? = null, nextCoverUrl: String? = null, secondNextCoverUrl: String? = null, clipToFrame: Boolean = true, buttonSkip: Pair&lt;Int, Int&gt; = 0 to 0, )</ID>
     <ID>LoopWithTooManyJumpStatements:LyricsScreen.kt$for</ID>
     <ID>MatchingDeclarationName:AudioOutputDetector.kt$AudioOutput</ID>
     <ID>MatchingDeclarationName:ReleaseNotesScreen.kt$ReleaseNote</ID>

@@ -6,12 +6,8 @@ import ch.snepilatch.app.R
 import ch.snepilatch.app.download.DownloadQueue
 import ch.snepilatch.app.download.Downloads
 import ch.snepilatch.app.ui.theme.SpfyWhite
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -47,23 +43,16 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.DialogWindowProvider
 import android.os.Build
-import androidx.core.graphics.drawable.toBitmap
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
@@ -71,9 +60,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -89,9 +76,7 @@ import ch.snepilatch.app.viewmodel.ThemeController
 import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import coil.compose.AsyncImage
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 /**
  * Match the app's transparent, edge-to-edge nav bar inside a ModalBottomSheet. The sheet
@@ -518,190 +503,4 @@ fun ProfileInfoItem(label: String, value: String, icon: ImageVector) {
         leadingContent = { Icon(icon, null, tint = SpfyLightGray) },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     )
-}
-
-/**
- * Three covers share one offset, keeping their spacing fixed throughout a drag and track change.
- */
-@Composable
-fun SlidingCoverImage(
-    url: String?,
-    modifier: Modifier = Modifier,
-    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(8.dp),
-    trackKey: Any? = url,
-    forward: Boolean = true,
-    onSwipePrevious: (() -> Unit)? = null,
-    onSwipeNext: (() -> Unit)? = null,
-    previousCoverUrl: String? = null,
-    nextCoverUrl: String? = null,
-    secondNextCoverUrl: String? = null,
-    clipToFrame: Boolean = true,
-    buttonSkip: Pair<Int, Int> = 0 to 0,
-) {
-    val scope = rememberCoroutineScope()
-    val offset = remember { Animatable(0f) }
-    val gap = with(androidx.compose.ui.platform.LocalDensity.current) { 32.dp.toPx() }
-    var width by remember { mutableFloatStateOf(0f) }
-    var dragOffset by remember { mutableFloatStateOf(0f) }
-    var dragging by remember { mutableStateOf(false) }
-    var swipeDirection by remember { mutableIntStateOf(0) }
-    var settleJob by remember { mutableStateOf<Job?>(null) }
-    var currentKey by remember { mutableStateOf(trackKey) }
-    var currentUrl by remember { mutableStateOf(url) }
-    var leftUrl by remember { mutableStateOf(previousCoverUrl) }
-    var rightUrl by remember { mutableStateOf(nextCoverUrl) }
-    val previousAction by androidx.compose.runtime.rememberUpdatedState(onSwipePrevious)
-    val nextAction by androidx.compose.runtime.rememberUpdatedState(onSwipeNext)
-    val latestPrevious by androidx.compose.runtime.rememberUpdatedState(previousCoverUrl)
-    val latestNext by androidx.compose.runtime.rememberUpdatedState(nextCoverUrl)
-    val context = androidx.compose.ui.platform.LocalContext.current
-    var loadedCovers by remember { mutableStateOf(emptyMap<String, BitmapPainter>()) }
-    val coverUrls = listOfNotNull(
-        url, previousCoverUrl, nextCoverUrl, secondNextCoverUrl, leftUrl, currentUrl, rightUrl
-    ).filter { it.isNotBlank() }.distinct()
-    LaunchedEffect(coverUrls, width) {
-        if (width <= 0f) return@LaunchedEffect
-        loadedCovers = loadedCovers.filterKeys { it in coverUrls }
-        coverUrls.filterNot { it in loadedCovers }.forEach { cover ->
-            launch {
-                val painter = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    val result = coil.Coil.imageLoader(context).execute(
-                        coil.request.ImageRequest.Builder(context)
-                            .data(cover).size(width.toInt()).allowHardware(false).build()
-                    )
-                    (result as? coil.request.SuccessResult)?.drawable?.let {
-                        BitmapPainter(it.toBitmap().asImageBitmap())
-                    }
-                }
-                if (painter != null) loadedCovers = loadedCovers + (cover to painter)
-            }
-        }
-    }
-
-    LaunchedEffect(buttonSkip) {
-        if (buttonSkip.first == 0) return@LaunchedEffect
-        settleJob?.cancel()
-        leftUrl = latestPrevious
-        rightUrl = latestNext
-        dragging = false
-        swipeDirection = buttonSkip.second
-        settleJob = scope.launch {
-            offset.animateTo(buttonSkip.second * (width + gap), tween(220))
-            delay(1000)
-            swipeDirection = 0
-            offset.animateTo(0f, tween(160))
-        }
-    }
-
-    LaunchedEffect(trackKey) {
-        if (trackKey == currentKey) return@LaunchedEffect
-        val direction = swipeDirection
-        val oldUrl = currentUrl
-        val oldOffset = if (dragging) dragOffset else offset.value
-        settleJob?.cancel()
-        val movement = if (direction != 0) direction else if (forward) -1 else 1
-        val incomingUrl = if (movement < 0) rightUrl else leftUrl
-        // Move the strip and replace its contents together, before the next frame.
-        offset.snapTo((if (direction != 0) oldOffset else 0f) - movement * (width + gap))
-        dragging = false
-        swipeDirection = 0
-        currentKey = trackKey
-        currentUrl = url?.takeIf { it in loadedCovers }
-            ?: incomingUrl?.takeIf { it in loadedCovers } ?: url
-        leftUrl = if (movement < 0) oldUrl else previousCoverUrl
-        rightUrl = if (movement > 0) oldUrl else nextCoverUrl
-        settleJob = scope.launch {
-            offset.animateTo(0f, tween(if (direction != 0) 160 else 220))
-        }
-    }
-    LaunchedEffect(url, loadedCovers[url]) {
-        if (trackKey == currentKey && url in loadedCovers) currentUrl = url
-    }
-    LaunchedEffect(previousCoverUrl, nextCoverUrl, currentKey, dragging, swipeDirection) {
-        if (!dragging && swipeDirection == 0) {
-            settleJob?.join()
-            leftUrl = previousCoverUrl
-            rightUrl = nextCoverUrl
-        }
-    }
-
-    Box(
-        modifier
-            .onSizeChanged { width = it.width.toFloat() }
-            .then(if (clipToFrame) Modifier.clip(shape) else Modifier)
-            .pointerInput(gap) {
-                val tracker = androidx.compose.ui.input.pointer.util.VelocityTracker()
-                detectHorizontalDragGestures(
-                    onDragStart = {
-                        tracker.resetTracking()
-                        settleJob?.cancel()
-                        swipeDirection = 0
-                        if (offset.value == 0f) {
-                            leftUrl = latestPrevious
-                            rightUrl = latestNext
-                        }
-                        dragOffset = offset.value
-                        dragging = true
-                    },
-                    onHorizontalDrag = { change, amount ->
-                        tracker.addPosition(change.uptimeMillis, change.position)
-                        change.consume()
-                        dragOffset = (dragOffset + amount)
-                            .coerceIn(-size.width - gap, size.width + gap)
-                    },
-                    onDragEnd = {
-                        val release = dragOffset
-                        val velocity = tracker.calculateVelocity().x
-                        val direction = when {
-                            velocity > 700f -> 1
-                            velocity < -700f -> -1
-                            release > size.width * 0.15f -> 1
-                            release < -size.width * 0.15f -> -1
-                            else -> 0
-                        }
-                        settleJob = scope.launch {
-                            offset.snapTo(release)
-                            dragging = false
-                            if (direction == 0) {
-                                offset.animateTo(0f, spring(stiffness = 600f))
-                            } else {
-                                swipeDirection = direction
-                                if (direction > 0) previousAction?.invoke() else nextAction?.invoke()
-                                offset.animateTo(direction * (size.width + gap), tween(160))
-                                delay(250)
-                                if (swipeDirection == direction) {
-                                    swipeDirection = 0
-                                    offset.animateTo(0f, spring(stiffness = 600f))
-                                }
-                            }
-                        }
-                    },
-                    onDragCancel = {
-                        val release = dragOffset
-                        settleJob = scope.launch {
-                            offset.snapTo(release)
-                            dragging = false
-                            offset.animateTo(0f, spring(stiffness = 600f))
-                        }
-                    }
-                )
-            }
-    ) {
-        val covers = listOf(leftUrl, currentUrl, rightUrl)
-        covers.forEachIndexed { index, cover ->
-            androidx.compose.foundation.Image(
-                painter = loadedCovers[cover] ?: androidx.compose.ui.graphics.painter.ColorPainter(SpfyGray),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .matchParentSize()
-                    .graphicsLayer {
-                        translationX = (if (dragging) dragOffset else offset.value) +
-                            (index - 1) * (size.width + gap)
-                    }
-                    .clip(shape)
-                    .background(SpfyGray),
-            )
-        }
-    }
 }

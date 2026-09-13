@@ -46,6 +46,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import ch.snepilatch.app.ui.components.CoverNeighbours
+import ch.snepilatch.app.ui.components.CoverTrack
+import ch.snepilatch.app.ui.components.SlidingCoverImage
 import ch.snepilatch.app.ui.components.SheetNavBarFix
 import ch.snepilatch.app.ui.components.SpfyImage
 import ch.snepilatch.app.ui.components.TightAlertDialog
@@ -449,20 +452,15 @@ fun NowPlayingScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        ch.snepilatch.app.ui.components.SlidingCoverImage(
+                        SlidingCoverImage(
                             url = displayArtUrl,
                             modifier = Modifier
                                 .fillMaxHeight(0.85f)
                                 .aspectRatio(1f),
+                            track = CoverTrack(track?.uri, forward = !skippedBack, buttonSkip = buttonSkip),
                             shape = RoundedCornerShape(16.dp),
-                            trackKey = track?.uri,
-                            buttonSkip = buttonSkip,
-                            forward = !skippedBack,
-                            onSwipePrevious = { vm.skipPrevious(forceTrackChange = true) },
-                            onSwipeNext = { vm.skipNext() },
-                            previousCoverUrl = previousPreview?.albumArt,
-                            nextCoverUrl = nextPreview?.albumArt,
-                            secondNextCoverUrl = secondNextPreview?.albumArt,
+                            neighbours = CoverNeighbours(previousPreview?.albumArt, nextPreview?.albumArt, secondNextPreview?.albumArt),
+                            onSwipe = { if (it > 0) vm.skipPrevious(forceTrackChange = true) else vm.skipNext() },
                         )
                     }
 
@@ -705,21 +703,16 @@ fun NowPlayingScreen(
                     Spacer(Modifier.weight(0.3f))
 
                     // Keep the cover-sized swipe target over Canvas while leaving the video visible.
-                    ch.snepilatch.app.ui.components.SlidingCoverImage(
+                    SlidingCoverImage(
                         url = displayArtUrl,
                         modifier = Modifier
                             .fillMaxWidth()
                             .aspectRatio(1f)
                             .graphicsLayer { alpha = if (hasCanvas) 0f else 1f },
+                        track = CoverTrack(track?.uri, forward = !skippedBack, buttonSkip = buttonSkip),
                         shape = RoundedCornerShape(16.dp),
-                        trackKey = track?.uri,
-                        buttonSkip = buttonSkip,
-                        forward = !skippedBack,
-                        onSwipePrevious = { vm.skipPrevious(forceTrackChange = true) },
-                        onSwipeNext = { vm.skipNext() },
-                        previousCoverUrl = previousPreview?.albumArt,
-                        nextCoverUrl = nextPreview?.albumArt,
-                        secondNextCoverUrl = secondNextPreview?.albumArt,
+                        neighbours = CoverNeighbours(previousPreview?.albumArt, nextPreview?.albumArt, secondNextPreview?.albumArt),
+                        onSwipe = { if (it > 0) vm.skipPrevious(forceTrackChange = true) else vm.skipNext() },
                         clipToFrame = false,
                     )
 

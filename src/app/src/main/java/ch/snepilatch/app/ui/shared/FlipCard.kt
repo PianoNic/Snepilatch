@@ -78,7 +78,7 @@ fun FlipCard(
             var target = ceil((angle - rest) / FULL_TURN) * FULL_TURN + rest
             if (target - angle > FULL_TURN - MAX_BACKTRACK) target -= FULL_TURN
             // Underdamped on purpose: the card overshoots its side a little and springs back to lock in.
-            animate(angle, target, velocity, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow)) { value, _ -> angle = value }
+            animate(angle, target, velocity, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium)) { value, _ -> angle = value }
             velocity = 0f
         } finally {
             turning = false
@@ -130,8 +130,8 @@ private const val KICK_RAMP_S = 0.12f
 /** How fast the spin bleeds off: the velocity falls to a third about every third of a second. */
 private const val FRICTION_PER_S = 3f
 
-/** Below this the card stops coasting and eases onto its resting side. */
-private const val SETTLE_DEG_PER_S = 90f
+/** Below this the card stops coasting and the spring takes it the rest of the way, while it still has speed to snap in with. */
+private const val SETTLE_DEG_PER_S = 180f
 
 /** A frame after a long stall is treated as this long, so the card does not jump a whole turn. */
 private const val MAX_FRAME_S = 0.05f

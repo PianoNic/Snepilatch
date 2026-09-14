@@ -357,6 +357,10 @@ private fun LyricLine(
             )
             .padding(vertical = if (wholeLine) 8.dp else 4.dp)
             .graphicsLayer {
+                // Modulated, not composited: a layer below full alpha would render offscreen and clip
+                // the glow and blur halo at the row edge while the row fades, and cost a buffer per
+                // row while scrolling (#825).
+                compositingStrategy = CompositingStrategy.ModulateAlpha
                 this.alpha = alpha
                 scaleX = scale
                 scaleY = scale
@@ -655,6 +659,7 @@ private fun DotsRow(item: DotsItem, smoothPosition: State<Long>, fontSize: TextU
             .graphicsLayer {
                 scaleX = groupScale
                 scaleY = groupScale
+                compositingStrategy = CompositingStrategy.ModulateAlpha
                 alpha = unfolded
                 transformOrigin = TransformOrigin.Center
             },

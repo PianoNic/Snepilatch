@@ -45,8 +45,11 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.draw.clip
 import ch.snepilatch.app.ui.shared.CoverNeighbours
 import ch.snepilatch.app.ui.shared.CoverTrack
+import ch.snepilatch.app.ui.shared.FlipCard
 import ch.snepilatch.app.ui.shared.SlidingCoverImage
 import ch.snepilatch.app.ui.shared.InfiniPlayTimeline
 import ch.snepilatch.app.ui.shared.rememberSmoothPositionMs
@@ -396,6 +399,8 @@ fun NowPlayingScreen(
     val displayTitle = track?.name ?: stringResource(R.string.now_playing_not_playing)
     val displayArtist = track?.artist ?: ""
     val displayArtUrl: String? = track?.albumArt
+    // The cover turned over to its lyrics side (#817); kept across rotations, not across app restarts.
+    var coverFlipped by rememberSaveable { mutableStateOf(false) }
     val streamLoading by vm.isStreamLoading.collectAsState()
     // Spinner spans the whole ad skip: isAd covers the ad dwell, streamLoading the post-ad resolve.
     val spinnerActive = streamLoading || isAd
@@ -455,16 +460,23 @@ fun NowPlayingScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        SlidingCoverImage(
-                            url = displayArtUrl,
+                        FlipCard(
+                            flipped = coverFlipped,
+                            onTap = { coverFlipped = !coverFlipped },
                             modifier = Modifier
                                 .fillMaxHeight(0.85f)
                                 .aspectRatio(1f),
-                            track = CoverTrack(track?.uri, forward = !skippedBack, buttonSkip = buttonSkip),
-                            shape = RoundedCornerShape(16.dp),
-                            neighbours = CoverNeighbours(previousPreview?.albumArt, nextPreview?.albumArt, secondNextPreview?.albumArt),
-                            onSwipe = { if (it > 0) vm.skipPrevious(forceTrackChange = true) else vm.skipNext() },
-                        )
+                            back = { CoverLyrics(vm, Modifier.clip(RoundedCornerShape(16.dp))) },
+                        ) {
+                            SlidingCoverImage(
+                                url = displayArtUrl,
+                                modifier = Modifier.fillMaxSize(),
+                                track = CoverTrack(track?.uri, forward = !skippedBack, buttonSkip = buttonSkip),
+                                shape = RoundedCornerShape(16.dp),
+                                neighbours = CoverNeighbours(previousPreview?.albumArt, nextPreview?.albumArt, secondNextPreview?.albumArt),
+                                onSwipe = { if (it > 0) vm.skipPrevious(forceTrackChange = true) else vm.skipNext() },
+                            )
+                        }
                     }
 
                     Spacer(Modifier.width(16.dp))
@@ -687,18 +699,26 @@ fun NowPlayingScreen(
                     Spacer(Modifier.weight(0.3f))
 
                     // Keep the cover-sized swipe target over Canvas while leaving the video visible.
-                    SlidingCoverImage(
-                        url = displayArtUrl,
+                    FlipCard(
+                        flipped = coverFlipped,
+                        onTap = { coverFlipped = !coverFlipped },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .aspectRatio(1f)
-                            .graphicsLayer { alpha = if (hasCanvas) 0f else 1f },
-                        track = CoverTrack(track?.uri, forward = !skippedBack, buttonSkip = buttonSkip),
-                        shape = RoundedCornerShape(16.dp),
-                        neighbours = CoverNeighbours(previousPreview?.albumArt, nextPreview?.albumArt, secondNextPreview?.albumArt),
-                        onSwipe = { if (it > 0) vm.skipPrevious(forceTrackChange = true) else vm.skipNext() },
-                        clipToFrame = false,
-                    )
+                            .aspectRatio(1f),
+                        back = { CoverLyrics(vm, Modifier.clip(RoundedCornerShape(16.dp))) },
+                    ) {
+                        SlidingCoverImage(
+                            url = displayArtUrl,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer { alpha = if (hasCanvas) 0f else 1f },
+                            track = CoverTrack(track?.uri, forward = !skippedBack, buttonSkip = buttonSkip),
+                            shape = RoundedCornerShape(16.dp),
+                            neighbours = CoverNeighbours(previousPreview?.albumArt, nextPreview?.albumArt, secondNextPreview?.albumArt),
+                            onSwipe = { if (it > 0) vm.skipPrevious(forceTrackChange = true) else vm.skipNext() },
+                            clipToFrame = false,
+                        )
+                    }
 
                     Spacer(Modifier.height(32.dp))
 

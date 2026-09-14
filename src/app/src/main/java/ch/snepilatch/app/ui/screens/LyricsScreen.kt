@@ -30,6 +30,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.shared.SpfyImage
+import ch.snepilatch.app.ui.shared.rememberSmoothPosition
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.viewmodel.LyricsViewModel
@@ -89,39 +90,9 @@ fun LyricsScreen(vm: PlaybackViewModel) {
         track?.let { lyricsVm.fetch(it) }
     }
 
-    // Smooth position interpolation:
-    // We remember the wall-clock time when the ViewModel last gave us a position,
-    // then each frame we compute: lastKnownPos + (now - lastKnownWallClock)
-    val smoothPosition = remember { mutableLongStateOf(vm.positionFlow.value) }
-    val lastKnownPos = remember { mutableLongStateOf(vm.positionFlow.value) }
-    val lastKnownWallClock = remember { mutableLongStateOf(System.currentTimeMillis()) }
-    val isPlaying = isPlayingRaw && !isPaused
-
-    // Re-anchor whenever an authoritative position arrives. Collecting the flow inside the coroutine
-    // (instead of keying a LaunchedEffect on a composition read) keeps the 2Hz ticks from recomposing
-    // the whole lyrics scaffold — only smoothPosition mutates, which only the lyric leaves read.
-    LaunchedEffect(Unit) {
-        vm.positionFlow.collect { pos ->
-            lastKnownPos.longValue = pos
-            lastKnownWallClock.longValue = System.currentTimeMillis()
-            smoothPosition.longValue = pos
-        }
-    }
-
-    // Only LINE/SYLLABLE-synced lyrics drive a per-frame karaoke reveal; unsynced/loading/no-lyrics
-    // tracks don't need the frame loop at all (the coarse anchor effect above already tracks position).
+    // Only synced lyrics need the per-frame clock; unsynced, loading and missing ones follow the coarse position.
     val syncedReveal = lyrics?.syncType == "LINE_SYNCED" || lyrics?.syncType == "SYLLABLE_SYNCED"
-
-    // Each frame, compute interpolated position from anchor — but only when a synced reveal needs it.
-    LaunchedEffect(isPlaying, syncedReveal) {
-        if (!isPlaying || !syncedReveal) return@LaunchedEffect
-        while (true) {
-            withFrameNanos { }
-            val elapsed = System.currentTimeMillis() - lastKnownWallClock.longValue
-            val interpolated = lastKnownPos.longValue + elapsed
-            smoothPosition.longValue = interpolated.coerceAtMost(vm.durationFlow.value.coerceAtLeast(1))
-        }
-    }
+    val smoothPosition = rememberSmoothPosition(vm, active = isPlayingRaw && !isPaused && syncedReveal)
 
     Box(Modifier.fillMaxSize()) {
         track?.albumArt?.let { artUrl ->

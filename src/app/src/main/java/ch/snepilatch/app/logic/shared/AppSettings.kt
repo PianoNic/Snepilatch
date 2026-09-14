@@ -95,6 +95,8 @@ object AppSettings {
 
     // Action assigned to the button beside the full-screen player's track details.
     val playerShortcut = MutableStateFlow(PlayerShortcut.LIKE)
+    val swipeLeftAction = MutableStateFlow(PlayerShortcut.ADD_TO_QUEUE)
+    val swipeRightAction = MutableStateFlow(PlayerShortcut.ADD_TO_PLAYLIST)
 
     // How the equalizer is handled. One choice, because the options exclude each other: the in-app EQ
     // computes its own input gain from the curve, while the headroom attenuation exists only to give an
@@ -163,6 +165,12 @@ object AppSettings {
         eqBands.value = parseBands(prefs.getString("eq_bands", null))
         playerGradientBg.value = prefs.getBoolean("player_gradient_bg", false)
         playerShortcut.value = PlayerShortcut.fromId(prefs.getString("player_shortcut", null))
+        swipeLeftAction.value = PlayerShortcut.fromId(
+            prefs.getString("swipe_left_action", null), PlayerShortcut.ADD_TO_QUEUE
+        )
+        swipeRightAction.value = PlayerShortcut.fromId(
+            prefs.getString("swipe_right_action", null), PlayerShortcut.ADD_TO_PLAYLIST
+        )
         contentRegion.value = prefs.getString("content_region", "nearest") ?: "nearest"
         updateChannel.value = prefs.getString("update_channel", CHANNEL_STABLE) ?: CHANNEL_STABLE
         lokiEndpoint.value = prefs.getString("loki_endpoint", "") ?: ""
@@ -315,6 +323,16 @@ object AppSettings {
     fun setPlayerShortcut(shortcut: PlayerShortcut, context: Context) {
         playerShortcut.value = shortcut
         prefs(context).edit().putString("player_shortcut", shortcut.id).apply()
+    }
+
+    fun setSwipeLeftAction(action: PlayerShortcut, context: Context) {
+        swipeLeftAction.value = action
+        prefs(context).edit().putString("swipe_left_action", action.id).apply()
+    }
+
+    fun setSwipeRightAction(action: PlayerShortcut, context: Context) {
+        swipeRightAction.value = action
+        prefs(context).edit().putString("swipe_right_action", action.id).apply()
     }
 
     /**

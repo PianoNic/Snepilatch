@@ -16,6 +16,7 @@ enum class PlayerShortcut(val id: String, val requiresTrack: Boolean = true) {
     ;
 
     companion object {
-        fun fromId(id: String?): PlayerShortcut = entries.firstOrNull { it.id == id } ?: LIKE
+        fun fromId(id: String?, fallback: PlayerShortcut = LIKE): PlayerShortcut =
+            entries.firstOrNull { it.id == id } ?: fallback
     }
 }

@@ -77,6 +77,9 @@
     <string name="lyrics_horizontal">Слева направо</string>
     <string name="player_shortcut">Кнопка плеера</string>
     <string name="player_shortcut_desc">Выберите кнопку рядом с меню плеера</string>
+    <string name="swipe_left_action">Свайп влево</string>
+    <string name="swipe_right_action">Свайп вправо</string>
+    <string name="swipe_action_desc">Выберите действие для этого направления свайпа</string>
     <string name="notification_left_button">Левая кнопка уведомления</string>
     <string name="notification_right_button">Правая кнопка уведомления</string>
     <string name="notif_like">Нравится</string>

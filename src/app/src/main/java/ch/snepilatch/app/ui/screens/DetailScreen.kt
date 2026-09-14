@@ -59,6 +59,7 @@ import ch.snepilatch.app.logic.shared.SessionHolder
 import ch.snepilatch.app.logic.shared.shareLink
 import ch.snepilatch.app.ui.shared.trackMenuActions
 import ch.snepilatch.app.ui.shared.TrackMenuOptions
+import ch.snepilatch.app.ui.shared.SwipeableTrackRow
 import ch.snepilatch.app.logic.shared.spfyId
 
 /** Header actions share a footprint so save, download and the overflow menu line up. */
@@ -623,13 +624,14 @@ private fun ArtistTrackRow(
     val theme by ThemeController.themeColors.collectAsState()
     val accent = theme.primary
 
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable { vm.playTrack(track, contextUri, number - 1) }
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    SwipeableTrackRow(track, vm) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable { vm.playTrack(track, contextUri, number - 1) }
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
         Text(
             "$number",
             color = if (isPlaying) accent else SnepilatchLightGray,
@@ -679,6 +681,7 @@ private fun ArtistTrackRow(
                 onDismiss = { showMenu = false },
             )
         }
+        }
     }
 }
 
@@ -696,13 +699,14 @@ private fun AlbumTrackRow(
     val theme by ThemeController.themeColors.collectAsState()
     val accent = theme.primary
 
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable { vm.playTrack(track, contextUri, trackIndex) }
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    SwipeableTrackRow(track, vm) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable { vm.playTrack(track, contextUri, trackIndex) }
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
         Column(Modifier.weight(1f)) {
             Text(
                 track.name,
@@ -739,6 +743,7 @@ private fun AlbumTrackRow(
                 actions = items,
                 onDismiss = { showMenu = false },
             )
+        }
         }
     }
 }

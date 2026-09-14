@@ -77,7 +77,8 @@ fun FlipCard(
             // those few degrees rather than crawl a whole extra turn to the one after.
             var target = ceil((angle - rest) / FULL_TURN) * FULL_TURN + rest
             if (target - angle > FULL_TURN - MAX_BACKTRACK) target -= FULL_TURN
-            animate(angle, target, velocity, spring(Spring.DampingRatioNoBouncy, Spring.StiffnessMediumLow)) { value, _ -> angle = value }
+            // Underdamped on purpose: the card overshoots its side a little and springs back to lock in.
+            animate(angle, target, velocity, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow)) { value, _ -> angle = value }
             velocity = 0f
         } finally {
             turning = false

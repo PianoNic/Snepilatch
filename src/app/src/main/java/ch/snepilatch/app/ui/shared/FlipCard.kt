@@ -1,8 +1,8 @@
 package ch.snepilatch.app.ui.shared
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -38,16 +38,19 @@ fun FlipCard(
     LaunchedEffect(flipped) {
         if ((halfTurns % 2 == 1) != flipped) halfTurns++
     }
-    val rotation by animateFloatAsState(
-        targetValue = halfTurns * HALF_TURN,
-        animationSpec = tween(FLIP_MS, easing = FastOutSlowInEasing),
-        label = "flip",
-    )
+    // A spring rather than a tween: a tap mid-turn re-targets it without dropping the velocity it
+    // has, so quick taps stack up half turns and the card spins faster the further it falls behind
+    // its target, instead of stalling at every tap (#830).
+    val spin = remember { Animatable(halfTurns * HALF_TURN) }
+    LaunchedEffect(halfTurns) {
+        spin.animateTo(halfTurns * HALF_TURN, spring(Spring.DampingRatioNoBouncy, FLIP_STIFFNESS))
+    }
+    val rotation = spin.value
     val angle = rotation % FULL_TURN
     val showingBack = angle > HALF_TURN / 2 && angle < HALF_TURN * 1.5f
     // While turning, the side about to appear is composed early and kept invisible, so its first
     // layout and image decode are paid before the edge, not in the frame it shows.
-    val turning = rotation != halfTurns * HALF_TURN
+    val turning = spin.isRunning
     val turningToBack = halfTurns % 2 == 1
     val composeFront = !showingBack || (turning && !turningToBack)
     val composeBack = showingBack || (turning && turningToBack)
@@ -79,7 +82,8 @@ fun FlipCard(
 private const val FULL_TURN = 360f
 
 private const val HALF_TURN = 180f
-private const val FLIP_MS = 600
+/** Firm enough to finish a single turn in well under a second, soft enough to keep momentum across taps. */
+private const val FLIP_STIFFNESS = Spring.StiffnessMediumLow
 
 /** How far the camera sits from the card in dp; further means less perspective distortion mid-turn. */
 private const val CAMERA_DISTANCE_DP = 12f

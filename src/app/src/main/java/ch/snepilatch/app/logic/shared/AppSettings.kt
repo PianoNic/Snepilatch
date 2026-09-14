@@ -1,6 +1,7 @@
 package ch.snepilatch.app.logic.shared
 
 import android.content.Context
+import ch.snepilatch.app.data.PlayerShortcut
 import ch.snepilatch.app.logic.playback.MusicPlaybackService
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * `canvasUrl` is NOT here — it's the current track's video URL (playback-derived, not persisted), so
  * it stays on [PlaybackViewModel]; `setCanvasEnabled` there wraps [setCanvasEnabled] to also clear it.
  */
+@Suppress("TooManyFunctions")
 object AppSettings {
 
     const val PREFS = "kotify_prefs"
@@ -92,6 +94,9 @@ object AppSettings {
     // Canvas background toggle (the URL itself is playback state on PlaybackViewModel).
     val canvasEnabled = MutableStateFlow(false)
 
+    // Action assigned to the button beside the full-screen player's track details.
+    val playerShortcut = MutableStateFlow(PlayerShortcut.LIKE)
+
     // How the equalizer is handled. One choice, because the options exclude each other: the in-app EQ
     // computes its own input gain from the curve, while the headroom attenuation exists only to give an
     // EXTERNAL equalizer (Wavelet & co.) room to boost into. Running both would attenuate twice.
@@ -158,6 +163,7 @@ object AppSettings {
         eqMode.value = prefs.getString("eq_mode", null) ?: migratedEqMode(prefs)
         eqBands.value = parseBands(prefs.getString("eq_bands", null))
         playerGradientBg.value = prefs.getBoolean("player_gradient_bg", false)
+        playerShortcut.value = PlayerShortcut.fromId(prefs.getString("player_shortcut", null))
         contentRegion.value = prefs.getString("content_region", "nearest") ?: "nearest"
         updateChannel.value = prefs.getString("update_channel", CHANNEL_STABLE) ?: CHANNEL_STABLE
         lokiEndpoint.value = prefs.getString("loki_endpoint", "") ?: ""
@@ -313,6 +319,11 @@ object AppSettings {
         playerGradientBg.value = enabled
         prefs(context)
             .edit().putBoolean("player_gradient_bg", enabled).apply()
+    }
+
+    fun setPlayerShortcut(shortcut: PlayerShortcut, context: Context) {
+        playerShortcut.value = shortcut
+        prefs(context).edit().putString("player_shortcut", shortcut.id).apply()
     }
 
     /**

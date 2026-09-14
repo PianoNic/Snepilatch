@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronRight
@@ -90,7 +91,12 @@ fun SettingsSectionHeader(title: String) {
     )
 }
 
-data class RadioOption(val value: String, val label: String, val supportingText: String? = null)
+data class RadioOption(
+    val value: String,
+    val label: String,
+    val supportingText: String? = null,
+    val icon: ImageVector? = null,
+)
 
 /** Single radio-select settings dialog shared by the Account and Appearance pickers. */
 @Composable
@@ -124,6 +130,10 @@ fun RadioPickerDialog(
                             onClick = { onSelect(opt.value) },
                         )
                         Spacer(Modifier.width(8.dp))
+                        opt.icon?.let {
+                            Icon(it, null, tint = SnepilatchWhite, modifier = Modifier.size(24.dp))
+                            Spacer(Modifier.width(12.dp))
+                        }
                         if (opt.supportingText != null) {
                             Column {
                                 Text(opt.label, color = SnepilatchWhite, fontSize = 15.sp)

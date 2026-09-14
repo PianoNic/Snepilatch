@@ -75,6 +75,8 @@
     <string name="lyrics_anim_desc">Wähle die Animation für zeilenweise Lyrics.</string>
     <string name="lyrics_vertical">Von oben nach unten</string>
     <string name="lyrics_horizontal">Von links nach rechts</string>
+    <string name="player_shortcut">Player-Taste</string>
+    <string name="player_shortcut_desc">Wähle die Taste neben dem Player-Menü</string>
     <string name="notification_left_button">Benachrichtigung linke Taste</string>
     <string name="notification_right_button">Benachrichtigung rechte Taste</string>
     <string name="notif_like">Gefällt mir</string>

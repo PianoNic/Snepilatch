@@ -75,6 +75,8 @@
     <string name="lyrics_anim_desc">Выберите анимацию для построчного текста.</string>
     <string name="lyrics_vertical">Сверху вниз</string>
     <string name="lyrics_horizontal">Слева направо</string>
+    <string name="player_shortcut">Кнопка плеера</string>
+    <string name="player_shortcut_desc">Выберите кнопку рядом с меню плеера</string>
     <string name="notification_left_button">Левая кнопка уведомления</string>
     <string name="notification_right_button">Правая кнопка уведомления</string>
     <string name="notif_like">Нравится</string>

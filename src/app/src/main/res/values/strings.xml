@@ -80,6 +80,8 @@
     <string name="lyrics_anim_desc">Choose how line-synced lyrics animate.</string>
     <string name="lyrics_vertical">Top to Bottom</string>
     <string name="lyrics_horizontal">Left to Right</string>
+    <string name="player_shortcut">Player button</string>
+    <string name="player_shortcut_desc">Choose the button beside the player menu</string>
     <string name="notification_left_button">Notification Left Button</string>
     <string name="notification_right_button">Notification Right Button</string>
     <string name="notif_like">Like / Unlike</string>

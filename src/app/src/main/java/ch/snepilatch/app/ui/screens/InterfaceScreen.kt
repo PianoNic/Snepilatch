@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
+import ch.snepilatch.app.data.PlayerShortcut
 import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.ui.shared.RadioOption
@@ -132,6 +133,30 @@ private fun BehaviorSection(context: Context) {
                 showLyricsPicker = false
             },
             onDismiss = { showLyricsPicker = false }
+        )
+    }
+
+    val playerShortcut by AppSettings.playerShortcut.collectAsState()
+    var showPlayerShortcutPicker by remember { mutableStateOf(false) }
+    SettingRow(
+        title = stringResource(R.string.player_shortcut),
+        subtitle = stringResource(playerShortcut.titleRes),
+        icon = Icons.Rounded.TouchApp,
+        onClick = { showPlayerShortcutPicker = true },
+    )
+    if (showPlayerShortcutPicker) {
+        RadioPickerDialog(
+            title = stringResource(R.string.player_shortcut),
+            description = stringResource(R.string.player_shortcut_desc),
+            options = PlayerShortcut.entries.map {
+                RadioOption(it.id, stringResource(it.titleRes), icon = playerShortcutIcon(it))
+            },
+            selected = playerShortcut.id,
+            onSelect = {
+                AppSettings.setPlayerShortcut(PlayerShortcut.fromId(it), context)
+                showPlayerShortcutPicker = false
+            },
+            onDismiss = { showPlayerShortcutPicker = false }
         )
     }
 }

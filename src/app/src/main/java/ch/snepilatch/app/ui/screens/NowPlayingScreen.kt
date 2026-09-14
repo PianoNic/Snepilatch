@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -36,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.TextUnit
 import ch.snepilatch.app.R
+import ch.snepilatch.app.data.PlayerShortcut
 import ch.snepilatch.app.logic.download.Downloads
 import android.graphics.SurfaceTexture
 import android.net.Uri
@@ -61,7 +63,6 @@ import ch.snepilatch.app.viewmodel.LibraryViewModel
 import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import ch.snepilatch.app.logic.shared.shareSpfyUri
-import ch.snepilatch.app.ui.shared.LikeToggleButton
 import ch.snepilatch.app.ui.shared.PlaylistPickerDialog
 import ch.snepilatch.app.ui.shared.EntityMenuSheet
 import ch.snepilatch.app.ui.shared.MenuAction
@@ -578,8 +579,12 @@ fun NowPlayingScreen(
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
-                            val isLiked by vm.currentTrackLiked.collectAsState()
-                            LikeToggleButton(isLiked, track?.uri, vm, buttonBg, animatedPrimary, size = 40.dp, iconSize = 24.dp)
+                            PlayerShortcutButton(
+                                vm, track, buttonBg, animatedPrimary, 40.dp, 24.dp,
+                                onShowPlaylistPicker = { showPlaylistPicker = true },
+                                onShowJam = { showJam = true },
+                                onShowCode = { showCode = true },
+                            )
                         }
 
                         Spacer(Modifier.height(8.dp))
@@ -759,8 +764,12 @@ fun NowPlayingScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            val isLiked by vm.currentTrackLiked.collectAsState()
-                            LikeToggleButton(isLiked, track?.uri, vm, buttonBg, animatedPrimary, size = 48.dp, iconSize = 28.dp)
+                            PlayerShortcutButton(
+                                vm, track, buttonBg, animatedPrimary, 48.dp, 28.dp,
+                                onShowPlaylistPicker = { showPlaylistPicker = true },
+                                onShowJam = { showJam = true },
+                                onShowCode = { showCode = true },
+                            )
                             NowPlayingMenu(
                                 showMore = showMore,
                                 onShowMore = { showMore = it },
@@ -822,6 +831,123 @@ fun NowPlayingScreen(
             onDismiss = { showPlaylistPicker = false },
         )
     }
+}
+
+@Composable
+@Suppress("LongParameterList")
+internal fun PlayerShortcutButton(
+    vm: PlaybackViewModel,
+    track: ch.snepilatch.app.data.TrackInfo?,
+    buttonBg: Color,
+    accent: Color,
+    buttonSize: Dp,
+    iconSize: Dp,
+    onShowPlaylistPicker: () -> Unit,
+    onShowJam: () -> Unit,
+    onShowCode: () -> Unit,
+) {
+    val shortcut by AppSettings.playerShortcut.collectAsState()
+    val isLiked by vm.currentTrackLiked.collectAsState()
+    val downloadedIndex by Downloads.index.collectAsState()
+    val inFlight by Downloads.inProgress.collectAsState()
+    val inJam by JamHolder.session.collectAsState()
+    val context = LocalContext.current
+    val isDownloaded = track?.let { Downloads.isDownloaded(downloadedIndex, it.uri, it.name, it.artist) } == true
+    val isDownloading = track?.uri?.let { it in inFlight } == true
+    val active = shortcut == PlayerShortcut.LIKE && isLiked
+    val icon = playerShortcutIcon(shortcut, isLiked, isDownloaded)
+    val label = when {
+        shortcut == PlayerShortcut.LIKE && isLiked -> stringResource(R.string.unlike)
+        shortcut == PlayerShortcut.DOWNLOAD && isDownloading -> stringResource(R.string.downloading)
+        shortcut == PlayerShortcut.DOWNLOAD && isDownloaded -> stringResource(R.string.remove_download)
+        shortcut == PlayerShortcut.JAM && inJam != null -> stringResource(R.string.jam)
+        else -> stringResource(shortcut.titleRes)
+    }
+    val validTrack = track != null &&
+        (shortcut != PlayerShortcut.LIKE || track.uri.startsWith("spotify:track:"))
+    val enabled = (!shortcut.requiresTrack || validTrack) &&
+        !(shortcut == PlayerShortcut.DOWNLOAD && isDownloading)
+    val onClick: () -> Unit = {
+        runPlayerShortcut(
+            shortcut, vm, track, context, isLiked, isDownloaded, inJam != null,
+            onShowPlaylistPicker, onShowJam, onShowCode,
+        )
+    }
+    if (shortcut == PlayerShortcut.LIKE) {
+        FilledIconToggleButton(
+            checked = active,
+            onCheckedChange = { onClick() },
+            enabled = enabled,
+            modifier = Modifier.size(buttonSize),
+            colors = IconButtonDefaults.filledIconToggleButtonColors(
+                containerColor = buttonBg,
+                contentColor = SnepilatchWhite.copy(alpha = 0.7f),
+                checkedContainerColor = buttonBg,
+                checkedContentColor = accent,
+            ),
+        ) { Icon(icon, label, modifier = Modifier.size(iconSize)) }
+    } else {
+        FilledTonalIconButton(
+            onClick = onClick,
+            enabled = enabled,
+            modifier = Modifier.size(buttonSize),
+            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = buttonBg,
+                contentColor = SnepilatchWhite.copy(alpha = 0.7f),
+            ),
+        ) { Icon(icon, label, modifier = Modifier.size(iconSize)) }
+    }
+}
+
+@Suppress("LongParameterList")
+private fun runPlayerShortcut(
+    shortcut: PlayerShortcut,
+    vm: PlaybackViewModel,
+    track: ch.snepilatch.app.data.TrackInfo?,
+    context: android.content.Context,
+    isLiked: Boolean,
+    isDownloaded: Boolean,
+    inJam: Boolean,
+    onShowPlaylistPicker: () -> Unit,
+    onShowJam: () -> Unit,
+    onShowCode: () -> Unit,
+) {
+    when (shortcut) {
+        PlayerShortcut.LIKE -> track?.uri?.takeIf { it.startsWith("spotify:track:") }
+            ?.removePrefix("spotify:track:")
+            ?.let { if (isLiked) vm.unlikeSong(it) else vm.likeSong(it) }
+        PlayerShortcut.LYRICS -> vm.openLyrics()
+        PlayerShortcut.ADD_TO_QUEUE -> track?.uri?.let(vm::addToQueue)
+        PlayerShortcut.ADD_TO_PLAYLIST -> onShowPlaylistPicker()
+        PlayerShortcut.QUEUE -> vm.openQueue()
+        PlayerShortcut.ALBUM -> vm.openAlbumFromCurrentTrack()
+        PlayerShortcut.RADIO -> track?.uri?.let(ch.snepilatch.app.viewmodel.DetailRoutes::openRadio)
+        PlayerShortcut.DOWNLOAD -> track?.uri?.let {
+            if (isDownloaded) vm.removeDownload(it) else vm.downloadCurrentTrack(context)
+        }
+        PlayerShortcut.JAM -> if (inJam) vm.openQueue() else onShowJam()
+        PlayerShortcut.CODE -> onShowCode()
+        PlayerShortcut.SHARE -> track?.uri?.let {
+            shareSpfyUri(context, it, context.getString(R.string.share_track_chooser))
+        }
+    }
+}
+
+internal fun playerShortcutIcon(
+    shortcut: PlayerShortcut,
+    isLiked: Boolean = false,
+    isDownloaded: Boolean = false,
+) = when (shortcut) {
+    PlayerShortcut.LIKE -> if (isLiked) Icons.Rounded.Favorite else Icons.Filled.FavoriteBorder
+    PlayerShortcut.LYRICS -> Icons.Rounded.MusicNote
+    PlayerShortcut.ADD_TO_QUEUE, PlayerShortcut.QUEUE -> Icons.AutoMirrored.Rounded.QueueMusic
+    PlayerShortcut.ADD_TO_PLAYLIST -> Icons.AutoMirrored.Rounded.PlaylistAdd
+    PlayerShortcut.ALBUM -> Icons.Rounded.Album
+    PlayerShortcut.RADIO -> Icons.Rounded.Radio
+    PlayerShortcut.DOWNLOAD -> if (isDownloaded) Icons.Rounded.OfflinePin else Icons.Rounded.DownloadForOffline
+    PlayerShortcut.JAM -> Icons.Rounded.Groups
+    PlayerShortcut.CODE -> Icons.Rounded.QrCode2
+    PlayerShortcut.SHARE -> Icons.Rounded.Share
 }
 
 @Composable

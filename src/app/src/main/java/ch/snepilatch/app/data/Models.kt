@@ -6,9 +6,9 @@ import ch.snepilatch.app.ui.theme.SnepilatchGray
 import ch.snepilatch.app.ui.theme.SnepilatchLightGray
 import ch.snepilatch.app.logic.shared.spfyId
 
-enum class Screen {
+enum class Screen(val parent: Screen? = null) {
     LOGIN, HOME, SEARCH, LIBRARY, NOW_PLAYING, PLAYLIST_DETAIL, ALBUM_DETAIL,
-    ARTIST_DETAIL, SHOW_DETAIL, ACCOUNT, INTERFACE, LYRICS, EQUALIZER, DOWNLOADS
+    ARTIST_DETAIL, SHOW_DETAIL, ACCOUNT, INTERFACE(ACCOUNT), LYRICS, EQUALIZER, DOWNLOADS
 }
 
 data class TrackInfo(

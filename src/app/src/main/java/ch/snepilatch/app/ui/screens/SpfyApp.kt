@@ -82,6 +82,9 @@ import ch.snepilatch.app.ui.shared.PlaylistPickerDialog
 import ch.snepilatch.app.logic.shared.spfyId
 import ch.snepilatch.app.logic.shared.JamHolder
 import ch.snepilatch.app.ui.shared.JamBanner
+import ch.snepilatch.app.ui.shared.HorizontalPageTransition
+import ch.snepilatch.app.ui.shared.HorizontalPageTransitionDirection
+import ch.snepilatch.app.ui.shared.HorizontalPageTransitionRules
 
 /** Dp height of the bottom overlay (MiniPlayer + BottomNav). Screens use this for bottom padding. */
 val LocalBottomOverlayHeight = compositionLocalOf { mutableStateOf(0.dp) }
@@ -334,22 +337,31 @@ fun SpfyApp(vm: PlaybackViewModel) {
 private fun MainContent(screen: Screen, vm: PlaybackViewModel, hazeState: HazeState) {
     val libraryVm: LibraryViewModel = viewModel()
     val isOffline by vm.isOffline.collectAsState()
-    Box(
-        Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .hazeSource(hazeState)
-    ) {
-        when (screen) {
-            Screen.HOME -> if (isOffline) OfflineHomeScreen(vm) else HomeScreen(vm)
-            Screen.SEARCH -> SearchScreen(vm)
-            Screen.LIBRARY -> { LaunchedEffect(Unit) { libraryVm.loadLibrary() }; LibraryScreen() }
-            Screen.ACCOUNT -> AccountScreen(vm)
-            Screen.INTERFACE -> InterfaceScreen(vm)
-            Screen.EQUALIZER -> EqualizerScreen(vm)
-            Screen.DOWNLOADS -> DownloadsScreen(vm)
-            Screen.PLAYLIST_DETAIL, Screen.ALBUM_DETAIL, Screen.ARTIST_DETAIL, Screen.SHOW_DETAIL -> DetailScreen(vm)
-            Screen.NOW_PLAYING, Screen.LYRICS, Screen.LOGIN -> {}
+    HorizontalPageTransition(
+        targetState = screen,
+        modifier = Modifier.fillMaxSize(),
+        rules = HorizontalPageTransitionRules(
+            subtrees = mapOf(Screen.ACCOUNT to HorizontalPageTransitionDirection.Right),
+            parentOf = Screen::parent,
+        ),
+    ) { targetScreen ->
+        Box(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .hazeSource(hazeState)
+        ) {
+            when (targetScreen) {
+                Screen.HOME -> if (isOffline) OfflineHomeScreen(vm) else HomeScreen(vm)
+                Screen.SEARCH -> SearchScreen(vm)
+                Screen.LIBRARY -> { LaunchedEffect(Unit) { libraryVm.loadLibrary() }; LibraryScreen() }
+                Screen.ACCOUNT -> AccountScreen(vm)
+                Screen.INTERFACE -> InterfaceScreen(vm)
+                Screen.EQUALIZER -> EqualizerScreen(vm)
+                Screen.DOWNLOADS -> DownloadsScreen(vm)
+                Screen.PLAYLIST_DETAIL, Screen.ALBUM_DETAIL, Screen.ARTIST_DETAIL, Screen.SHOW_DETAIL -> DetailScreen(vm)
+                Screen.NOW_PLAYING, Screen.LYRICS, Screen.LOGIN -> {}
+            }
         }
     }
 }

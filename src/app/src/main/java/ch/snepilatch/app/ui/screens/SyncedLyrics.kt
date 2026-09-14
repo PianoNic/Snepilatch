@@ -6,9 +6,11 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.interaction.DragInteraction
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -39,6 +41,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
@@ -53,6 +56,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
@@ -60,11 +64,14 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.LineHeightStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ch.snepilatch.app.R
 import ch.snepilatch.app.logic.lyrics.DotsAnimator
 import ch.snepilatch.app.logic.lyrics.DotsItem
 import ch.snepilatch.app.logic.lyrics.LineAnimator
@@ -75,6 +82,7 @@ import ch.snepilatch.app.logic.lyrics.SungState
 import ch.snepilatch.app.logic.lyrics.Words
 import ch.snepilatch.app.logic.lyrics.WordsAnimator
 import ch.snepilatch.app.logic.lyrics.lyricItems
+import ch.snepilatch.app.logic.lyrics.providerLabel
 import ch.snepilatch.app.logic.lyrics.sungStateAt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -91,9 +99,16 @@ import kotlin.math.roundToInt
  * the frame loop bumps a tick that the draw and layer lambdas read, nothing recomposes.
  */
 @Composable
-internal fun SyncedLyricsView(lyrics: LyricsData, smoothPosition: State<Long>, isLandscape: Boolean, lineFillDirection: String) {
+internal fun SyncedLyricsView(
+    lyrics: LyricsData,
+    smoothPosition: State<Long>,
+    isLandscape: Boolean,
+    lineFillDirection: String,
+    onSeek: (Long) -> Unit,
+) {
     val items = remember(lyrics) { lyricItems(lyrics.lines) }
     val syllableSynced = lyrics.syncType == "SYLLABLE_SYNCED"
+    val duet = remember(lyrics) { lyrics.lines.any { it.oppositeAligned } }
     val fontSize = if (isLandscape) 24.sp else 30.sp
     val listState = rememberLazyListState()
     val activeIndex by remember(items) {
@@ -118,6 +133,7 @@ internal fun SyncedLyricsView(lyrics: LyricsData, smoothPosition: State<Long>, i
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val viewport = maxHeight
+        val inset = if (duet) maxWidth * LyricsStyle.DUET_INSET_FRACTION else 0.dp
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().fadedEdges(),
@@ -134,14 +150,44 @@ internal fun SyncedLyricsView(lyrics: LyricsData, smoothPosition: State<Long>, i
                             item = item,
                             state = state,
                             blurPx = if (userScrolling.value) 0f else LyricsStyle.blurPx(abs(index - activeIndex)),
-                            wholeLine = !syllableSynced || item.lead.syllables.isEmpty(),
-                            fillDirection = lineFillDirection,
+                            row = RowStyle(
+                                wholeLine = !syllableSynced || item.lead.syllables.isEmpty(),
+                                fillDirection = lineFillDirection,
+                                fontSize = fontSize,
+                                opposite = item.line.oppositeAligned,
+                                inset = inset,
+                            ),
                             smoothPosition = smoothPosition,
-                            fontSize = fontSize,
+                            onSeek = { onSeek(item.startMs) },
                         )
                     }
                 }
             }
+            item(key = "credits") { LyricsCredits(lyrics, fontSize) }
+        }
+    }
+}
+
+/** The writers and the provider under the last line, the way Spicy Lyrics credits them; nothing when neither is known. */
+@Composable
+internal fun LyricsCredits(lyrics: LyricsData, fontSize: TextUnit) {
+    val provider = remember(lyrics.providerName) { providerLabel(lyrics.providerName) }
+    if (lyrics.songwriters.isEmpty() && provider.isEmpty()) return
+    Column(Modifier.fillMaxWidth().padding(top = 16.dp)) {
+        if (lyrics.songwriters.isNotEmpty()) {
+            Text(
+                text = stringResource(R.string.lyrics_written_by, lyrics.songwriters.joinToString(", ")),
+                color = Color.White.copy(alpha = LyricsStyle.CREDITS_OPACITY),
+                style = lyricStyle(fontSize * LyricsStyle.CREDITS_SIZE_EM).copy(fontWeight = FontWeight.SemiBold),
+            )
+        }
+        if (provider.isNotEmpty()) {
+            Text(
+                text = stringResource(R.string.lyrics_provided_by, provider),
+                color = Color.White.copy(alpha = LyricsStyle.PROVIDER_OPACITY),
+                style = lyricStyle(fontSize * LyricsStyle.PROVIDER_SIZE_EM).copy(fontWeight = FontWeight.SemiBold),
+                modifier = Modifier.padding(top = 4.dp),
+            )
         }
     }
 }
@@ -153,14 +199,16 @@ internal fun UnsyncedLyricsView(lyrics: LyricsData, isLandscape: Boolean) {
         modifier = Modifier.fillMaxSize().fadedEdges(),
         contentPadding = PaddingValues(start = 24.dp, end = 36.dp, top = if (isLandscape) 40.dp else 80.dp, bottom = 160.dp),
     ) {
+        val fontSize = if (isLandscape) 20.sp else 24.sp
         itemsIndexed(lyrics.lines, key = { i, _ -> i }) { _, line ->
             Text(
                 text = line.text,
                 color = Color.White.copy(alpha = LyricsStyle.FILL_ALPHA),
-                style = lyricStyle(if (isLandscape) 20.sp else 24.sp),
+                style = lyricStyle(fontSize),
                 modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
             )
         }
+        item(key = "credits") { LyricsCredits(lyrics, fontSize) }
     }
 }
 
@@ -235,19 +283,34 @@ private fun Modifier.fadedEdges(): Modifier = graphicsLayer(compositingStrategy 
 }
 
 /**
+ * How a row is laid out: as one piece or as words, which way a whole line fills, its size, and for
+ * a duet which side it belongs to and how far it stays off the other voice's edge.
+ */
+private class RowStyle(
+    val wholeLine: Boolean,
+    val fillDirection: String,
+    val fontSize: TextUnit,
+    val opposite: Boolean,
+    val inset: Dp,
+)
+
+/**
  * One lyric row: dims, blurs ([blurPx], by distance from the sung row, 0 while the user scrolls)
- * and (line type) scales with its state; the words inside animate on their own.
+ * and (line type) scales with its state; the words inside animate on their own. The other singer's
+ * row of a duet sits against the far edge. A tap seeks to the row ([onSeek]).
  */
 @Composable
 private fun LyricLine(
     item: LineItem,
     state: SungState,
     blurPx: Float,
-    wholeLine: Boolean,
-    fillDirection: String,
+    row: RowStyle,
     smoothPosition: State<Long>,
-    fontSize: TextUnit,
+    onSeek: () -> Unit,
 ) {
+    val wholeLine = row.wholeLine
+    val fontSize = row.fontSize
+    val opposite = row.opposite
     val alpha by animateFloatAsState(
         targetValue = when (state) {
             SungState.ACTIVE -> LyricsStyle.ACTIVE_OPACITY
@@ -276,18 +339,21 @@ private fun LyricLine(
     Box(
         Modifier
             .fillMaxWidth()
+            .padding(start = if (opposite) row.inset else 0.dp, end = if (opposite) 0.dp else row.inset)
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onSeek)
             .padding(vertical = if (wholeLine) 8.dp else 4.dp)
             .graphicsLayer {
                 this.alpha = alpha
                 scaleX = scale
                 scaleY = scale
-                transformOrigin = TransformOrigin(0f, 0.5f)
-            }
+                transformOrigin = TransformOrigin(if (opposite) 1f else 0f, 0.5f)
+            },
+        contentAlignment = if (opposite) Alignment.CenterEnd else Alignment.CenterStart,
     ) {
         if (wholeLine) {
-            WholeLine(item.line.text, look, animator, tick, vertical = fillDirection != "horizontal")
+            WholeLine(item.line.text, look, animator, tick, vertical = row.fillDirection != "horizontal", opposite = opposite)
         } else {
-            WordsLine(item, look, animator, tick)
+            WordsLine(item, look, animator, tick, opposite)
         }
     }
 }
@@ -369,27 +435,28 @@ private fun lyricStyle(fontSize: TextUnit) = TextStyle(
 
 /** The lead voice of a syllable-synced line, and under it the backing vocals when the line has them. */
 @Composable
-private fun WordsLine(item: LineItem, look: LineLook, animator: LineAnimator, tick: State<Long>) {
+private fun WordsLine(item: LineItem, look: LineLook, animator: LineAnimator, tick: State<Long>, opposite: Boolean) {
     val background = item.background
     if (background == null) {
-        WordsFlow(item.lead, look, animator.lead, tick)
+        WordsFlow(item.lead, look, animator.lead, tick, opposite)
         return
     }
-    Column {
-        WordsFlow(item.lead, look, animator.lead, tick)
+    Column(horizontalAlignment = if (opposite) Alignment.End else Alignment.Start) {
+        WordsFlow(item.lead, look, animator.lead, tick, opposite)
         Spacer(Modifier.height(1.dp))
-        WordsFlow(background, look.background(), checkNotNull(animator.background), tick)
+        WordsFlow(background, look.background(), checkNotNull(animator.background), tick, opposite)
     }
 }
 
 /** One voice's words, wrapping like text; the pieces of one word stay together. */
 @Composable
-private fun WordsFlow(spec: Words, look: LineLook, animator: WordsAnimator, tick: State<Long>) {
+private fun WordsFlow(spec: Words, look: LineLook, animator: WordsAnimator, tick: State<Long>, opposite: Boolean) {
     val measurer = rememberTextMeasurer()
     val gap = with(LocalDensity.current) {
         remember(look.style) { (measurer.measure("0", look.style).size.width * LyricsStyle.WORD_GAP_CH).toDp() }
     }
-    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
+    val arrangement = Arrangement.spacedBy(gap, if (opposite) Alignment.End else Alignment.Start)
+    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = arrangement) {
         for (word in spec.runs) {
             Row {
                 for (i in word) {
@@ -465,14 +532,15 @@ private fun WordPiece(text: String, look: LineLook, motion: Motion, tick: State<
 
 /** A line synced as one piece: wraps to the width, fills top to bottom (or left to right), glows as a whole. */
 @Composable
-private fun WholeLine(text: String, look: LineLook, animator: LineAnimator, tick: State<Long>, vertical: Boolean) {
+private fun WholeLine(text: String, look: LineLook, animator: LineAnimator, tick: State<Long>, vertical: Boolean, opposite: Boolean) {
     val measurer = rememberTextMeasurer()
     val holder = remember { LayoutHolder() }
+    val style = if (opposite) look.style.copy(textAlign = TextAlign.End) else look.style
     Spacer(
         Modifier
             .fillMaxWidth()
             .layout { measurable, constraints ->
-                val result = measurer.measure(text, look.style, constraints = Constraints(maxWidth = constraints.maxWidth))
+                val result = measurer.measure(text, style, constraints = Constraints(maxWidth = constraints.maxWidth))
                 holder.layout = result
                 val placeable = measurable.measure(Constraints.fixed(result.size.width, result.size.height))
                 layout(result.size.width, result.size.height) { placeable.place(0, 0) }

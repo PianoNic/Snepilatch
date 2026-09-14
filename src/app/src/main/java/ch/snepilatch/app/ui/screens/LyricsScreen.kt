@@ -47,6 +47,7 @@ private fun LyricsBody(
     accent: Color,
     isLandscape: Boolean,
     lyricsAnimDirection: String,
+    onSeek: (Long) -> Unit,
 ) {
     when {
         isLoading -> {
@@ -64,7 +65,7 @@ private fun LyricsBody(
             }
         }
         lyrics.syncType == "UNSYNCED" -> UnsyncedLyricsView(lyrics, isLandscape)
-        else -> SyncedLyricsView(lyrics, smoothPosition, isLandscape, lyricsAnimDirection)
+        else -> SyncedLyricsView(lyrics, smoothPosition, isLandscape, lyricsAnimDirection, onSeek)
     }
 }
 
@@ -236,7 +237,10 @@ fun LyricsScreen(vm: PlaybackViewModel) {
                             .weight(0.6f)
                             .fillMaxHeight()
                     ) {
-                        LyricsBody(isLoading, lyrics, smoothPosition, animatedPrimary, isLandscape = true, lyricsAnimDirection = lyricsAnimDirection)
+                        LyricsBody(
+                            isLoading, lyrics, smoothPosition, animatedPrimary,
+                            isLandscape = true, lyricsAnimDirection = lyricsAnimDirection, onSeek = vm::seekTo,
+                        )
                     }
                 }
             } else {
@@ -272,7 +276,10 @@ fun LyricsScreen(vm: PlaybackViewModel) {
                         Spacer(Modifier.size(40.dp))
                     }
 
-                    LyricsBody(isLoading, lyrics, smoothPosition, animatedPrimary, isLandscape = false, lyricsAnimDirection = lyricsAnimDirection)
+                    LyricsBody(
+                        isLoading, lyrics, smoothPosition, animatedPrimary,
+                        isLandscape = false, lyricsAnimDirection = lyricsAnimDirection, onSeek = vm::seekTo,
+                    )
                 }
             }
         }

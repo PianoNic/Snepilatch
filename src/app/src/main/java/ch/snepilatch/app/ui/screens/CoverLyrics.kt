@@ -19,9 +19,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -33,11 +31,10 @@ import ch.snepilatch.app.ui.theme.SnepilatchLightGray
 import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import ch.snepilatch.app.viewmodel.LyricsViewModel
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
-import coil.compose.AsyncImage
 
 /**
- * The back of the flipped cover (#817): the playing track's lyrics in the card, over its blurred
- * art, with a button in the top right corner to the full lyrics screen. Lines are not tappable
+ * The back of the flipped cover (#817): the playing track's lyrics in the card over a scrim,
+ * with a button in the top right corner to the full lyrics screen. Lines are not tappable
  * here; a tap on the card turns it back over.
  */
 @Composable
@@ -56,16 +53,9 @@ fun CoverLyrics(vm: PlaybackViewModel, modifier: Modifier = Modifier) {
     val synced = lyrics?.syncType == "LINE_SYNCED" || lyrics?.syncType == "SYLLABLE_SYNCED"
     val smoothPosition = rememberSmoothPosition(vm, active = isPlayingRaw && !isPaused && synced)
 
-    Box(modifier.fillMaxSize()) {
-        track?.albumArt?.let { artUrl ->
-            AsyncImage(
-                model = artUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().blur(BACKDROP_BLUR_DP.dp),
-            )
-        }
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = BACKDROP_SCRIM)))
+    // The player already paints the blurred art behind the card, so the back only needs a scrim
+    // over it; a blurred image of its own cost a decode and a blur pass in the middle of the turn.
+    Box(modifier.fillMaxSize().background(Color.Black.copy(alpha = BACKDROP_SCRIM))) {
         val current = lyrics
         when {
             isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -83,5 +73,4 @@ fun CoverLyrics(vm: PlaybackViewModel, modifier: Modifier = Modifier) {
     }
 }
 
-private const val BACKDROP_BLUR_DP = 60
 private const val BACKDROP_SCRIM = 0.55f

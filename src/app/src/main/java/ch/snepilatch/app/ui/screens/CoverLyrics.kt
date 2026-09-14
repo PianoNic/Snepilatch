@@ -3,6 +3,7 @@
 package ch.snepilatch.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -20,6 +21,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -53,9 +56,32 @@ fun CoverLyrics(vm: PlaybackViewModel, modifier: Modifier = Modifier) {
     val synced = lyrics?.syncType == "LINE_SYNCED" || lyrics?.syncType == "SYLLABLE_SYNCED"
     val smoothPosition = rememberSmoothPosition(vm, active = isPlayingRaw && !isPaused && synced)
 
+    // A sideways swipe skips like one on the cover (#829). The list inside claims vertical drags,
+    // so only horizontal ones reach here; the swipe is decided on release by how far it went.
+    val swipeThresholdPx = with(LocalDensity.current) { SWIPE_THRESHOLD_DP.dp.toPx() }
     // The player already paints the blurred art behind the card, so the back only needs a scrim
     // over it; a blurred image of its own cost a decode and a blur pass in the middle of the turn.
-    Box(modifier.fillMaxSize().background(Color.Black.copy(alpha = BACKDROP_SCRIM))) {
+    Box(
+        modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = BACKDROP_SCRIM))
+            .pointerInput(swipeThresholdPx) {
+                var travelled = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = { travelled = 0f },
+                    onDragEnd = {
+                        when {
+                            travelled > swipeThresholdPx -> vm.skipPrevious(forceTrackChange = true)
+                            travelled < -swipeThresholdPx -> vm.skipNext()
+                        }
+                    },
+                    onHorizontalDrag = { change, amount ->
+                        travelled += amount
+                        change.consume()
+                    },
+                )
+            }
+    ) {
         val current = lyrics
         when {
             isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -74,3 +100,6 @@ fun CoverLyrics(vm: PlaybackViewModel, modifier: Modifier = Modifier) {
 }
 
 private const val BACKDROP_SCRIM = 0.55f
+
+/** How far a sideways drag has to travel to count as a swipe to the previous or next track. */
+private const val SWIPE_THRESHOLD_DP = 72

@@ -283,7 +283,11 @@
     <!-- Account section headers -->
     <string name="account_section_profile">Profil &amp; Konto</string>
     <string name="account_section_playback">Abspile</string>
-    <string name="account_section_appearance">Usgsee</string>
+    <string name="account_section_appearance">Oberflächi</string>
+    <string name="appearance">Usgsee</string>
+    <string name="behavior">Verhalte</string>
+    <string name="appearance_settings">Iistellige für d Oberflächi öffne</string>
+    <string name="appearance_settings_desc">Sproch, Lyrics, Hindergründ und Benachrichtigungs-Taste</string>
     <string name="account_section_notifications">Benachrichtigunge</string>
     <string name="account_section_sound">Ton</string>
 

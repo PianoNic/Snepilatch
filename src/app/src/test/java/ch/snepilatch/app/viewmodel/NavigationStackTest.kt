@@ -46,6 +46,15 @@ class NavigationStackTest {
         assertEquals(Screen.NOW_PLAYING, vm.currentScreen.value)
     }
 
+    @Test fun interfacePageReturnsToAccount() {
+        vm.navigateTo(Screen.ACCOUNT)
+        vm.navigateTo(Screen.INTERFACE)
+        assertEquals(Screen.INTERFACE, vm.currentScreen.value)
+
+        vm.goBack()
+        assertEquals(Screen.ACCOUNT, vm.currentScreen.value)
+    }
+
     @Test fun backFromPlayerCollapsesToContentBeneath() {
         vm.navigateTo(Screen.NOW_PLAYING)
         vm.goBack()

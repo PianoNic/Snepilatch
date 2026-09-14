@@ -273,7 +273,11 @@
     <!-- Account section headers -->
     <string name="account_section_profile">Profil &amp; Konto</string>
     <string name="account_section_playback">Wiedergabe</string>
-    <string name="account_section_appearance">Erscheinungsbild</string>
+    <string name="account_section_appearance">Oberfläche</string>
+    <string name="appearance">Erscheinungsbild</string>
+    <string name="behavior">Verhalten</string>
+    <string name="appearance_settings">Oberflächeneinstellungen öffnen</string>
+    <string name="appearance_settings_desc">Sprache, Lyrics, Hintergründe und Benachrichtigungstasten</string>
     <string name="account_section_notifications">Benachrichtigungen</string>
 
     <!-- Equalizer -->

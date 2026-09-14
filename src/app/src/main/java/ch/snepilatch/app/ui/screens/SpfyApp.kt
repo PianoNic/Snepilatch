@@ -345,6 +345,7 @@ private fun MainContent(screen: Screen, vm: PlaybackViewModel, hazeState: HazeSt
             Screen.SEARCH -> SearchScreen(vm)
             Screen.LIBRARY -> { LaunchedEffect(Unit) { libraryVm.loadLibrary() }; LibraryScreen() }
             Screen.ACCOUNT -> AccountScreen(vm)
+            Screen.INTERFACE -> InterfaceScreen(vm)
             Screen.EQUALIZER -> EqualizerScreen(vm)
             Screen.DOWNLOADS -> DownloadsScreen(vm)
             Screen.PLAYLIST_DETAIL, Screen.ALBUM_DETAIL, Screen.ARTIST_DETAIL, Screen.SHOW_DETAIL -> DetailScreen(vm)

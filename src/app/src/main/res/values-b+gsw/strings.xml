@@ -249,6 +249,8 @@
 
     <!-- Lyrics Screen -->
     <string name="lyrics_not_available">Kei Lyrics verfüegbar</string>
+    <string name="lyrics_written_by">Gschribe vo: %1</string>
+    <string name="lyrics_provided_by">Bereitgstellt vo: %1</string>
 
     <!-- Now Playing -->
     <string name="now_playing_playing_from">Lauft vo %s</string>

@@ -105,6 +105,15 @@ object LyricsStyle {
     const val SCROLL_ABOVE_CENTER_PX = 30f
     const val USER_SCROLL_COOLDOWN_MS = 750L
 
+    /** A duet: the other singer's lines sit against the far edge, each voice kept off the other's edge by this share of the width. */
+    const val DUET_INSET_FRACTION = 0.15f
+
+    /** The credits under the last line: the writers, then the provider, smaller and dimmer. */
+    const val CREDITS_SIZE_EM = 0.47f
+    const val CREDITS_OPACITY = 0.6f
+    const val PROVIDER_SIZE_EM = 0.34f
+    const val PROVIDER_OPACITY = 0.5f
+
     val wordScale = CubicSpline(0f to REST_SCALE, 0.7f to 1.0505f, 1f to 1f)
     val letterScale = CubicSpline(0f to REST_SCALE, 0.7f to 1.175f, 1f to 1f)
     val wordLift = CubicSpline(0f to REST_LIFT, 0.9f to -(1f / 60f), 1f to 0f)

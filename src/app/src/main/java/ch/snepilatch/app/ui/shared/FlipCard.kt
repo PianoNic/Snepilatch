@@ -77,6 +77,17 @@ fun FlipCard(
             // those few degrees rather than crawl a whole extra turn to the one after.
             var target = ceil((angle - rest) / FULL_TURN) * FULL_TURN + rest
             if (target - angle > FULL_TURN - MAX_BACKTRACK) target -= FULL_TURN
+            // Glide at the settle speed until just short of the resting angle: handing a spring
+            // more distance than that makes it accelerate into the lock, which reads as a lurch.
+            if (target > angle) {
+                velocity = SETTLE_DEG_PER_S
+                while (angle < target - LOCK_IN_DEG) {
+                    val now = withFrameNanos { it }
+                    val dt = ((now - last) / 1e9f).coerceAtMost(MAX_FRAME_S)
+                    last = now
+                    angle = min(angle + velocity * dt, target - LOCK_IN_DEG)
+                }
+            }
             // Underdamped on purpose: the card overshoots its side a little and springs back to lock in.
             animate(angle, target, velocity, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium)) { value, _ -> angle = value }
             velocity = 0f
@@ -132,6 +143,9 @@ private const val FRICTION_PER_S = 3f
 
 /** Below this the card stops coasting and the spring takes it the rest of the way, while it still has speed to snap in with. */
 private const val SETTLE_DEG_PER_S = 180f
+
+/** How close to the resting angle the glide hands over to the spring; small, so the spring can only overshoot and return. */
+private const val LOCK_IN_DEG = 8f
 
 /** A frame after a long stall is treated as this long, so the card does not jump a whole turn. */
 private const val MAX_FRAME_S = 0.05f

@@ -68,7 +68,6 @@ import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -665,7 +664,7 @@ private fun DotsRow(item: DotsItem, smoothPosition: State<Long>, fontSize: TextU
     val style = lyricStyle(fontSize * LyricsStyle.DOT_SIZE_EM).copy(lineHeight = fontSize * LyricsStyle.DOT_SIZE_EM * 0.65f)
     val measurer = rememberTextMeasurer()
     val layout = remember(style) { measurer.measure("•", style) }
-    val size = with(density) { DpSize(layout.size.width.toDp(), layout.size.height.toDp()) }
+    val slack = with(density) { LyricsStyle.GLOW_SLACK_DP.dp.roundToPx() }
     Row(
         Modifier
             .layout { measurable, constraints ->
@@ -685,24 +684,31 @@ private fun DotsRow(item: DotsItem, smoothPosition: State<Long>, fontSize: TextU
         for (dot in animator.dots) {
             Spacer(
                 Modifier
-                    .size(size)
+                    // The same glow slack as a word piece: the dot's halo is wider than its glyph.
+                    .layout { measurable, _ ->
+                        val placeable = measurable.measure(Constraints.fixed(layout.size.width + 2 * slack, layout.size.height + 2 * slack))
+                        layout(layout.size.width, layout.size.height) { placeable.place(-slack, -slack) }
+                    }
                     .graphicsLayer {
                         tick.value
                         scaleX = dot.scale.position
                         scaleY = dot.scale.position
                         translationY = dot.lift.position * fontPx
+                        compositingStrategy = CompositingStrategy.ModulateAlpha
                         alpha = dot.opacity.position.coerceIn(0f, 1f)
                         transformOrigin = TransformOrigin.Center
                     }
                     .drawBehind {
                         tick.value
                         val glow = dot.glow.position
-                        if (glow > 0.005f) {
-                            val blur = (LyricsStyle.GLOW_BLUR_BASE_PX + GlowSpec.DOT.blurPx * glow).dp.toPx()
-                            val alpha = (glow * GlowSpec.DOT.opacity).coerceIn(0f, MAX_SHADOW_ALPHA)
-                            drawText(layout, color = Color.Transparent, shadow = Shadow(Color.White.copy(alpha = alpha), Offset.Zero, blur))
+                        translate(slack.toFloat(), slack.toFloat()) {
+                            if (glow > 0.005f) {
+                                val blur = (LyricsStyle.GLOW_BLUR_BASE_PX + GlowSpec.DOT.blurPx * glow).dp.toPx()
+                                val alpha = (glow * GlowSpec.DOT.opacity).coerceIn(0f, MAX_SHADOW_ALPHA)
+                                drawText(layout, color = Color.Transparent, shadow = Shadow(Color.White.copy(alpha = alpha), Offset.Zero, blur))
+                            }
+                            drawText(layout, color = Color.White.copy(alpha = LyricsStyle.FILL_ALPHA))
                         }
-                        drawText(layout, color = Color.White.copy(alpha = LyricsStyle.FILL_ALPHA))
                     }
             )
         }

@@ -3,11 +3,13 @@ package ch.snepilatch.app.ui.shared
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import kotlinx.coroutines.delay
+import ch.snepilatch.app.viewmodel.PlaybackViewModel
 
 /**
  * A playback position (ms) that advances at the display's native refresh rate instead of stepping
@@ -57,3 +59,32 @@ fun rememberSmoothPositionMs(positionMs: Long, durationMs: Long, isPlaying: Bool
 private const val PROGRESS_TICK_MS = 32L
 
 // --- Track Row ---
+
+/**
+ * The lyric clock: the player's last reported position, advanced by the wall clock every frame
+ * while [active]. Unlike [rememberSmoothPositionMs] it takes the position off the flow inside its
+ * effect, so the composable that holds it never recomposes on the player's ticks, and it runs at
+ * the full frame rate, which a karaoke fill needs and a progress bar does not.
+ */
+@Composable
+fun rememberSmoothPosition(vm: PlaybackViewModel, active: Boolean): MutableState<Long> {
+    val smoothPosition = remember { mutableLongStateOf(vm.positionFlow.value) }
+    val lastKnownPos = remember { mutableLongStateOf(vm.positionFlow.value) }
+    val lastKnownWallClock = remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        vm.positionFlow.collect { pos ->
+            lastKnownPos.longValue = pos
+            lastKnownWallClock.longValue = System.currentTimeMillis()
+            smoothPosition.longValue = pos
+        }
+    }
+    LaunchedEffect(active) {
+        if (!active) return@LaunchedEffect
+        while (true) {
+            withFrameNanos { }
+            val elapsed = System.currentTimeMillis() - lastKnownWallClock.longValue
+            smoothPosition.longValue = (lastKnownPos.longValue + elapsed).coerceAtMost(vm.durationFlow.value.coerceAtLeast(1))
+        }
+    }
+    return smoothPosition
+}

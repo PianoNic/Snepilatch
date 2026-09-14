@@ -104,12 +104,20 @@ internal fun SyncedLyricsView(
     smoothPosition: State<Long>,
     isLandscape: Boolean,
     lineFillDirection: String,
-    onSeek: (Long) -> Unit,
+    /** Seeks to a tapped line; null leaves the lines untouchable, for a host that claims taps itself. */
+    onSeek: ((Long) -> Unit)?,
+    /** Smaller type and tighter margins, for the lyrics in a card rather than a screen. */
+    compact: Boolean = false,
 ) {
     val items = remember(lyrics) { lyricItems(lyrics.lines) }
     val syllableSynced = lyrics.syncType == "SYLLABLE_SYNCED"
     val duet = remember(lyrics) { lyrics.lines.any { it.oppositeAligned } }
-    val fontSize = if (isLandscape) 24.sp else 30.sp
+    val fontSize = when {
+        compact -> 18.sp
+        isLandscape -> 24.sp
+        else -> 30.sp
+    }
+    val (startPad, endPad) = if (compact) 16.dp to 16.dp else 24.dp to 36.dp
     val listState = rememberLazyListState()
     val activeIndex by remember(items) {
         derivedStateOf {
@@ -137,7 +145,7 @@ internal fun SyncedLyricsView(
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().fadedEdges(),
-            contentPadding = PaddingValues(start = 24.dp, end = 36.dp, top = viewport * 0.35f, bottom = viewport * 0.5f),
+            contentPadding = PaddingValues(start = startPad, end = endPad, top = viewport * 0.35f, bottom = viewport * 0.5f),
         ) {
             itemsIndexed(items, key = { i, _ -> i }) { index, item ->
                 when (item) {
@@ -158,7 +166,7 @@ internal fun SyncedLyricsView(
                                 inset = inset,
                             ),
                             smoothPosition = smoothPosition,
-                            onSeek = { onSeek(item.startMs) },
+                            onSeek = onSeek?.let { seek -> { seek(item.startMs) } },
                         )
                     }
                 }
@@ -306,7 +314,7 @@ private fun LyricLine(
     blurPx: Float,
     row: RowStyle,
     smoothPosition: State<Long>,
-    onSeek: () -> Unit,
+    onSeek: (() -> Unit)?,
 ) {
     val wholeLine = row.wholeLine
     val fontSize = row.fontSize
@@ -340,7 +348,13 @@ private fun LyricLine(
         Modifier
             .fillMaxWidth()
             .padding(start = if (opposite) row.inset else 0.dp, end = if (opposite) 0.dp else row.inset)
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onSeek)
+            .then(
+                if (onSeek == null) {
+                    Modifier
+                } else {
+                    Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onSeek)
+                }
+            )
             .padding(vertical = if (wholeLine) 8.dp else 4.dp)
             .graphicsLayer {
                 this.alpha = alpha

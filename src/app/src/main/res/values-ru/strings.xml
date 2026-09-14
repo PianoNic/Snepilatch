@@ -238,8 +238,8 @@
 
     <!-- Lyrics Screen -->
     <string name="lyrics_not_available">Текст недоступен</string>
-    <string name="lyrics_written_by">Авторы: %1</string>
-    <string name="lyrics_provided_by">Источник: %1</string>
+    <string name="lyrics_written_by">Авторы: %1$s</string>
+    <string name="lyrics_provided_by">Источник: %1$s</string>
 
     <!-- Now Playing -->
     <string name="now_playing_playing_from">Играет из %s</string>

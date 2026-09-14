@@ -241,8 +241,8 @@
 
     <!-- Lyrics Screen -->
     <string name="lyrics_not_available">No lyrics available</string>
-    <string name="lyrics_written_by">Written by: %1</string>
-    <string name="lyrics_provided_by">Provided by: %1</string>
+    <string name="lyrics_written_by">Written by: %1$s</string>
+    <string name="lyrics_provided_by">Provided by: %1$s</string>
 
     <!-- Now Playing -->
     <string name="now_playing_playing_from">Playing from %s</string>

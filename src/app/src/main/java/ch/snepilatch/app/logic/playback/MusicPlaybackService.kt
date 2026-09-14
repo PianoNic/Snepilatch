@@ -118,9 +118,11 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
     // The five notification transport PendingIntents never vary (fixed action + request code +
     // FLAG_IMMUTABLE), so build them once instead of reconstructing all five on every notification
-    // refresh (which happens on every play/pause, position, and metadata update).
+    // refresh (which happens on every play/pause, position, and metadata update). They name the
+    // receiver class: Android 8+ drops a bare-action broadcast to a manifest receiver, which is what
+    // every phone below 13 sends when a notification button is pressed (#821).
     private fun broadcastIntent(action: String, requestCode: Int) = PendingIntent.getBroadcast(
-        this, requestCode, Intent(action), PendingIntent.FLAG_IMMUTABLE
+        this, requestCode, Intent(action).setClass(this, MediaActionReceiver::class.java), PendingIntent.FLAG_IMMUTABLE
     )
     private val prevIntent by lazy { broadcastIntent("ch.snepilatch.app.PREV", 0) }
     private val playPauseIntent by lazy { broadcastIntent("ch.snepilatch.app.PLAY_PAUSE", 1) }

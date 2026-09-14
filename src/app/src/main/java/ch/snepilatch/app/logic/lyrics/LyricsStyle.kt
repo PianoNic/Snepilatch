@@ -105,6 +105,9 @@ object LyricsStyle {
     const val SCROLL_ABOVE_CENTER_PX = 30f
     const val USER_SCROLL_COOLDOWN_MS = 750L
 
+    /** Room a piece draws into past its glyphs on every side, in dp, so the widest glow (letter emphasis) is never cut. */
+    const val GLOW_SLACK_DP = GLOW_BLUR_BASE_PX + LETTER_GLOW_BLUR_PX
+
     /** A duet: the other singer's lines sit against the far edge, each voice kept off the other's edge by this share of the width. */
     const val DUET_INSET_FRACTION = 0.15f
 

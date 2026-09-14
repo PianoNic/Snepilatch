@@ -53,6 +53,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
@@ -67,7 +68,6 @@ import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -357,6 +357,10 @@ private fun LyricLine(
             )
             .padding(vertical = if (wholeLine) 8.dp else 4.dp)
             .graphicsLayer {
+                // Modulated, not composited: a layer below full alpha would render offscreen and clip
+                // the glow and blur halo at the row edge while the row fades, and cost a buffer per
+                // row while scrolling (#825).
+                compositingStrategy = CompositingStrategy.ModulateAlpha
                 this.alpha = alpha
                 scaleX = scale
                 scaleY = scale
@@ -526,20 +530,31 @@ private fun EmphasisedWord(
 private fun WordPiece(text: String, look: LineLook, motion: Motion, tick: State<Long>, origin: TransformOrigin, glow: GlowSpec) {
     val measurer = rememberTextMeasurer()
     val layout = remember(text, look.style) { measurer.measure(text, look.style) }
-    val size = with(LocalDensity.current) { DpSize(layout.size.width.toDp(), layout.size.height.toDp()) }
+    val slack = with(LocalDensity.current) { LyricsStyle.GLOW_SLACK_DP.dp.roundToPx() }
+    val width = layout.size.width
+    val height = layout.size.height
+    // The piece takes up its glyph box in the line, but draws into a box wider by the slack on every
+    // side, placed back over it, so the glow has room past the glyphs instead of ending at their edge
+    // (#825). The pivot is moved onto the same point of the wider box.
+    val pivot = TransformOrigin((origin.pivotFractionX * width + slack) / (width + 2 * slack), origin.pivotFractionY)
     Spacer(
         Modifier
-            .size(size)
+            .layout { measurable, _ ->
+                val placeable = measurable.measure(Constraints.fixed(width + 2 * slack, height + 2 * slack))
+                layout(width, height) { placeable.place(-slack, -slack) }
+            }
             .graphicsLayer {
                 tick.value
                 scaleX = motion.scale.position
                 scaleY = motion.scale.position
                 translationY = motion.lift.position * glow.liftFactor * look.fontPx
-                transformOrigin = origin
+                transformOrigin = pivot
             }
             .drawBehind {
                 tick.value
-                drawPiece(layout, look, motion.fill, motion.glow.position, glow, vertical = false)
+                translate(slack.toFloat(), slack.toFloat()) {
+                    drawPiece(layout, look, motion.fill, motion.glow.position, glow, vertical = false)
+                }
             }
     )
 }
@@ -550,19 +565,23 @@ private fun WholeLine(text: String, look: LineLook, animator: LineAnimator, tick
     val measurer = rememberTextMeasurer()
     val holder = remember { LayoutHolder() }
     val style = if (opposite) look.style.copy(textAlign = TextAlign.End) else look.style
+    val slack = with(LocalDensity.current) { LyricsStyle.GLOW_SLACK_DP.dp.roundToPx() }
     Spacer(
         Modifier
             .fillMaxWidth()
             .layout { measurable, constraints ->
                 val result = measurer.measure(text, style, constraints = Constraints(maxWidth = constraints.maxWidth))
                 holder.layout = result
-                val placeable = measurable.measure(Constraints.fixed(result.size.width, result.size.height))
-                layout(result.size.width, result.size.height) { placeable.place(0, 0) }
+                // Drawn into a box wider by the slack on every side, like a word piece, so the glow is not cut.
+                val placeable = measurable.measure(Constraints.fixed(result.size.width + 2 * slack, result.size.height + 2 * slack))
+                layout(result.size.width, result.size.height) { placeable.place(-slack, -slack) }
             }
             .drawBehind {
                 tick.value
                 val layout = holder.layout ?: return@drawBehind
-                drawPiece(layout, look, animator.lineFill, animator.lineGlow.position, GlowSpec.LINE, vertical)
+                translate(slack.toFloat(), slack.toFloat()) {
+                    drawPiece(layout, look, animator.lineFill, animator.lineGlow.position, GlowSpec.LINE, vertical)
+                }
             }
     )
 }
@@ -600,7 +619,8 @@ private fun DrawScope.drawPiece(
     }
     val sung = Color.White.copy(alpha = look.fillAlpha)
     val unsung = Color.White.copy(alpha = look.fillAlphaEnd)
-    val extent = if (vertical) size.height else size.width
+    // The glyph box, not the draw box: the box has glow slack around the text.
+    val extent = if (vertical) layout.size.height.toFloat() else layout.size.width.toFloat()
     val start = extent * fill / 100f
     val end = extent * (fill + LyricsStyle.FILL_BAND) / 100f
     when {
@@ -644,7 +664,7 @@ private fun DotsRow(item: DotsItem, smoothPosition: State<Long>, fontSize: TextU
     val style = lyricStyle(fontSize * LyricsStyle.DOT_SIZE_EM).copy(lineHeight = fontSize * LyricsStyle.DOT_SIZE_EM * 0.65f)
     val measurer = rememberTextMeasurer()
     val layout = remember(style) { measurer.measure("•", style) }
-    val size = with(density) { DpSize(layout.size.width.toDp(), layout.size.height.toDp()) }
+    val slack = with(density) { LyricsStyle.GLOW_SLACK_DP.dp.roundToPx() }
     Row(
         Modifier
             .layout { measurable, constraints ->
@@ -655,6 +675,7 @@ private fun DotsRow(item: DotsItem, smoothPosition: State<Long>, fontSize: TextU
             .graphicsLayer {
                 scaleX = groupScale
                 scaleY = groupScale
+                compositingStrategy = CompositingStrategy.ModulateAlpha
                 alpha = unfolded
                 transformOrigin = TransformOrigin.Center
             },
@@ -663,24 +684,31 @@ private fun DotsRow(item: DotsItem, smoothPosition: State<Long>, fontSize: TextU
         for (dot in animator.dots) {
             Spacer(
                 Modifier
-                    .size(size)
+                    // The same glow slack as a word piece: the dot's halo is wider than its glyph.
+                    .layout { measurable, _ ->
+                        val placeable = measurable.measure(Constraints.fixed(layout.size.width + 2 * slack, layout.size.height + 2 * slack))
+                        layout(layout.size.width, layout.size.height) { placeable.place(-slack, -slack) }
+                    }
                     .graphicsLayer {
                         tick.value
                         scaleX = dot.scale.position
                         scaleY = dot.scale.position
                         translationY = dot.lift.position * fontPx
+                        compositingStrategy = CompositingStrategy.ModulateAlpha
                         alpha = dot.opacity.position.coerceIn(0f, 1f)
                         transformOrigin = TransformOrigin.Center
                     }
                     .drawBehind {
                         tick.value
                         val glow = dot.glow.position
-                        if (glow > 0.005f) {
-                            val blur = (LyricsStyle.GLOW_BLUR_BASE_PX + GlowSpec.DOT.blurPx * glow).dp.toPx()
-                            val alpha = (glow * GlowSpec.DOT.opacity).coerceIn(0f, MAX_SHADOW_ALPHA)
-                            drawText(layout, color = Color.Transparent, shadow = Shadow(Color.White.copy(alpha = alpha), Offset.Zero, blur))
+                        translate(slack.toFloat(), slack.toFloat()) {
+                            if (glow > 0.005f) {
+                                val blur = (LyricsStyle.GLOW_BLUR_BASE_PX + GlowSpec.DOT.blurPx * glow).dp.toPx()
+                                val alpha = (glow * GlowSpec.DOT.opacity).coerceIn(0f, MAX_SHADOW_ALPHA)
+                                drawText(layout, color = Color.Transparent, shadow = Shadow(Color.White.copy(alpha = alpha), Offset.Zero, blur))
+                            }
+                            drawText(layout, color = Color.White.copy(alpha = LyricsStyle.FILL_ALPHA))
                         }
-                        drawText(layout, color = Color.White.copy(alpha = LyricsStyle.FILL_ALPHA))
                     }
             )
         }

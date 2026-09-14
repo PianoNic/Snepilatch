@@ -41,6 +41,7 @@ import ch.snepilatch.app.ui.theme.SnepilatchLightGray
 import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import ch.snepilatch.app.viewmodel.LyricsViewModel
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
+import kotlinx.coroutines.launch
 
 /**
  * The back of the flipped cover (#817): the playing track's lyrics in the card over a scrim,

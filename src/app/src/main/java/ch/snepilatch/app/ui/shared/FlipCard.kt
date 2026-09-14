@@ -82,6 +82,7 @@ fun FlipCard(
 private const val FULL_TURN = 360f
 
 private const val HALF_TURN = 180f
+
 /** Firm enough to finish a single turn in well under a second, soft enough to keep momentum across taps. */
 private const val FLIP_STIFFNESS = Spring.StiffnessMediumLow
 

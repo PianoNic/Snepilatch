@@ -95,8 +95,8 @@ object AppSettings {
 
     // Action assigned to the button beside the full-screen player's track details.
     val playerShortcut = MutableStateFlow(PlayerShortcut.LIKE)
-    val swipeLeftAction = MutableStateFlow(PlayerShortcut.ADD_TO_QUEUE)
-    val swipeRightAction = MutableStateFlow(PlayerShortcut.ADD_TO_PLAYLIST)
+    val swipeLeftAction = MutableStateFlow(PlayerShortcut.ADD_TO_PLAYLIST)
+    val swipeRightAction = MutableStateFlow(PlayerShortcut.ADD_TO_QUEUE)
 
     // How the equalizer is handled. One choice, because the options exclude each other: the in-app EQ
     // computes its own input gain from the curve, while the headroom attenuation exists only to give an
@@ -166,10 +166,10 @@ object AppSettings {
         playerGradientBg.value = prefs.getBoolean("player_gradient_bg", false)
         playerShortcut.value = PlayerShortcut.fromId(prefs.getString("player_shortcut", null))
         swipeLeftAction.value = PlayerShortcut.fromId(
-            prefs.getString("swipe_left_action", null), PlayerShortcut.ADD_TO_QUEUE
+            prefs.getString("swipe_left_action", null), PlayerShortcut.ADD_TO_PLAYLIST
         )
         swipeRightAction.value = PlayerShortcut.fromId(
-            prefs.getString("swipe_right_action", null), PlayerShortcut.ADD_TO_PLAYLIST
+            prefs.getString("swipe_right_action", null), PlayerShortcut.ADD_TO_QUEUE
         )
         contentRegion.value = prefs.getString("content_region", "nearest") ?: "nearest"
         updateChannel.value = prefs.getString("update_channel", CHANNEL_STABLE) ?: CHANNEL_STABLE

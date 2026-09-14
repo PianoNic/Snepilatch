@@ -57,8 +57,8 @@ class AppSettingsDefaultsTest {
     fun swipeActionsUseTheirOwnDefaults() {
         AppSettings.load(contextWith(emptyPrefs()))
 
-        assertEquals(PlayerShortcut.ADD_TO_QUEUE, AppSettings.swipeLeftAction.value)
-        assertEquals(PlayerShortcut.ADD_TO_PLAYLIST, AppSettings.swipeRightAction.value)
+        assertEquals(PlayerShortcut.ADD_TO_PLAYLIST, AppSettings.swipeLeftAction.value)
+        assertEquals(PlayerShortcut.ADD_TO_QUEUE, AppSettings.swipeRightAction.value)
     }
 
     @Test
@@ -69,8 +69,8 @@ class AppSettingsDefaultsTest {
 
         AppSettings.load(contextWith(prefs))
 
-        assertEquals(PlayerShortcut.ADD_TO_QUEUE, AppSettings.swipeLeftAction.value)
-        assertEquals(PlayerShortcut.ADD_TO_PLAYLIST, AppSettings.swipeRightAction.value)
+        assertEquals(PlayerShortcut.ADD_TO_PLAYLIST, AppSettings.swipeLeftAction.value)
+        assertEquals(PlayerShortcut.ADD_TO_QUEUE, AppSettings.swipeRightAction.value)
         AppSettings.load(contextWith(emptyPrefs()))
     }
 

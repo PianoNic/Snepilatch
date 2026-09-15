@@ -109,6 +109,8 @@
     <string name="tap_to_check">Нажмите для проверки обновлений</string>
     <string name="release_notes">Примечания к выпуску</string>
     <string name="view_changelog">Просмотр изменений</string>
+    <string name="relay_server">Сервер ретрансляции</string>
+    <string name="relay_server_desc">Сервер, через который работают джемы. Укажите адрес своего Snepirelay или оставьте пустым, чтобы использовать сервер по умолчанию.</string>
     <string name="debug_logging">Отладочное логирование</string>
     <string name="debug_logging_desc">Введите URL конечной точки Loki, чтобы поделиться логами с разработчиком. Оставьте пустым, чтобы отключить.</string>
     <string name="debug_logging_off">Выкл</string>

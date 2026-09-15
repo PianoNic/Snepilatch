@@ -114,6 +114,8 @@
     <string name="tap_to_check">Tap to check for new versions</string>
     <string name="release_notes">Release Notes</string>
     <string name="view_changelog">View changelog</string>
+    <string name="relay_server">Relay server</string>
+    <string name="relay_server_desc">The server jams run through. Enter your own Snepirelay address, or leave empty for the default.</string>
     <string name="debug_logging">Debug Logging</string>
     <string name="debug_logging_desc">Enter a Loki endpoint URL to share logs with a developer. Leave empty to disable.</string>
     <string name="debug_logging_off">Off</string>

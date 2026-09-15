@@ -24,7 +24,7 @@ class RelayClientLiveTest {
 
     private fun client(scope: CoroutineScope, name: String): RelayClient {
         val identity = RelayIdentity(UUID.randomUUID().toString(), UUID.randomUUID().toString() + UUID.randomUUID())
-        val url = System.getenv("RELAY_URL") ?: RelayClient.DEFAULT_URL
+        val url = RelayClient.socketUrl(System.getenv("RELAY_URL") ?: RelaySettings.DEFAULT_URL)
         val profile = RelayCodec.Profile(null, "live-$name", null)
         val device = RelayCodec.Device("d-$name", "test", "Computer")
         return RelayClient(url, { RelayCodec.hello(identity.installId, identity.secret, profile, device) }, scope)

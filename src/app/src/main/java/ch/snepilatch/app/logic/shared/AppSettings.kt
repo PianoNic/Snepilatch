@@ -169,6 +169,7 @@ object AppSettings {
         contentRegion.value = prefs.getString("content_region", "nearest") ?: "nearest"
         updateChannel.value = prefs.getString("update_channel", CHANNEL_STABLE) ?: CHANNEL_STABLE
         lokiEndpoint.value = prefs.getString("loki_endpoint", "") ?: ""
+        ch.snepilatch.app.logic.relay.RelaySettings.load(prefs)
         downloadCapGb.value = prefs.getFloat("download_cap_gb", 0f)
         downloadCapPolicy.value = prefs.getString("download_cap_policy", CAP_POLICY_STOP) ?: CAP_POLICY_STOP
         notificationLeftButton.value = prefs.getString("notification_left_button", "repeat") ?: "repeat"

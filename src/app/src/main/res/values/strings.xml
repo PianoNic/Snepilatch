@@ -220,6 +220,7 @@
     <string name="refresh">Refresh</string>
     <string name="lyrics">Lyrics</string>
     <string name="infiniplay">InfiniPlay</string>
+    <string name="infiniplay_stop">Stop InfiniPlay</string>
     <string name="view_queue">View Queue</string>
     <string name="visit_artist">Visit Artist</string>
     <string name="devices">Devices</string>

@@ -4,7 +4,6 @@ import androidx.compose.ui.graphics.Color
 import ch.snepilatch.app.ui.theme.SnepilatchBlack
 import ch.snepilatch.app.ui.theme.SnepilatchGray
 import ch.snepilatch.app.ui.theme.SnepilatchLightGray
-import ch.snepilatch.app.logic.shared.spfyId
 
 enum class Screen {
     LOGIN, HOME, SEARCH, LIBRARY, NOW_PLAYING, PLAYLIST_DETAIL, ALBUM_DETAIL,
@@ -80,6 +79,8 @@ data class DetailData(
     // a display name and can't be matched against an account.
     val ownerName: String? = null,
     val ownerUri: String? = null,
+    /** Whether the signed-in user may add or remove this playlist's items, owner or collaborator. */
+    val canEditItems: Boolean = false,
     val followers: Long? = null,
     val savedInLibrary: Boolean = false,
     // Artist-specific
@@ -92,11 +93,12 @@ data class DetailData(
     val publisher: String? = null
 )
 
-/** True when this detail is a playlist [username] owns — the only case where a track may be removed. */
-fun DetailData.isPlaylistOwnedBy(username: String): Boolean =
-    type == "playlist" &&
-        username.isNotBlank() &&
-        ownerUri?.let(::spfyId) == username
+/**
+ * True when a track may be taken out of this list. Not the same as owning it: a collaborative
+ * playlist someone else owns is editable too, which is what the service reports and what the web
+ * player gates its remove action on (#853).
+ */
+fun DetailData.canEditPlaylistItems(): Boolean = type == "playlist" && canEditItems
 
 data class RelatedArtist(
     val uri: String,

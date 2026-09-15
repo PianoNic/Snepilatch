@@ -14,10 +14,10 @@ import kotify.api.playlist.Playlist
  * do this before, so a track added twice from the player could not be undone from there.
  */
 
-/** True when the player may offer the removal: own playlist, and the row it plays is known. */
+/** True when the player may offer the removal: an editable playlist, and the row it plays is known. */
 fun PlaybackViewModel.canRemovePlayingFromPlaylist(): Boolean {
     val context = playingContext.value ?: return false
-    return context.ownedByUser &&
+    return context.canEditItems &&
         context.uri?.contains(":playlist:") == true &&
         playback.value.track?.uid != null
 }

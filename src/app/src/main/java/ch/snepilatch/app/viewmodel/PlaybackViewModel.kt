@@ -25,7 +25,7 @@ import ch.snepilatch.app.logic.playback.PositionInterpolator
 import ch.snepilatch.app.logic.shared.AccountStore
 import ch.snepilatch.app.logic.shared.SavedAccount
 import ch.snepilatch.app.logic.shared.SessionHolder
-import ch.snepilatch.app.logic.shared.spfyId
+
 import ch.snepilatch.app.logic.download.DownloadFolder
 import ch.snepilatch.app.logic.download.DownloadNotifier
 import ch.snepilatch.app.logic.download.DownloadQueue
@@ -374,8 +374,8 @@ class PlaybackViewModel : ViewModel() {
     }
 
     // Playing context (e.g. "Album • Abbey Road" or "Playlist • Chill Vibes")
-    /** [ownedByUser] gates the playlist-only actions on the player, such as removing the playing track (#851). */
-    data class PlayingContext(val type: String, val name: String, val uri: String? = null, val ownedByUser: Boolean = false)
+    /** [canEditItems] gates the playlist-only actions on the player, such as removing the playing track (#851). */
+    data class PlayingContext(val type: String, val name: String, val uri: String? = null, val canEditItems: Boolean = false)
     val playingContext = MutableStateFlow<PlayingContext?>(null)
 
     /** The offline engine's side of this model: the state mirror, the network watch, the takeover (#789, #792). */
@@ -430,8 +430,8 @@ class PlaybackViewModel : ViewModel() {
 
     private val playlistNameCache = mutableMapOf<String, String>()
 
-    /** Playlists the signed-in user owns, learned from the same lookup that names them. */
-    private val playlistOwnedCache = mutableMapOf<String, Boolean>()
+    /** Playlists the signed-in user may edit, learned from the same lookup that names them. */
+    private val playlistEditableCache = mutableMapOf<String, Boolean>()
 
     // Loading (detail loading moved to DetailViewModel.isLoading)
     val isStreamLoading = MutableStateFlow(false)
@@ -1467,17 +1467,19 @@ class PlaybackViewModel : ViewModel() {
                         try {
                             val sess = session ?: return@launch
                             val info = kotify.api.playlist.Playlist(sess).getPlaylist(playlistId, limit = 1)
-                            val owned = spfyId(info.owner.uri) == SessionHolder.username
-                            playlistOwnedCache[playlistId] = owned
+                            // What the service says this user may do, not who owns it: a
+                            // collaborative playlist is editable by people who do not own it (#853).
+                            val editable = info.canEditItems
+                            playlistEditableCache[playlistId] = editable
                             val title = info.name.takeIf { it.isNotBlank() }
                             if (title != null) {
                                 playlistNameCache[playlistId] = title
-                                playingContext.value = PlayingContext("Playlist", title, contextUri, owned)
+                                playingContext.value = PlayingContext("Playlist", title, contextUri, editable)
                             }
                         } catch (_: Exception) {}
                     }
                 }
-                PlayingContext("Playlist", cached ?: "Playlist", contextUri, playlistOwnedCache[playlistId] == true)
+                PlayingContext("Playlist", cached ?: "Playlist", contextUri, playlistEditableCache[playlistId] == true)
             }
             contextUri.contains(":album:") -> PlayingContext("Album", track?.albumName ?: "Album", contextUri)
             contextUri.contains(":artist:") -> PlayingContext("Artist", track?.artistName ?: "Artist", contextUri)

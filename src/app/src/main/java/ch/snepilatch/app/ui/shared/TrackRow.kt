@@ -42,7 +42,7 @@ import androidx.compose.runtime.setValue
 
 /**
  * [onRemoveFromPlaylist] adds a "Remove from this Playlist" entry. Passed in because only the caller
- * knows whether this list is a playlist the user may edit (see [ch.snepilatch.app.data.isPlaylistOwnedBy]).
+ * knows whether this list is a playlist the user may edit (see [ch.snepilatch.app.data.canEditPlaylistItems]).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

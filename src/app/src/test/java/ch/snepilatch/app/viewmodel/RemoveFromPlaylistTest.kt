@@ -2,7 +2,7 @@ package ch.snepilatch.app.viewmodel
 
 import ch.snepilatch.app.data.DetailData
 import ch.snepilatch.app.data.TrackInfo
-import ch.snepilatch.app.data.isPlaylistOwnedBy
+import ch.snepilatch.app.data.canEditPlaylistItems
 import ch.snepilatch.app.logic.shared.SessionHolder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -40,11 +40,12 @@ class RemoveFromPlaylistTest {
         Dispatchers.resetMain()
     }
 
-    private fun playlist(owner: String = "spotify:user:pianonic") = DetailData(
+    private fun playlist(owner: String = "spotify:user:pianonic", canEdit: Boolean = true) = DetailData(
         name = "Mix",
         uri = "spotify:playlist:p1",
         type = "playlist",
         ownerUri = owner,
+        canEditItems = canEdit,
         tracks = listOf(
             TrackInfo("spotify:track:a", "A", "x", null, uid = "u1"),
             // The same song twice — this is what makes uid rather than uri the key.
@@ -55,24 +56,26 @@ class RemoveFromPlaylistTest {
     )
 
     @Test fun ownPlaylistIsEditable() {
-        assertTrue(playlist().isPlaylistOwnedBy("pianonic"))
+        assertTrue(playlist().canEditPlaylistItems())
     }
 
-    @Test fun someoneElsesPlaylistIsNot() {
-        assertFalse(playlist(owner = "spotify:user:stranger").isPlaylistOwnedBy("pianonic"))
+    @Test fun someoneElsesPlaylistIsEditableWhenTheyLetYou() {
+        // A collaborative playlist: not ours, still ours to change. Comparing the owner used to hide
+        // the remove action here (#853).
+        assertTrue(playlist(owner = "spotify:user:stranger").canEditPlaylistItems())
+    }
+
+    @Test fun aPlaylistWeOnlyFollowIsNot() {
+        assertFalse(playlist(owner = "spotify:user:stranger", canEdit = false).canEditPlaylistItems())
     }
 
     @Test fun likedSongsIsNotAPlaylist() {
-        val liked = DetailData(uri = "spotify:collection:tracks", ownerUri = "spotify:user:pianonic")
-        assertFalse(liked.isPlaylistOwnedBy("pianonic"))
+        val liked = DetailData(uri = "spotify:collection:tracks", canEditItems = true)
+        assertFalse(liked.canEditPlaylistItems())
     }
 
     @Test fun anAlbumIsNotAPlaylist() {
-        assertFalse(playlist().copy(type = "album").isPlaylistOwnedBy("pianonic"))
-    }
-
-    @Test fun signedOutOwnsNothing() {
-        assertFalse(playlist().isPlaylistOwnedBy(""))
+        assertFalse(playlist().copy(type = "album").canEditPlaylistItems())
     }
 
     @Test fun removingWithoutASessionLeavesTheListAlone() {

@@ -30,7 +30,7 @@
 | **Your music** | **Looks** |
 | <ul><li>Liked songs, playlists, albums, artists and podcasts</li><li>Search, a home feed, your queue one swipe away</li><li>Scan a code to open a song</li><li>Shared links open straight in the app</li></ul> | <ul><li>Colours that follow the album cover</li><li>Swipe your way around the player</li><li>Moving artwork behind the music</li><li>Built for Android, feels like it</li></ul> |
 | **Make it yours** | **Languages** |
-| <ul><li>Swipe a song left or right to do whatever you want</li><li>Choose the extra button on the player</li><li>Choose the two buttons on the notification</li><li>Looks and behaviour all in one place</li></ul> | <ul><li>🇨🇭 **Schwiizerdütsch**, properly translated, not an afterthought</li><li>English, German and Russian too</li><li>New versions arrive in the app</li></ul> |
+| <ul><li>Swipe a song left or right to do whatever you want</li><li>Choose the extra button on the player</li><li>Choose the two buttons on the notification</li><li>Looks and behaviour all in one place</li></ul> | <ul><li>🇨🇭 **Schwiizerdütsch**, we had no say in it, the app is made in Switzerland</li><li>English, German and Russian too</li><li>New versions arrive in the app</li></ul> |
 
 > [!CAUTION]
 > This is an unofficial client, use at your own risk or with an alternative account, as account safety cannot be guaranteed.

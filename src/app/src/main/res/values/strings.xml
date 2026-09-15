@@ -275,11 +275,11 @@
     <!-- Account section headers -->
     <string name="account_section_profile">Profile &amp; Account</string>
     <string name="account_section_playback">Playback</string>
-    <string name="account_section_appearance">Interface</string>
+    <string name="account_section_appearance">Appearance</string>
+    <string name="account_section_interface">Interface</string>
     <string name="appearance">Appearance</string>
     <string name="behavior">Behavior</string>
-    <string name="appearance_settings">Open interface settings</string>
-    <string name="appearance_settings_desc">Language, lyrics, backgrounds and notification buttons</string>
+    <string name="interface_desc">Language, lyrics, backgrounds and notification buttons</string>
     <string name="account_section_notifications">Notifications</string>
 
     <!-- Equalizer -->

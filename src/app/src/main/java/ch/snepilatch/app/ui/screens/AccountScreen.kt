@@ -439,8 +439,8 @@ fun AccountScreen(vm: PlaybackViewModel) {
         SettingsSectionHeader(stringResource(R.string.account_section_appearance))
 
         SettingRow(
-            title = stringResource(R.string.appearance_settings),
-            subtitle = stringResource(R.string.appearance_settings_desc),
+            title = stringResource(R.string.account_section_interface),
+            subtitle = stringResource(R.string.interface_desc),
             icon = Icons.Rounded.Palette,
             onClick = { vm.navigateTo(Screen.INTERFACE) },
         )

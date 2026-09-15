@@ -1,5 +1,6 @@
 package ch.snepilatch.app.ui.screens
 
+import android.content.Context
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
@@ -14,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -30,8 +32,8 @@ import ch.snepilatch.app.ui.shared.SettingToggleRow
 import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 
+/** The appearance and behaviour settings, moved off the account tab onto their own page (#828). */
 @Composable
-@Suppress("LongMethod")
 fun InterfaceScreen(vm: PlaybackViewModel) {
     val context = LocalContext.current
     val theme by ThemeController.themeColors.collectAsState()
@@ -51,171 +53,167 @@ fun InterfaceScreen(vm: PlaybackViewModel) {
                 Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back), tint = SnepilatchWhite)
             }
             Text(
-                stringResource(R.string.account_section_appearance),
+                stringResource(R.string.account_section_interface),
                 color = SnepilatchWhite,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold
             )
         }
 
-        SettingsSectionHeader(stringResource(R.string.language))
+        LanguageSection(vm, context)
+        Spacer(Modifier.height(24.dp))
+        BehaviorSection(context)
+        Spacer(Modifier.height(24.dp))
+        AppearanceSection(vm, context, animatedPrimary)
+        Spacer(Modifier.height(24.dp))
+        NotificationButtonsSection(context)
+    }
+}
 
-        val appLanguage by AppSettings.appLanguage.collectAsState()
-        var showLanguagePicker by remember { mutableStateOf(false) }
-        val systemDefaultLabel = stringResource(R.string.language_system_default)
-        val languages = remember(systemDefaultLabel) {
-            listOf(
-                "system" to systemDefaultLabel,
-                "en" to "English",
-                "de" to "Deutsch",
-                "ru" to "Русский",
-                "gsw" to "Schwiizerdütsch"
-            )
-        }
-        val currentLanguageLabel = languages.find { it.first == appLanguage }?.second ?: systemDefaultLabel
-        SettingRow(
+@Composable
+private fun LanguageSection(vm: PlaybackViewModel, context: Context) {
+    SettingsSectionHeader(stringResource(R.string.language))
+    val appLanguage by AppSettings.appLanguage.collectAsState()
+    var showLanguagePicker by remember { mutableStateOf(false) }
+    val systemDefaultLabel = stringResource(R.string.language_system_default)
+    val languages = remember(systemDefaultLabel) {
+        listOf(
+            "system" to systemDefaultLabel,
+            "en" to "English",
+            "de" to "Deutsch",
+            "ru" to "Русский",
+            "gsw" to "Schwiizerdütsch"
+        )
+    }
+    val currentLanguageLabel = languages.find { it.first == appLanguage }?.second ?: systemDefaultLabel
+    SettingRow(
+        title = stringResource(R.string.language),
+        subtitle = currentLanguageLabel,
+        icon = Icons.Rounded.Language,
+        onClick = { showLanguagePicker = true },
+    )
+    if (showLanguagePicker) {
+        RadioPickerDialog(
             title = stringResource(R.string.language),
-            subtitle = currentLanguageLabel,
-            icon = Icons.Rounded.Language,
-            onClick = { showLanguagePicker = true },
+            options = languages.map { RadioOption(it.first, it.second) },
+            selected = appLanguage,
+            onSelect = {
+                vm.setAppLanguage(it, context)
+                showLanguagePicker = false
+            },
+            onDismiss = { showLanguagePicker = false }
         )
-        if (showLanguagePicker) {
-            RadioPickerDialog(
-                title = stringResource(R.string.language),
-                options = languages.map { RadioOption(it.first, it.second) },
-                selected = appLanguage,
-                onSelect = {
-                    vm.setAppLanguage(it, context)
-                    showLanguagePicker = false
-                },
-                onDismiss = { showLanguagePicker = false }
-            )
-        }
+    }
+}
 
-        Spacer(Modifier.height(24.dp))
-        SettingsSectionHeader(stringResource(R.string.behavior))
-
-        val lyricsAnim by AppSettings.lyricsAnimDirection.collectAsState()
-        var showLyricsPicker by remember { mutableStateOf(false) }
-        val lyricsLabel = if (lyricsAnim == "horizontal") stringResource(R.string.lyrics_horizontal) else stringResource(R.string.lyrics_vertical)
-        SettingRow(
+@Composable
+private fun BehaviorSection(context: Context) {
+    SettingsSectionHeader(stringResource(R.string.behavior))
+    val lyricsAnim by AppSettings.lyricsAnimDirection.collectAsState()
+    var showLyricsPicker by remember { mutableStateOf(false) }
+    val lyricsLabel = if (lyricsAnim == "horizontal") stringResource(R.string.lyrics_horizontal) else stringResource(R.string.lyrics_vertical)
+    SettingRow(
+        title = stringResource(R.string.lyrics_animation),
+        subtitle = lyricsLabel,
+        icon = Icons.Rounded.MusicNote,
+        onClick = { showLyricsPicker = true },
+    )
+    if (showLyricsPicker) {
+        RadioPickerDialog(
             title = stringResource(R.string.lyrics_animation),
-            subtitle = lyricsLabel,
-            icon = Icons.Rounded.MusicNote,
-            onClick = { showLyricsPicker = true },
+            description = stringResource(R.string.lyrics_anim_desc),
+            options = listOf(
+                RadioOption("vertical", stringResource(R.string.lyrics_vertical)),
+                RadioOption("horizontal", stringResource(R.string.lyrics_horizontal))
+            ),
+            selected = lyricsAnim,
+            onSelect = {
+                AppSettings.setLyricsAnimDirection(it, context)
+                showLyricsPicker = false
+            },
+            onDismiss = { showLyricsPicker = false }
         )
-        if (showLyricsPicker) {
-            RadioPickerDialog(
-                title = stringResource(R.string.lyrics_animation),
-                description = stringResource(R.string.lyrics_anim_desc),
-                options = listOf(
-                    RadioOption("vertical", stringResource(R.string.lyrics_vertical)),
-                    RadioOption("horizontal", stringResource(R.string.lyrics_horizontal))
-                ),
-                selected = lyricsAnim,
-                onSelect = {
-                    AppSettings.setLyricsAnimDirection(it, context)
-                    showLyricsPicker = false
-                },
-                onDismiss = { showLyricsPicker = false }
-            )
-        }
+    }
+}
 
-        Spacer(Modifier.height(24.dp))
-        SettingsSectionHeader(stringResource(R.string.appearance))
+@Composable
+private fun AppearanceSection(vm: PlaybackViewModel, context: Context, accent: Color) {
+    SettingsSectionHeader(stringResource(R.string.appearance))
+    val canvasOn by AppSettings.canvasEnabled.collectAsState()
+    SettingToggleRow(
+        title = stringResource(R.string.canvas_background),
+        checked = canvasOn,
+        onCheckedChange = { vm.setCanvasEnabled(it, context) },
+        accent = accent,
+        subtitle = if (canvasOn) stringResource(R.string.canvas_on) else stringResource(R.string.canvas_off),
+        icon = Icons.Rounded.PlayCircle,
+    )
+    val gradientBg by AppSettings.playerGradientBg.collectAsState()
+    SettingToggleRow(
+        title = stringResource(R.string.gradient_background),
+        checked = gradientBg,
+        onCheckedChange = { AppSettings.setPlayerGradientBg(it, context) },
+        accent = accent,
+        subtitle = stringResource(if (gradientBg) R.string.gradient_bg_on else R.string.gradient_bg_off),
+        icon = Icons.Rounded.Gradient,
+    )
+}
 
-        val canvasOn by AppSettings.canvasEnabled.collectAsState()
-        SettingToggleRow(
-            title = stringResource(R.string.canvas_background),
-            checked = canvasOn,
-            onCheckedChange = { vm.setCanvasEnabled(it, context) },
-            accent = animatedPrimary,
-            subtitle = if (canvasOn) stringResource(R.string.canvas_on) else stringResource(R.string.canvas_off),
-            icon = Icons.Rounded.PlayCircle,
+@Composable
+private fun NotificationButtonsSection(context: Context) {
+    SettingsSectionHeader(stringResource(R.string.account_section_notifications))
+    val labels = mapOf(
+        "like" to stringResource(R.string.notif_like),
+        "shuffle" to stringResource(R.string.notif_shuffle),
+        "repeat" to stringResource(R.string.notif_repeat),
+    )
+    val descriptions = mapOf(
+        "like" to stringResource(R.string.notif_like_short_desc),
+        "shuffle" to stringResource(R.string.notif_shuffle_desc),
+        "repeat" to stringResource(R.string.notif_repeat_desc),
+    )
+    val options = labels.map { (type, label) -> RadioOption(type, label, descriptions[type]) }
+
+    val leftButton by AppSettings.notificationLeftButton.collectAsState()
+    NotificationButtonRow(
+        title = stringResource(R.string.notification_left_button),
+        pickerTitle = stringResource(R.string.notification_button_left),
+        current = leftButton,
+        label = labels[leftButton] ?: leftButton,
+        options = options,
+    ) { AppSettings.setNotificationLeftButton(it, context) }
+
+    val rightButton by AppSettings.notificationRightButton.collectAsState()
+    NotificationButtonRow(
+        title = stringResource(R.string.notification_right_button),
+        pickerTitle = stringResource(R.string.notification_button_right),
+        current = rightButton,
+        label = labels[rightButton] ?: rightButton,
+        options = options,
+    ) { AppSettings.setNotificationRightButton(it, context) }
+}
+
+@Composable
+private fun NotificationButtonRow(
+    title: String,
+    pickerTitle: String,
+    current: String,
+    label: String,
+    options: List<RadioOption>,
+    onSelect: (String) -> Unit,
+) {
+    var showPicker by remember { mutableStateOf(false) }
+    SettingRow(title = title, subtitle = label, icon = Icons.Rounded.Notifications, onClick = { showPicker = true })
+    if (showPicker) {
+        RadioPickerDialog(
+            title = pickerTitle,
+            options = options,
+            selected = current,
+            onSelect = {
+                onSelect(it)
+                showPicker = false
+            },
+            onDismiss = { showPicker = false }
         )
-
-        val gradientBg by AppSettings.playerGradientBg.collectAsState()
-        SettingToggleRow(
-            title = stringResource(R.string.gradient_background),
-            checked = gradientBg,
-            onCheckedChange = { AppSettings.setPlayerGradientBg(it, context) },
-            accent = animatedPrimary,
-            subtitle = stringResource(if (gradientBg) R.string.gradient_bg_on else R.string.gradient_bg_off),
-            icon = Icons.Rounded.Gradient,
-        )
-
-        Spacer(Modifier.height(24.dp))
-        SettingsSectionHeader(stringResource(R.string.account_section_notifications))
-
-        // Notification button options
-        val notifLikeLabel = stringResource(R.string.notif_like)
-        val notifShuffleLabel = stringResource(R.string.notif_shuffle)
-        val notifRepeatLabel = stringResource(R.string.notif_repeat)
-        val notifLikeDesc = stringResource(R.string.notif_like_short_desc)
-        val notifShuffleDesc = stringResource(R.string.notif_shuffle_desc)
-        val notifRepeatDesc = stringResource(R.string.notif_repeat_desc)
-        val buttonOptions = remember(
-            notifLikeLabel, notifShuffleLabel, notifRepeatLabel,
-            notifLikeDesc, notifShuffleDesc, notifRepeatDesc
-        ) {
-            listOf(
-                "like" to notifLikeLabel to notifLikeDesc,
-                "shuffle" to notifShuffleLabel to notifShuffleDesc,
-                "repeat" to notifRepeatLabel to notifRepeatDesc
-            )
-        }
-        fun buttonLabel(type: String) = when (type) {
-            "like" -> notifLikeLabel
-            "shuffle" -> notifShuffleLabel
-            "repeat" -> notifRepeatLabel
-            else -> type
-        }
-        val notifRadioOptions = buttonOptions.map { (pair, desc) ->
-            RadioOption(pair.first, pair.second, desc)
-        }
-
-        // Left notification button
-        val leftButton by AppSettings.notificationLeftButton.collectAsState()
-        var showLeftPicker by remember { mutableStateOf(false) }
-        SettingRow(
-            title = stringResource(R.string.notification_left_button),
-            subtitle = buttonLabel(leftButton),
-            icon = Icons.Rounded.Notifications,
-            onClick = { showLeftPicker = true },
-        )
-        if (showLeftPicker) {
-            RadioPickerDialog(
-                title = stringResource(R.string.notification_button_left),
-                options = notifRadioOptions,
-                selected = leftButton,
-                onSelect = {
-                    AppSettings.setNotificationLeftButton(it, context)
-                    showLeftPicker = false
-                },
-                onDismiss = { showLeftPicker = false }
-            )
-        }
-
-        // Right notification button
-        val rightButton by AppSettings.notificationRightButton.collectAsState()
-        var showRightPicker by remember { mutableStateOf(false) }
-        SettingRow(
-            title = stringResource(R.string.notification_right_button),
-            subtitle = buttonLabel(rightButton),
-            icon = Icons.Rounded.Notifications,
-            onClick = { showRightPicker = true },
-        )
-        if (showRightPicker) {
-            RadioPickerDialog(
-                title = stringResource(R.string.notification_button_right),
-                options = notifRadioOptions,
-                selected = rightButton,
-                onSelect = {
-                    AppSettings.setNotificationRightButton(it, context)
-                    showRightPicker = false
-                },
-                onDismiss = { showRightPicker = false }
-            )
-        }
     }
 }

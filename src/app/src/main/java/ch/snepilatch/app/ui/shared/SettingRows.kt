@@ -90,11 +90,11 @@ fun SettingsSectionHeader(title: String) {
     )
 }
 
-internal data class RadioOption(val value: String, val label: String, val supportingText: String? = null)
+data class RadioOption(val value: String, val label: String, val supportingText: String? = null)
 
 /** Single radio-select settings dialog shared by the Account and Appearance pickers. */
 @Composable
-internal fun RadioPickerDialog(
+fun RadioPickerDialog(
     title: String,
     description: String? = null,
     options: List<RadioOption>,

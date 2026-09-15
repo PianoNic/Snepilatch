@@ -25,10 +25,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.layout
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import ch.snepilatch.app.data.PlayerShortcut
 import ch.snepilatch.app.data.TrackInfo
@@ -38,7 +39,6 @@ import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import kotlinx.coroutines.launch
 import kotlin.math.abs
-import kotlin.math.roundToInt
 
 /**
  * Adds the configured start-to-end and end-to-start actions to a track row without changing its tap
@@ -94,7 +94,14 @@ fun SwipeableTrackRow(
             val shortcut = swipeActionFor(direction, endToStart, startToEnd)
             val action = actions.firstOrNull { it.shortcut == shortcut }
             if (action != null) {
-                SwipeActionBackground(state, action, direction == SwipeToDismissBoxValue.StartToEnd, theme.primary, flashAlpha.value)
+                SwipeActionBackground(
+                    state,
+                    action.icon,
+                    action.label,
+                    direction == SwipeToDismissBoxValue.StartToEnd,
+                    theme.primary,
+                    flashAlpha.value,
+                )
             }
         },
         content = { Box(Modifier.fillMaxWidth()) { content() } },
@@ -116,39 +123,48 @@ internal fun swipeActionFor(
 }
 
 /**
- * The label under the row, sized to the strip the row has uncovered so nothing shows through the
- * row itself, which keeps whatever background the screen paints. Flashes [tint] once the action ran.
+ * The full action stays anchored behind the row, which reveals it as the row moves. Flashes [tint]
+ * once the action ran.
  */
 @Composable
-private fun SwipeActionBackground(
+internal fun SwipeActionBackground(
     state: SwipeToDismissBoxState,
-    action: PlayerAction,
+    icon: ImageVector,
+    label: String,
     fromStart: Boolean,
-    tint: Color,
-    flashAlpha: Float,
+    tint: Color = Color.Transparent,
+    flashAlpha: Float = 0f,
 ) {
+    val iconProgress = with(LocalDensity.current) {
+        (runCatching { abs(state.requireOffset()) }.getOrDefault(0f) / 96.dp.toPx()).coerceIn(0f, 1f)
+    }
+    val iconScale = 0.5f + iconProgress * 0.5f
     Box(Modifier.fillMaxSize()) {
         Row(
             Modifier
                 .align(if (fromStart) Alignment.CenterStart else Alignment.CenterEnd)
                 .fillMaxHeight()
-                .layout { measurable, constraints ->
-                    val exposed = runCatching { abs(state.requireOffset()).roundToInt() }.getOrDefault(0).coerceIn(0, constraints.maxWidth)
-                    val placeable = measurable.measure(constraints.copy(minWidth = exposed, maxWidth = exposed))
-                    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
-                }
-                .clipToBounds()
                 .drawBehind { drawRect(tint.copy(alpha = flashAlpha)) }
                 .padding(horizontal = 20.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = if (fromStart) Arrangement.Start else Arrangement.End,
         ) {
             if (fromStart) {
-                Icon(action.icon, action.label, tint = SnepilatchWhite)
-                Text(action.label, color = SnepilatchWhite, maxLines = 1, modifier = Modifier.padding(start = 8.dp))
+                Icon(
+                    icon,
+                    label,
+                    tint = SnepilatchWhite,
+                    modifier = Modifier.graphicsLayer { scaleX = iconScale; scaleY = iconScale },
+                )
+                Text(label, color = SnepilatchWhite, maxLines = 1, modifier = Modifier.padding(start = 8.dp))
             } else {
-                Text(action.label, color = SnepilatchWhite, maxLines = 1, modifier = Modifier.padding(end = 8.dp))
-                Icon(action.icon, action.label, tint = SnepilatchWhite)
+                Text(label, color = SnepilatchWhite, maxLines = 1, modifier = Modifier.padding(end = 8.dp))
+                Icon(
+                    icon,
+                    label,
+                    tint = SnepilatchWhite,
+                    modifier = Modifier.graphicsLayer { scaleX = iconScale; scaleY = iconScale },
+                )
             }
         }
     }

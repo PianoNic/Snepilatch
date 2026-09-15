@@ -19,6 +19,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.res.stringResource
@@ -29,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.shared.SheetNavBarFix
 import ch.snepilatch.app.ui.shared.SpfyImage
+import ch.snepilatch.app.ui.shared.SwipeActionBackground
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.logic.shared.LokiLogger
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
@@ -39,6 +42,7 @@ import ch.snepilatch.app.ui.shared.JamInviteSheet
 import ch.snepilatch.app.viewmodel.JamViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 /** The queue as a bottom drawer over whatever is showing; the full player stays open underneath. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -272,6 +276,10 @@ private fun SwipeableQueueRow(
 ) {
     val state = rememberSwipeToDismissBoxState()
     val scope = rememberCoroutineScope()
+    val swipeOffset = runCatching { abs(state.requireOffset()) }.getOrDefault(0f)
+    val cornerRadius = with(LocalDensity.current) {
+        (12.dp.toPx() * (swipeOffset / 48.dp.toPx()).coerceIn(0f, 1f)).toDp()
+    }
     SwipeToDismissBox(
         state = state,
         modifier = modifier
@@ -298,29 +306,24 @@ private fun SwipeableQueueRow(
                 Modifier
                     .fillMaxSize()
                     .background(
-                        if (state.dismissDirection == SwipeToDismissBoxValue.StartToEnd) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            SnepilatchError
+                        when (state.dismissDirection) {
+                            SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.primary
+                            SwipeToDismissBoxValue.EndToStart -> SnepilatchError
+                            SwipeToDismissBoxValue.Settled -> SnepilatchElevated
                         }
                     )
-                    .padding(horizontal = 24.dp),
-                contentAlignment = if (state.dismissDirection == SwipeToDismissBoxValue.StartToEnd) {
-                    Alignment.CenterStart
-                } else {
-                    Alignment.CenterEnd
-                }
             ) {
                 val adding = state.dismissDirection == SwipeToDismissBoxValue.StartToEnd
-                Icon(
-                    if (adding) Icons.AutoMirrored.Rounded.QueueMusic else Icons.Rounded.Delete,
-                    stringResource(if (adding) R.string.add_to_queue else R.string.queue_remove),
-                    tint = SnepilatchWhite,
+                SwipeActionBackground(
+                    state = state,
+                    icon = if (adding) Icons.AutoMirrored.Rounded.QueueMusic else Icons.Rounded.Delete,
+                    label = stringResource(if (adding) R.string.add_to_queue else R.string.queue_remove),
+                    fromStart = adding,
                 )
             }
         }
     ) {
-        QueueRow(track, onClick, drag)
+        QueueRow(track, onClick, drag, cornerRadius)
     }
 }
 
@@ -345,10 +348,12 @@ private fun QueueRow(
     track: ch.snepilatch.app.data.TrackInfo,
     onClick: () -> Unit,
     drag: RowDrag?,
+    cornerRadius: Dp,
 ) {
     Row(
         Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(cornerRadius))
             .onSizeChanged { drag?.onMeasured?.invoke(it.height) }
             // Opaque on purpose: the delete panel sits behind every row, so a transparent row shows
             // it through and the whole list reads as though it were mid-swipe.

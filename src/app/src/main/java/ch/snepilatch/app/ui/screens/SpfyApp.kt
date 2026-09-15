@@ -82,9 +82,12 @@ import ch.snepilatch.app.ui.shared.PlaylistPickerDialog
 import ch.snepilatch.app.logic.shared.spfyId
 import ch.snepilatch.app.logic.shared.JamHolder
 import ch.snepilatch.app.ui.shared.JamBanner
-import ch.snepilatch.app.ui.shared.HorizontalPageTransition
-import ch.snepilatch.app.ui.shared.HorizontalPageTransitionDirection
-import ch.snepilatch.app.ui.shared.HorizontalPageTransitionRules
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 
 /** Dp height of the bottom overlay (MiniPlayer + BottomNav). Screens use this for bottom padding. */
 val LocalBottomOverlayHeight = compositionLocalOf { mutableStateOf(0.dp) }
@@ -337,20 +340,24 @@ fun SpfyApp(vm: PlaybackViewModel) {
 private fun MainContent(screen: Screen, vm: PlaybackViewModel, hazeState: HazeState) {
     val libraryVm: LibraryViewModel = viewModel()
     val isOffline by vm.isOffline.collectAsState()
-    HorizontalPageTransition(
-        targetState = screen,
-        modifier = Modifier.fillMaxSize(),
-        rules = HorizontalPageTransitionRules(
-            subtrees = mapOf(Screen.ACCOUNT to HorizontalPageTransitionDirection.Right),
-            parentOf = Screen::parent,
-        ),
-    ) { targetScreen ->
-        Box(
-            Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .hazeSource(hazeState)
-        ) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .hazeSource(hazeState)
+    ) {
+        // The interface page slides in over the account tab and back out; every other switch is a cut.
+        AnimatedContent(
+            targetState = screen,
+            transitionSpec = {
+                when {
+                    targetState == Screen.INTERFACE -> slideInHorizontally { it } togetherWith slideOutHorizontally { -it }
+                    initialState == Screen.INTERFACE -> slideInHorizontally { -it } togetherWith slideOutHorizontally { it }
+                    else -> EnterTransition.None togetherWith ExitTransition.None
+                }
+            },
+            label = "mainContent",
+        ) { targetScreen ->
             when (targetScreen) {
                 Screen.HOME -> if (isOffline) OfflineHomeScreen(vm) else HomeScreen(vm)
                 Screen.SEARCH -> SearchScreen(vm)

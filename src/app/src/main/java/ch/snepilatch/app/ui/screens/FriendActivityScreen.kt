@@ -2,8 +2,6 @@ package ch.snepilatch.app.ui.screens
 
 import android.text.format.DateUtils
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.StartOffset
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -38,8 +36,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -105,7 +103,7 @@ fun FriendActivityScreen(vm: PlaybackViewModel, friendsVm: FriendActivityViewMod
 
 /**
  * Laid out like the web's row: a playing friend has no time after the name and the track line in
- * the accent colour behind animated bars; a stopped one gets "• 56 min ago" after the name and a
+ * the accent colour behind a spinning disc; a stopped one gets "• 56 min ago" after the name and a
  * grey track line.
  */
 @Composable
@@ -134,7 +132,7 @@ private fun FriendRow(friend: FriendActivity, onClick: () -> Unit) {
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (friend.isPlaying) {
-                    PlayingBars(theme.primary, Modifier.size(12.dp))
+                    SpinningDisc(theme.primary, Modifier.size(12.dp))
                     Spacer(Modifier.width(6.dp))
                 }
                 Text(
@@ -150,27 +148,23 @@ private fun FriendRow(friend: FriendActivity, onClick: () -> Unit) {
     }
 }
 
-/** Three bars bouncing out of phase, the web's `animated` now-playing glyph. */
+/** A spinning disc: a ring with a hole and a dark groove so the turn reads, our own now-playing glyph. */
 @Composable
-private fun PlayingBars(color: Color, modifier: Modifier = Modifier) {
-    val transition = rememberInfiniteTransition(label = "playingBars")
-    val phases = BAR_PHASES.map { phase ->
-        transition.animateFloat(
-            initialValue = 0.3f, targetValue = 1f, label = "bar$phase",
-            animationSpec = infiniteRepeatable(tween(BAR_PERIOD_MS, easing = LinearEasing), RepeatMode.Reverse, StartOffset(phase)),
-        )
-    }
-    Canvas(modifier) {
-        val gap = size.width / (phases.size * 2 - 1)
-        phases.forEachIndexed { i, level ->
-            val h = size.height * level.value
-            drawRect(color, topLeft = Offset(i * 2 * gap, size.height - h), size = Size(gap, h))
-        }
+private fun SpinningDisc(color: Color, modifier: Modifier = Modifier) {
+    val angle by rememberInfiniteTransition(label = "disc").animateFloat(
+        initialValue = 0f, targetValue = 360f, label = "angle",
+        animationSpec = infiniteRepeatable(tween(DISC_TURN_MS, easing = LinearEasing)),
+    )
+    Canvas(modifier.rotate(angle)) {
+        val r = size.minDimension / 2
+        drawCircle(color, r)
+        drawLine(color.copy(alpha = DISC_GROOVE_ALPHA), Offset(r, 0f), Offset(r, r), strokeWidth = r / 3)
+        drawCircle(Color.Black, r / 3)
     }
 }
 
-private val BAR_PHASES = listOf(0, 180, 360)
-private const val BAR_PERIOD_MS = 500
+private const val DISC_TURN_MS = 1800
+private const val DISC_GROOVE_ALPHA = 0.5f
 
 /** "now" inside the first minute, then the platform's abbreviated relative time ("56 min ago"). */
 @Composable

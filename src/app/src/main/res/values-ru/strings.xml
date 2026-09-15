@@ -277,6 +277,10 @@
     <string name="account_section_profile">Профиль и аккаунт</string>
     <string name="account_section_playback">Воспроизведение</string>
     <string name="account_section_appearance">Внешний вид</string>
+    <string name="account_section_interface">Интерфейс</string>
+    <string name="appearance">Внешний вид</string>
+    <string name="behavior">Поведение</string>
+    <string name="interface_desc">Язык, текст песен, фон и кнопки уведомлений</string>
     <string name="account_section_notifications">Уведомления</string>
 
     <!-- Equalizer -->

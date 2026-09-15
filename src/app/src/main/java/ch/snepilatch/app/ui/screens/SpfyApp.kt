@@ -82,6 +82,12 @@ import ch.snepilatch.app.ui.shared.PlaylistPickerDialog
 import ch.snepilatch.app.logic.shared.spfyId
 import ch.snepilatch.app.logic.shared.JamHolder
 import ch.snepilatch.app.ui.shared.JamBanner
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 
 /** Dp height of the bottom overlay (MiniPlayer + BottomNav). Screens use this for bottom padding. */
 val LocalBottomOverlayHeight = compositionLocalOf { mutableStateOf(0.dp) }
@@ -340,15 +346,29 @@ private fun MainContent(screen: Screen, vm: PlaybackViewModel, hazeState: HazeSt
             .statusBarsPadding()
             .hazeSource(hazeState)
     ) {
-        when (screen) {
-            Screen.HOME -> if (isOffline) OfflineHomeScreen(vm) else HomeScreen(vm)
-            Screen.SEARCH -> SearchScreen(vm)
-            Screen.LIBRARY -> { LaunchedEffect(Unit) { libraryVm.loadLibrary() }; LibraryScreen() }
-            Screen.ACCOUNT -> AccountScreen(vm)
-            Screen.EQUALIZER -> EqualizerScreen(vm)
-            Screen.DOWNLOADS -> DownloadsScreen(vm)
-            Screen.PLAYLIST_DETAIL, Screen.ALBUM_DETAIL, Screen.ARTIST_DETAIL, Screen.SHOW_DETAIL -> DetailScreen(vm)
-            Screen.NOW_PLAYING, Screen.LYRICS, Screen.LOGIN -> {}
+        // The interface page slides in over the account tab and back out; every other switch is a cut.
+        AnimatedContent(
+            targetState = screen,
+            transitionSpec = {
+                when {
+                    targetState == Screen.INTERFACE -> slideInHorizontally { it } togetherWith slideOutHorizontally { -it }
+                    initialState == Screen.INTERFACE -> slideInHorizontally { -it } togetherWith slideOutHorizontally { it }
+                    else -> EnterTransition.None togetherWith ExitTransition.None
+                }
+            },
+            label = "mainContent",
+        ) { targetScreen ->
+            when (targetScreen) {
+                Screen.HOME -> if (isOffline) OfflineHomeScreen(vm) else HomeScreen(vm)
+                Screen.SEARCH -> SearchScreen(vm)
+                Screen.LIBRARY -> { LaunchedEffect(Unit) { libraryVm.loadLibrary() }; LibraryScreen() }
+                Screen.ACCOUNT -> AccountScreen(vm)
+                Screen.INTERFACE -> InterfaceScreen(vm)
+                Screen.EQUALIZER -> EqualizerScreen(vm)
+                Screen.DOWNLOADS -> DownloadsScreen(vm)
+                Screen.PLAYLIST_DETAIL, Screen.ALBUM_DETAIL, Screen.ARTIST_DETAIL, Screen.SHOW_DETAIL -> DetailScreen(vm)
+                Screen.NOW_PLAYING, Screen.LYRICS, Screen.LOGIN -> {}
+            }
         }
     }
 }

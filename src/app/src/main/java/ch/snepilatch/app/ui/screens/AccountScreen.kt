@@ -24,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -98,7 +99,11 @@ fun AccountScreen(vm: PlaybackViewModel) {
 
             Spacer(Modifier.height(6.dp))
             Text(
-                stringResource(R.string.profile_header, account.playlistCount, account.followers, account.following),
+                listOf(
+                    pluralStringResource(R.plurals.profile_playlists, account.playlistCount, account.playlistCount),
+                    pluralStringResource(R.plurals.profile_followers, account.followers, account.followers),
+                    pluralStringResource(R.plurals.profile_following, account.following, account.following),
+                ).joinToString(" · "),
                 color = SnepilatchLightGray,
                 fontSize = 13.sp
             )

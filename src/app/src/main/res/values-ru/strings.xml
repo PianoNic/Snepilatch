@@ -208,6 +208,10 @@
     <string name="queue">Очередь</string>
     <string name="audio_output">Аудиовыход</string>
     <string name="equalizer">Эквалайзер</string>
+    <string name="friend_activity">Активность друзей</string>
+    <string name="friend_activity_empty">Никто из тех, на кого вы подписаны, не делится тем, что слушает.</string>
+    <string name="friend_activity_now">Сейчас</string>
+    <string name="refresh">Обновить</string>
     <string name="lyrics">Текст</string>
     <string name="view_queue">Показать очередь</string>
     <string name="visit_artist">Перейти к исполнителю</string>

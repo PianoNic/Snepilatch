@@ -218,6 +218,10 @@
     <string name="queue">Wartelischte</string>
     <string name="audio_output">Ton-Uusgab</string>
     <string name="equalizer">Equalizer</string>
+    <string name="friend_activity">Höraktivität</string>
+    <string name="friend_activity_empty">Niemert, wo du folgsch, teilt grad, was er losed.</string>
+    <string name="friend_activity_now">Jetzt</string>
+    <string name="refresh">Aktualisiere</string>
     <string name="lyrics">Lyrics</string>
     <string name="infiniplay">InfiniPlay</string>
     <string name="view_queue">Wartelischte aaluege</string>

@@ -1,5 +1,6 @@
 package ch.snepilatch.app.logic.shared
 
+import ch.snepilatch.app.logic.relay.RelayJam
 import kotify.api.common.ShortLink
 import kotify.api.jam.Jam
 import kotify.api.jam.JamSession
@@ -52,6 +53,8 @@ object JamHolder {
         (token ?: session?.joinSessionToken?.takeIf { it.isNotBlank() })?.let(::jamShareLink)
 
     fun apply(update: JamUpdate, tokenFromClient: String?) {
+        // A jam held through the relay is not the account's jam as the player client sees it.
+        if (RelayJam.active) return
         session.value = update.session
         if (update.session == null) {
             shareToken.value = null

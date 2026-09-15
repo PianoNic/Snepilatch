@@ -49,6 +49,7 @@ import ch.snepilatch.app.viewmodel.JamViewModel
 fun JamSheet(onDismiss: () -> Unit, jamVm: JamViewModel = viewModel()) {
     val jam by jamVm.jam.collectAsState()
     val joining by jamVm.joining.collectAsState()
+    val starting by jamVm.starting.collectAsState()
     val error by jamVm.error.collectAsState()
     var link by remember { mutableStateOf("") }
     val sheetState = rememberBottomSheetState(
@@ -67,8 +68,24 @@ fun JamSheet(onDismiss: () -> Unit, jamVm: JamViewModel = viewModel()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Rounded.Groups, null, tint = SnepilatchWhite, modifier = Modifier.size(24.dp))
                 Spacer(Modifier.width(12.dp))
-                Text(stringResource(R.string.join_jam), color = SnepilatchWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.jam_start_title), color = SnepilatchWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
             }
+            Spacer(Modifier.height(8.dp))
+            Text(stringResource(R.string.jam_start_hint), color = SnepilatchLightGray, fontSize = 13.sp)
+            Spacer(Modifier.height(12.dp))
+            Button(
+                onClick = { jamVm.start() },
+                enabled = !starting && !joining,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(if (starting) R.string.jam_starting else R.string.jam_start))
+            }
+            if (error == JamViewModel.START_FAILED) {
+                Spacer(Modifier.height(6.dp))
+                Text(stringResource(R.string.jam_start_failed), color = SnepilatchLightGray, fontSize = 12.sp)
+            }
+            Spacer(Modifier.height(20.dp))
+            Text(stringResource(R.string.join_jam), color = SnepilatchWhite, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(12.dp))
             Text(stringResource(R.string.jam_paste_hint), color = SnepilatchLightGray, fontSize = 13.sp)
             Spacer(Modifier.height(8.dp))
@@ -79,7 +96,7 @@ fun JamSheet(onDismiss: () -> Unit, jamVm: JamViewModel = viewModel()) {
                 placeholder = { Text(stringResource(R.string.jam_link_placeholder), color = SnepilatchLightGray) },
                 modifier = Modifier.fillMaxWidth()
             )
-            if (error != null) {
+            if (error != null && error != JamViewModel.START_FAILED) {
                 Spacer(Modifier.height(6.dp))
                 Text(
                     stringResource(if (error == JamHolder.NOT_READY) R.string.jam_not_ready else R.string.jam_join_failed),

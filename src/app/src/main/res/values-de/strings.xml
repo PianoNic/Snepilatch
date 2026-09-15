@@ -395,6 +395,12 @@
     <string name="jam_link_placeholder">Jam-Link</string>
     <string name="jam_join_failed">Beitritt fehlgeschlagen. Der Link ist vielleicht abgelaufen.</string>
     <string name="jam_not_ready">Verbindung wird noch aufgebaut. Gleich nochmal versuchen.</string>
+    <string name="jam_start_title">Jam starten</string>
+    <string name="jam_start_hint">Hört gemeinsam Musik. Wer den Link hat, kann beitreten und hört, was du abspielst.</string>
+    <string name="jam_start">Starten</string>
+    <string name="jam_starting">Wird gestartet...</string>
+    <string name="jam_start_failed">Der Jam konnte nicht gestartet werden. Prüfe den Relay-Server in den Einstellungen.</string>
+    <string name="jam_menu">Jam starten oder beitreten</string>
     <string name="join_jam">Einem Jam beitreten</string>
     <string name="jam_connected">Mit Jam verbunden</string>
     <string name="jam_of">Jam von %1$s</string>

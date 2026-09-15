@@ -411,6 +411,12 @@
     <string name="jam_link_placeholder">Jam-Link</string>
     <string name="jam_join_failed">Biitrete het nöd klappet. De Link isch villicht abglaufe.</string>
     <string name="jam_not_ready">Verbindig wird no ufboue. Grad nomal probiere.</string>
+    <string name="jam_start_title">Jam starte</string>
+    <string name="jam_start_hint">Losed zäme Musig. Wer de Link het, cha biträte und ghört, was du abspielsch.</string>
+    <string name="jam_start">Starte</string>
+    <string name="jam_starting">Wird gstartet...</string>
+    <string name="jam_start_failed">De Jam het nöd chöne gstartet werde. Lueg de Relay-Server i de Istellige a.</string>
+    <string name="jam_menu">Jam starte oder biitrete</string>
     <string name="join_jam">Emene Jam biitrete</string>
     <string name="jam_connected">Mit em Jam verbunde</string>
     <string name="jam_of">Jam vo %1$s</string>

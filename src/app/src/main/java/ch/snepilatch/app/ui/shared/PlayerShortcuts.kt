@@ -31,7 +31,7 @@ fun playerShortcutTitle(shortcut: PlayerShortcut): Int = when (shortcut) {
     PlayerShortcut.RADIO -> R.string.go_to_song_radio
     PlayerShortcut.DOWNLOAD -> R.string.download_track
     PlayerShortcut.INFINIPLAY -> R.string.infiniplay
-    PlayerShortcut.JAM -> R.string.join_jam
+    PlayerShortcut.JAM -> R.string.jam_menu
     PlayerShortcut.CODE -> R.string.show_code
     PlayerShortcut.SHARE -> R.string.share
 }

@@ -410,6 +410,12 @@
     <string name="jam_link_placeholder">Jam link</string>
     <string name="jam_join_failed">Couldn\'t join that jam. The link may have expired.</string>
     <string name="jam_not_ready">Still connecting. Try again in a moment.</string>
+    <string name="jam_start_title">Start a jam</string>
+    <string name="jam_start_hint">Listen together with friends. Anyone with the link can join, and everyone hears what you play.</string>
+    <string name="jam_start">Start</string>
+    <string name="jam_starting">Starting...</string>
+    <string name="jam_start_failed">Could not start the jam. Check the relay server in the settings.</string>
+    <string name="jam_menu">Start or join a jam</string>
     <string name="join_jam">Join a jam</string>
     <string name="jam_connected">Connected to jam</string>
     <string name="jam_of">%1$s\'s Jam</string>

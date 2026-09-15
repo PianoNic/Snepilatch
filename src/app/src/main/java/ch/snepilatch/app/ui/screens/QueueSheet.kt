@@ -19,8 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.res.stringResource
@@ -31,9 +29,11 @@ import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.shared.SheetNavBarFix
 import ch.snepilatch.app.ui.shared.SpfyImage
-import ch.snepilatch.app.ui.shared.SwipeActionBackground
+import ch.snepilatch.app.ui.shared.SwipeAction
+import ch.snepilatch.app.ui.shared.SwipeableActionRow
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.logic.shared.LokiLogger
+import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import kotlin.math.roundToInt
 import ch.snepilatch.app.ui.shared.SheetDragHandle
@@ -41,8 +41,6 @@ import ch.snepilatch.app.ui.shared.JamHeader
 import ch.snepilatch.app.ui.shared.JamInviteSheet
 import ch.snepilatch.app.viewmodel.JamViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.launch
-import kotlin.math.abs
 
 /** The queue as a bottom drawer over whatever is showing; the full player stays open underneath. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -103,13 +101,6 @@ fun QueueSheet(vm: PlaybackViewModel) {
     }
 }
 
-/**
- * A queue row you can swipe away, or swipe into the immediate queue when it is only up next.
- *
- * Explicit queue entries only support removal. Context entries support both actions because adding
- * one to the queue is what makes it play before the rest of the context.
- */
-@OptIn(ExperimentalMaterial3Api::class)
 /**
  * A stable, unique key per queue row.
  *
@@ -239,6 +230,7 @@ private fun QueueList(
                     onClick = { tap(entry.first, entry.second, i) },
                     onRemove = { vm.removeFromQueue(entry.second) },
                     onAdd = null,
+                    isContextEntry = false,
                     modifier = Modifier.animateItem(),
                 )
             }
@@ -253,11 +245,8 @@ private fun QueueList(
                     dragFor(entry.first, entry.second, queuedCount + i),
                     onClick = { tap(entry.first, entry.second, queuedCount + i) },
                     onRemove = { vm.removeFromQueue(entry.second) },
-                    onAdd = if (canAddToQueue) {
-                        { vm.addToQueue(entry.second.uri) }
-                    } else {
-                        null
-                    },
+                    onAdd = ({ vm.addToQueue(entry.second.uri) }).takeIf { canAddToQueue },
+                    isContextEntry = true,
                     modifier = Modifier.animateItem(),
                 )
             }
@@ -265,6 +254,26 @@ private fun QueueList(
     }
 }
 
+internal data class QueueSwipePolicy(
+    val hasAddAction: Boolean,
+    val swipeEnabled: Boolean,
+) {
+    fun resetsAfter(direction: SwipeToDismissBoxValue): Boolean =
+        hasAddAction && direction == SwipeToDismissBoxValue.StartToEnd
+}
+
+internal fun queueSwipePolicy(
+    isContextEntry: Boolean,
+    canAddToQueue: Boolean,
+    dragging: Boolean,
+): QueueSwipePolicy = QueueSwipePolicy(isContextEntry && canAddToQueue, !dragging)
+
+/**
+ * A queue row you can swipe away, or swipe into the immediate queue when it is only up next.
+ *
+ * Explicit queue entries only support removal. Context entries support both actions because adding
+ * one to the queue is what makes it play before the rest of the context.
+ */
 @Composable
 private fun SwipeableQueueRow(
     track: ch.snepilatch.app.data.TrackInfo,
@@ -272,59 +281,38 @@ private fun SwipeableQueueRow(
     onClick: () -> Unit,
     onRemove: () -> Unit,
     onAdd: (() -> Unit)?,
+    isContextEntry: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val state = rememberSwipeToDismissBoxState()
-    val scope = rememberCoroutineScope()
-    val swipeOffset = runCatching { abs(state.requireOffset()) }.getOrDefault(0f)
-    val cornerRadius = with(LocalDensity.current) {
-        (12.dp.toPx() * (swipeOffset / 48.dp.toPx()).coerceIn(0f, 1f)).toDp()
-    }
-    SwipeToDismissBox(
-        state = state,
+    val theme by ThemeController.themeColors.collectAsState()
+    val policy = queueSwipePolicy(isContextEntry, onAdd != null, drag?.dragging == true)
+    SwipeableActionRow(
         modifier = modifier
             // The dragged row rides above the rest and follows the finger; everything else
             // holds still until the drop, so the list cannot reflow under the gesture. Rows sit
             // above the now playing item so a tapped row travelling up passes behind them.
             .zIndex(if (drag?.dragging == true) 2f else 1f)
             .offset { IntOffset(0, (drag?.offsetY ?: 0f).roundToInt()) },
-        onDismiss = { value ->
-            when (value) {
-                SwipeToDismissBoxValue.EndToStart -> onRemove()
-                SwipeToDismissBoxValue.StartToEnd -> {
-                    onAdd?.invoke()
-                    scope.launch { state.reset() }
-                }
-                SwipeToDismissBoxValue.Settled -> Unit
-            }
+        startToEndAction = onAdd?.let {
+            SwipeAction(
+                Icons.AutoMirrored.Rounded.QueueMusic,
+                stringResource(R.string.add_to_queue),
+                theme.primary,
+                it,
+                resetAfterRun = policy.resetsAfter(SwipeToDismissBoxValue.StartToEnd),
+            )
         },
-        // A vertical drag on the grip must not also read as a swipe to delete.
-        enableDismissFromEndToStart = drag?.dragging != true,
-        enableDismissFromStartToEnd = onAdd != null && drag?.dragging != true,
-        backgroundContent = {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        when (state.dismissDirection) {
-                            SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.primary
-                            SwipeToDismissBoxValue.EndToStart -> SnepilatchError
-                            SwipeToDismissBoxValue.Settled -> SnepilatchElevated
-                        }
-                    )
-            ) {
-                val adding = state.dismissDirection == SwipeToDismissBoxValue.StartToEnd
-                SwipeActionBackground(
-                    state = state,
-                    icon = if (adding) Icons.AutoMirrored.Rounded.QueueMusic else Icons.Rounded.Delete,
-                    label = stringResource(if (adding) R.string.add_to_queue else R.string.queue_remove),
-                    fromStart = adding,
-                )
-            }
-        }
-    ) {
-        QueueRow(track, onClick, drag, cornerRadius)
-    }
+        endToStartAction = SwipeAction(
+            Icons.Rounded.Delete,
+            stringResource(R.string.queue_remove),
+            SnepilatchError,
+            onRemove,
+            resetAfterRun = policy.resetsAfter(SwipeToDismissBoxValue.EndToStart),
+        ),
+        enableDismissFromEndToStart = policy.swipeEnabled,
+        enableDismissFromStartToEnd = policy.swipeEnabled,
+        contentBackground = SnepilatchElevated,
+    ) { QueueRow(track, onClick, drag) }
 }
 
 /** Opaque and above the now playing row, so a tapped row travelling up passes behind it. */
@@ -348,16 +336,11 @@ private fun QueueRow(
     track: ch.snepilatch.app.data.TrackInfo,
     onClick: () -> Unit,
     drag: RowDrag?,
-    cornerRadius: Dp,
 ) {
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(cornerRadius))
             .onSizeChanged { drag?.onMeasured?.invoke(it.height) }
-            // Opaque on purpose: the delete panel sits behind every row, so a transparent row shows
-            // it through and the whole list reads as though it were mid-swipe.
-            .background(SnepilatchElevated)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically

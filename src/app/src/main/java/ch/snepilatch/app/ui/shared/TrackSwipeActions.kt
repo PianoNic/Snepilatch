@@ -3,6 +3,7 @@ package ch.snepilatch.app.ui.shared
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxState
@@ -25,13 +27,18 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import ch.snepilatch.app.data.PlayerShortcut
 import ch.snepilatch.app.data.TrackInfo
 import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.logic.shared.ThemeController
@@ -57,8 +64,6 @@ fun SwipeableTrackRow(
         Box(modifier) { content() }
         return
     }
-    val state = rememberSwipeToDismissBoxState()
-    val scope = rememberCoroutineScope()
     val theme by ThemeController.themeColors.collectAsState()
     val endToStart by AppSettings.swipeLeftAction.collectAsState()
     val startToEnd by AppSettings.swipeRightAction.collectAsState()
@@ -71,104 +76,192 @@ fun SwipeableTrackRow(
             PlayerOverlay.Code -> showCode = true
         }
     }
-    val flashAlpha = remember { Animatable(0f) }
-    var completedDirection by remember { mutableStateOf<SwipeToDismissBoxValue?>(null) }
-
-    SwipeToDismissBox(
-        state = state,
+    SwipeableActionRow(
         modifier = modifier,
-        onDismiss = { direction ->
-            val shortcut = swipeActionFor(direction, endToStart, startToEnd)
-            actions.firstOrNull { it.shortcut == shortcut }?.run?.invoke()
-            completedDirection = direction.takeUnless { it == SwipeToDismissBoxValue.Settled }
-            scope.launch {
-                flashAlpha.snapTo(0f)
-                flashAlpha.animateTo(FLASH_ALPHA, tween(FLASH_MS, easing = FastOutSlowInEasing))
-                flashAlpha.animateTo(0f, tween(FLASH_MS, easing = FastOutSlowInEasing))
-                completedDirection = null
-                state.reset()
-            }
+        startToEndAction = actions.firstOrNull { it.shortcut == startToEnd }?.let {
+            SwipeAction(it.icon, it.label, theme.primary, it.run)
         },
-        backgroundContent = {
-            val direction = completedDirection ?: state.dismissDirection
-            val shortcut = swipeActionFor(direction, endToStart, startToEnd)
-            val action = actions.firstOrNull { it.shortcut == shortcut }
-            if (action != null) {
-                SwipeActionBackground(
-                    state,
-                    action.icon,
-                    action.label,
-                    direction == SwipeToDismissBoxValue.StartToEnd,
-                    theme.primary,
-                    flashAlpha.value,
-                )
-            }
+        endToStartAction = actions.firstOrNull { it.shortcut == endToStart }?.let {
+            SwipeAction(it.icon, it.label, theme.primary, it.run)
         },
-        content = { Box(Modifier.fillMaxWidth()) { content() } },
+        content = content,
     )
 
     if (showJam) JamSheet(onDismiss = { showJam = false })
     if (showCode) ScannableCodeSheet(track, theme.primary) { showCode = false }
 }
 
-/** Which configured shortcut a swipe in [direction] runs; none while the row sits still. */
-internal fun swipeActionFor(
-    direction: SwipeToDismissBoxValue,
-    endToStart: PlayerShortcut,
-    startToEnd: PlayerShortcut,
-): PlayerShortcut? = when (direction) {
-    SwipeToDismissBoxValue.EndToStart -> endToStart
-    SwipeToDismissBoxValue.StartToEnd -> startToEnd
-    SwipeToDismissBoxValue.Settled -> null
+internal data class SwipeAction(
+    val icon: ImageVector,
+    val label: String,
+    val tint: Color,
+    val run: () -> Unit,
+    val resetAfterRun: Boolean = true,
+)
+
+/**
+ * Adds the shared swipe gesture and action treatment to a row. The action content stays composed at
+ * its full size and is clipped to the part uncovered by the moving row.
+ */
+@Composable
+internal fun SwipeableActionRow(
+    startToEndAction: SwipeAction? = null,
+    endToStartAction: SwipeAction? = null,
+    modifier: Modifier = Modifier,
+    enableDismissFromStartToEnd: Boolean = startToEndAction != null,
+    enableDismissFromEndToStart: Boolean = endToStartAction != null,
+    contentBackground: Color = Color.Transparent,
+    content: @Composable () -> Unit,
+) {
+    val state = rememberSwipeToDismissBoxState()
+    val scope = rememberCoroutineScope()
+    val flashAlpha = remember { Animatable(0f) }
+    var completedDirection by remember { mutableStateOf<SwipeToDismissBoxValue?>(null) }
+    val density = LocalDensity.current
+    val offset = runCatching { abs(state.requireOffset()) }.getOrDefault(0f)
+    val cornerRadiusPx = with(density) {
+        CORNER_RADIUS.toPx() * swipeProgress(offset, CORNER_RADIUS_DISTANCE.toPx())
+    }
+
+    SwipeToDismissBox(
+        state = state,
+        modifier = modifier,
+        enableDismissFromStartToEnd = startToEndAction != null && enableDismissFromStartToEnd,
+        enableDismissFromEndToStart = endToStartAction != null && enableDismissFromEndToStart,
+        onDismiss = { direction ->
+            val action = when (direction) {
+                SwipeToDismissBoxValue.StartToEnd -> startToEndAction
+                SwipeToDismissBoxValue.EndToStart -> endToStartAction
+                SwipeToDismissBoxValue.Settled -> null
+            }
+            action?.run?.invoke()
+            completedDirection = direction.takeUnless { it == SwipeToDismissBoxValue.Settled }
+            scope.launch {
+                flashAlpha.snapTo(0f)
+                flashAlpha.animateTo(FLASH_ALPHA, tween(FLASH_MS, easing = FastOutSlowInEasing))
+                flashAlpha.animateTo(0f, tween(FLASH_MS, easing = FastOutSlowInEasing))
+                completedDirection = null
+                if (action?.resetAfterRun == true) state.reset()
+            }
+        },
+        backgroundContent = {
+            val direction = completedDirection ?: state.dismissDirection
+            val action = when (direction) {
+                SwipeToDismissBoxValue.StartToEnd -> startToEndAction
+                SwipeToDismissBoxValue.EndToStart -> endToStartAction
+                SwipeToDismissBoxValue.Settled -> null
+            }
+            if (action != null) {
+                SwipeActionBackground(
+                    state = state,
+                    action = action,
+                    fromStart = direction == SwipeToDismissBoxValue.StartToEnd,
+                    cornerRadius = cornerRadiusPx,
+                    flashAlpha = flashAlpha.value,
+                )
+            }
+        },
+        content = {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(with(density) { cornerRadiusPx.toDp() }))
+                    .background(contentBackground)
+            ) { content() }
+        },
+    )
 }
 
 /**
- * The full action stays anchored behind the row, which reveals it as the row moves. Flashes [tint]
+ * The full action stays anchored behind the row and is clipped to the revealed width. Flashes it
  * once the action ran.
  */
 @Composable
-internal fun SwipeActionBackground(
+private fun SwipeActionBackground(
     state: SwipeToDismissBoxState,
-    icon: ImageVector,
-    label: String,
+    action: SwipeAction,
     fromStart: Boolean,
-    tint: Color = Color.Transparent,
+    cornerRadius: Float,
     flashAlpha: Float = 0f,
 ) {
-    val iconProgress = with(LocalDensity.current) {
-        (runCatching { abs(state.requireOffset()) }.getOrDefault(0f) / 96.dp.toPx()).coerceIn(0f, 1f)
+    val offset = runCatching { abs(state.requireOffset()) }.getOrDefault(0f)
+    val density = LocalDensity.current
+    val iconProgress = with(density) {
+        swipeProgress(offset, ICON_DISTANCE.toPx())
     }
     val iconScale = 0.5f + iconProgress * 0.5f
-    Box(Modifier.fillMaxSize()) {
+    val iconTranslationX = with(density) {
+        ICON_TRANSLATION.toPx() * (1f - iconProgress) * if (fromStart) -1f else 1f
+    }
+    Box(
+        Modifier
+            .fillMaxSize()
+            .drawBehind {
+                val revealWidth = offset.coerceAtMost(size.width)
+                if (revealWidth > 0f) {
+                    val left = if (fromStart) 0f else size.width - revealWidth
+                    drawRoundRect(
+                        color = action.tint,
+                        topLeft = Offset(left, 0f),
+                        size = Size(revealWidth, size.height),
+                        cornerRadius = CornerRadius(cornerRadius),
+                    )
+                    if (flashAlpha > 0f) {
+                        drawRoundRect(
+                            color = SnepilatchWhite.copy(alpha = flashAlpha),
+                            topLeft = Offset(left, 0f),
+                            size = Size(revealWidth, size.height),
+                            cornerRadius = CornerRadius(cornerRadius),
+                        )
+                    }
+                }
+            }
+            .drawWithContent {
+                val revealWidth = offset.coerceAtMost(size.width)
+                val left = if (fromStart) 0f else size.width - revealWidth
+                clipRect(left = left, right = left + revealWidth) { this@drawWithContent.drawContent() }
+            }
+    ) {
+        val iconModifier = Modifier.graphicsLayer {
+            scaleX = iconScale
+            scaleY = iconScale
+            translationX = iconTranslationX
+        }
         Row(
             Modifier
                 .align(if (fromStart) Alignment.CenterStart else Alignment.CenterEnd)
                 .fillMaxHeight()
-                .drawBehind { drawRect(tint.copy(alpha = flashAlpha)) }
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = ICON_TRANSLATION),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = if (fromStart) Arrangement.Start else Arrangement.End,
         ) {
             if (fromStart) {
                 Icon(
-                    icon,
-                    label,
+                    action.icon,
+                    action.label,
                     tint = SnepilatchWhite,
-                    modifier = Modifier.graphicsLayer { scaleX = iconScale; scaleY = iconScale },
+                    modifier = iconModifier,
                 )
-                Text(label, color = SnepilatchWhite, maxLines = 1, modifier = Modifier.padding(start = 8.dp))
+                Text(action.label, color = SnepilatchWhite, maxLines = 1, modifier = Modifier.padding(start = 8.dp))
             } else {
-                Text(label, color = SnepilatchWhite, maxLines = 1, modifier = Modifier.padding(end = 8.dp))
+                Text(action.label, color = SnepilatchWhite, maxLines = 1, modifier = Modifier.padding(end = 8.dp))
                 Icon(
-                    icon,
-                    label,
+                    action.icon,
+                    action.label,
                     tint = SnepilatchWhite,
-                    modifier = Modifier.graphicsLayer { scaleX = iconScale; scaleY = iconScale },
+                    modifier = iconModifier,
                 )
             }
         }
     }
 }
 
+internal fun swipeProgress(offset: Float, distance: Float): Float =
+    (abs(offset) / distance).coerceIn(0f, 1f)
+
+private val CORNER_RADIUS = 12.dp
+private val CORNER_RADIUS_DISTANCE = 48.dp
+private val ICON_DISTANCE = 96.dp
+private val ICON_TRANSLATION = 16.dp
 private const val FLASH_ALPHA = 0.24f
 private const val FLASH_MS = 200

@@ -336,6 +336,8 @@
     <string name="error_follow">Künstler konnte nicht gefolgt werden</string>
     <string name="error_save_library">Konnte nicht zur Bibliothek hinzugefügt werden</string>
     <string name="error_add_playlist">Konnte nicht zur Playlist hinzugefügt werden</string>
+    <string name="removed_from_playlist">Aus der Playlist entfernt</string>
+    <string name="error_remove_playlist">Konnte nicht aus der Playlist entfernt werden</string>
     <string name="error_add_queue">Konnte nicht zur Warteschlange hinzugefügt werden</string>
     <string name="downloads">Downloads</string>
     <string name="downloading">Wird heruntergeladen</string>

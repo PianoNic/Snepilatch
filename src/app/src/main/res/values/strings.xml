@@ -342,6 +342,8 @@
     <string name="error_follow">Could not follow artist</string>
     <string name="error_save_library">Could not save to library</string>
     <string name="error_add_playlist">Could not add to playlist</string>
+    <string name="removed_from_playlist">Removed from the playlist</string>
+    <string name="error_remove_playlist">Could not remove from the playlist</string>
     <string name="error_add_queue">Could not add to queue</string>
     <string name="downloads">Downloads</string>
     <string name="downloading">Downloading</string>

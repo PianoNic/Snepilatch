@@ -164,6 +164,7 @@ fun PlaylistInfo.toDetailData(playlistId: String) = DetailData(
     loadedOffset = tracks.size,
     ownerName = owner.name,
     ownerUri = owner.uri,
+    canEditItems = canEditItems,
     followers = followers,
     savedInLibrary = following,
     tracks = tracks.map { it.toTrackInfo() },

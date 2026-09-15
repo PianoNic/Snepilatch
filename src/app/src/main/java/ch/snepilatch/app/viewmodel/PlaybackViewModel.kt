@@ -25,6 +25,7 @@ import ch.snepilatch.app.logic.playback.PositionInterpolator
 import ch.snepilatch.app.logic.shared.AccountStore
 import ch.snepilatch.app.logic.shared.SavedAccount
 import ch.snepilatch.app.logic.shared.SessionHolder
+
 import ch.snepilatch.app.logic.download.DownloadFolder
 import ch.snepilatch.app.logic.download.DownloadNotifier
 import ch.snepilatch.app.logic.download.DownloadQueue
@@ -373,7 +374,8 @@ class PlaybackViewModel : ViewModel() {
     }
 
     // Playing context (e.g. "Album • Abbey Road" or "Playlist • Chill Vibes")
-    data class PlayingContext(val type: String, val name: String, val uri: String? = null)
+    /** [canEditItems] gates the playlist-only actions on the player, such as removing the playing track (#851). */
+    data class PlayingContext(val type: String, val name: String, val uri: String? = null, val canEditItems: Boolean = false)
     val playingContext = MutableStateFlow<PlayingContext?>(null)
 
     /** The offline engine's side of this model: the state mirror, the network watch, the takeover (#789, #792). */
@@ -428,6 +430,9 @@ class PlaybackViewModel : ViewModel() {
 
     private val playlistNameCache = mutableMapOf<String, String>()
 
+    /** Playlists the signed-in user may edit, learned from the same lookup that names them. */
+    private val playlistEditableCache = mutableMapOf<String, Boolean>()
+
     // Loading (detail loading moved to DetailViewModel.isLoading)
     val isStreamLoading = MutableStateFlow(false)
 
@@ -435,6 +440,9 @@ class PlaybackViewModel : ViewModel() {
     // the like button filling in or the track appearing in the queue is its own confirmation.
     // Carries a string resource, not a resolved String — the ViewModel has no Context, and resolving
     // in the UI is what makes the message follow the picked app language.
+    /** Post a one-line message to the app's snackbar; the only feedback a background action has. */
+    internal fun emitMessage(@StringRes id: Int) { _errorMessage.tryEmit(UiMessage(id)) }
+
     private val _errorMessage =
         kotlinx.coroutines.flow.MutableSharedFlow<UiMessage>(extraBufferCapacity = 1)
     val errorMessage: kotlinx.coroutines.flow.SharedFlow<UiMessage> = _errorMessage
@@ -1263,6 +1271,7 @@ class PlaybackViewModel : ViewModel() {
         val trackInfo = if (track != null) {
             TrackInfo(
                 uri = track.uri,
+                uid = track.uid,
                 name = track.name.ifBlank { "Unknown" },
                 artist = track.displayArtist(),
                 albumArt = imageUrl,
@@ -1458,15 +1467,19 @@ class PlaybackViewModel : ViewModel() {
                         try {
                             val sess = session ?: return@launch
                             val info = kotify.api.playlist.Playlist(sess).getPlaylist(playlistId, limit = 1)
+                            // What the service says this user may do, not who owns it: a
+                            // collaborative playlist is editable by people who do not own it (#853).
+                            val editable = info.canEditItems
+                            playlistEditableCache[playlistId] = editable
                             val title = info.name.takeIf { it.isNotBlank() }
                             if (title != null) {
                                 playlistNameCache[playlistId] = title
-                                playingContext.value = PlayingContext("Playlist", title, contextUri)
+                                playingContext.value = PlayingContext("Playlist", title, contextUri, editable)
                             }
                         } catch (_: Exception) {}
                     }
                 }
-                PlayingContext("Playlist", cached ?: "Playlist", contextUri)
+                PlayingContext("Playlist", cached ?: "Playlist", contextUri, playlistEditableCache[playlistId] == true)
             }
             contextUri.contains(":album:") -> PlayingContext("Album", track?.albumName ?: "Album", contextUri)
             contextUri.contains(":artist:") -> PlayingContext("Artist", track?.artistName ?: "Artist", contextUri)
@@ -1724,8 +1737,9 @@ class PlaybackViewModel : ViewModel() {
         val position = event.positionMs ?: _playback.value.positionMs
         val paused = event.paused == true
         val art = normalizeSpfyImageUrl(current.imageLargeUrl ?: current.imageUrl)
+        val name = current.name.ifBlank { "Unknown" }
         val track = TrackInfo(
-            uri = current.uri, name = current.name.ifBlank { "Unknown" }, artist = current.displayArtist(), albumArt = art,
+            uri = current.uri, uid = current.uid, name = name, artist = current.displayArtist(), albumArt = art,
             albumName = current.albumName,
             durationMs = if (current.durationMs > 0) current.durationMs else _playback.value.durationMs
         )
@@ -3183,7 +3197,7 @@ class PlaybackViewModel : ViewModel() {
 
         // Update UI with new track info immediately — audio will follow in ~100ms
         val newTrack = TrackInfo(
-            uri = trackUri, name = title, artist = artist, albumArt = art,
+            uri = trackUri, uid = current.uid, name = title, artist = artist, albumArt = art,
             albumName = current.albumName,
             durationMs = if (current.durationMs > 0) current.durationMs else _playback.value.durationMs
         )

@@ -350,7 +350,7 @@ class DetailViewModel : SessionViewModel("DetailVM") {
         val before = _detail.value
         val uid = track.uid ?: return
         val sess = SessionHolder.session ?: return
-        if (!before.isPlaylistOwnedBy(SessionHolder.username)) return
+        if (!before.canEditPlaylistItems()) return
         val playlistId = before.uri.removePrefix("spotify:playlist:")
         val remaining = before.tracks.filterNot { it.uid == uid }
         if (remaining.size == before.tracks.size) return

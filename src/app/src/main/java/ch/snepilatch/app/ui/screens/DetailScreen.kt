@@ -44,7 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
-import ch.snepilatch.app.data.isPlaylistOwnedBy
+import ch.snepilatch.app.data.canEditPlaylistItems
 import ch.snepilatch.app.logic.download.Downloads
 import ch.snepilatch.app.ui.shared.SpfyImage
 import ch.snepilatch.app.ui.shared.TrackRow
@@ -55,7 +55,6 @@ import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.viewmodel.DetailRoutes
 import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
-import ch.snepilatch.app.logic.shared.SessionHolder
 import ch.snepilatch.app.logic.shared.shareLink
 import ch.snepilatch.app.ui.shared.trackMenuActions
 import ch.snepilatch.app.ui.shared.TrackMenuOptions
@@ -75,7 +74,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
     val theme by ThemeController.themeColors.collectAsState()
     val accentColor by androidx.compose.animation.animateColorAsState(theme.primary, androidx.compose.animation.core.tween(800), label = "detailAccent")
     val isArtist = detail.type == "artist"
-    val isOwnPlaylist = detail.isPlaylistOwnedBy(ch.snepilatch.app.logic.shared.SessionHolder.username)
+    val canEditItems = detail.canEditPlaylistItems()
 
     if (isLoading) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -420,7 +419,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                     track, vm,
                     contextUri = detail.uri,
                     trackIndex = index,
-                    onRemoveFromPlaylist = if (isOwnPlaylist && track.uid != null) {
+                    onRemoveFromPlaylist = if (canEditItems && track.uid != null) {
                         { detailVm.removeFromPlaylist(track) }
                     } else {
                         null

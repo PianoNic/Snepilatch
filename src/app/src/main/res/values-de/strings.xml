@@ -109,6 +109,8 @@
     <string name="tap_to_check">Tippe, um nach Updates zu suchen</string>
     <string name="release_notes">Versionshinweise</string>
     <string name="view_changelog">Änderungsprotokoll anzeigen</string>
+    <string name="relay_server">Relay-Server</string>
+    <string name="relay_server_desc">Der Server, über den Jams laufen. Gib die Adresse deines eigenen Snepirelay ein oder lass das Feld leer für den Standard.</string>
     <string name="debug_logging">Debug-Logging</string>
     <string name="debug_logging_desc">Gib eine Loki-Endpunkt-URL ein, um Logs mit einem Entwickler zu teilen. Leer lassen zum Deaktivieren.</string>
     <string name="debug_logging_off">Aus</string>

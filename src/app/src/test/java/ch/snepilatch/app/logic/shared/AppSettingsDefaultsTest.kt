@@ -3,6 +3,7 @@ package ch.snepilatch.app.logic.shared
 import android.content.Context
 import android.content.SharedPreferences
 import ch.snepilatch.app.data.PlayerShortcut
+import ch.snepilatch.app.logic.relay.RelaySettings
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
@@ -72,6 +73,12 @@ class AppSettingsDefaultsTest {
         assertEquals(PlayerShortcut.ADD_TO_PLAYLIST, AppSettings.swipeLeftAction.value)
         assertEquals(PlayerShortcut.ADD_TO_QUEUE, AppSettings.swipeRightAction.value)
         AppSettings.load(contextWith(emptyPrefs()))
+    }
+
+    @Test
+    fun freshInstallUsesTheDefaultRelayServer() {
+        AppSettings.load(contextWith(emptyPrefs()))
+        assertEquals(RelaySettings.DEFAULT_URL, RelaySettings.url.value)
     }
 
     @Test

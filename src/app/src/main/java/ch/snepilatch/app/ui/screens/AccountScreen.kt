@@ -39,6 +39,7 @@ import ch.snepilatch.app.R
 import ch.snepilatch.app.data.Screen
 import ch.snepilatch.app.logic.download.DownloadFolder
 import ch.snepilatch.app.logic.download.Downloads
+import ch.snepilatch.app.logic.relay.RelaySettings
 import ch.snepilatch.app.ui.shared.TightAlertDialog
 import ch.snepilatch.app.ui.shared.UpdateDialog
 import ch.snepilatch.app.ui.theme.*
@@ -598,6 +599,29 @@ fun AccountScreen(vm: PlaybackViewModel) {
 
         if (showReleaseNotes) {
             ReleaseNotesDialog(onDismiss = { showReleaseNotes = false })
+        }
+
+        val relayUrl by RelaySettings.url.collectAsState()
+        var showRelayDialog by remember { mutableStateOf(false) }
+        SettingRow(
+            title = stringResource(R.string.relay_server),
+            subtitle = relayUrl,
+            icon = Icons.Rounded.Groups,
+            onClick = { showRelayDialog = true },
+        )
+        if (showRelayDialog) {
+            TextInputDialog(
+                title = stringResource(R.string.relay_server),
+                description = stringResource(R.string.relay_server_desc),
+                initialValue = relayUrl.takeUnless { it == RelaySettings.DEFAULT_URL }.orEmpty(),
+                placeholder = RelaySettings.DEFAULT_URL,
+                keyboardType = KeyboardType.Uri,
+                onConfirm = {
+                    RelaySettings.set(it, audioContext)
+                    showRelayDialog = false
+                },
+                onDismiss = { showRelayDialog = false }
+            )
         }
 
         // Debug logging: lets the user point the app at a Loki endpoint to share logs on request,

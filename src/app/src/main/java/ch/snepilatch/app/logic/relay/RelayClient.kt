@@ -179,7 +179,18 @@ class RelayClient(
     }
 
     companion object {
-        const val DEFAULT_URL = "wss://snepirelay.pianonic.ch/api/relay"
+        /** The relay's WebSocket for a server address as the user types it: https becomes wss, http becomes ws. */
+        fun socketUrl(serverUrl: String): String {
+            val base = serverUrl.trim().trimEnd('/')
+            val socketBase = when {
+                base.startsWith("https://") -> "wss://" + base.removePrefix("https://")
+                base.startsWith("http://") -> "ws://" + base.removePrefix("http://")
+                base.startsWith("wss://") || base.startsWith("ws://") -> base
+                else -> "wss://$base"
+            }
+            return "$socketBase/api/relay"
+        }
+
         private const val TAG = "RelayClient"
         private const val NORMAL_CLOSURE = 1000
         private const val EVENT_BUFFER = 64

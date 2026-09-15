@@ -22,11 +22,15 @@
 
 | Playback | Sound |
 | --- | --- |
-| <ul><li>Plays locally on your phone as its own Connect device, so transport actions are never skip-capped</li><li>Ad-free listening</li><li>Choose your audio source: the standard stream, optional lossless, or YouTube Music</li><li>Full Connect control: transfer to and from other devices</li></ul> | <ul><li>Ten-band in-app equalizer with a drag-and-drop curve editor</li><li>Automatic gain staging so boosted bands cannot clip</li><li>EQ headroom for anyone running an external equalizer such as Wavelet</li></ul> |
-| **InfiniPlay** | **Library and browsing** |
-| <ul><li>Turns any track into a never-ending remix, beat-matched and crossfaded in the audio chain</li><li>Builds a beat graph from the waveform itself, with no per-track analysis API</li></ul> | <ul><li>Liked songs, playlists, albums, artists and podcasts</li><li>Search, home feed, and queue management in a bottom drawer</li><li>Word-level synced lyrics</li></ul> |
-| **Interface** | **Languages and updates** |
-| <ul><li>Fully native UI built with Jetpack Compose and Material 3</li><li>Dynamic color theming from album art</li><li>Gesture-based player with swipe navigation</li><li>Canvas background animations</li></ul> | <ul><li>English, German, Russian and Swiss German</li><li>Automatic in-app updates</li></ul> |
+| <ul><li>No ads, ever</li><li>Skip as much as you like</li><li>Pick how it sounds: normal, lossless, or YouTube Music</li><li>Push the music to your speaker or laptop and pull it back</li><li>Shuffle that mixes in songs you might like</li></ul> | <ul><li>A ten-band equalizer built in, drag the curve however you like</li><li>Turn it up without anything crackling</li><li>Plays nice with an equalizer app like Wavelet</li></ul> |
+| **InfiniPlay** | **Offline** |
+| <ul><li>Turns any song into an endless remix</li><li>Loops on the beat, so you never hear the seam</li></ul> | <ul><li>Save songs, albums and whole playlists to your phone</li><li>Keeps playing when you lose signal, picks back up when it returns</li><li>Choose where the files land, pause the downloads whenever</li></ul> |
+| **Lyrics** | **Friends** |
+| <ul><li>Word-by-word synced lyrics that light up as they play</li><li>Duets, backing vocals, and who wrote the song</li><li>Tap a line to jump there</li><li>Tap the cover to flip it over to the lyrics</li></ul> | <ul><li>See what your friends are playing and join in with one tap</li><li>Listen together, hop in from a link or a QR code</li><li>Several accounts, one tap to swap between them</li><li>Change your profile picture</li></ul> |
+| **Your music** | **Looks** |
+| <ul><li>Liked songs, playlists, albums, artists and podcasts</li><li>Search, a home feed, your queue one swipe away</li><li>Scan a code to open a song</li><li>Shared links open straight in the app</li></ul> | <ul><li>Colours that follow the album cover</li><li>Swipe your way around the player</li><li>Moving artwork behind the music</li><li>Built for Android, feels like it</li></ul> |
+| **Make it yours** | **Languages** |
+| <ul><li>Swipe a song left or right to do whatever you want</li><li>Choose the extra button on the player</li><li>Choose the two buttons on the notification</li><li>Looks and behaviour all in one place</li></ul> | <ul><li>🇨🇭 **Schwiizerdütsch**, we had no say in it, the app is made in Switzerland</li><li>English, German and Russian too</li><li>New versions arrive in the app</li></ul> |
 
 > [!CAUTION]
 > This is an unofficial client, use at your own risk or with an alternative account, as account safety cannot be guaranteed.

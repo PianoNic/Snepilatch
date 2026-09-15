@@ -23,7 +23,7 @@ class QueueRowKeysTest {
             track("autoplay", durationMs = 300_000),
         )
 
-        assertEquals(180_000, totalQueuedDurationMs(queue, 2))
+        assertEquals(180_000, nextInQueueTime(queue, 2))
     }
 
     @Test

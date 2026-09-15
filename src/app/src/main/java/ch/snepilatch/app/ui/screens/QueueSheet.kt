@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
+import ch.snepilatch.app.data.TrackInfo
 import ch.snepilatch.app.ui.shared.SheetNavBarFix
 import ch.snepilatch.app.ui.shared.SpfyImage
 import ch.snepilatch.app.ui.theme.*
@@ -211,7 +212,7 @@ private fun QueueList(
     )
 
     val upNext = shown.drop(queuedCount)
-    val queueTime = totalQueuedDurationMs(shown.map { it.second }, queuedCount)
+    val queueTime = nextInQueueTime(shown.map { it.second }, queuedCount)
 
     fun tap(key: String, track: ch.snepilatch.app.data.TrackInfo, index: Int) {
         tapped = key to track.uri

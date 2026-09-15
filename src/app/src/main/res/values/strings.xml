@@ -54,7 +54,9 @@
     <string name="user_id">User ID</string>
     <string name="plan">Plan</string>
     <string name="plan_free">Free</string>
-    <string name="followers_playlists">%1$d Followers · %2$d Playlists</string>
+    <plurals name="profile_playlists"><item quantity="one">%d public playlist</item><item quantity="other">%d public playlists</item></plurals>
+    <plurals name="profile_followers"><item quantity="one">%d follower</item><item quantity="other">%d followers</item></plurals>
+    <plurals name="profile_following"><item quantity="one">%d following</item><item quantity="other">%d following</item></plurals>
     <string name="log_out">Log out</string>
 
     <!-- Settings -->

@@ -561,7 +561,7 @@ class PlaybackViewModel : ViewModel() {
             isPremium = isPremium,
             profileImageUrl = imageUrl,
             userId = username,
-            followers = pubProfile.followers,
+            followers = pubProfile.followers, following = pubProfile.following,
             playlistCount = pubProfile.publicPlaylists
         )
         LokiLogger.i(TAG, "User: $username ($displayName), premium: $isPremium")

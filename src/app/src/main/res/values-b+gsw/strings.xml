@@ -62,7 +62,9 @@
     <string name="user_id">Benutzer-ID</string>
     <string name="plan">Abo</string>
     <string name="plan_free">Gratis</string>
-    <string name="followers_playlists">%1$d Follower · %2$d Playlists</string>
+    <plurals name="profile_playlists"><item quantity="one">%d öffentlichi Playlist</item><item quantity="other">%d öffentlichi Playlists</item></plurals>
+    <plurals name="profile_followers"><item quantity="one">%d Follower</item><item quantity="other">%d Follower</item></plurals>
+    <plurals name="profile_following"><item quantity="one">%d gfolgt</item><item quantity="other">%d gfolgt</item></plurals>
     <string name="log_out">Abmälde</string>
 
     <!-- Settings -->

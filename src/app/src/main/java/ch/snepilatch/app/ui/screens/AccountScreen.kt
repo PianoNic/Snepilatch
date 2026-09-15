@@ -3,6 +3,10 @@
 package ch.snepilatch.app.ui.screens
 
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
+import ch.snepilatch.app.viewmodel.ProfileViewModel
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
@@ -68,23 +72,52 @@ fun AccountScreen(vm: PlaybackViewModel) {
                 .padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Profile image
-            Box(
-                Modifier
-                    .size(120.dp)
-                    .clip(CircleShape)
-                    .background(SnepilatchGray),
-                contentAlignment = Alignment.Center
-            ) {
-                if (account.profileImageUrl != null) {
-                    AsyncImage(
-                        model = account.profileImageUrl,
-                        contentDescription = stringResource(R.string.profile_image),
-                        modifier = Modifier.size(120.dp).clip(CircleShape),
-                        contentScale = ContentScale.Crop
+            // Profile image: a tap offers to change or remove it (#840).
+            val profileVm: ProfileViewModel = viewModel()
+            val profileBusy by profileVm.busy.collectAsState()
+            val context = LocalContext.current
+            var showPictureMenu by remember { mutableStateOf(false) }
+            val picturePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { picked ->
+                if (picked != null) profileVm.setPicture(context, picked) { vm.refreshAccount() }
+            }
+            Box {
+                Box(
+                    Modifier
+                        .size(120.dp)
+                        .clip(CircleShape)
+                        .background(SnepilatchGray)
+                        .clickable(enabled = !profileBusy) { showPictureMenu = true },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (account.profileImageUrl != null) {
+                        AsyncImage(
+                            model = account.profileImageUrl,
+                            contentDescription = stringResource(R.string.profile_image),
+                            modifier = Modifier.size(120.dp).clip(CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(Icons.Rounded.Person, null, tint = SnepilatchLightGray, modifier = Modifier.size(64.dp))
+                    }
+                    if (profileBusy) CircularProgressIndicator(color = SnepilatchWhite, modifier = Modifier.size(32.dp))
+                }
+                DropdownMenu(expanded = showPictureMenu, onDismissRequest = { showPictureMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.change_profile_picture)) },
+                        onClick = {
+                            showPictureMenu = false
+                            picturePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        },
                     )
-                } else {
-                    Icon(Icons.Rounded.Person, null, tint = SnepilatchLightGray, modifier = Modifier.size(64.dp))
+                    if (account.profileImageUrl != null) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.remove_profile_picture)) },
+                            onClick = {
+                                showPictureMenu = false
+                                profileVm.removePicture { vm.refreshAccount() }
+                            },
+                        )
+                    }
                 }
             }
 

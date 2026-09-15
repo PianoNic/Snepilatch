@@ -580,6 +580,9 @@ class PlaybackViewModel : ViewModel() {
         launchWithPlayer("adoptState") { p -> p.getState()?.let { updatePlaybackFromState(it) } }
     }
 
+    /** Re-reads the account after the profile changed, such as a new picture (#840). */
+    fun refreshAccount() = launchWithSession("refreshAccount") { sess -> loadAccount(sess) }
+
     /** Disconnects the running player and drops the holder, so the next init starts from nothing. */
     private fun tearDownSession() {
         JamHolder.clear()
@@ -793,9 +796,7 @@ class PlaybackViewModel : ViewModel() {
         // Cold-start: complete the deferred so coldStartPlay can proceed
         // with resolving the CDN URL and loading ExoPlayer.
         val deferred = coldStartFileId
-        if (coldStartPending && deferred != null && !deferred.isCompleted) {
-            deferred.complete(fileId)
-        }
+        if (coldStartPending && deferred != null && !deferred.isCompleted) deferred.complete(fileId)
     }
 
     /**

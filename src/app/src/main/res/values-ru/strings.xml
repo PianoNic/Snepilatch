@@ -135,6 +135,8 @@
 
     <!-- Account (added) -->
     <string name="profile_image">Профиль</string>
+    <string name="change_profile_picture">Изменить фото</string>
+    <string name="remove_profile_picture">Удалить фото</string>
     <string name="account_image">Аккаунт</string>
 
     <!-- Language -->

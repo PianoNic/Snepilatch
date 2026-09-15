@@ -49,7 +49,12 @@ import kotlinx.coroutines.launch
  * here; a tap on the card turns it back over.
  */
 @Composable
-fun CoverLyrics(vm: PlaybackViewModel, modifier: Modifier = Modifier) {
+fun CoverLyrics(
+    vm: PlaybackViewModel,
+    modifier: Modifier = Modifier,
+    /** Whether the card is actually showing this side; the clock below only runs when it is. */
+    visible: Boolean = true,
+) {
     val lyricsVm: LyricsViewModel = viewModel()
     val track by vm.currentTrack.collectAsState()
     val lyrics by lyricsVm.lyrics.collectAsState()
@@ -62,7 +67,10 @@ fun CoverLyrics(vm: PlaybackViewModel, modifier: Modifier = Modifier) {
         track?.let { lyricsVm.fetch(it) }
     }
     val synced = lyrics?.syncType == "LINE_SYNCED" || lyrics?.syncType == "SYLLABLE_SYNCED"
-    val smoothPosition = rememberSmoothPosition(vm, active = isPlayingRaw && !isPaused && synced)
+    // Gated on [visible] as well (#858): the flip card composes both of its sides at all times, so
+    // behind the cover this clock was still asking for a frame at the panel's full rate, all the way
+    // through every song, to animate lyrics nobody could see.
+    val smoothPosition = rememberSmoothPosition(vm, active = visible && isPlayingRaw && !isPaused && synced)
 
     // A sideways drag moves the lyrics with the finger like the cover strip (#829): let go early and
     // they spring back, drag far enough and they slide out of the card while the track skips. The

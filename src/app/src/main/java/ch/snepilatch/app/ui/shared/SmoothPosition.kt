@@ -56,7 +56,7 @@ fun rememberSmoothPositionMs(positionMs: Long, durationMs: Long, isPlaying: Bool
  * in [rememberSmoothPositionMs]. The value stays derived from the real frame timestamp, so throttling
  * the cadence costs accuracy nothing — only the number of frames requested.
  */
-private const val PROGRESS_TICK_MS = 32L
+private const val PROGRESS_TICK_MS = 100L
 
 // --- Track Row ---
 

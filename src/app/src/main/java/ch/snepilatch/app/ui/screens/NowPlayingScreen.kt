@@ -5,7 +5,6 @@ package ch.snepilatch.app.ui.screens
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -20,6 +19,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.runtime.withFrameNanos
+import kotlinx.coroutines.delay
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -476,7 +478,7 @@ fun NowPlayingScreen(
                             modifier = Modifier
                                 .fillMaxHeight(0.85f)
                                 .aspectRatio(1f),
-                            back = { CoverLyrics(vm, Modifier.clip(RoundedCornerShape(16.dp))) },
+                            back = { CoverLyrics(vm, Modifier.clip(RoundedCornerShape(16.dp)), visible = coverFlipped) },
                         ) {
                             SlidingCoverImage(
                                 url = displayArtUrl,
@@ -708,7 +710,7 @@ fun NowPlayingScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .aspectRatio(1f),
-                        back = { CoverLyrics(vm, Modifier.clip(RoundedCornerShape(16.dp))) },
+                        back = { CoverLyrics(vm, Modifier.clip(RoundedCornerShape(16.dp)), visible = coverFlipped) },
                     ) {
                         SlidingCoverImage(
                             url = displayArtUrl,
@@ -1173,18 +1175,87 @@ private fun MarqueeText(
     fontWeight: FontWeight? = null,
     modifier: Modifier = Modifier
 ) {
+    // Same behaviour as the basicMarquee this replaces — the title drives all the way through, a
+    // second copy follows a gap behind it, and there is a pause between passes — but not the same
+    // cost (#856). basicMarquee scrolls by re-laying-out the text on every frame, which held the
+    // whole player at the panel's 120Hz for as long as the song played: 83% of a core against 16%
+    // for a title that fits. Here the slide is a translation only ever read inside graphicsLayer,
+    // so a step moves the layer and nothing above it composes or measures again, it reads the real
+    // frame clock so the motion keeps its speed, and it steps on every second refresh.
+    var textWidth by remember { mutableIntStateOf(0) }
+    var boxWidth by remember { mutableIntStateOf(0) }
+    val overflowing = boxWidth > 0 && textWidth > boxWidth
+    val density = LocalDensity.current
+    val gapPx = with(density) { MARQUEE_GAP.toPx() }
+    val speedPxPerSecond = with(density) { MARQUEE_VELOCITY.toPx() }
+    val offset = remember { mutableFloatStateOf(0f) }
+    val loopPx = textWidth + gapPx
+
+    LaunchedEffect(text, isPlaying, overflowing, loopPx) {
+        offset.floatValue = 0f
+        if (!isPlaying || !overflowing || loopPx <= 0f) return@LaunchedEffect
+        while (true) {
+            delay(MARQUEE_REPEAT_DELAY_MS)
+            var travelled = 0f
+            var pending = 0f
+            var previous = withFrameNanos { it }
+            while (travelled < loopPx) {
+                withFrameNanos { now ->
+                    pending += (now - previous) / 1_000_000_000f
+                    previous = now
+                    // Every step is worth exactly the time that passed, so the slide keeps its speed;
+                    // holding them back until half a frame has built up moves the text on every second
+                    // refresh of a 120Hz panel, which still reads as smooth and costs half as much.
+                    if (pending >= MARQUEE_MIN_STEP_SECONDS) {
+                        travelled = (travelled + pending * speedPxPerSecond).coerceAtMost(loopPx)
+                        offset.floatValue = travelled
+                        pending = 0f
+                    }
+                }
+            }
+            // A whole loop on: the trailing copy now sits exactly where the first one started, so
+            // going back to zero is invisible and the next pass carries straight on.
+            offset.floatValue = 0f
+        }
+    }
+
+    Box(modifier.fillMaxWidth().clipToBounds().onSizeChanged { boxWidth = it.width }) {
+        Row(
+            Modifier
+                .wrapContentWidth(Alignment.Start, unbounded = true)
+                .graphicsLayer { translationX = -offset.floatValue },
+        ) {
+            MarqueeLabel(text, color, fontSize, fontWeight) { textWidth = it }
+            if (overflowing) {
+                Spacer(Modifier.width(MARQUEE_GAP))
+                MarqueeLabel(text, color, fontSize, fontWeight)
+            }
+        }
+    }
+}
+
+/** One copy of the sliding text; the first reports its width, which is what the loop is measured on. */
+@Composable
+private fun MarqueeLabel(
+    text: String,
+    color: androidx.compose.ui.graphics.Color,
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    fontWeight: FontWeight?,
+    onWidth: ((Int) -> Unit)? = null,
+) {
     Text(
         text = text,
         color = color,
         fontSize = fontSize,
         fontWeight = fontWeight,
-        minLines = 1,
+        softWrap = false,
         maxLines = 1,
-        // Scroll forever while playing (so long titles always reveal their tail), but disable the
-        // animation when paused (iterations = 0) so this per-frame marquee loop stops requesting frames.
-        modifier = modifier.basicMarquee(
-            iterations = if (isPlaying) Int.MAX_VALUE else 0,
-            velocity = 40.dp
-        )
+        modifier = if (onWidth == null) Modifier else Modifier.onSizeChanged { onWidth(it.width) },
     )
 }
+
+/** How fast a title that does not fit slides, the gap before its repeat, the wait between passes. */
+private val MARQUEE_VELOCITY = 40.dp
+private val MARQUEE_GAP = 48.dp
+private const val MARQUEE_REPEAT_DELAY_MS = 1200L
+private const val MARQUEE_MIN_STEP_SECONDS = 0.015f

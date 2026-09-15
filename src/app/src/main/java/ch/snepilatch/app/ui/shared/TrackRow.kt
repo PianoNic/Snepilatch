@@ -75,53 +75,55 @@ fun TrackRow(
     val percent by DownloadQueue.progress.collectAsState()
     val trackPercent = percent[track.uri]
 
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable { vm.playTrack(track, contextUri, trackIndex) }
-            .padding(horizontal = 16.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        SpfyImage(
-            url = track.albumArt,
-            modifier = Modifier.size(48.dp),
-            shape = RoundedCornerShape(4.dp)
-        )
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                track.name, color = if (isPlaying) accent else SnepilatchWhite, fontSize = 15.sp, fontWeight = FontWeight.Medium,
-                maxLines = 1, overflow = TextOverflow.Ellipsis,
+    SwipeableTrackRow(track, vm) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable { vm.playTrack(track, contextUri, trackIndex) }
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            SpfyImage(
+                url = track.albumArt,
+                modifier = Modifier.size(48.dp),
+                shape = RoundedCornerShape(4.dp)
             )
-            Text(track.artist, color = SnepilatchLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        if (isDownloading) {
-            if (trackPercent == null) {
-                CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
-            } else {
-                CircularProgressIndicator(
-                    progress = { trackPercent.coerceIn(0, 100) / 100f },
-                    color = accent,
-                    strokeWidth = 2.dp,
-                    modifier = Modifier.size(14.dp),
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    track.name, color = if (isPlaying) accent else SnepilatchWhite, fontSize = 15.sp, fontWeight = FontWeight.Medium,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
+                Text(track.artist, color = SnepilatchLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            Spacer(Modifier.width(6.dp))
-        } else if (isDownloaded) {
-            Icon(
-                Icons.Rounded.OfflinePin,
-                stringResource(R.string.downloaded_indicator),
-                tint = accent,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(Modifier.width(6.dp))
-        }
-        if (track.durationMs > 0) {
-            Text(formatTime(track.durationMs), color = SnepilatchLightGray, fontSize = 12.sp)
-            Spacer(Modifier.width(4.dp))
-        }
-        IconButton(onClick = { showMenu = true }, modifier = Modifier.size(36.dp)) {
-            Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SnepilatchLightGray, modifier = Modifier.size(20.dp))
+            if (isDownloading) {
+                if (trackPercent == null) {
+                    CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
+                } else {
+                    CircularProgressIndicator(
+                        progress = { trackPercent.coerceIn(0, 100) / 100f },
+                        color = accent,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+                Spacer(Modifier.width(6.dp))
+            } else if (isDownloaded) {
+                Icon(
+                    Icons.Rounded.OfflinePin,
+                    stringResource(R.string.downloaded_indicator),
+                    tint = accent,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+            }
+            if (track.durationMs > 0) {
+                Text(formatTime(track.durationMs), color = SnepilatchLightGray, fontSize = 12.sp)
+                Spacer(Modifier.width(4.dp))
+            }
+            IconButton(onClick = { showMenu = true }, modifier = Modifier.size(36.dp)) {
+                Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SnepilatchLightGray, modifier = Modifier.size(20.dp))
+            }
         }
     }
 

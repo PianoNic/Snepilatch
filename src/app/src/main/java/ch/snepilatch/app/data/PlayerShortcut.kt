@@ -16,6 +16,17 @@ enum class PlayerShortcut(val id: String, val requiresTrack: Boolean = true) {
     ;
 
     companion object {
-        fun fromId(id: String?): PlayerShortcut = entries.firstOrNull { it.id == id } ?: LIKE
+        /**
+         * What a swipe on a list row may do: the shortcuts that act on the row's own track. LIKE is out
+         * because a row does not know its liked state, LYRICS because the lyrics view follows the player.
+         */
+        val perTrack: List<PlayerShortcut> = entries.filter { it.requiresTrack && it != LIKE && it != LYRICS }
+
+        fun fromId(id: String?, fallback: PlayerShortcut = LIKE): PlayerShortcut =
+            entries.firstOrNull { it.id == id } ?: fallback
+
+        /** [fromId] limited to [perTrack], so a stored choice that no longer applies to rows falls back. */
+        fun perTrackFromId(id: String?, fallback: PlayerShortcut): PlayerShortcut =
+            perTrack.firstOrNull { it.id == id } ?: fallback
     }
 }

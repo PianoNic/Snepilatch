@@ -59,6 +59,7 @@ import ch.snepilatch.app.logic.shared.SessionHolder
 import ch.snepilatch.app.logic.shared.shareLink
 import ch.snepilatch.app.ui.shared.trackMenuActions
 import ch.snepilatch.app.ui.shared.TrackMenuOptions
+import ch.snepilatch.app.ui.shared.SwipeableTrackRow
 import ch.snepilatch.app.logic.shared.spfyId
 
 /** Header actions share a footprint so save, download and the overflow menu line up. */
@@ -623,42 +624,43 @@ private fun ArtistTrackRow(
     val theme by ThemeController.themeColors.collectAsState()
     val accent = theme.primary
 
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable { vm.playTrack(track, contextUri, number - 1) }
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            "$number",
-            color = if (isPlaying) accent else SnepilatchLightGray,
-            fontSize = 15.sp,
-            modifier = Modifier.width(28.dp)
-        )
-        SpfyImage(
-            url = track.albumArt,
-            modifier = Modifier.size(44.dp),
-            shape = RoundedCornerShape(4.dp)
-        )
-        Spacer(Modifier.width(12.dp))
-        // Track name only (no artist — we're on the artist page)
-        Column(Modifier.weight(1f)) {
+    SwipeableTrackRow(track, vm) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable { vm.playTrack(track, contextUri, number - 1) }
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text(
-                track.name,
-                color = if (isPlaying) accent else SnepilatchWhite,
+                "$number",
+                color = if (isPlaying) accent else SnepilatchLightGray,
                 fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                modifier = Modifier.width(28.dp)
             )
-            if (playcount != null) {
-                val formatted = try {
-                    val num = playcount.toLong()
-                    String.format("%,d", num)
-                } catch (_: Exception) { playcount }
-                Text(formatted, color = SnepilatchLightGray, fontSize = 12.sp)
-            }
+            SpfyImage(
+                url = track.albumArt,
+                modifier = Modifier.size(44.dp),
+                shape = RoundedCornerShape(4.dp)
+            )
+            Spacer(Modifier.width(12.dp))
+            // Track name only (no artist — we're on the artist page)
+            Column(Modifier.weight(1f)) {
+                Text(
+                    track.name,
+                    color = if (isPlaying) accent else SnepilatchWhite,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (playcount != null) {
+                    val formatted = try {
+                        val num = playcount.toLong()
+                        String.format("%,d", num)
+                    } catch (_: Exception) { playcount }
+                    Text(formatted, color = SnepilatchLightGray, fontSize = 12.sp)
+                }
         }
         // 3-dot menu
         var showMenu by remember { mutableStateOf(false) }
@@ -678,6 +680,7 @@ private fun ArtistTrackRow(
                 actions = items,
                 onDismiss = { showMenu = false },
             )
+            }
         }
     }
 }
@@ -696,31 +699,32 @@ private fun AlbumTrackRow(
     val theme by ThemeController.themeColors.collectAsState()
     val accent = theme.primary
 
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable { vm.playTrack(track, contextUri, trackIndex) }
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                track.name,
-                color = if (isPlaying) accent else SnepilatchWhite,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (track.artist.isNotBlank()) {
+    SwipeableTrackRow(track, vm) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable { vm.playTrack(track, contextUri, trackIndex) }
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
                 Text(
-                    track.artist,
-                    color = SnepilatchLightGray,
-                    fontSize = 13.sp,
+                    track.name,
+                    color = if (isPlaying) accent else SnepilatchWhite,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-            }
+                if (track.artist.isNotBlank()) {
+                    Text(
+                        track.artist,
+                        color = SnepilatchLightGray,
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
         }
         var showMenu by remember { mutableStateOf(false) }
         IconButton(onClick = { showMenu = true }, modifier = Modifier.size(36.dp)) {
@@ -739,6 +743,7 @@ private fun AlbumTrackRow(
                 actions = items,
                 onDismiss = { showMenu = false },
             )
+            }
         }
     }
 }

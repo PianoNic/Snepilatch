@@ -77,6 +77,9 @@
     <string name="lyrics_horizontal">Von links nach rechts</string>
     <string name="player_shortcut">Player-Taste</string>
     <string name="player_shortcut_desc">Wähle die Taste neben dem Player-Menü</string>
+    <string name="swipe_left_action">Nach links wischen</string>
+    <string name="swipe_right_action">Nach rechts wischen</string>
+    <string name="swipe_action_desc">Wähle die Aktion für diese Wischrichtung</string>
     <string name="notification_left_button">Benachrichtigung linke Taste</string>
     <string name="notification_right_button">Benachrichtigung rechte Taste</string>
     <string name="notif_like">Gefällt mir</string>

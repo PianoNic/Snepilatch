@@ -36,7 +36,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.TextUnit
 import ch.snepilatch.app.R
 import ch.snepilatch.app.data.PlayerShortcut
-import ch.snepilatch.app.logic.download.Downloads
 import android.graphics.SurfaceTexture
 import android.net.Uri
 import android.view.TextureView
@@ -63,11 +62,11 @@ import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import ch.snepilatch.app.logic.shared.shareSpfyUri
 import ch.snepilatch.app.ui.shared.LikeToggleButton
 import ch.snepilatch.app.ui.shared.PlaylistPickerDialog
-import ch.snepilatch.app.ui.shared.playerShortcutIcon
-import ch.snepilatch.app.ui.shared.playerShortcutTitle
+import ch.snepilatch.app.ui.shared.PlayerAction
+import ch.snepilatch.app.ui.shared.PlayerOverlay
+import ch.snepilatch.app.ui.shared.rememberPlayerActions
 import ch.snepilatch.app.ui.shared.EntityMenuSheet
 import ch.snepilatch.app.ui.shared.MenuAction
-import ch.snepilatch.app.logic.shared.JamHolder
 import ch.snepilatch.app.ui.shared.jamAllowsControls
 
 /**
@@ -421,9 +420,9 @@ fun NowPlayingScreen(
     var showCode by remember { mutableStateOf(false) }
     val playerActions = rememberPlayerActions(vm, track) {
         when (it) {
-            NowPlayingOverlay.PlaylistPicker -> showPlaylistPicker = true
-            NowPlayingOverlay.Jam -> showJam = true
-            NowPlayingOverlay.Code -> showCode = true
+            PlayerOverlay.PlaylistPicker -> showPlaylistPicker = true
+            PlayerOverlay.Jam -> showJam = true
+            PlayerOverlay.Code -> showCode = true
         }
     }
     val shareContext = LocalContext.current
@@ -817,82 +816,6 @@ fun NowPlayingScreen(
     }
 }
 
-/**
- * One player action per [PlayerShortcut] except LIKE (which keeps its toggle button), built once and
- * consumed by both the three dots sheet and the configurable button, so the two never drift.
- */
-private class PlayerAction(
-    val shortcut: PlayerShortcut,
-    val icon: androidx.compose.ui.graphics.vector.ImageVector,
-    val label: String,
-    val enabled: Boolean,
-    val run: () -> Unit,
-)
-
-/** What the player's actions act on; one holder instead of the same seven values passed to every action. */
-private class PlayerActionScope(
-    val vm: PlaybackViewModel,
-    val track: ch.snepilatch.app.data.TrackInfo?,
-    val context: android.content.Context,
-    val shareTrackLabel: String,
-    val inJam: Boolean,
-    val isDownloaded: Boolean,
-    val onOpen: (NowPlayingOverlay) -> Unit,
-) {
-    fun run(shortcut: PlayerShortcut) {
-        when (shortcut) {
-            PlayerShortcut.LIKE -> Unit
-            PlayerShortcut.LYRICS -> vm.openLyrics()
-            PlayerShortcut.ADD_TO_QUEUE -> track?.uri?.let { vm.addToQueue(it) }
-            PlayerShortcut.ADD_TO_PLAYLIST -> onOpen(NowPlayingOverlay.PlaylistPicker)
-            PlayerShortcut.QUEUE -> vm.openQueue()
-            PlayerShortcut.ALBUM -> vm.openAlbumFromCurrentTrack()
-            // Via the router: the sheet is built outside a composable that owns a DetailViewModel.
-            PlayerShortcut.RADIO -> track?.uri?.let { ch.snepilatch.app.viewmodel.DetailRoutes.openRadio(it) }
-            PlayerShortcut.DOWNLOAD -> download()
-            PlayerShortcut.JAM -> if (inJam) vm.openQueue() else onOpen(NowPlayingOverlay.Jam)
-            PlayerShortcut.CODE -> onOpen(NowPlayingOverlay.Code)
-            PlayerShortcut.SHARE -> track?.uri?.let { shareSpfyUri(context, it, shareTrackLabel) }
-        }
-    }
-
-    private fun download() {
-        val uri = track?.uri ?: return
-        if (isDownloaded) vm.removeDownload(uri) else vm.downloadCurrentTrack(context)
-    }
-}
-
-@Composable
-private fun rememberPlayerActions(
-    vm: PlaybackViewModel,
-    track: ch.snepilatch.app.data.TrackInfo?,
-    onOpen: (NowPlayingOverlay) -> Unit,
-): List<PlayerAction> {
-    val inJam = JamHolder.session.collectAsState().value != null
-    // Falls back to title/artist like playback does, so a relinked track's label agrees with what is
-    // actually on disk. In-flight counts as well, like every track row: isDownloaded is still false
-    // while the fetch runs, so without it a second tap started a second download of the same track.
-    val downloadedIndex by Downloads.index.collectAsState()
-    val inFlight by Downloads.inProgress.collectAsState()
-    val isDownloaded = track?.let { Downloads.isDownloaded(downloadedIndex, it.uri, it.name, it.artist) } == true
-    val isDownloading = track?.uri?.let { it in inFlight } == true
-    val scope = PlayerActionScope(
-        vm, track, LocalContext.current, stringResource(R.string.share_track_chooser), inJam, isDownloaded, onOpen,
-    )
-    return PlayerShortcut.entries.filter { it != PlayerShortcut.LIKE }.map { shortcut ->
-        val label = when {
-            shortcut == PlayerShortcut.DOWNLOAD && isDownloading -> stringResource(R.string.downloading)
-            shortcut == PlayerShortcut.DOWNLOAD && isDownloaded -> stringResource(R.string.remove_download)
-            shortcut == PlayerShortcut.JAM && inJam -> stringResource(R.string.jam)
-            else -> stringResource(playerShortcutTitle(shortcut))
-        }
-        val enabled = (!shortcut.requiresTrack || track != null) && !(shortcut == PlayerShortcut.DOWNLOAD && isDownloading)
-        PlayerAction(shortcut, playerShortcutIcon(shortcut, isDownloaded = isDownloaded), label, enabled) {
-            if (enabled) scope.run(shortcut)
-        }
-    }
-}
-
 /** The button beside the track details: the like toggle by default, or whichever [PlayerAction] the setting picked. */
 @Composable
 private fun PlayerShortcutButton(
@@ -1194,8 +1117,6 @@ private fun SourcePill(provider: String?) {
 }
 
 /** What the three dots menu can open on top of the player. */
-private enum class NowPlayingOverlay { PlaylistPicker, Jam, Code }
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NowPlayingMenu(

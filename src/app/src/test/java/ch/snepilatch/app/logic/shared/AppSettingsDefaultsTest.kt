@@ -54,6 +54,27 @@ class AppSettingsDefaultsTest {
     }
 
     @Test
+    fun swipeActionsUseTheirOwnDefaults() {
+        AppSettings.load(contextWith(emptyPrefs()))
+
+        assertEquals(PlayerShortcut.ADD_TO_PLAYLIST, AppSettings.swipeLeftAction.value)
+        assertEquals(PlayerShortcut.ADD_TO_QUEUE, AppSettings.swipeRightAction.value)
+    }
+
+    @Test
+    fun unknownSwipeActionsFallBackToTheirOwnDefaults() {
+        val prefs = emptyPrefs()
+        every { prefs.getString("swipe_left_action", null) } returns "unknown-left"
+        every { prefs.getString("swipe_right_action", null) } returns "unknown-right"
+
+        AppSettings.load(contextWith(prefs))
+
+        assertEquals(PlayerShortcut.ADD_TO_PLAYLIST, AppSettings.swipeLeftAction.value)
+        assertEquals(PlayerShortcut.ADD_TO_QUEUE, AppSettings.swipeRightAction.value)
+        AppSettings.load(contextWith(emptyPrefs()))
+    }
+
+    @Test
     fun aStoredChoiceStillWins() {
         val prefs: SharedPreferences = mockk {
             every { getString(any(), any()) } answers { secondArg() }

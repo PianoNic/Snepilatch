@@ -24,7 +24,7 @@
 | --- | --- |
 | <ul><li>No ads, ever</li><li>Skip as much as you like</li><li>Pick how it sounds: normal, lossless, or YouTube Music</li><li>Push the music to your speaker or laptop and pull it back</li><li>Shuffle that mixes in songs you might like</li></ul> | <ul><li>A ten-band equalizer built in, drag the curve however you like</li><li>Turn it up without anything crackling</li><li>Plays nice with an equalizer app like Wavelet</li></ul> |
 | **InfiniPlay** | **Offline** |
-| <ul><li>Turns any song into an endless remix</li><li>Loops on the beat, so you never hear the seam</li><li>Works on any track, nothing to set up</li></ul> | <ul><li>Save songs, albums and whole playlists to your phone</li><li>Keeps playing when you lose signal, picks back up when it returns</li><li>Choose where the files land, pause the downloads whenever</li></ul> |
+| <ul><li>Turns any song into an endless remix</li><li>Loops on the beat, so you never hear the seam</li></ul> | <ul><li>Save songs, albums and whole playlists to your phone</li><li>Keeps playing when you lose signal, picks back up when it returns</li><li>Choose where the files land, pause the downloads whenever</li></ul> |
 | **Lyrics** | **Friends** |
 | <ul><li>Word-by-word synced lyrics that light up as they play</li><li>Duets, backing vocals, and who wrote the song</li><li>Tap a line to jump there</li><li>Tap the cover to flip it over to the lyrics</li></ul> | <ul><li>See what your friends are playing and join in with one tap</li><li>Listen together, hop in from a link or a QR code</li><li>Several accounts, one tap to swap between them</li><li>Change your profile picture</li></ul> |
 | **Your music** | **Looks** |

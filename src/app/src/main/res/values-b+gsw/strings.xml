@@ -88,6 +88,8 @@
     <string name="lyrics_anim_desc">Wähl, wie ziilewiisi Lyrics animiert wärded.</string>
     <string name="lyrics_vertical">Vo obe abe</string>
     <string name="lyrics_horizontal">Vo links uf rächts</string>
+    <string name="player_shortcut">Player-Taste</string>
+    <string name="player_shortcut_desc">Wähl d Taste näbed em Player-Menü</string>
     <string name="notification_left_button">Linki Taschte i de Benachrichtigunge</string>
     <string name="notification_right_button">Rächti Taschte i de Benachrichtigunge</string>
     <string name="notif_like">Gfallt mer / Gfallt mer nüm</string>

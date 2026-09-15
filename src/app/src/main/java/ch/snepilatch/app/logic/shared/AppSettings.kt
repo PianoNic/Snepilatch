@@ -1,6 +1,7 @@
 package ch.snepilatch.app.logic.shared
 
 import android.content.Context
+import ch.snepilatch.app.data.PlayerShortcut
 import ch.snepilatch.app.logic.playback.MusicPlaybackService
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -92,6 +93,9 @@ object AppSettings {
     // Canvas background toggle (the URL itself is playback state on PlaybackViewModel).
     val canvasEnabled = MutableStateFlow(false)
 
+    // Action assigned to the button beside the full-screen player's track details.
+    val playerShortcut = MutableStateFlow(PlayerShortcut.LIKE)
+
     // How the equalizer is handled. One choice, because the options exclude each other: the in-app EQ
     // computes its own input gain from the curve, while the headroom attenuation exists only to give an
     // EXTERNAL equalizer (Wavelet & co.) room to boost into. Running both would attenuate twice.
@@ -158,6 +162,7 @@ object AppSettings {
         eqMode.value = prefs.getString("eq_mode", null) ?: migratedEqMode(prefs)
         eqBands.value = parseBands(prefs.getString("eq_bands", null))
         playerGradientBg.value = prefs.getBoolean("player_gradient_bg", false)
+        playerShortcut.value = PlayerShortcut.fromId(prefs.getString("player_shortcut", null))
         contentRegion.value = prefs.getString("content_region", "nearest") ?: "nearest"
         updateChannel.value = prefs.getString("update_channel", CHANNEL_STABLE) ?: CHANNEL_STABLE
         lokiEndpoint.value = prefs.getString("loki_endpoint", "") ?: ""
@@ -289,22 +294,14 @@ object AppSettings {
         (context as? android.app.Activity)?.recreate()
     }
 
-    fun setNotificationLeftButton(button: String, context: Context) {
-        notificationLeftButton.value = button
-        prefs(context)
-            .edit().putString("notification_left_button", button).apply()
+    /** One setter for both notification slots; pass only the side that changed. */
+    fun setNotificationButtons(context: Context, left: String = notificationLeftButton.value, right: String = notificationRightButton.value) {
+        notificationLeftButton.value = left
+        notificationRightButton.value = right
+        prefs(context).edit().putString("notification_left_button", left).putString("notification_right_button", right).apply()
         MusicPlaybackService.instance?.let { svc ->
-            svc.notificationLeftButton = button
-            svc.updateNotification()
-        }
-    }
-
-    fun setNotificationRightButton(button: String, context: Context) {
-        notificationRightButton.value = button
-        prefs(context)
-            .edit().putString("notification_right_button", button).apply()
-        MusicPlaybackService.instance?.let { svc ->
-            svc.notificationRightButton = button
+            svc.notificationLeftButton = left
+            svc.notificationRightButton = right
             svc.updateNotification()
         }
     }
@@ -313,6 +310,11 @@ object AppSettings {
         playerGradientBg.value = enabled
         prefs(context)
             .edit().putBoolean("player_gradient_bg", enabled).apply()
+    }
+
+    fun setPlayerShortcut(shortcut: PlayerShortcut, context: Context) {
+        playerShortcut.value = shortcut
+        prefs(context).edit().putString("player_shortcut", shortcut.id).apply()
     }
 
     /**

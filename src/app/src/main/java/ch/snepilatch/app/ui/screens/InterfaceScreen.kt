@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
+import ch.snepilatch.app.data.PlayerShortcut
 import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.ui.shared.RadioOption
@@ -29,6 +30,8 @@ import ch.snepilatch.app.ui.shared.RadioPickerDialog
 import ch.snepilatch.app.ui.shared.SettingRow
 import ch.snepilatch.app.ui.shared.SettingsSectionHeader
 import ch.snepilatch.app.ui.shared.SettingToggleRow
+import ch.snepilatch.app.ui.shared.playerShortcutIcon
+import ch.snepilatch.app.ui.shared.playerShortcutTitle
 import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 
@@ -134,6 +137,30 @@ private fun BehaviorSection(context: Context) {
             onDismiss = { showLyricsPicker = false }
         )
     }
+
+    val playerShortcut by AppSettings.playerShortcut.collectAsState()
+    var showPlayerShortcutPicker by remember { mutableStateOf(false) }
+    SettingRow(
+        title = stringResource(R.string.player_shortcut),
+        subtitle = stringResource(playerShortcutTitle(playerShortcut)),
+        icon = Icons.Rounded.TouchApp,
+        onClick = { showPlayerShortcutPicker = true },
+    )
+    if (showPlayerShortcutPicker) {
+        RadioPickerDialog(
+            title = stringResource(R.string.player_shortcut),
+            description = stringResource(R.string.player_shortcut_desc),
+            options = PlayerShortcut.entries.map {
+                RadioOption(it.id, stringResource(playerShortcutTitle(it)), icon = playerShortcutIcon(it))
+            },
+            selected = playerShortcut.id,
+            onSelect = {
+                AppSettings.setPlayerShortcut(PlayerShortcut.fromId(it), context)
+                showPlayerShortcutPicker = false
+            },
+            onDismiss = { showPlayerShortcutPicker = false }
+        )
+    }
 }
 
 @Composable
@@ -181,7 +208,7 @@ private fun NotificationButtonsSection(context: Context) {
         current = leftButton,
         label = labels[leftButton] ?: leftButton,
         options = options,
-    ) { AppSettings.setNotificationLeftButton(it, context) }
+    ) { AppSettings.setNotificationButtons(context, left = it) }
 
     val rightButton by AppSettings.notificationRightButton.collectAsState()
     NotificationButtonRow(
@@ -190,7 +217,7 @@ private fun NotificationButtonsSection(context: Context) {
         current = rightButton,
         label = labels[rightButton] ?: rightButton,
         options = options,
-    ) { AppSettings.setNotificationRightButton(it, context) }
+    ) { AppSettings.setNotificationButtons(context, right = it) }
 }
 
 @Composable

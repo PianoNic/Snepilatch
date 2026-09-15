@@ -2,6 +2,7 @@ package ch.snepilatch.app.logic.shared
 
 import android.content.Context
 import android.content.SharedPreferences
+import ch.snepilatch.app.data.PlayerShortcut
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
@@ -39,6 +40,17 @@ class AppSettingsDefaultsTest {
         assertFalse(AppSettings.playerGradientBg.value)
         AppSettings.load(contextWith(emptyPrefs()))
         assertFalse(AppSettings.playerGradientBg.value)
+    }
+
+    @Test
+    fun unknownPlayerShortcutFallsBackToLike() {
+        val prefs = emptyPrefs()
+        every { prefs.getString("player_shortcut", null) } returns "unknown"
+
+        AppSettings.load(contextWith(prefs))
+
+        assertEquals(PlayerShortcut.LIKE, AppSettings.playerShortcut.value)
+        AppSettings.load(contextWith(emptyPrefs()))
     }
 
     @Test

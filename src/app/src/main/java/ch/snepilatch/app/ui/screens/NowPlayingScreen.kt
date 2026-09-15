@@ -477,7 +477,7 @@ fun NowPlayingScreen(
                             modifier = Modifier
                                 .fillMaxHeight(0.85f)
                                 .aspectRatio(1f),
-                            back = { CoverLyrics(vm, Modifier.clip(RoundedCornerShape(16.dp))) },
+                            back = { CoverLyrics(vm, Modifier.clip(RoundedCornerShape(16.dp)), visible = coverFlipped) },
                         ) {
                             SlidingCoverImage(
                                 url = displayArtUrl,
@@ -709,7 +709,7 @@ fun NowPlayingScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .aspectRatio(1f),
-                        back = { CoverLyrics(vm, Modifier.clip(RoundedCornerShape(16.dp))) },
+                        back = { CoverLyrics(vm, Modifier.clip(RoundedCornerShape(16.dp)), visible = coverFlipped) },
                     ) {
                         SlidingCoverImage(
                             url = displayArtUrl,

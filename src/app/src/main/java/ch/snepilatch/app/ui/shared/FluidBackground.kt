@@ -10,14 +10,17 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asComposeRenderEffect
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -90,9 +93,11 @@ private fun KawarpBackground(
             val frame = withFrameNanos { it }
             if (last != 0L) {
                 acc += (frame - last) / 1_000_000_000f
-                // Throttle to ~30fps: only advance the clock (and thus invalidate the warp/blur/grade
-                // rebuild) once ~33ms of real time has accumulated, instead of every 120Hz vsync.
-                if (acc >= 0.033f) {
+                // Throttle to ~15fps: only advance the clock (and thus invalidate the warp/blur/grade
+                // rebuild) once that much real time has accumulated, instead of every 120Hz vsync.
+                // The warp drifts slowly enough that halving the old 30 is not visible, and this is
+                // the single most expensive thing on the screen (#858).
+                if (acc >= WARP_TICK_SECONDS) {
                     time.floatValue += acc
                     acc = 0f
                 }
@@ -128,16 +133,28 @@ private fun WarpedLayer(
         coil.request.ImageRequest.Builder(context).data(artUrl).size(128).allowHardware(false)
             .crossfade(700).build()
     }
+    // The whole chain runs in a layer a fraction of the screen, then that layer is scaled up (#858).
+    // At full size the warp, the 120px blur and the grade cover ~2.5 million pixels every step; at a
+    // quarter of each edge it is ~160 thousand. The source is a 128px thumbnail under a heavy blur,
+    // so there is no detail left for the extra pixels to carry.
+    val density = LocalDensity.current
+    val smallW = (size.width / DOWNSCALE).coerceAtLeast(1)
+    val smallH = (size.height / DOWNSCALE).coerceAtLeast(1)
     AsyncImage(
         model = lowResModel,
         contentDescription = null,
         contentScale = ContentScale.Crop,
         modifier = modifier
-            .fillMaxSize()
+            .size(with(density) { smallW.toDp() }, with(density) { smallH.toDp() })
             .graphicsLayer {
-                val w = size.width.toFloat()
-                val h = size.height.toFloat()
-                if (w > 0f && h > 0f) {
+                val w = smallW.toFloat()
+                val h = smallH.toFloat()
+                if (w > 1f && h > 1f) {
+                    // Drawn small, shown full size: the transform is applied when the layer is
+                    // composited, so the effects below still only ever touch the small pixels.
+                    scaleX = DOWNSCALE.toFloat()
+                    scaleY = DOWNSCALE.toFloat()
+                    transformOrigin = TransformOrigin(0f, 0f)
                     val t = time.floatValue
                     warpShader.setFloatUniform("size", w, h)
                     warpShader.setFloatUniform("u_time", t)
@@ -150,15 +167,20 @@ private fun WarpedLayer(
 
                     // warp(source) -> blur -> grade, as a native RenderEffect chain.
                     val warp = RenderEffect.createRuntimeShaderEffect(warpShader, "u_texture")
-                    val blurred = RenderEffect.createBlurEffect(
-                        BLUR_RADIUS, BLUR_RADIUS, warp, Shader.TileMode.CLAMP
-                    )
+                    val radius = BLUR_RADIUS / DOWNSCALE
+                    val blurred = RenderEffect.createBlurEffect(radius, radius, warp, Shader.TileMode.CLAMP)
                     val grade = RenderEffect.createRuntimeShaderEffect(gradeShader, "u_texture")
                     renderEffect = RenderEffect.createChainEffect(grade, blurred).asComposeRenderEffect()
                 }
             }
     )
 }
+
+/** How many times smaller than the screen the backdrop is rendered before being scaled back up. */
+private const val DOWNSCALE = 4
+
+/** How much real time passes between warp steps, in seconds (~15fps). */
+private const val WARP_TICK_SECONDS = 0.066f
 
 // Kawarp static-mode options (spicy-lyrics KawarpOptionsStatic): warpIntensity 1, saturation 1.5,
 // dithering 0.008, scale 1. Kawarp blurs 8 Kawase passes at 128px; a wide native blur matches the look.

@@ -134,6 +134,8 @@
 
     <!-- Account (added) -->
     <string name="profile_image">Profile</string>
+    <string name="change_profile_picture">Change picture</string>
+    <string name="remove_profile_picture">Remove picture</string>
     <string name="account_image">Account</string>
 
     <!-- Language -->

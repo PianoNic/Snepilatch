@@ -2202,9 +2202,7 @@ class PlaybackViewModel : ViewModel() {
         if (isOffline.value) {
             // No Connect to echo anything back: the offline engine plays it, with the list the row
             // came from as the queue, and its state is mirrored into the playback state (#789, #791).
-            if (!OfflinePlayer.playFromDownloads(track, contextUri)) {
-                LokiLogger.w(TAG, "No downloaded copy of ${track.uri} to play offline")
-            }
+            if (!OfflinePlayer.playFromDownloads(track, contextUri)) LokiLogger.w(TAG, "No downloaded copy of ${track.uri} to play offline")
             return
         }
         // Honor the resulting onTrackChange even if we're starting from idle (no local audio yet).
@@ -2221,19 +2219,15 @@ class PlaybackViewModel : ViewModel() {
                 launch(Dispatchers.IO) { optimisticTapPlay(track) }
             }
             try {
-                try {
-                    pc.playTrack(track.uri, contextUri, track.uid, trackIndex)
-                } catch (e: Exception) {
+                try { pc.playTrack(track.uri, contextUri, track.uid, trackIndex) } catch (e: Exception) {
                     if (e.message?.contains("PLAYER_COMMAND_REJECTED") == true) {
                         LokiLogger.i(TAG, "Command rejected, transferring playback here and retrying")
-                        pc.transferPlaybackHere()
-                        delay(500)
+                        pc.transferPlaybackHere(); delay(500)
                         pc.playTrack(track.uri, contextUri, track.uid, trackIndex)
                     } else throw e
                 }
-                delay(500)
-                refreshState()
-            } catch (e: Exception) { LokiLogger.e(TAG, "playTrack", e) }
+                delay(500); refreshState()
+            } catch (e: Exception) { isStreamLoading.value = false; LokiLogger.e(TAG, "playTrack", e) }
         }
     }
 
@@ -2279,8 +2273,14 @@ class PlaybackViewModel : ViewModel() {
                 LokiLogger.i(TAG, "[InstantTap] downloaded copy started in ${System.currentTimeMillis() - t0}ms")
                 return
             }
-            // No downloaded copy: audio follows the server push, as the web player only resolves
-            // what the state machine holds.
+            // No downloaded copy: audio follows the server push, as the web player only resolves what the
+            // state machine holds. The outgoing track stops now though (#845): the web player goes quiet the
+            // moment the new track is in state. A re-tap of the streaming track is left alone, its echo
+            // short-circuits on currentStreamUri and would not reload.
+            if (trackUri != currentStreamUri) {
+                isStreamLoading.value = true; stopPositionTicker()
+                withContext(Dispatchers.Main) { MusicPlaybackService.instance?.stop() }
+            }
             LokiLogger.i(TAG, "[InstantTap] no downloaded copy for $trackUri, audio follows the echo")
         } catch (e: Exception) {
             LokiLogger.w(TAG, "[InstantTap] optimistic play failed (${e.message}); echo path will handle it")

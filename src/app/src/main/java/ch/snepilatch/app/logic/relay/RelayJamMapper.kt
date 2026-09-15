@@ -45,6 +45,19 @@ object RelayJamMapper {
 
     fun isRelay(session: JamSession?): Boolean = session?.initialSessionType == SESSION_TYPE
 
+    /**
+     * The join token in something a user pasted or scanned: a relay invite link (any server, the path
+     * is what counts) or the bare twelve character token. Null for anything else, an official jam link included.
+     */
+    fun joinToken(input: String): String? {
+        val text = input.trim()
+        if (TOKEN.matches(text)) return text
+        val afterPath = text.substringBefore('?').trimEnd('/').substringAfter("/jam/", "")
+        return afterPath.takeIf { TOKEN.matches(it) }
+    }
+
+    private val TOKEN = Regex("[A-Za-z0-9]{12}")
+
     private fun member(member: RelayMember, guestsControl: Boolean) = JamMember(
         id = member.id,
         username = member.userId ?: member.id,

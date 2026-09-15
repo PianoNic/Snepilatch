@@ -13,9 +13,7 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -63,7 +61,10 @@ import ch.snepilatch.app.viewmodel.LibraryViewModel
 import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import ch.snepilatch.app.logic.shared.shareSpfyUri
+import ch.snepilatch.app.ui.shared.LikeToggleButton
 import ch.snepilatch.app.ui.shared.PlaylistPickerDialog
+import ch.snepilatch.app.ui.shared.playerShortcutIcon
+import ch.snepilatch.app.ui.shared.playerShortcutTitle
 import ch.snepilatch.app.ui.shared.EntityMenuSheet
 import ch.snepilatch.app.ui.shared.MenuAction
 import ch.snepilatch.app.logic.shared.JamHolder
@@ -418,6 +419,13 @@ fun NowPlayingScreen(
     var showPlaylistPicker by remember { mutableStateOf(false) }
     var showJam by remember { mutableStateOf(false) }
     var showCode by remember { mutableStateOf(false) }
+    val playerActions = rememberPlayerActions(vm, track) {
+        when (it) {
+            NowPlayingOverlay.PlaylistPicker -> showPlaylistPicker = true
+            NowPlayingOverlay.Jam -> showJam = true
+            NowPlayingOverlay.Code -> showCode = true
+        }
+    }
     val shareContext = LocalContext.current
     val shareTrackLabel = stringResource(R.string.share_track_chooser)
     val canvasVideoUrl by vm.canvasUrl.collectAsState()
@@ -532,14 +540,7 @@ fun NowPlayingScreen(
                             NowPlayingMenu(
                                 showMore = showMore,
                                 onShowMore = { showMore = it },
-                                onOpen = {
-                                    when (it) {
-                                        NowPlayingOverlay.PlaylistPicker -> showPlaylistPicker = true
-                                        NowPlayingOverlay.Jam -> showJam = true
-                                        NowPlayingOverlay.Code -> showCode = true
-                                    }
-                                },
-                                vm = vm,
+                                actions = playerActions,
                                 track = track,
                                 buttonBg = buttonBg
                             )
@@ -579,12 +580,7 @@ fun NowPlayingScreen(
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
-                            PlayerShortcutButton(
-                                vm, track, buttonBg, animatedPrimary, 40.dp, 24.dp,
-                                onShowPlaylistPicker = { showPlaylistPicker = true },
-                                onShowJam = { showJam = true },
-                                onShowCode = { showCode = true },
-                            )
+                            PlayerShortcutButton(playerActions, vm, track, buttonBg, animatedPrimary, 40.dp, 24.dp)
                         }
 
                         Spacer(Modifier.height(8.dp))
@@ -764,23 +760,11 @@ fun NowPlayingScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            PlayerShortcutButton(
-                                vm, track, buttonBg, animatedPrimary, 48.dp, 28.dp,
-                                onShowPlaylistPicker = { showPlaylistPicker = true },
-                                onShowJam = { showJam = true },
-                                onShowCode = { showCode = true },
-                            )
+                            PlayerShortcutButton(playerActions, vm, track, buttonBg, animatedPrimary, 48.dp, 28.dp)
                             NowPlayingMenu(
                                 showMore = showMore,
                                 onShowMore = { showMore = it },
-                                onOpen = {
-                                    when (it) {
-                                        NowPlayingOverlay.PlaylistPicker -> showPlaylistPicker = true
-                                        NowPlayingOverlay.Jam -> showJam = true
-                                        NowPlayingOverlay.Code -> showCode = true
-                                    }
-                                },
-                                vm = vm,
+                                actions = playerActions,
                                 track = track,
                                 buttonBg = buttonBg
                             )
@@ -833,121 +817,109 @@ fun NowPlayingScreen(
     }
 }
 
+/**
+ * One player action per [PlayerShortcut] except LIKE (which keeps its toggle button), built once and
+ * consumed by both the three dots sheet and the configurable button, so the two never drift.
+ */
+private class PlayerAction(
+    val shortcut: PlayerShortcut,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val label: String,
+    val enabled: Boolean,
+    val run: () -> Unit,
+)
+
+/** What the player's actions act on; one holder instead of the same seven values passed to every action. */
+private class PlayerActionScope(
+    val vm: PlaybackViewModel,
+    val track: ch.snepilatch.app.data.TrackInfo?,
+    val context: android.content.Context,
+    val shareTrackLabel: String,
+    val inJam: Boolean,
+    val isDownloaded: Boolean,
+    val onOpen: (NowPlayingOverlay) -> Unit,
+) {
+    fun run(shortcut: PlayerShortcut) {
+        when (shortcut) {
+            PlayerShortcut.LIKE -> Unit
+            PlayerShortcut.LYRICS -> vm.openLyrics()
+            PlayerShortcut.ADD_TO_QUEUE -> track?.uri?.let { vm.addToQueue(it) }
+            PlayerShortcut.ADD_TO_PLAYLIST -> onOpen(NowPlayingOverlay.PlaylistPicker)
+            PlayerShortcut.QUEUE -> vm.openQueue()
+            PlayerShortcut.ALBUM -> vm.openAlbumFromCurrentTrack()
+            // Via the router: the sheet is built outside a composable that owns a DetailViewModel.
+            PlayerShortcut.RADIO -> track?.uri?.let { ch.snepilatch.app.viewmodel.DetailRoutes.openRadio(it) }
+            PlayerShortcut.DOWNLOAD -> download()
+            PlayerShortcut.JAM -> if (inJam) vm.openQueue() else onOpen(NowPlayingOverlay.Jam)
+            PlayerShortcut.CODE -> onOpen(NowPlayingOverlay.Code)
+            PlayerShortcut.SHARE -> track?.uri?.let { shareSpfyUri(context, it, shareTrackLabel) }
+        }
+    }
+
+    private fun download() {
+        val uri = track?.uri ?: return
+        if (isDownloaded) vm.removeDownload(uri) else vm.downloadCurrentTrack(context)
+    }
+}
+
 @Composable
-@Suppress("LongParameterList")
-internal fun PlayerShortcutButton(
+private fun rememberPlayerActions(
+    vm: PlaybackViewModel,
+    track: ch.snepilatch.app.data.TrackInfo?,
+    onOpen: (NowPlayingOverlay) -> Unit,
+): List<PlayerAction> {
+    val inJam = JamHolder.session.collectAsState().value != null
+    // Falls back to title/artist like playback does, so a relinked track's label agrees with what is
+    // actually on disk. In-flight counts as well, like every track row: isDownloaded is still false
+    // while the fetch runs, so without it a second tap started a second download of the same track.
+    val downloadedIndex by Downloads.index.collectAsState()
+    val inFlight by Downloads.inProgress.collectAsState()
+    val isDownloaded = track?.let { Downloads.isDownloaded(downloadedIndex, it.uri, it.name, it.artist) } == true
+    val isDownloading = track?.uri?.let { it in inFlight } == true
+    val scope = PlayerActionScope(
+        vm, track, LocalContext.current, stringResource(R.string.share_track_chooser), inJam, isDownloaded, onOpen,
+    )
+    return PlayerShortcut.entries.filter { it != PlayerShortcut.LIKE }.map { shortcut ->
+        val label = when {
+            shortcut == PlayerShortcut.DOWNLOAD && isDownloading -> stringResource(R.string.downloading)
+            shortcut == PlayerShortcut.DOWNLOAD && isDownloaded -> stringResource(R.string.remove_download)
+            shortcut == PlayerShortcut.JAM && inJam -> stringResource(R.string.jam)
+            else -> stringResource(playerShortcutTitle(shortcut))
+        }
+        val enabled = (!shortcut.requiresTrack || track != null) && !(shortcut == PlayerShortcut.DOWNLOAD && isDownloading)
+        PlayerAction(shortcut, playerShortcutIcon(shortcut, isDownloaded = isDownloaded), label, enabled) {
+            if (enabled) scope.run(shortcut)
+        }
+    }
+}
+
+/** The button beside the track details: the like toggle by default, or whichever [PlayerAction] the setting picked. */
+@Composable
+private fun PlayerShortcutButton(
+    actions: List<PlayerAction>,
     vm: PlaybackViewModel,
     track: ch.snepilatch.app.data.TrackInfo?,
     buttonBg: Color,
     accent: Color,
-    buttonSize: Dp,
+    size: Dp,
     iconSize: Dp,
-    onShowPlaylistPicker: () -> Unit,
-    onShowJam: () -> Unit,
-    onShowCode: () -> Unit,
 ) {
     val shortcut by AppSettings.playerShortcut.collectAsState()
-    val isLiked by vm.currentTrackLiked.collectAsState()
-    val downloadedIndex by Downloads.index.collectAsState()
-    val inFlight by Downloads.inProgress.collectAsState()
-    val inJam by JamHolder.session.collectAsState()
-    val context = LocalContext.current
-    val isDownloaded = track?.let { Downloads.isDownloaded(downloadedIndex, it.uri, it.name, it.artist) } == true
-    val isDownloading = track?.uri?.let { it in inFlight } == true
-    val active = shortcut == PlayerShortcut.LIKE && isLiked
-    val icon = playerShortcutIcon(shortcut, isLiked, isDownloaded)
-    val label = when {
-        shortcut == PlayerShortcut.LIKE && isLiked -> stringResource(R.string.unlike)
-        shortcut == PlayerShortcut.DOWNLOAD && isDownloading -> stringResource(R.string.downloading)
-        shortcut == PlayerShortcut.DOWNLOAD && isDownloaded -> stringResource(R.string.remove_download)
-        shortcut == PlayerShortcut.JAM && inJam != null -> stringResource(R.string.jam)
-        else -> stringResource(shortcut.titleRes)
-    }
-    val validTrack = track != null &&
-        (shortcut != PlayerShortcut.LIKE || track.uri.startsWith("spotify:track:"))
-    val enabled = (!shortcut.requiresTrack || validTrack) &&
-        !(shortcut == PlayerShortcut.DOWNLOAD && isDownloading)
-    val onClick: () -> Unit = {
-        runPlayerShortcut(
-            shortcut, vm, track, context, isLiked, isDownloaded, inJam != null,
-            onShowPlaylistPicker, onShowJam, onShowCode,
-        )
-    }
     if (shortcut == PlayerShortcut.LIKE) {
-        FilledIconToggleButton(
-            checked = active,
-            onCheckedChange = { onClick() },
-            enabled = enabled,
-            modifier = Modifier.size(buttonSize),
-            colors = IconButtonDefaults.filledIconToggleButtonColors(
-                containerColor = buttonBg,
-                contentColor = SnepilatchWhite.copy(alpha = 0.7f),
-                checkedContainerColor = buttonBg,
-                checkedContentColor = accent,
-            ),
-        ) { Icon(icon, label, modifier = Modifier.size(iconSize)) }
-    } else {
-        FilledTonalIconButton(
-            onClick = onClick,
-            enabled = enabled,
-            modifier = Modifier.size(buttonSize),
-            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                containerColor = buttonBg,
-                contentColor = SnepilatchWhite.copy(alpha = 0.7f),
-            ),
-        ) { Icon(icon, label, modifier = Modifier.size(iconSize)) }
+        val isLiked by vm.currentTrackLiked.collectAsState()
+        LikeToggleButton(isLiked, track?.uri, vm, buttonBg, accent, size, iconSize)
+        return
     }
-}
-
-@Suppress("LongParameterList")
-private fun runPlayerShortcut(
-    shortcut: PlayerShortcut,
-    vm: PlaybackViewModel,
-    track: ch.snepilatch.app.data.TrackInfo?,
-    context: android.content.Context,
-    isLiked: Boolean,
-    isDownloaded: Boolean,
-    inJam: Boolean,
-    onShowPlaylistPicker: () -> Unit,
-    onShowJam: () -> Unit,
-    onShowCode: () -> Unit,
-) {
-    when (shortcut) {
-        PlayerShortcut.LIKE -> track?.uri?.takeIf { it.startsWith("spotify:track:") }
-            ?.removePrefix("spotify:track:")
-            ?.let { if (isLiked) vm.unlikeSong(it) else vm.likeSong(it) }
-        PlayerShortcut.LYRICS -> vm.openLyrics()
-        PlayerShortcut.ADD_TO_QUEUE -> track?.uri?.let(vm::addToQueue)
-        PlayerShortcut.ADD_TO_PLAYLIST -> onShowPlaylistPicker()
-        PlayerShortcut.QUEUE -> vm.openQueue()
-        PlayerShortcut.ALBUM -> vm.openAlbumFromCurrentTrack()
-        PlayerShortcut.RADIO -> track?.uri?.let(ch.snepilatch.app.viewmodel.DetailRoutes::openRadio)
-        PlayerShortcut.DOWNLOAD -> track?.uri?.let {
-            if (isDownloaded) vm.removeDownload(it) else vm.downloadCurrentTrack(context)
-        }
-        PlayerShortcut.JAM -> if (inJam) vm.openQueue() else onShowJam()
-        PlayerShortcut.CODE -> onShowCode()
-        PlayerShortcut.SHARE -> track?.uri?.let {
-            shareSpfyUri(context, it, context.getString(R.string.share_track_chooser))
-        }
-    }
-}
-
-internal fun playerShortcutIcon(
-    shortcut: PlayerShortcut,
-    isLiked: Boolean = false,
-    isDownloaded: Boolean = false,
-) = when (shortcut) {
-    PlayerShortcut.LIKE -> if (isLiked) Icons.Rounded.Favorite else Icons.Filled.FavoriteBorder
-    PlayerShortcut.LYRICS -> Icons.Rounded.MusicNote
-    PlayerShortcut.ADD_TO_QUEUE, PlayerShortcut.QUEUE -> Icons.AutoMirrored.Rounded.QueueMusic
-    PlayerShortcut.ADD_TO_PLAYLIST -> Icons.AutoMirrored.Rounded.PlaylistAdd
-    PlayerShortcut.ALBUM -> Icons.Rounded.Album
-    PlayerShortcut.RADIO -> Icons.Rounded.Radio
-    PlayerShortcut.DOWNLOAD -> if (isDownloaded) Icons.Rounded.OfflinePin else Icons.Rounded.DownloadForOffline
-    PlayerShortcut.JAM -> Icons.Rounded.Groups
-    PlayerShortcut.CODE -> Icons.Rounded.QrCode2
-    PlayerShortcut.SHARE -> Icons.Rounded.Share
+    val action = actions.first { it.shortcut == shortcut }
+    FilledTonalIconButton(
+        onClick = action.run,
+        enabled = action.enabled,
+        modifier = Modifier.size(size),
+        colors = IconButtonDefaults.filledTonalIconButtonColors(
+            containerColor = buttonBg,
+            contentColor = SnepilatchWhite.copy(alpha = 0.7f),
+        ),
+    ) { Icon(action.icon, action.label, modifier = Modifier.size(iconSize)) }
 }
 
 @Composable
@@ -1229,8 +1201,7 @@ private enum class NowPlayingOverlay { PlaylistPicker, Jam, Code }
 private fun NowPlayingMenu(
     showMore: Boolean,
     onShowMore: (Boolean) -> Unit,
-    onOpen: (NowPlayingOverlay) -> Unit,
-    vm: PlaybackViewModel,
+    actions: List<PlayerAction>,
     track: ch.snepilatch.app.data.TrackInfo?,
     buttonBg: Color
 ) {
@@ -1246,82 +1217,7 @@ private fun NowPlayingMenu(
     }
 
     if (showMore) {
-        val shareTrackLabel = stringResource(R.string.share_track_chooser)
-        val lyricsLabel = stringResource(R.string.lyrics)
-        val addQueueLabel = stringResource(R.string.add_to_queue)
-        val addPlaylistLabel = stringResource(R.string.add_to_playlist)
-        val viewQueueLabel = stringResource(R.string.view_queue)
-        val visitAlbumLabel = stringResource(R.string.visit_album)
-        val songRadioLabel = stringResource(R.string.go_to_song_radio)
-        val shareLabel = stringResource(R.string.share)
-        val joinJamLabel = stringResource(R.string.join_jam)
-        val jamLabel = stringResource(R.string.jam)
-        val inJam = JamHolder.session.collectAsState().value != null
-        val showCodeLabel = stringResource(R.string.show_code)
-        val shareContext = LocalContext.current
-        val downloadCtx = androidx.compose.ui.platform.LocalContext.current
-        // Falls back to title/artist like playback does, so a relinked track's menu label
-        // agrees with what's actually on disk.
-        val downloadedIndex by Downloads.index.collectAsState()
-        // In-flight as well as downloaded, like every track row: isDownloaded is still false while
-        // the fetch runs, so without this the entry looked untouched and a second tap started a
-        // second download of the same track.
-        val inFlight by Downloads.inProgress.collectAsState()
-        val isDownloaded = track?.let { Downloads.isDownloaded(downloadedIndex, it.uri, it.name, it.artist) } == true
-        val isDownloading = track?.uri?.let { it in inFlight } == true
-        val downloadLabel = when {
-            isDownloading -> stringResource(R.string.downloading)
-            isDownloaded -> stringResource(R.string.remove_download)
-            else -> stringResource(R.string.download_track)
-        }
-        val items = listOf(
-            MenuAction(Icons.Rounded.MusicNote, lyricsLabel) {
-                onShowMore(false); vm.openLyrics()
-            },
-            MenuAction(Icons.AutoMirrored.Rounded.QueueMusic, addQueueLabel) {
-                track?.uri?.let { vm.addToQueue(it) }; onShowMore(false)
-            },
-            MenuAction(Icons.AutoMirrored.Rounded.PlaylistAdd, addPlaylistLabel) {
-                onShowMore(false); onOpen(NowPlayingOverlay.PlaylistPicker)
-            },
-            MenuAction(Icons.AutoMirrored.Rounded.QueueMusic, viewQueueLabel) {
-                vm.openQueue(); onShowMore(false)
-            },
-            MenuAction(Icons.Rounded.Album, visitAlbumLabel) {
-                onShowMore(false); vm.openAlbumFromCurrentTrack()
-            },
-            MenuAction(Icons.Rounded.Radio, songRadioLabel) {
-                onShowMore(false)
-                // Via the router: this menu is built outside a composable that owns a DetailViewModel.
-                track?.uri?.let { ch.snepilatch.app.viewmodel.DetailRoutes.openRadio(it) }
-            },
-            // Same glyphs as the track rows in SharedComponents: the same track reached two ways
-            // showed two different icons for one state.
-            MenuAction(
-                if (isDownloaded) Icons.Rounded.OfflinePin else Icons.Rounded.DownloadForOffline,
-                downloadLabel,
-            ) {
-                onShowMore(false)
-                val uri = track?.uri
-                when {
-                    uri == null || isDownloading -> Unit
-                    isDownloaded -> vm.removeDownload(uri)
-                    else -> vm.downloadCurrentTrack(downloadCtx)
-                }
-            },
-            MenuAction(Icons.Rounded.Groups, if (inJam) jamLabel else joinJamLabel) {
-                onShowMore(false)
-                if (inJam) vm.openQueue() else onOpen(NowPlayingOverlay.Jam)
-            },
-            MenuAction(Icons.Rounded.QrCode2, showCodeLabel) {
-                onShowMore(false)
-                onOpen(NowPlayingOverlay.Code)
-            },
-            MenuAction(Icons.Rounded.Share, shareLabel) {
-                onShowMore(false)
-                track?.uri?.let { shareSpfyUri(shareContext, it, shareTrackLabel) }
-            }
-        )
+        val items = actions.map { action -> MenuAction(action.icon, action.label) { onShowMore(false); action.run() } }
         EntityMenuSheet(
             imageUrl = track?.albumArt,
             title = track?.name,

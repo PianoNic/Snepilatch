@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * `canvasUrl` is NOT here — it's the current track's video URL (playback-derived, not persisted), so
  * it stays on [PlaybackViewModel]; `setCanvasEnabled` there wraps [setCanvasEnabled] to also clear it.
  */
-@Suppress("TooManyFunctions")
 object AppSettings {
 
     const val PREFS = "kotify_prefs"
@@ -295,22 +294,14 @@ object AppSettings {
         (context as? android.app.Activity)?.recreate()
     }
 
-    fun setNotificationLeftButton(button: String, context: Context) {
-        notificationLeftButton.value = button
-        prefs(context)
-            .edit().putString("notification_left_button", button).apply()
+    /** One setter for both notification slots; pass only the side that changed. */
+    fun setNotificationButtons(context: Context, left: String = notificationLeftButton.value, right: String = notificationRightButton.value) {
+        notificationLeftButton.value = left
+        notificationRightButton.value = right
+        prefs(context).edit().putString("notification_left_button", left).putString("notification_right_button", right).apply()
         MusicPlaybackService.instance?.let { svc ->
-            svc.notificationLeftButton = button
-            svc.updateNotification()
-        }
-    }
-
-    fun setNotificationRightButton(button: String, context: Context) {
-        notificationRightButton.value = button
-        prefs(context)
-            .edit().putString("notification_right_button", button).apply()
-        MusicPlaybackService.instance?.let { svc ->
-            svc.notificationRightButton = button
+            svc.notificationLeftButton = left
+            svc.notificationRightButton = right
             svc.updateNotification()
         }
     }

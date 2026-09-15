@@ -30,6 +30,8 @@ import ch.snepilatch.app.ui.shared.RadioPickerDialog
 import ch.snepilatch.app.ui.shared.SettingRow
 import ch.snepilatch.app.ui.shared.SettingsSectionHeader
 import ch.snepilatch.app.ui.shared.SettingToggleRow
+import ch.snepilatch.app.ui.shared.playerShortcutIcon
+import ch.snepilatch.app.ui.shared.playerShortcutTitle
 import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 
@@ -140,7 +142,7 @@ private fun BehaviorSection(context: Context) {
     var showPlayerShortcutPicker by remember { mutableStateOf(false) }
     SettingRow(
         title = stringResource(R.string.player_shortcut),
-        subtitle = stringResource(playerShortcut.titleRes),
+        subtitle = stringResource(playerShortcutTitle(playerShortcut)),
         icon = Icons.Rounded.TouchApp,
         onClick = { showPlayerShortcutPicker = true },
     )
@@ -149,7 +151,7 @@ private fun BehaviorSection(context: Context) {
             title = stringResource(R.string.player_shortcut),
             description = stringResource(R.string.player_shortcut_desc),
             options = PlayerShortcut.entries.map {
-                RadioOption(it.id, stringResource(it.titleRes), icon = playerShortcutIcon(it))
+                RadioOption(it.id, stringResource(playerShortcutTitle(it)), icon = playerShortcutIcon(it))
             },
             selected = playerShortcut.id,
             onSelect = {
@@ -206,7 +208,7 @@ private fun NotificationButtonsSection(context: Context) {
         current = leftButton,
         label = labels[leftButton] ?: leftButton,
         options = options,
-    ) { AppSettings.setNotificationLeftButton(it, context) }
+    ) { AppSettings.setNotificationButtons(context, left = it) }
 
     val rightButton by AppSettings.notificationRightButton.collectAsState()
     NotificationButtonRow(
@@ -215,7 +217,7 @@ private fun NotificationButtonsSection(context: Context) {
         current = rightButton,
         label = labels[rightButton] ?: rightButton,
         options = options,
-    ) { AppSettings.setNotificationRightButton(it, context) }
+    ) { AppSettings.setNotificationButtons(context, right = it) }
 }
 
 @Composable

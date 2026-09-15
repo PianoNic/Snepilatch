@@ -191,7 +191,7 @@ private fun SwipeActionBackground(
     }
     val iconScale = 0.5f + iconProgress * 0.5f
     val iconTranslationX = with(density) {
-        ICON_TRANSLATION.toPx() * (1f - iconProgress) * if (fromStart) -1f else 1f
+        ICON_START_TRANSLATION.toPx() * (1f - iconProgress) * if (fromStart) -1f else 1f
     }
     Box(
         Modifier
@@ -231,7 +231,7 @@ private fun SwipeActionBackground(
             Modifier
                 .align(if (fromStart) Alignment.CenterStart else Alignment.CenterEnd)
                 .fillMaxHeight()
-                .padding(horizontal = ICON_TRANSLATION),
+                .padding(horizontal = ACTION_HORIZONTAL_PADDING),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = if (fromStart) Arrangement.Start else Arrangement.End,
         ) {
@@ -262,6 +262,7 @@ internal fun swipeProgress(offset: Float, distance: Float): Float =
 private val CORNER_RADIUS = 12.dp
 private val CORNER_RADIUS_DISTANCE = 48.dp
 private val ICON_DISTANCE = 96.dp
-private val ICON_TRANSLATION = 16.dp
+private val ACTION_HORIZONTAL_PADDING = 16.dp
+private val ICON_START_TRANSLATION = 16.dp
 private const val FLASH_ALPHA = 0.24f
 private const val FLASH_MS = 200

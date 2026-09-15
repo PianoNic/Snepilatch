@@ -230,7 +230,6 @@ private fun QueueList(
                     onClick = { tap(entry.first, entry.second, i) },
                     onRemove = { vm.removeFromQueue(entry.second) },
                     onAdd = null,
-                    isContextEntry = false,
                     modifier = Modifier.animateItem(),
                 )
             }
@@ -246,27 +245,12 @@ private fun QueueList(
                     onClick = { tap(entry.first, entry.second, queuedCount + i) },
                     onRemove = { vm.removeFromQueue(entry.second) },
                     onAdd = ({ vm.addToQueue(entry.second.uri) }).takeIf { canAddToQueue },
-                    isContextEntry = true,
                     modifier = Modifier.animateItem(),
                 )
             }
         }
     }
 }
-
-internal data class QueueSwipePolicy(
-    val hasAddAction: Boolean,
-    val swipeEnabled: Boolean,
-) {
-    fun resetsAfter(direction: SwipeToDismissBoxValue): Boolean =
-        hasAddAction && direction == SwipeToDismissBoxValue.StartToEnd
-}
-
-internal fun queueSwipePolicy(
-    isContextEntry: Boolean,
-    canAddToQueue: Boolean,
-    dragging: Boolean,
-): QueueSwipePolicy = QueueSwipePolicy(isContextEntry && canAddToQueue, !dragging)
 
 /**
  * A queue row you can swipe away, or swipe into the immediate queue when it is only up next.
@@ -281,11 +265,10 @@ private fun SwipeableQueueRow(
     onClick: () -> Unit,
     onRemove: () -> Unit,
     onAdd: (() -> Unit)?,
-    isContextEntry: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val theme by ThemeController.themeColors.collectAsState()
-    val policy = queueSwipePolicy(isContextEntry, onAdd != null, drag?.dragging == true)
+    val swipeEnabled = drag?.dragging != true
     SwipeableActionRow(
         modifier = modifier
             // The dragged row rides above the rest and follows the finger; everything else
@@ -299,7 +282,7 @@ private fun SwipeableQueueRow(
                 stringResource(R.string.add_to_queue),
                 theme.primary,
                 it,
-                resetAfterRun = policy.resetsAfter(SwipeToDismissBoxValue.StartToEnd),
+                resetAfterRun = true,
             )
         },
         endToStartAction = SwipeAction(
@@ -307,10 +290,10 @@ private fun SwipeableQueueRow(
             stringResource(R.string.queue_remove),
             SnepilatchError,
             onRemove,
-            resetAfterRun = policy.resetsAfter(SwipeToDismissBoxValue.EndToStart),
+            resetAfterRun = false,
         ),
-        enableDismissFromEndToStart = policy.swipeEnabled,
-        enableDismissFromStartToEnd = policy.swipeEnabled,
+        enableDismissFromEndToStart = swipeEnabled,
+        enableDismissFromStartToEnd = swipeEnabled,
         contentBackground = SnepilatchElevated,
     ) { QueueRow(track, onClick, drag) }
 }

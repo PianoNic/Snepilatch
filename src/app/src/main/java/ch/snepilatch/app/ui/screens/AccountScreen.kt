@@ -98,7 +98,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
 
             Spacer(Modifier.height(6.dp))
             Text(
-                stringResource(R.string.followers_playlists, account.followers, account.playlistCount),
+                stringResource(R.string.profile_header, account.playlistCount, account.followers, account.following),
                 color = SnepilatchLightGray,
                 fontSize = 13.sp
             )

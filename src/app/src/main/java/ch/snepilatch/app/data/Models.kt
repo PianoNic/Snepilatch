@@ -119,6 +119,7 @@ data class AccountInfo(
     val profileImageUrl: String? = null,
     val userId: String = "",
     val followers: Int = 0,
+    val following: Int = 0,
     val playlistCount: Int = 0
 )
 

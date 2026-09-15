@@ -52,7 +52,7 @@
     <string name="user_id">Benutzer-ID</string>
     <string name="plan">Abo</string>
     <string name="plan_free">Kostenlos</string>
-    <string name="followers_playlists">%1$d Follower · %2$d Playlists</string>
+    <string name="profile_header">%1$d öffentliche Playlists · %2$d Follower · %3$d gefolgt</string>
     <string name="log_out">Abmelden</string>
 
     <!-- Settings -->

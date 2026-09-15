@@ -180,6 +180,8 @@ fun SpfyApp(vm: PlaybackViewModel) {
                 }
         ) {
             val jam by JamHolder.session.collectAsState()
+            val appContext = LocalContext.current.applicationContext
+            LaunchedEffect(vm) { ch.snepilatch.app.logic.relay.RelayJam.bind(vm, appContext) }
             jam?.let { JamBanner(it, onClick = { vm.openQueue() }) }
             if (hasTrack) {
                 MiniPlayer(

@@ -174,11 +174,13 @@ class RelayClient(
     }
 
     private fun failPending() {
-        pending.values.forEach { it.cancel() }
+        pending.forEach { (rid, answer) -> answer.complete(RelayEvent.Error(DISCONNECTED, emptyMap(), rid)) }
         pending.clear()
     }
 
     companion object {
+        const val DISCONNECTED = "DISCONNECTED"
+
         /** The relay's WebSocket for a server address as the user types it: https becomes wss, http becomes ws. */
         fun socketUrl(serverUrl: String): String {
             val base = serverUrl.trim().trimEnd('/')

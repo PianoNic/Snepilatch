@@ -350,6 +350,8 @@
     <string name="error_follow">Em Künschtler folge hät nöd funktioniert</string>
     <string name="error_save_library">I d Bibliothek spichere hät nöd funktioniert</string>
     <string name="error_add_playlist">I d Playlist iifüege hät nöd funktioniert</string>
+    <string name="removed_from_playlist">Us dr Playlist uusegnoh</string>
+    <string name="error_remove_playlist">Het nöd us dr Playlist chöne uusegnoh werde</string>
     <string name="error_add_queue">I d Wartelischte dezuetue hät nöd funktioniert</string>
 
     <!-- Downloads -->

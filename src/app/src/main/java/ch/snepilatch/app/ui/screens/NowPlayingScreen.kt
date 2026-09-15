@@ -59,6 +59,8 @@ import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.viewmodel.LibraryViewModel
 import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
+import ch.snepilatch.app.viewmodel.canRemovePlayingFromPlaylist
+import ch.snepilatch.app.viewmodel.removePlayingFromPlaylist
 import ch.snepilatch.app.logic.shared.shareSpfyUri
 import ch.snepilatch.app.ui.shared.LikeToggleButton
 import ch.snepilatch.app.ui.shared.PlaylistPickerDialog
@@ -541,7 +543,8 @@ fun NowPlayingScreen(
                                 onShowMore = { showMore = it },
                                 actions = playerActions,
                                 track = track,
-                                buttonBg = buttonBg
+                                buttonBg = buttonBg,
+                                vm = vm,
                             )
                         }
 
@@ -765,7 +768,8 @@ fun NowPlayingScreen(
                                 onShowMore = { showMore = it },
                                 actions = playerActions,
                                 track = track,
-                                buttonBg = buttonBg
+                                buttonBg = buttonBg,
+                                vm = vm,
                             )
                         }
                     }
@@ -1124,7 +1128,8 @@ private fun NowPlayingMenu(
     onShowMore: (Boolean) -> Unit,
     actions: List<PlayerAction>,
     track: ch.snepilatch.app.data.TrackInfo?,
-    buttonBg: Color
+    buttonBg: Color,
+    vm: PlaybackViewModel,
 ) {
     FilledTonalIconButton(
         onClick = { onShowMore(true) },
@@ -1138,7 +1143,16 @@ private fun NowPlayingMenu(
     }
 
     if (showMore) {
-        val items = actions.map { action -> MenuAction(action.icon, action.label) { onShowMore(false); action.run() } }
+        // Only here, not in the shared action table: it depends on where the track is playing from,
+        // so it is nothing a configurable button or a row swipe could carry (#851).
+        val canRemove = vm.canRemovePlayingFromPlaylist()
+        val removeLabel = stringResource(R.string.remove_from_playlist)
+        val items = actions.map { action -> MenuAction(action.icon, action.label) { onShowMore(false); action.run() } } +
+            if (canRemove) {
+                listOf(MenuAction(Icons.Rounded.PlaylistRemove, removeLabel) { onShowMore(false); vm.removePlayingFromPlaylist() })
+            } else {
+                emptyList()
+            }
         EntityMenuSheet(
             imageUrl = track?.albumArt,
             title = track?.name,

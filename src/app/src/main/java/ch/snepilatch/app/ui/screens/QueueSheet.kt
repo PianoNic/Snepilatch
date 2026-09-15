@@ -121,7 +121,7 @@ internal fun queueRowKeys(queue: List<ch.snepilatch.app.data.TrackInfo>): List<S
     }
 }
 
-internal fun totalQueuedDurationMs(queue: List<ch.snepilatch.app.data.TrackInfo>, queuedCount: Int): Long =
+internal fun totalQueuedDurationMs(queue: List<TrackInfo>, queuedCount: Int): Long =
     queue.take(queuedCount).sumOf { it.durationMs }
 
 /** One row's drag wiring, bundled so a row takes a drag contract rather than six loose callbacks. */

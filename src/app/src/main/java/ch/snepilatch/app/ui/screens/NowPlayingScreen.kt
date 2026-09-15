@@ -1175,82 +1175,61 @@ private fun MarqueeText(
     fontWeight: FontWeight? = null,
     modifier: Modifier = Modifier
 ) {
-    // Not basicMarquee (#856): that one scrolls by re-laying-out the text every frame, which held the
-    // whole player at the panel's 120Hz and dragged the backdrop's warp/blur/grade chain — built to
-    // run at 15 — up with it. Measured at 83% of a core against 16% for a title that fits.
-    // Here the text is drawn twice with a gap and slid by a translation that only ever gets read
-    // inside graphicsLayer, so a frame moves the layer and nothing above it composes or measures
-    // again. Reading the real frame clock keeps the slide smooth, and wrapping on the loop length
-    // means it runs on round after round instead of snapping back to the start.
+    // Not basicMarquee (#856): that one scrolls by re-laying-out the text on every frame, which held
+    // the whole player at the panel's 120Hz for as long as the song played — 83% of a core against
+    // 16% for a title that fits. Here the slide is a translation that is only ever read inside
+    // graphicsLayer, so a step moves the layer and nothing above it composes or measures again.
+    // It reads the real frame clock so the motion keeps its speed, moves on every second refresh,
+    // and rests at both ends, which is the cheapest part: nothing is drawn at all while it waits.
     var textWidth by remember { mutableIntStateOf(0) }
     var boxWidth by remember { mutableIntStateOf(0) }
-    val overflowing = boxWidth > 0 && textWidth > boxWidth
-    val density = LocalDensity.current
-    val gapPx = with(density) { MARQUEE_GAP.toPx() }
-    val speedPxPerSecond = with(density) { MARQUEE_VELOCITY.toPx() }
+    val overflowPx = (textWidth - boxWidth).coerceAtLeast(0)
+    val speedPxPerSecond = with(LocalDensity.current) { MARQUEE_VELOCITY.toPx() }
     val offset = remember { mutableFloatStateOf(0f) }
-    val loopPx = textWidth + gapPx
 
-    LaunchedEffect(text, isPlaying, overflowing, loopPx) {
+    LaunchedEffect(text, isPlaying, overflowPx, speedPxPerSecond) {
         offset.floatValue = 0f
-        if (!isPlaying || !overflowing || loopPx <= 0f) return@LaunchedEffect
-        delay(MARQUEE_LEAD_IN_MS)
-        var previous = 0L
-        var pending = 0f
+        if (!isPlaying || overflowPx <= 0) return@LaunchedEffect
         while (true) {
-            withFrameNanos { now ->
-                if (previous != 0L) {
-                    // Every step is worth exactly the time that passed, so the slide keeps its speed;
-                    // holding them back until half a frame's worth has built up moves the text on
-                    // every second vsync of a 120Hz panel, which is still smooth and costs half.
-                    pending += (now - previous) / 1_000_000_000f
-                    if (pending >= MARQUEE_MIN_STEP_SECONDS) {
-                        offset.floatValue = (offset.floatValue + pending * speedPxPerSecond) % loopPx
-                        pending = 0f
+            delay(MARQUEE_REST_MS)
+            var previous = 0L
+            var pending = 0f
+            while (offset.floatValue > -overflowPx) {
+                withFrameNanos { now ->
+                    if (previous != 0L) {
+                        pending += (now - previous) / 1_000_000_000f
+                        if (pending >= MARQUEE_MIN_STEP_SECONDS) {
+                            offset.floatValue =
+                                (offset.floatValue - pending * speedPxPerSecond).coerceAtLeast(-overflowPx.toFloat())
+                            pending = 0f
+                        }
                     }
+                    previous = now
                 }
-                previous = now
             }
+            // Held at the tail so it can be read, then back to the start for the next pass.
+            delay(MARQUEE_REST_MS)
+            offset.floatValue = 0f
         }
     }
 
     Box(modifier.fillMaxWidth().clipToBounds().onSizeChanged { boxWidth = it.width }) {
-        Row(
-            Modifier
+        Text(
+            text = text,
+            color = color,
+            fontSize = fontSize,
+            fontWeight = fontWeight,
+            softWrap = false,
+            maxLines = 1,
+            modifier = Modifier
                 .wrapContentWidth(Alignment.Start, unbounded = true)
-                .graphicsLayer { translationX = -offset.floatValue },
-        ) {
-            MarqueeLabel(text, color, fontSize, fontWeight) { textWidth = it }
-            if (overflowing) {
-                Spacer(Modifier.width(MARQUEE_GAP))
-                MarqueeLabel(text, color, fontSize, fontWeight)
-            }
-        }
+                .onSizeChanged { textWidth = it.width }
+                .graphicsLayer { translationX = offset.floatValue },
+        )
     }
 }
 
-/** One copy of the sliding text; the first reports its width, which is what the loop is measured on. */
-@Composable
-private fun MarqueeLabel(
-    text: String,
-    color: androidx.compose.ui.graphics.Color,
-    fontSize: androidx.compose.ui.unit.TextUnit,
-    fontWeight: FontWeight?,
-    onWidth: ((Int) -> Unit)? = null,
-) {
-    Text(
-        text = text,
-        color = color,
-        fontSize = fontSize,
-        fontWeight = fontWeight,
-        softWrap = false,
-        maxLines = 1,
-        modifier = if (onWidth == null) Modifier else Modifier.onSizeChanged { onWidth(it.width) },
-    )
-}
-
-/** How fast a title that does not fit slides past, the gap between its repeats, and the rest before it starts. */
+/** How fast a title that does not fit slides past, how long it rests at each end, and the smallest step. */
 private val MARQUEE_VELOCITY = 40.dp
-private val MARQUEE_GAP = 48.dp
-private const val MARQUEE_LEAD_IN_MS = 1200L
+private const val MARQUEE_REST_MS = 2500L
 private const val MARQUEE_MIN_STEP_SECONDS = 0.015f

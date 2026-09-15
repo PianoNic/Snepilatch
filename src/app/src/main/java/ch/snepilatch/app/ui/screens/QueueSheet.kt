@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DragHandle
@@ -37,6 +38,7 @@ import ch.snepilatch.app.ui.shared.JamHeader
 import ch.snepilatch.app.ui.shared.JamInviteSheet
 import ch.snepilatch.app.viewmodel.JamViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 
 /** The queue as a bottom drawer over whatever is showing; the full player stays open underneath. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -44,6 +46,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 fun QueueSheet(vm: PlaybackViewModel) {
     val queue by vm.queue.collectAsState()
     val queuedCount by vm.queuedCount.collectAsState()
+    val offline by vm.isOffline.collectAsState()
     val playback by vm.playback.collectAsState()
     val sheetState = rememberBottomSheetState(
         initialValue = SheetValue.Hidden,
@@ -91,16 +94,16 @@ fun QueueSheet(vm: PlaybackViewModel) {
                 }
                 return@Column
             }
-            QueueList(vm, playback.track, queue, queuedCount, Modifier.weight(1f))
+            QueueList(vm, playback.track, queue, queuedCount, !offline, Modifier.weight(1f))
         }
     }
 }
 
 /**
- * A queue row you can swipe away, which is the primary way out of a track added by mistake.
+ * A queue row you can swipe away, or swipe into the immediate queue when it is only up next.
  *
- * One direction only: a row also responds to a tap, and a two way swipe on top of that turns an
- * imprecise gesture into a coin flip between playing something and deleting it.
+ * Explicit queue entries only support removal. Context entries support both actions because adding
+ * one to the queue is what makes it play before the rest of the context.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 /**
@@ -143,6 +146,7 @@ private fun QueueList(
     nowPlaying: ch.snepilatch.app.data.TrackInfo?,
     queue: List<ch.snepilatch.app.data.TrackInfo>,
     queuedCount: Int,
+    canAddToQueue: Boolean,
     modifier: Modifier = Modifier,
 ) {
     // Keys ride with their entry, so the preview below can reorder freely without a row's identity
@@ -230,6 +234,7 @@ private fun QueueList(
                     dragFor(entry.first, entry.second, i),
                     onClick = { tap(entry.first, entry.second, i) },
                     onRemove = { vm.removeFromQueue(entry.second) },
+                    onAdd = null,
                     modifier = Modifier.animateItem(),
                 )
             }
@@ -244,6 +249,11 @@ private fun QueueList(
                     dragFor(entry.first, entry.second, queuedCount + i),
                     onClick = { tap(entry.first, entry.second, queuedCount + i) },
                     onRemove = { vm.removeFromQueue(entry.second) },
+                    onAdd = if (canAddToQueue) {
+                        { vm.addToQueue(entry.second.uri) }
+                    } else {
+                        null
+                    },
                     modifier = Modifier.animateItem(),
                 )
             }
@@ -257,9 +267,11 @@ private fun SwipeableQueueRow(
     drag: RowDrag?,
     onClick: () -> Unit,
     onRemove: () -> Unit,
+    onAdd: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val state = rememberSwipeToDismissBoxState()
+    val scope = rememberCoroutineScope()
     SwipeToDismissBox(
         state = state,
         modifier = modifier
@@ -268,19 +280,43 @@ private fun SwipeableQueueRow(
             // above the now playing item so a tapped row travelling up passes behind them.
             .zIndex(if (drag?.dragging == true) 2f else 1f)
             .offset { IntOffset(0, (drag?.offsetY ?: 0f).roundToInt()) },
-        onDismiss = { value -> if (value == SwipeToDismissBoxValue.EndToStart) onRemove() },
+        onDismiss = { value ->
+            when (value) {
+                SwipeToDismissBoxValue.EndToStart -> onRemove()
+                SwipeToDismissBoxValue.StartToEnd -> {
+                    onAdd?.invoke()
+                    scope.launch { state.reset() }
+                }
+                SwipeToDismissBoxValue.Settled -> Unit
+            }
+        },
         // A vertical drag on the grip must not also read as a swipe to delete.
         enableDismissFromEndToStart = drag?.dragging != true,
-        enableDismissFromStartToEnd = false,
+        enableDismissFromStartToEnd = onAdd != null && drag?.dragging != true,
         backgroundContent = {
             Box(
                 Modifier
                     .fillMaxSize()
-                    .background(SnepilatchError)
+                    .background(
+                        if (state.dismissDirection == SwipeToDismissBoxValue.StartToEnd) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            SnepilatchError
+                        }
+                    )
                     .padding(horizontal = 24.dp),
-                contentAlignment = Alignment.CenterEnd
+                contentAlignment = if (state.dismissDirection == SwipeToDismissBoxValue.StartToEnd) {
+                    Alignment.CenterStart
+                } else {
+                    Alignment.CenterEnd
+                }
             ) {
-                Icon(Icons.Rounded.Delete, stringResource(R.string.queue_remove), tint = SnepilatchWhite)
+                val adding = state.dismissDirection == SwipeToDismissBoxValue.StartToEnd
+                Icon(
+                    if (adding) Icons.AutoMirrored.Rounded.QueueMusic else Icons.Rounded.Delete,
+                    stringResource(if (adding) R.string.add_to_queue else R.string.queue_remove),
+                    tint = SnepilatchWhite,
+                )
             }
         }
     ) {

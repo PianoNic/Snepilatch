@@ -1,6 +1,14 @@
 package ch.snepilatch.app.ui.screens
 
 import android.text.format.DateUtils
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.StartOffset
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,6 +38,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -37,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.R
+import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.ui.shared.SpfyImage
 import ch.snepilatch.app.ui.theme.SnepilatchLightGray
 import ch.snepilatch.app.ui.theme.SnepilatchWhite
@@ -91,8 +103,14 @@ fun FriendActivityScreen(vm: PlaybackViewModel, friendsVm: FriendActivityViewMod
     }
 }
 
+/**
+ * Laid out like the web's row: a playing friend has no time after the name and the track line in
+ * the accent colour behind animated bars; a stopped one gets "• 56 min ago" after the name and a
+ * grey track line.
+ */
 @Composable
 private fun FriendRow(friend: FriendActivity, onClick: () -> Unit) {
+    val theme by ThemeController.themeColors.collectAsState()
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -110,28 +128,56 @@ private fun FriendRow(friend: FriendActivity, onClick: () -> Unit) {
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
-                Spacer(Modifier.width(8.dp))
-                Text(relativeTime(friend), color = SnepilatchLightGray, fontSize = 12.sp)
+                if (!friend.isPlaying) {
+                    Text(" • " + relativeTime(friend.timestampMs), color = SnepilatchLightGray, fontSize = 12.sp, maxLines = 1)
+                }
             }
-            Text(
-                "${friend.trackName} • ${friend.artistName}",
-                color = SnepilatchLightGray,
-                fontSize = 13.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            // ponytail: the web shows the context's name (playlist/album); we only have the album
-            // from the track. Resolve playlist names in Kotify when it matters.
-            friend.albumName?.let {
-                Text(it, color = SnepilatchLightGray, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (friend.isPlaying) {
+                    PlayingBars(theme.primary, Modifier.size(12.dp))
+                    Spacer(Modifier.width(6.dp))
+                }
+                Text(
+                    "${friend.trackName} • ${friend.artistName}",
+                    color = if (friend.isPlaying) theme.primary else SnepilatchLightGray,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
         SpfyImage(friend.imageUrl, Modifier.size(44.dp))
     }
 }
 
+/** Three bars bouncing out of phase, the web's `animated` now-playing glyph. */
 @Composable
-private fun relativeTime(friend: FriendActivity): String = when {
-    friend.isPlaying -> stringResource(R.string.friend_activity_now)
-    else -> DateUtils.getRelativeTimeSpanString(friend.timestampMs, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString()
+private fun PlayingBars(color: Color, modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "playingBars")
+    val phases = BAR_PHASES.map { phase ->
+        transition.animateFloat(
+            initialValue = 0.3f, targetValue = 1f, label = "bar$phase",
+            animationSpec = infiniteRepeatable(tween(BAR_PERIOD_MS, easing = LinearEasing), RepeatMode.Reverse, StartOffset(phase)),
+        )
+    }
+    Canvas(modifier) {
+        val gap = size.width / (phases.size * 2 - 1)
+        phases.forEachIndexed { i, level ->
+            val h = size.height * level.value
+            drawRect(color, topLeft = Offset(i * 2 * gap, size.height - h), size = Size(gap, h))
+        }
+    }
+}
+
+private val BAR_PHASES = listOf(0, 180, 360)
+private const val BAR_PERIOD_MS = 500
+
+/** "now" inside the first minute, then the platform's abbreviated relative time ("56 min ago"). */
+@Composable
+private fun relativeTime(timestampMs: Long): String {
+    val now = System.currentTimeMillis()
+    return when {
+        now - timestampMs < DateUtils.MINUTE_IN_MILLIS -> stringResource(R.string.friend_activity_now)
+        else -> DateUtils.getRelativeTimeSpanString(timestampMs, now, DateUtils.MINUTE_IN_MILLIS, DateUtils.FORMAT_ABBREV_RELATIVE).toString()
+    }
 }

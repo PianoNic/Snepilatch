@@ -1197,11 +1197,7 @@ private fun MarqueeText(
         delay(MARQUEE_LEAD_IN_MS)
         var previous = 0L
         var pending = 0f
-        var travelled = 0f
-        // Rounds, not forever: a redraw of this screen is expensive whatever is on it, so a title that
-        // scrolled for the whole song held it at 55% of a core the entire time. Showing the tail a few
-        // times and then resting drops the average to a few percent, and the next track starts it again.
-        while (travelled < loopPx * MARQUEE_ROUNDS) {
+        while (true) {
             withFrameNanos { now ->
                 if (previous != 0L) {
                     // Every step is worth exactly the time that passed, so the slide keeps its speed;
@@ -1209,16 +1205,13 @@ private fun MarqueeText(
                     // every second vsync of a 120Hz panel, which is still smooth and costs half.
                     pending += (now - previous) / 1_000_000_000f
                     if (pending >= MARQUEE_MIN_STEP_SECONDS) {
-                        val advanced = pending * speedPxPerSecond
-                        travelled += advanced
-                        offset.floatValue = (offset.floatValue + advanced) % loopPx
+                        offset.floatValue = (offset.floatValue + pending * speedPxPerSecond) % loopPx
                         pending = 0f
                     }
                 }
                 previous = now
             }
         }
-        offset.floatValue = 0f
     }
 
     Box(modifier.fillMaxWidth().clipToBounds().onSizeChanged { boxWidth = it.width }) {
@@ -1261,4 +1254,3 @@ private val MARQUEE_VELOCITY = 40.dp
 private val MARQUEE_GAP = 48.dp
 private const val MARQUEE_LEAD_IN_MS = 1200L
 private const val MARQUEE_MIN_STEP_SECONDS = 0.015f
-private const val MARQUEE_ROUNDS = 2

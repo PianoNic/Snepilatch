@@ -12,8 +12,19 @@ import org.junit.Test
  */
 class QueueRowKeysTest {
 
-    private fun track(qid: String?, uri: String = "spotify:track:x") =
-        TrackInfo(uri = uri, name = "n", artist = "a", albumArt = null, qid = qid)
+    private fun track(qid: String?, uri: String = "spotify:track:x", durationMs: Long = 0) =
+        TrackInfo(uri = uri, name = "n", artist = "a", albumArt = null, qid = qid, durationMs = durationMs)
+
+    @Test
+    fun `total duration only includes queued entries`() {
+        val queue = listOf(
+            track("queued-1", durationMs = 60_000),
+            track("queued-2", durationMs = 120_000),
+            track("autoplay", durationMs = 300_000),
+        )
+
+        assertEquals(180_000, nextInQueueTime(queue, 2))
+    }
 
     @Test
     fun `distinct entries keep their qid`() {

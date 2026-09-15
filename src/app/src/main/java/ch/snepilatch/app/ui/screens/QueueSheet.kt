@@ -26,9 +26,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
+import ch.snepilatch.app.data.TrackInfo
 import ch.snepilatch.app.ui.shared.SheetNavBarFix
 import ch.snepilatch.app.ui.shared.SpfyImage
 import ch.snepilatch.app.ui.theme.*
+import ch.snepilatch.app.logic.shared.formatTime
 import ch.snepilatch.app.logic.shared.LokiLogger
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import kotlin.math.roundToInt
@@ -120,6 +122,9 @@ internal fun queueRowKeys(queue: List<ch.snepilatch.app.data.TrackInfo>): List<S
     }
 }
 
+internal fun nextInQueueTime(queue: List<TrackInfo>, queuedCount: Int): Long =
+    queue.take(queuedCount).sumOf { it.durationMs }
+
 /** One row's drag wiring, bundled so a row takes a drag contract rather than six loose callbacks. */
 private class RowDrag(
     val dragging: Boolean,
@@ -207,6 +212,7 @@ private fun QueueList(
     )
 
     val upNext = shown.drop(queuedCount)
+    val queueTime = nextInQueueTime(shown.map { it.second }, queuedCount)
 
     fun tap(key: String, track: ch.snepilatch.app.data.TrackInfo, index: Int) {
         tapped = key to track.uri
@@ -222,7 +228,11 @@ private fun QueueList(
         }
         if (queuedCount > 0) {
             item(key = "header-queued") {
-                SectionHeader(stringResource(R.string.queue_next_in_queue), Modifier.animateItem())
+                SectionHeader(
+                    stringResource(R.string.queue_next_in_queue),
+                    Modifier.animateItem(),
+                    formatTime(queueTime),
+                )
             }
             itemsIndexed(shown.take(queuedCount), key = { _, entry -> entry.first }) { i, entry ->
                 SwipeableQueueRow(
@@ -290,18 +300,33 @@ private fun SwipeableQueueRow(
 
 /** Opaque and above the now playing row, so a tapped row travelling up passes behind it. */
 @Composable
-private fun SectionHeader(title: String, modifier: Modifier = Modifier) {
-    Text(
-        title,
-        color = SnepilatchLightGray,
-        fontSize = 14.sp,
-        fontWeight = FontWeight.Bold,
-        modifier = modifier
+private fun SectionHeader(title: String, modifier: Modifier = Modifier, trailing: String? = null) {
+    Row(
+        modifier
             .zIndex(1f)
             .fillMaxWidth()
             .background(SnepilatchElevated)
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-    )
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            title,
+            color = SnepilatchLightGray,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(1f),
+        )
+        trailing?.let {
+            Text(
+                it,
+                color = SnepilatchLightGray,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(start = 16.dp),
+            )
+        }
+    }
 }
 
 @Composable

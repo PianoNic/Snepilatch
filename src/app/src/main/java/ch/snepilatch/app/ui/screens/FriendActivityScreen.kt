@@ -1,0 +1,137 @@
+package ch.snepilatch.app.ui.screens
+
+import android.text.format.DateUtils
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import ch.snepilatch.app.R
+import ch.snepilatch.app.ui.shared.SpfyImage
+import ch.snepilatch.app.ui.theme.SnepilatchLightGray
+import ch.snepilatch.app.ui.theme.SnepilatchWhite
+import ch.snepilatch.app.viewmodel.FriendActivityViewModel
+import ch.snepilatch.app.viewmodel.PlaybackViewModel
+import kotify.api.user.FriendActivity
+
+/**
+ * The web player's buddy feed (#843): one row per friend with their avatar, the track they are on
+ * and how long ago; playing friends say "Now". Tapping a row plays that track in the friend's
+ * context, so the queue continues the way theirs does.
+ */
+@Composable
+fun FriendActivityScreen(vm: PlaybackViewModel, friendsVm: FriendActivityViewModel = viewModel()) {
+    val feed by friendsVm.feed.collectAsState()
+    val loading by friendsVm.loading.collectAsState()
+    LaunchedEffect(Unit) { friendsVm.load() }
+
+    Column(Modifier.fillMaxSize().padding(top = 12.dp)) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = { vm.goBack() }) {
+                Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back), tint = SnepilatchWhite)
+            }
+            Text(
+                stringResource(R.string.friend_activity),
+                color = SnepilatchWhite,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = { friendsVm.load() }, enabled = !loading) {
+                Icon(Icons.Rounded.Refresh, stringResource(R.string.refresh), tint = SnepilatchWhite)
+            }
+        }
+
+        when {
+            loading && feed.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = SnepilatchWhite)
+            }
+            feed.isEmpty() -> Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+                Text(stringResource(R.string.friend_activity_empty), color = SnepilatchLightGray, fontSize = 14.sp)
+            }
+            else -> LazyColumn(contentPadding = PaddingValues(bottom = LocalBottomOverlayHeight.current.value + 16.dp)) {
+                items(feed, key = { it.userUri }) { friend ->
+                    FriendRow(friend) { vm.playTrack(friend.trackUri, friend.contextUri) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FriendRow(friend: FriendActivity, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        SpfyImage(friend.userImageUrl, Modifier.size(44.dp), shape = CircleShape, icon = Icons.Rounded.Person)
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    friend.userName,
+                    color = SnepilatchWhite,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(relativeTime(friend), color = SnepilatchLightGray, fontSize = 12.sp)
+            }
+            Text(
+                "${friend.trackName} • ${friend.artistName}",
+                color = SnepilatchLightGray,
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            // ponytail: the web shows the context's name (playlist/album); we only have the album
+            // from the track. Resolve playlist names in Kotify when it matters.
+            friend.albumName?.let {
+                Text(it, color = SnepilatchLightGray, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        SpfyImage(friend.imageUrl, Modifier.size(44.dp))
+    }
+}
+
+@Composable
+private fun relativeTime(friend: FriendActivity): String = when {
+    friend.isPlaying -> stringResource(R.string.friend_activity_now)
+    else -> DateUtils.getRelativeTimeSpanString(friend.timestampMs, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString()
+}

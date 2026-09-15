@@ -210,6 +210,10 @@
     <string name="queue">Queue</string>
     <string name="audio_output">Audio Output</string>
     <string name="equalizer">Equalizer</string>
+    <string name="friend_activity">Friend activity</string>
+    <string name="friend_activity_empty">Nobody you follow is sharing what they listen to.</string>
+    <string name="friend_activity_now">Now</string>
+    <string name="refresh">Refresh</string>
     <string name="lyrics">Lyrics</string>
     <string name="infiniplay">InfiniPlay</string>
     <string name="view_queue">View Queue</string>

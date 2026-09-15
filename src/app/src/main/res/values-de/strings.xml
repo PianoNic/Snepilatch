@@ -208,6 +208,10 @@
     <string name="queue">Warteschlange</string>
     <string name="audio_output">Audio-Ausgabe</string>
     <string name="equalizer">Equalizer</string>
+    <string name="friend_activity">Höraktivität</string>
+    <string name="friend_activity_empty">Niemand, dem du folgst, teilt gerade, was er hört.</string>
+    <string name="friend_activity_now">Jetzt</string>
+    <string name="refresh">Aktualisieren</string>
     <string name="lyrics">Lyrics</string>
     <string name="infiniplay">InfiniPlay</string>
     <string name="view_queue">Warteschlange anzeigen</string>

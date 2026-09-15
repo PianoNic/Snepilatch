@@ -2,6 +2,7 @@ package ch.snepilatch.app.ui.screens
 
 import androidx.compose.material.icons.rounded.AddCircleOutline
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -13,6 +14,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import ch.snepilatch.app.R
+import ch.snepilatch.app.data.Screen
 import ch.snepilatch.app.data.LIKED_SONGS_COVER_URL
 import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import androidx.compose.foundation.background
@@ -102,13 +104,23 @@ fun HomeScreen(vm: PlaybackViewModel) {
         contentPadding = PaddingValues(top = 8.dp, bottom = LocalBottomOverlayHeight.current.value + 16.dp)
     ) {
         item {
-            Text(
-                homeData?.greeting ?: stringResource(R.string.greeting_fallback),
-                color = SnepilatchWhite,
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    homeData?.greeting ?: stringResource(R.string.greeting_fallback),
+                    color = SnepilatchWhite,
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                )
+                // What friends are listening to (#843), the web player's buddy feed.
+                IconButton(onClick = { vm.navigateTo(Screen.FRIEND_ACTIVITY) }) {
+                    Icon(Icons.Rounded.Groups, stringResource(R.string.friend_activity), tint = SnepilatchWhite)
+                }
+            }
         }
 
         // Quick-pick grid (first section as compact grid)

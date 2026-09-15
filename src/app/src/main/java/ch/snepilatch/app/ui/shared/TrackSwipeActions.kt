@@ -3,16 +3,16 @@ package ch.snepilatch.app.ui.shared
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxState
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberSwipeToDismissBoxState
@@ -25,27 +25,26 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.dp
-import ch.snepilatch.app.R
 import ch.snepilatch.app.data.PlayerShortcut
 import ch.snepilatch.app.data.TrackInfo
-import ch.snepilatch.app.logic.download.Downloads
 import ch.snepilatch.app.logic.shared.AppSettings
-import ch.snepilatch.app.logic.shared.JamHolder
-import ch.snepilatch.app.logic.shared.LyricsTarget
-import ch.snepilatch.app.logic.shared.shareSpfyUri
-import ch.snepilatch.app.ui.theme.SnepilatchBlack
+import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.ui.theme.SnepilatchWhite
-import ch.snepilatch.app.viewmodel.DetailRoutes
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
-/** Adds the configured left and right actions to a track row without changing its tap behavior. */
+/**
+ * Adds the configured start-to-end and end-to-start actions to a track row without changing its tap
+ * behavior. The actions are the player's own [PlayerAction]s for the row's track. Offline rows are
+ * left alone, every swipe action needs a session.
+ */
 @Composable
 fun SwipeableTrackRow(
     track: TrackInfo,
@@ -53,157 +52,107 @@ fun SwipeableTrackRow(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
+    val offline by vm.isOffline.collectAsState()
+    if (offline) {
+        Box(modifier) { content() }
+        return
+    }
     val state = rememberSwipeToDismissBoxState()
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
-    val leftAction by AppSettings.swipeLeftAction.collectAsState()
-    val rightAction by AppSettings.swipeRightAction.collectAsState()
-    val successAlpha = remember { Animatable(0f) }
-    val confirmationColor = MaterialTheme.colorScheme.primary
-    val currentUri by vm.currentTrackUri.collectAsState()
-    val isLiked by vm.currentTrackLiked.collectAsState()
-    val downloadedIndex by Downloads.index.collectAsState()
-    val inFlight by Downloads.inProgress.collectAsState()
-    val inJam by JamHolder.session.collectAsState()
-    val isDownloaded = Downloads.isDownloaded(downloadedIndex, track.uri, track.name, track.artist)
-    val isDownloading = track.uri in inFlight
-    val trackIsLiked = currentUri == track.uri && isLiked
-    var completedDirection by remember { mutableStateOf<SwipeToDismissBoxValue?>(null) }
+    val theme by ThemeController.themeColors.collectAsState()
+    val endToStart by AppSettings.swipeLeftAction.collectAsState()
+    val startToEnd by AppSettings.swipeRightAction.collectAsState()
     var showJam by remember { mutableStateOf(false) }
     var showCode by remember { mutableStateOf(false) }
+    val actions = rememberPlayerActions(vm, track) { overlay ->
+        when (overlay) {
+            PlayerOverlay.PlaylistPicker -> vm.showPlaylistPickerForTrack(track.uri)
+            PlayerOverlay.Jam -> showJam = true
+            PlayerOverlay.Code -> showCode = true
+        }
+    }
+    val flashAlpha = remember { Animatable(0f) }
+    var completedDirection by remember { mutableStateOf<SwipeToDismissBoxValue?>(null) }
 
     SwipeToDismissBox(
         state = state,
         modifier = modifier,
         onDismiss = { direction ->
-            val action = swipeActionFor(direction, leftAction, rightAction)
-            action?.let {
-                runSwipeAction(
-                    it, track, vm, context, trackIsLiked, isDownloaded, isDownloading,
-                    inJam != null, onShowJam = { showJam = true }, onShowCode = { showCode = true },
-                )
-            }
+            val shortcut = swipeActionFor(direction, endToStart, startToEnd)
+            actions.firstOrNull { it.shortcut == shortcut }?.run?.invoke()
             completedDirection = direction.takeUnless { it == SwipeToDismissBoxValue.Settled }
             scope.launch {
-                successAlpha.snapTo(0f)
-                successAlpha.animateTo(0.24f, tween(200, easing = FastOutSlowInEasing))
-                successAlpha.animateTo(0f, tween(200, easing = FastOutSlowInEasing))
+                flashAlpha.snapTo(0f)
+                flashAlpha.animateTo(FLASH_ALPHA, tween(FLASH_MS, easing = FastOutSlowInEasing))
+                flashAlpha.animateTo(0f, tween(FLASH_MS, easing = FastOutSlowInEasing))
                 completedDirection = null
                 state.reset()
             }
         },
         backgroundContent = {
             val direction = completedDirection ?: state.dismissDirection
-            SwipeActionBackground(
-                direction, leftAction, rightAction, trackIsLiked, isDownloaded, isDownloading,
-                inJam != null, confirmationColor, successAlpha.value,
-            )
-        },
-        content = {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(SnepilatchBlack)
-            ) {
-                content()
+            val shortcut = swipeActionFor(direction, endToStart, startToEnd)
+            val action = actions.firstOrNull { it.shortcut == shortcut }
+            if (action != null) {
+                SwipeActionBackground(state, action, direction == SwipeToDismissBoxValue.StartToEnd, theme.primary, flashAlpha.value)
             }
         },
+        content = { Box(Modifier.fillMaxWidth()) { content() } },
     )
 
     if (showJam) JamSheet(onDismiss = { showJam = false })
-    if (showCode) {
-        val accent = MaterialTheme.colorScheme.primary
-        ScannableCodeSheet(track, accent) { showCode = false }
-    }
+    if (showCode) ScannableCodeSheet(track, theme.primary) { showCode = false }
 }
 
-private fun swipeActionFor(
+/** Which configured shortcut a swipe in [direction] runs; none while the row sits still. */
+internal fun swipeActionFor(
     direction: SwipeToDismissBoxValue,
-    leftAction: PlayerShortcut,
-    rightAction: PlayerShortcut,
+    endToStart: PlayerShortcut,
+    startToEnd: PlayerShortcut,
 ): PlayerShortcut? = when (direction) {
-    SwipeToDismissBoxValue.EndToStart -> leftAction
-    SwipeToDismissBoxValue.StartToEnd -> rightAction
+    SwipeToDismissBoxValue.EndToStart -> endToStart
+    SwipeToDismissBoxValue.StartToEnd -> startToEnd
     SwipeToDismissBoxValue.Settled -> null
 }
 
-@Suppress("LongParameterList")
-private fun runSwipeAction(
-    action: PlayerShortcut,
-    track: TrackInfo,
-    vm: PlaybackViewModel,
-    context: android.content.Context,
-    trackIsLiked: Boolean,
-    isDownloaded: Boolean,
-    isDownloading: Boolean,
-    inJam: Boolean,
-    onShowJam: () -> Unit,
-    onShowCode: () -> Unit,
+/**
+ * The label under the row, sized to the strip the row has uncovered so nothing shows through the
+ * row itself, which keeps whatever background the screen paints. Flashes [tint] once the action ran.
+ */
+@Composable
+private fun SwipeActionBackground(
+    state: SwipeToDismissBoxState,
+    action: PlayerAction,
+    fromStart: Boolean,
+    tint: Color,
+    flashAlpha: Float,
 ) {
-    when (action) {
-        PlayerShortcut.LIKE -> {
-            track.uri
-                .takeIf { it.startsWith("spotify:track:") }
-                ?.removePrefix("spotify:track:")
-                ?.let { if (trackIsLiked) vm.unlikeSong(it) else vm.likeSong(it) }
+    Box(Modifier.fillMaxSize()) {
+        Row(
+            Modifier
+                .align(if (fromStart) Alignment.CenterStart else Alignment.CenterEnd)
+                .fillMaxHeight()
+                .layout { measurable, constraints ->
+                    val exposed = runCatching { abs(state.requireOffset()).roundToInt() }.getOrDefault(0).coerceIn(0, constraints.maxWidth)
+                    val placeable = measurable.measure(constraints.copy(minWidth = exposed, maxWidth = exposed))
+                    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                }
+                .clipToBounds()
+                .drawBehind { drawRect(tint.copy(alpha = flashAlpha)) }
+                .padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = if (fromStart) Arrangement.Start else Arrangement.End,
+        ) {
+            if (fromStart) {
+                Icon(action.icon, action.label, tint = SnepilatchWhite)
+                Text(action.label, color = SnepilatchWhite, maxLines = 1, modifier = Modifier.padding(start = 8.dp))
+            } else {
+                Text(action.label, color = SnepilatchWhite, maxLines = 1, modifier = Modifier.padding(end = 8.dp))
+                Icon(action.icon, action.label, tint = SnepilatchWhite)
+            }
         }
-        PlayerShortcut.LYRICS -> {
-            LyricsTarget.track.value = track
-            vm.openLyrics()
-        }
-        PlayerShortcut.ADD_TO_QUEUE -> vm.addToQueue(track.uri)
-        PlayerShortcut.ADD_TO_PLAYLIST -> vm.showPlaylistPickerForTrack(track.uri)
-        PlayerShortcut.QUEUE -> vm.openQueue()
-        PlayerShortcut.ALBUM -> DetailRoutes.openAlbumForTrack(track.uri)
-        PlayerShortcut.RADIO -> DetailRoutes.openRadio(track.uri)
-        PlayerShortcut.DOWNLOAD -> if (!isDownloading) {
-            if (isDownloaded) vm.removeDownload(track.uri) else vm.downloadTrack(track, context)
-        }
-        PlayerShortcut.JAM -> if (inJam) vm.openQueue() else onShowJam()
-        PlayerShortcut.CODE -> onShowCode()
-        PlayerShortcut.SHARE -> shareSpfyUri(context, track.uri, context.getString(R.string.share_track_chooser))
     }
 }
 
-@Composable
-@Suppress("LongParameterList")
-private fun SwipeActionBackground(
-    direction: SwipeToDismissBoxValue,
-    leftAction: PlayerShortcut,
-    rightAction: PlayerShortcut,
-    trackIsLiked: Boolean,
-    isDownloaded: Boolean,
-    isDownloading: Boolean,
-    inJam: Boolean,
-    confirmationColor: androidx.compose.ui.graphics.Color,
-    successAlpha: Float,
-) {
-    val action = swipeActionFor(direction, leftAction, rightAction) ?: return
-    val label = when {
-        action == PlayerShortcut.LIKE && trackIsLiked -> stringResource(R.string.unlike)
-        action == PlayerShortcut.DOWNLOAD && isDownloading -> stringResource(R.string.downloading)
-        action == PlayerShortcut.DOWNLOAD && isDownloaded -> stringResource(R.string.remove_download)
-        action == PlayerShortcut.JAM && inJam -> stringResource(R.string.jam)
-        else -> stringResource(action.titleRes)
-    }
-    val icon = playerShortcutIcon(action, trackIsLiked, isDownloaded)
-    val toPlaylist = direction == SwipeToDismissBoxValue.StartToEnd
-    Row(
-        Modifier
-            .fillMaxSize()
-            .background(SnepilatchBlack)
-            .drawBehind { drawRect(confirmationColor.copy(alpha = successAlpha)) }
-            .padding(horizontal = 20.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = if (toPlaylist) Arrangement.Start else Arrangement.End,
-    ) {
-        if (toPlaylist) {
-            Icon(icon, label, tint = SnepilatchWhite)
-            Text(label, color = SnepilatchWhite, modifier = Modifier.padding(start = 8.dp))
-        } else {
-            Text(label, color = SnepilatchWhite, modifier = Modifier.padding(end = 8.dp))
-            Icon(icon, label, tint = SnepilatchWhite)
-        }
-    }
-}
+private const val FLASH_ALPHA = 0.24f
+private const val FLASH_MS = 200

@@ -127,15 +127,14 @@ object AppSettings {
      * previous registration instead.
      */
     fun persistedDeviceId(): String {
+        // 32 hex chars, the shape KotifyClient mints itself.
+        fun newDeviceId(): String =
+            ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
         val ctx = appContext ?: return newDeviceId()
         val prefs = prefs(ctx)
         prefs.getString("device_id", null)?.let { return it }
         return newDeviceId().also { prefs.edit().putString("device_id", it).apply() }
     }
-
-    /** 32 hex chars, the shape KotifyClient mints itself. */
-    private fun newDeviceId(): String =
-        ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
 
     fun load(context: Context) {
         appContext = context.applicationContext
@@ -165,12 +164,8 @@ object AppSettings {
         eqBands.value = parseBands(prefs.getString("eq_bands", null))
         playerGradientBg.value = prefs.getBoolean("player_gradient_bg", false)
         playerShortcut.value = PlayerShortcut.fromId(prefs.getString("player_shortcut", null))
-        swipeLeftAction.value = PlayerShortcut.fromId(
-            prefs.getString("swipe_left_action", null), PlayerShortcut.ADD_TO_PLAYLIST
-        )
-        swipeRightAction.value = PlayerShortcut.fromId(
-            prefs.getString("swipe_right_action", null), PlayerShortcut.ADD_TO_QUEUE
-        )
+        swipeLeftAction.value = PlayerShortcut.perTrackFromId(prefs.getString("swipe_left_action", null), PlayerShortcut.ADD_TO_PLAYLIST)
+        swipeRightAction.value = PlayerShortcut.perTrackFromId(prefs.getString("swipe_right_action", null), PlayerShortcut.ADD_TO_QUEUE)
         contentRegion.value = prefs.getString("content_region", "nearest") ?: "nearest"
         updateChannel.value = prefs.getString("update_channel", CHANNEL_STABLE) ?: CHANNEL_STABLE
         lokiEndpoint.value = prefs.getString("loki_endpoint", "") ?: ""
@@ -325,14 +320,11 @@ object AppSettings {
         prefs(context).edit().putString("player_shortcut", shortcut.id).apply()
     }
 
-    fun setSwipeLeftAction(action: PlayerShortcut, context: Context) {
-        swipeLeftAction.value = action
-        prefs(context).edit().putString("swipe_left_action", action.id).apply()
-    }
-
-    fun setSwipeRightAction(action: PlayerShortcut, context: Context) {
-        swipeRightAction.value = action
-        prefs(context).edit().putString("swipe_right_action", action.id).apply()
+    /** One setter for both swipe directions; pass only the side that changed. */
+    fun setSwipeActions(context: Context, left: PlayerShortcut = swipeLeftAction.value, right: PlayerShortcut = swipeRightAction.value) {
+        swipeLeftAction.value = left
+        swipeRightAction.value = right
+        prefs(context).edit().putString("swipe_left_action", left.id).putString("swipe_right_action", right.id).apply()
     }
 
     /**

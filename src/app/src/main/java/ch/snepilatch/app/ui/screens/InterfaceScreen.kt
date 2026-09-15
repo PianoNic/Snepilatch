@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
+import androidx.compose.ui.graphics.vector.ImageVector
 import ch.snepilatch.app.data.PlayerShortcut
 import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.logic.shared.ThemeController
@@ -139,26 +140,61 @@ private fun BehaviorSection(context: Context) {
     }
 
     val playerShortcut by AppSettings.playerShortcut.collectAsState()
-    var showPlayerShortcutPicker by remember { mutableStateOf(false) }
-    SettingRow(
+    ShortcutPickerRow(
         title = stringResource(R.string.player_shortcut),
-        subtitle = stringResource(playerShortcutTitle(playerShortcut)),
+        description = stringResource(R.string.player_shortcut_desc),
         icon = Icons.Rounded.TouchApp,
-        onClick = { showPlayerShortcutPicker = true },
+        current = playerShortcut,
+        options = PlayerShortcut.entries,
+    ) { AppSettings.setPlayerShortcut(it, context) }
+
+    // The row swipes only offer what acts on the swiped track (#578).
+    val swipeLeft by AppSettings.swipeLeftAction.collectAsState()
+    ShortcutPickerRow(
+        title = stringResource(R.string.swipe_left_action),
+        description = stringResource(R.string.swipe_action_desc),
+        icon = Icons.Rounded.SwipeLeft,
+        current = swipeLeft,
+        options = PlayerShortcut.perTrack,
+    ) { AppSettings.setSwipeActions(context, left = it) }
+    val swipeRight by AppSettings.swipeRightAction.collectAsState()
+    ShortcutPickerRow(
+        title = stringResource(R.string.swipe_right_action),
+        description = stringResource(R.string.swipe_action_desc),
+        icon = Icons.Rounded.SwipeRight,
+        current = swipeRight,
+        options = PlayerShortcut.perTrack,
+    ) { AppSettings.setSwipeActions(context, right = it) }
+}
+
+/** A setting row that picks one [PlayerShortcut] out of [options], shown with its title and glyph. */
+@Composable
+private fun ShortcutPickerRow(
+    title: String,
+    description: String,
+    icon: ImageVector,
+    current: PlayerShortcut,
+    options: List<PlayerShortcut>,
+    onSelect: (PlayerShortcut) -> Unit,
+) {
+    var showPicker by remember { mutableStateOf(false) }
+    SettingRow(
+        title = title,
+        subtitle = stringResource(playerShortcutTitle(current)),
+        icon = icon,
+        onClick = { showPicker = true },
     )
-    if (showPlayerShortcutPicker) {
+    if (showPicker) {
         RadioPickerDialog(
-            title = stringResource(R.string.player_shortcut),
-            description = stringResource(R.string.player_shortcut_desc),
-            options = PlayerShortcut.entries.map {
-                RadioOption(it.id, stringResource(playerShortcutTitle(it)), icon = playerShortcutIcon(it))
+            title = title,
+            description = description,
+            options = options.map { RadioOption(it.id, stringResource(playerShortcutTitle(it)), icon = playerShortcutIcon(it)) },
+            selected = current.id,
+            onSelect = { id ->
+                onSelect(options.first { it.id == id })
+                showPicker = false
             },
-            selected = playerShortcut.id,
-            onSelect = {
-                AppSettings.setPlayerShortcut(PlayerShortcut.fromId(it), context)
-                showPlayerShortcutPicker = false
-            },
-            onDismiss = { showPlayerShortcutPicker = false }
+            onDismiss = { showPicker = false },
         )
     }
 }

@@ -5,7 +5,6 @@ package ch.snepilatch.app.ui.screens
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -20,6 +19,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.onSizeChanged
+import kotlinx.coroutines.delay
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -1173,18 +1174,46 @@ private fun MarqueeText(
     fontWeight: FontWeight? = null,
     modifier: Modifier = Modifier
 ) {
-    Text(
-        text = text,
-        color = color,
-        fontSize = fontSize,
-        fontWeight = fontWeight,
-        minLines = 1,
-        maxLines = 1,
-        // Scroll forever while playing (so long titles always reveal their tail), but disable the
-        // animation when paused (iterations = 0) so this per-frame marquee loop stops requesting frames.
-        modifier = modifier.basicMarquee(
-            iterations = if (isPlaying) Int.MAX_VALUE else 0,
-            velocity = 40.dp
+    // Not basicMarquee (#856): that one scrolls off the frame clock, so a long title held the whole
+    // player at the panel's 120Hz — and with it the backdrop's warp/blur/grade chain, which is built
+    // to run at 30. Measured at 83% of a core against 16% for a title that fits. This advances the
+    // offset on the same ~30fps cadence the progress bar and the backdrop already use, and only ever
+    // reads it inside graphicsLayer, so a step moves the layer without composing or measuring again.
+    var textWidth by remember { mutableIntStateOf(0) }
+    var boxWidth by remember { mutableIntStateOf(0) }
+    val overflow = (textWidth - boxWidth).coerceAtLeast(0)
+    val offsetPx = remember { mutableFloatStateOf(0f) }
+    val stepPx = with(LocalDensity.current) { MARQUEE_VELOCITY.toPx() } * MARQUEE_TICK_MS / 1000f
+    LaunchedEffect(text, isPlaying, overflow, stepPx) {
+        offsetPx.floatValue = 0f
+        if (!isPlaying || overflow <= 0) return@LaunchedEffect
+        while (true) {
+            delay(MARQUEE_PAUSE_MS)
+            while (offsetPx.floatValue > -overflow) {
+                delay(MARQUEE_TICK_MS)
+                offsetPx.floatValue = (offsetPx.floatValue - stepPx).coerceAtLeast(-overflow.toFloat())
+            }
+            delay(MARQUEE_PAUSE_MS)
+            offsetPx.floatValue = 0f
+        }
+    }
+    Box(modifier.fillMaxWidth().clipToBounds().onSizeChanged { boxWidth = it.width }) {
+        Text(
+            text = text,
+            color = color,
+            fontSize = fontSize,
+            fontWeight = fontWeight,
+            softWrap = false,
+            maxLines = 1,
+            modifier = Modifier
+                .wrapContentWidth(Alignment.Start, unbounded = true)
+                .onSizeChanged { textWidth = it.width }
+                .graphicsLayer { translationX = offsetPx.floatValue },
         )
-    )
+    }
 }
+
+/** How fast a title that does not fit slides past, how often it steps, and how long it rests at each end. */
+private val MARQUEE_VELOCITY = 40.dp
+private const val MARQUEE_TICK_MS = 32L
+private const val MARQUEE_PAUSE_MS = 1200L

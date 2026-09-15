@@ -1175,61 +1175,87 @@ private fun MarqueeText(
     fontWeight: FontWeight? = null,
     modifier: Modifier = Modifier
 ) {
-    // Not basicMarquee (#856): that one scrolls by re-laying-out the text on every frame, which held
-    // the whole player at the panel's 120Hz for as long as the song played — 83% of a core against
-    // 16% for a title that fits. Here the slide is a translation that is only ever read inside
-    // graphicsLayer, so a step moves the layer and nothing above it composes or measures again.
-    // It reads the real frame clock so the motion keeps its speed, moves on every second refresh,
-    // and rests at both ends, which is the cheapest part: nothing is drawn at all while it waits.
+    // Same behaviour as the basicMarquee this replaces — the title drives all the way through, a
+    // second copy follows a gap behind it, and there is a pause between passes — but not the same
+    // cost (#856). basicMarquee scrolls by re-laying-out the text on every frame, which held the
+    // whole player at the panel's 120Hz for as long as the song played: 83% of a core against 16%
+    // for a title that fits. Here the slide is a translation only ever read inside graphicsLayer,
+    // so a step moves the layer and nothing above it composes or measures again, it reads the real
+    // frame clock so the motion keeps its speed, and it steps on every second refresh.
     var textWidth by remember { mutableIntStateOf(0) }
     var boxWidth by remember { mutableIntStateOf(0) }
-    val overflowPx = (textWidth - boxWidth).coerceAtLeast(0)
-    val speedPxPerSecond = with(LocalDensity.current) { MARQUEE_VELOCITY.toPx() }
+    val overflowing = boxWidth > 0 && textWidth > boxWidth
+    val density = LocalDensity.current
+    val gapPx = with(density) { MARQUEE_GAP.toPx() }
+    val speedPxPerSecond = with(density) { MARQUEE_VELOCITY.toPx() }
     val offset = remember { mutableFloatStateOf(0f) }
+    val loopPx = textWidth + gapPx
 
-    LaunchedEffect(text, isPlaying, overflowPx, speedPxPerSecond) {
+    LaunchedEffect(text, isPlaying, overflowing, loopPx) {
         offset.floatValue = 0f
-        if (!isPlaying || overflowPx <= 0) return@LaunchedEffect
+        if (!isPlaying || !overflowing || loopPx <= 0f) return@LaunchedEffect
         while (true) {
-            delay(MARQUEE_REST_MS)
-            var previous = 0L
+            delay(MARQUEE_REPEAT_DELAY_MS)
+            var travelled = 0f
             var pending = 0f
-            while (offset.floatValue > -overflowPx) {
+            var previous = withFrameNanos { it }
+            while (travelled < loopPx) {
                 withFrameNanos { now ->
-                    if (previous != 0L) {
-                        pending += (now - previous) / 1_000_000_000f
-                        if (pending >= MARQUEE_MIN_STEP_SECONDS) {
-                            offset.floatValue =
-                                (offset.floatValue - pending * speedPxPerSecond).coerceAtLeast(-overflowPx.toFloat())
-                            pending = 0f
-                        }
-                    }
+                    pending += (now - previous) / 1_000_000_000f
                     previous = now
+                    // Every step is worth exactly the time that passed, so the slide keeps its speed;
+                    // holding them back until half a frame has built up moves the text on every second
+                    // refresh of a 120Hz panel, which still reads as smooth and costs half as much.
+                    if (pending >= MARQUEE_MIN_STEP_SECONDS) {
+                        travelled = (travelled + pending * speedPxPerSecond).coerceAtMost(loopPx)
+                        offset.floatValue = travelled
+                        pending = 0f
+                    }
                 }
             }
-            // Held at the tail so it can be read, then back to the start for the next pass.
-            delay(MARQUEE_REST_MS)
+            // A whole loop on: the trailing copy now sits exactly where the first one started, so
+            // going back to zero is invisible and the next pass carries straight on.
             offset.floatValue = 0f
         }
     }
 
     Box(modifier.fillMaxWidth().clipToBounds().onSizeChanged { boxWidth = it.width }) {
-        Text(
-            text = text,
-            color = color,
-            fontSize = fontSize,
-            fontWeight = fontWeight,
-            softWrap = false,
-            maxLines = 1,
-            modifier = Modifier
+        Row(
+            Modifier
                 .wrapContentWidth(Alignment.Start, unbounded = true)
-                .onSizeChanged { textWidth = it.width }
-                .graphicsLayer { translationX = offset.floatValue },
-        )
+                .graphicsLayer { translationX = -offset.floatValue },
+        ) {
+            MarqueeLabel(text, color, fontSize, fontWeight) { textWidth = it }
+            if (overflowing) {
+                Spacer(Modifier.width(MARQUEE_GAP))
+                MarqueeLabel(text, color, fontSize, fontWeight)
+            }
+        }
     }
 }
 
-/** How fast a title that does not fit slides past, how long it rests at each end, and the smallest step. */
+/** One copy of the sliding text; the first reports its width, which is what the loop is measured on. */
+@Composable
+private fun MarqueeLabel(
+    text: String,
+    color: androidx.compose.ui.graphics.Color,
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    fontWeight: FontWeight?,
+    onWidth: ((Int) -> Unit)? = null,
+) {
+    Text(
+        text = text,
+        color = color,
+        fontSize = fontSize,
+        fontWeight = fontWeight,
+        softWrap = false,
+        maxLines = 1,
+        modifier = if (onWidth == null) Modifier else Modifier.onSizeChanged { onWidth(it.width) },
+    )
+}
+
+/** How fast a title that does not fit slides, the gap before its repeat, the wait between passes. */
 private val MARQUEE_VELOCITY = 40.dp
-private const val MARQUEE_REST_MS = 2500L
+private val MARQUEE_GAP = 48.dp
+private const val MARQUEE_REPEAT_DELAY_MS = 1200L
 private const val MARQUEE_MIN_STEP_SECONDS = 0.015f

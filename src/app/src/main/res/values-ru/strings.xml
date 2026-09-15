@@ -315,6 +315,7 @@
     <string name="lossless_on_flac">FLAC</string>
     <string name="region_nearest">Ближайший (авто)</string>
     <string name="infiniplay">InfiniPlay</string>
+    <string name="infiniplay_stop">Остановить InfiniPlay</string>
 
     <!-- Snackbars -->
     <string name="save_to_library">Добавить в медиатеку</string>

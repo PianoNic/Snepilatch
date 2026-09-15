@@ -66,9 +66,9 @@ fun EntityMenuSheet(
                     .padding(horizontal = 20.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(action.icon, null, tint = SnepilatchWhite, modifier = Modifier.size(24.dp))
+                Icon(action.icon, null, tint = action.tint ?: SnepilatchWhite, modifier = Modifier.size(24.dp))
                 Spacer(Modifier.width(16.dp))
-                Text(action.label, color = SnepilatchWhite, fontSize = 15.sp)
+                Text(action.label, color = action.tint ?: SnepilatchWhite, fontSize = 15.sp)
             }
         }
         Spacer(Modifier.navigationBarsPadding().height(12.dp))
@@ -95,4 +95,10 @@ private fun MenuHeader(imageUrl: String?, title: String, subtitle: String?, circ
 }
 
 /** One row of an [EntityMenuSheet]: what it looks like, what it says, what it does. */
-data class MenuAction(val icon: ImageVector, val label: String, val onClick: () -> Unit)
+/** [tint] marks an action that is currently on, such as the infiniPlay while it remixes; null is the plain look. */
+data class MenuAction(
+    val icon: ImageVector,
+    val label: String,
+    val tint: androidx.compose.ui.graphics.Color? = null,
+    val onClick: () -> Unit,
+)

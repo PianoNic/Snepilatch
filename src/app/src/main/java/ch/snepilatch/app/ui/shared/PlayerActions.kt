@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -12,6 +13,7 @@ import ch.snepilatch.app.data.PlayerShortcut
 import ch.snepilatch.app.data.TrackInfo
 import ch.snepilatch.app.logic.download.Downloads
 import ch.snepilatch.app.logic.shared.JamHolder
+import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.logic.shared.shareSpfyUri
 import ch.snepilatch.app.viewmodel.DetailRoutes
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
@@ -26,6 +28,8 @@ class PlayerAction(
     val icon: ImageVector,
     val label: String,
     val enabled: Boolean,
+    /** Set while the action is on, so the sheet and the button can show it as active. */
+    val tint: Color? = null,
     val run: () -> Unit,
 )
 
@@ -40,6 +44,7 @@ class PlayerActionScope(
     val shareTrackLabel: String,
     val inJam: Boolean,
     val isDownloaded: Boolean,
+    val infiniPlayOn: Boolean,
     val onOpen: (PlayerOverlay) -> Unit,
 ) {
     fun run(shortcut: PlayerShortcut) {
@@ -54,6 +59,8 @@ class PlayerActionScope(
             PlayerShortcut.ALBUM -> uri?.let { DetailRoutes.openAlbumForTrack(it) }
             PlayerShortcut.RADIO -> uri?.let { DetailRoutes.openRadio(it) }
             PlayerShortcut.DOWNLOAD -> track?.let { if (isDownloaded) vm.removeDownload(it.uri) else vm.downloadTrack(it, context) }
+            // Acts on what is streaming rather than on a uri, so it needs nothing from the track here.
+            PlayerShortcut.INFINIPLAY -> vm.toggleInfiniPlay()
             PlayerShortcut.JAM -> if (inJam) vm.openQueue() else onOpen(PlayerOverlay.Jam)
             PlayerShortcut.CODE -> onOpen(PlayerOverlay.Code)
             PlayerShortcut.SHARE -> uri?.let { shareSpfyUri(context, it, shareTrackLabel) }
@@ -72,18 +79,36 @@ fun rememberPlayerActions(vm: PlaybackViewModel, track: TrackInfo?, onOpen: (Pla
     val inFlight by Downloads.inProgress.collectAsState()
     val isDownloaded = track?.let { Downloads.isDownloaded(downloadedIndex, it.uri, it.name, it.artist) } == true
     val isDownloading = track?.uri?.let { it in inFlight } == true
+    val infiniPlayOn by vm.infiniPlayEnabled.collectAsState()
+    val accent = ThemeController.themeColors.collectAsState().value.primary
     val scope = PlayerActionScope(
-        vm, track, LocalContext.current, stringResource(R.string.share_track_chooser), inJam, isDownloaded, onOpen,
+        vm, track, LocalContext.current, stringResource(R.string.share_track_chooser), inJam, isDownloaded,
+        infiniPlayOn, onOpen,
     )
     return PlayerShortcut.entries.filter { it != PlayerShortcut.LIKE }.map { shortcut ->
         val label = when {
             shortcut == PlayerShortcut.DOWNLOAD && isDownloading -> stringResource(R.string.downloading)
             shortcut == PlayerShortcut.DOWNLOAD && isDownloaded -> stringResource(R.string.remove_download)
             shortcut == PlayerShortcut.JAM && inJam -> stringResource(R.string.jam)
+            shortcut == PlayerShortcut.INFINIPLAY && infiniPlayOn -> stringResource(R.string.infiniplay_stop)
             else -> stringResource(playerShortcutTitle(shortcut))
         }
         val enabled = (!shortcut.requiresTrack || track != null) && !(shortcut == PlayerShortcut.DOWNLOAD && isDownloading)
-        PlayerAction(shortcut, playerShortcutIcon(shortcut, isDownloaded = isDownloaded), label, enabled) {
+        // Everything with an on state wears the accent while it is on, so the sheet reads at a glance:
+        // the track is downloaded, a jam is running, the infiniPlay is remixing.
+        val on = when (shortcut) {
+            PlayerShortcut.DOWNLOAD -> isDownloaded
+            PlayerShortcut.JAM -> inJam
+            PlayerShortcut.INFINIPLAY -> infiniPlayOn
+            else -> false
+        }
+        PlayerAction(
+            shortcut,
+            playerShortcutIcon(shortcut, isDownloaded = isDownloaded),
+            label,
+            enabled,
+            tint = accent.takeIf { on },
+        ) {
             if (enabled) scope.run(shortcut)
         }
     }

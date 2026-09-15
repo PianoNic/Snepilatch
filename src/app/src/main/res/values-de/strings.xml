@@ -218,6 +218,7 @@
     <string name="refresh">Aktualisieren</string>
     <string name="lyrics">Lyrics</string>
     <string name="infiniplay">InfiniPlay</string>
+    <string name="infiniplay_stop">InfiniPlay beenden</string>
     <string name="view_queue">Warteschlange anzeigen</string>
     <string name="visit_artist">Künstler anzeigen</string>
     <string name="devices">Geräte</string>

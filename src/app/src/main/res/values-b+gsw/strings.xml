@@ -228,6 +228,7 @@
     <string name="refresh">Aktualisiere</string>
     <string name="lyrics">Lyrics</string>
     <string name="infiniplay">InfiniPlay</string>
+    <string name="infiniplay_stop">InfiniPlay stoppe</string>
     <string name="view_queue">Wartelischte aaluege</string>
     <string name="visit_artist">Künschtler aaluege</string>
     <string name="devices">Gräti</string>

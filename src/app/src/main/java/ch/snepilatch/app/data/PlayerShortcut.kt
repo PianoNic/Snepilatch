@@ -10,6 +10,7 @@ enum class PlayerShortcut(val id: String, val requiresTrack: Boolean = true) {
     ALBUM("album"),
     RADIO("radio"),
     DOWNLOAD("download"),
+    INFINIPLAY("infiniplay"),
     JAM("jam", false),
     CODE("code"),
     SHARE("share"),
@@ -18,9 +19,11 @@ enum class PlayerShortcut(val id: String, val requiresTrack: Boolean = true) {
     companion object {
         /**
          * What a swipe on a list row may do: the shortcuts that act on the row's own track. LIKE is out
-         * because a row does not know its liked state, LYRICS because the lyrics view follows the player.
+         * because a row does not know its liked state, LYRICS because the lyrics view follows the player,
+         * and INFINIPLAY because it remixes whatever is streaming, not the row you swiped.
          */
-        val perTrack: List<PlayerShortcut> = entries.filter { it.requiresTrack && it != LIKE && it != LYRICS }
+        val perTrack: List<PlayerShortcut> =
+            entries.filter { it.requiresTrack && it != LIKE && it != LYRICS && it != INFINIPLAY }
 
         fun fromId(id: String?, fallback: PlayerShortcut = LIKE): PlayerShortcut =
             entries.firstOrNull { it.id == id } ?: fallback

@@ -5,6 +5,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.rounded.AllInclusive
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.DownloadForOffline
 import androidx.compose.material.icons.rounded.Favorite
@@ -29,6 +30,7 @@ fun playerShortcutTitle(shortcut: PlayerShortcut): Int = when (shortcut) {
     PlayerShortcut.ALBUM -> R.string.visit_album
     PlayerShortcut.RADIO -> R.string.go_to_song_radio
     PlayerShortcut.DOWNLOAD -> R.string.download_track
+    PlayerShortcut.INFINIPLAY -> R.string.infiniplay
     PlayerShortcut.JAM -> R.string.join_jam
     PlayerShortcut.CODE -> R.string.show_code
     PlayerShortcut.SHARE -> R.string.share
@@ -43,6 +45,8 @@ fun playerShortcutIcon(shortcut: PlayerShortcut, isLiked: Boolean = false, isDow
     PlayerShortcut.ALBUM -> Icons.Rounded.Album
     PlayerShortcut.RADIO -> Icons.Rounded.Radio
     PlayerShortcut.DOWNLOAD -> if (isDownloaded) Icons.Rounded.OfflinePin else Icons.Rounded.DownloadForOffline
+    // The infinity mark either way; whether it is running is what the label says.
+    PlayerShortcut.INFINIPLAY -> Icons.Rounded.AllInclusive
     PlayerShortcut.JAM -> Icons.Rounded.Groups
     PlayerShortcut.CODE -> Icons.Rounded.QrCode2
     PlayerShortcut.SHARE -> Icons.Rounded.Share

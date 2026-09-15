@@ -44,10 +44,13 @@ import ch.snepilatch.app.ui.shared.UpdateDialog
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.logic.shared.UpdateInfo
 import ch.snepilatch.app.logic.shared.UpdateService
-import ch.snepilatch.app.logic.shared.clearCookies
+import ch.snepilatch.app.logic.shared.AccountStore
 import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
+import ch.snepilatch.app.viewmodel.addAccount
+import ch.snepilatch.app.viewmodel.logout
+import ch.snepilatch.app.viewmodel.switchAccount
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -650,6 +653,8 @@ fun AccountScreen(vm: PlaybackViewModel) {
             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
         )
 
+        AccountsSection(vm, account.username)
+
         Spacer(Modifier.height(16.dp))
 
         val context = androidx.compose.ui.platform.LocalContext.current
@@ -658,13 +663,80 @@ fun AccountScreen(vm: PlaybackViewModel) {
             leadingContent = { Icon(Icons.AutoMirrored.Rounded.ExitToApp, null, tint = Color(0xFFE57373)) },
             trailingContent = { Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            modifier = Modifier.clickable {
-                clearCookies(context)
-                vm.showLogin()
-            }
+            modifier = Modifier.clickable { vm.logout(context) }
         )
     }
 }
+
+/**
+ * The signed-in accounts (#847). The active one is marked and does nothing on a tap; any other one
+ * switches, which tears the session down and rebuilds it from that account's cookies. The last row
+ * signs a further account in, leaving the listed ones alone.
+ */
+@Composable
+private fun AccountsSection(vm: PlaybackViewModel, activeUsername: String) {
+    val accounts by AccountStore.accounts.collectAsState()
+    val theme by ThemeController.themeColors.collectAsState()
+    val context = LocalContext.current
+
+    Spacer(Modifier.height(24.dp))
+    SettingsSectionHeader(stringResource(R.string.account_section_accounts))
+
+    accounts.forEach { saved ->
+        val active = saved.username == activeUsername
+        ListItem(
+            headlineContent = { Text(saved.displayName.ifEmpty { saved.username }, color = SnepilatchWhite) },
+            supportingContent = { Text(saved.username, color = SnepilatchLightGray, fontSize = 12.sp) },
+            leadingContent = {
+                if (saved.imageUrl != null) {
+                    AsyncImage(
+                        model = saved.imageUrl,
+                        contentDescription = null,
+                        modifier = Modifier.size(40.dp).clip(CircleShape),
+                        contentScale = ContentScale.Crop,
+                    )
+                } else {
+                    Box(Modifier.size(40.dp).clip(CircleShape).background(SnepilatchGray), Alignment.Center) {
+                        Icon(Icons.Rounded.Person, null, tint = SnepilatchLightGray)
+                    }
+                }
+            },
+            trailingContent = {
+                // Both states occupy an icon button's width, so the trailing column lines up.
+                Box(Modifier.size(TRAILING_SLOT), Alignment.Center) {
+                    if (active) {
+                        Icon(Icons.Rounded.CheckCircle, stringResource(R.string.active), tint = theme.primary)
+                    } else {
+                        IconButton(onClick = { AccountStore.forget(saved.username) }) {
+                            Icon(Icons.Rounded.PersonRemove, stringResource(R.string.remove_account), tint = SnepilatchLightGray)
+                        }
+                    }
+                }
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable(enabled = !active) { vm.switchAccount(context, saved) },
+        )
+    }
+
+    // Same 40dp leading circle as an account row, so the rows line up down the section.
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.add_account), color = SnepilatchWhite) },
+        leadingContent = {
+            Box(Modifier.size(40.dp).clip(CircleShape).background(SnepilatchGray), Alignment.Center) {
+                Icon(Icons.Rounded.PersonAdd, null, tint = SnepilatchLightGray)
+            }
+        },
+        trailingContent = {
+            Box(Modifier.size(TRAILING_SLOT), Alignment.Center) {
+                Icon(Icons.Rounded.ChevronRight, null, tint = SnepilatchLightGray)
+            }
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = Modifier.clickable { vm.addAccount() },
+    )
+}
+
+private val TRAILING_SLOT = 48.dp
 
 /** Free-text settings dialog, e.g. the Loki debug-logging endpoint. Empty input clears the setting. */
 @Composable

@@ -58,6 +58,10 @@
     <plurals name="profile_followers"><item quantity="one">%d follower</item><item quantity="other">%d followers</item></plurals>
     <plurals name="profile_following"><item quantity="one">%d following</item><item quantity="other">%d following</item></plurals>
     <string name="log_out">Log out</string>
+    <string name="account_section_accounts">Accounts</string>
+    <string name="add_account">Add account</string>
+    <string name="active">Active</string>
+    <string name="remove_account">Remove account</string>
 
     <!-- Settings -->
     <string name="audio_source">Audio source</string>

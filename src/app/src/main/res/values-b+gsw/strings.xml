@@ -66,6 +66,10 @@
     <plurals name="profile_followers"><item quantity="one">%d Follower</item><item quantity="other">%d Follower</item></plurals>
     <plurals name="profile_following"><item quantity="one">%d gfolgt</item><item quantity="other">%d gfolgt</item></plurals>
     <string name="log_out">Abmälde</string>
+    <string name="account_section_accounts">Konte</string>
+    <string name="add_account">Konto hinzuefüege</string>
+    <string name="active">Aktiv</string>
+    <string name="remove_account">Konto entferne</string>
 
     <!-- Settings -->
     <string name="audio_source">Tonquälle</string>

@@ -51,6 +51,10 @@ object SessionHolder {
      *  library mutations (create/delete/save playlist) that need it. */
     @Volatile var username: String = ""
 
+    /** Bumped when a session finishes initialising, so a feature ViewModel built for an earlier
+     *  account reloads for the new one (#847). */
+    val generation = MutableStateFlow(0)
+
     /** True if the holder has a ready-to-use session + player + resolver. */
     val isReady: Boolean
         get() = session != null && player != null && cdnResolver != null

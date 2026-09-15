@@ -56,6 +56,10 @@
     <plurals name="profile_followers"><item quantity="one">%d подписчик</item><item quantity="few">%d подписчика</item><item quantity="many">%d подписчиков</item><item quantity="other">%d подписчиков</item></plurals>
     <plurals name="profile_following"><item quantity="one">%d подписка</item><item quantity="few">%d подписки</item><item quantity="many">%d подписок</item><item quantity="other">%d подписок</item></plurals>
     <string name="log_out">Выйти</string>
+    <string name="account_section_accounts">Аккаунты</string>
+    <string name="add_account">Добавить аккаунт</string>
+    <string name="active">Активный</string>
+    <string name="remove_account">Удалить аккаунт</string>
 
     <!-- Settings -->
     <string name="audio_source">Источник звука</string>

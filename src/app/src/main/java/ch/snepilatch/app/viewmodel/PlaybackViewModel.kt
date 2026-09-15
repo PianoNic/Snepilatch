@@ -13,6 +13,8 @@ import ch.snepilatch.app.logic.playback.OfflinePlayer
 import ch.snepilatch.app.logic.playback.QueueMovePlan
 import ch.snepilatch.app.logic.playback.ResumeLoader
 import ch.snepilatch.app.logic.playback.planQueueMove
+import ch.snepilatch.app.logic.relay.RelayCommand
+import ch.snepilatch.app.logic.relay.RelayJam
 import ch.snepilatch.app.logic.shared.LokiLogger
 import ch.snepilatch.app.logic.shared.detectActiveAudioOutput
 import ch.snepilatch.app.logic.shared.hasInternet
@@ -1161,7 +1163,8 @@ class PlaybackViewModel : ViewModel() {
 
     /**
      * Handle a deep link URI from open.spotify.com.
-     * Supported paths: /track/{id}, /album/{id}, /playlist/{id}, /artist/{id}, /socialsession/{token}.
+     * Supported paths: /track/{id}, /album/{id}, /playlist/{id}, /artist/{id}, /socialsession/{token},
+     * and a relay invite's /jam/{token}.
      * A spotify.link short link is expanded first and then handled like the long one.
      */
     fun handleDeepLink(uri: android.net.Uri) {
@@ -1189,6 +1192,7 @@ class PlaybackViewModel : ViewModel() {
             "album" -> DetailRoutes.openAlbum(id)
             "playlist" -> DetailRoutes.openPlaylist(id)
             "artist" -> DetailRoutes.openArtist(id)
+            "jam" -> launchWithSession("joinRelayJam") { RelayJam.joinFromLink(id) }
             "socialsession" -> launchWithSession("joinJam") { sess ->
                 JamHolder.join(sess, id)?.let { LokiLogger.w(TAG, "Jam link $id not joined: $it") }
             }
@@ -1539,6 +1543,8 @@ class PlaybackViewModel : ViewModel() {
     }
 
     fun togglePlayPause() {
+        val paused = _playback.value.isPaused || !_playback.value.isPlaying
+        if (RelayJam.redirect(RelayCommand(if (paused) RelayCommand.RESUME else RelayCommand.PAUSE))) return
         commandJob?.cancel()
         if (isOffline.value) {
             commandJob = viewModelScope.launch(Dispatchers.IO) { OfflinePlayer.togglePlayPause() }
@@ -1959,6 +1965,7 @@ class PlaybackViewModel : ViewModel() {
     }
 
     fun skipNext() {
+        if (RelayJam.redirect(RelayCommand(RelayCommand.NEXT))) return
         if (isOffline.value) {
             commandJob?.cancel()
             commandJob = viewModelScope.launch(Dispatchers.IO) { OfflinePlayer.next() }
@@ -1994,6 +2001,7 @@ class PlaybackViewModel : ViewModel() {
 
     /** True when the track changes, false when the current one restarts instead. */
     fun skipPrevious(forceTrackChange: Boolean = false): Boolean {
+        if (RelayJam.redirect(RelayCommand(RelayCommand.PREVIOUS))) return false
         if (isOffline.value) {
             commandJob?.cancel()
             commandJob = viewModelScope.launch(Dispatchers.IO) { OfflinePlayer.previous() }
@@ -2033,6 +2041,7 @@ class PlaybackViewModel : ViewModel() {
     }
 
     fun seekTo(positionMs: Long) {
+        if (RelayJam.redirect(RelayCommand(RelayCommand.SEEK, positionMs = positionMs))) return
         // Reflect the target immediately; ExoPlayer's getCurrentPosition() catches up once the
         // posted seek lands, and the position ticker then reads it straight from the player.
         _playback.value = _playback.value.copy(positionMs = positionMs)
@@ -2230,6 +2239,7 @@ class PlaybackViewModel : ViewModel() {
      * matching the JS skip_to.
      */
     fun playTrack(track: TrackInfo, contextUri: String? = null, trackIndex: Int? = null) {
+        if (RelayJam.redirect(RelayCommand(RelayCommand.PLAY, uri = track.uri, contextUri = contextUri))) return
         userPlayJob?.cancel()
         userPlayJob = viewModelScope.launch(Dispatchers.IO) { startUserPlayback(track, contextUri, trackIndex) }
     }
@@ -2395,6 +2405,7 @@ class PlaybackViewModel : ViewModel() {
      */
     fun addAllToQueue(trackUris: List<String>) {
         if (trackUris.isEmpty()) return
+        if (trackUris.all { RelayJam.redirect(RelayCommand(RelayCommand.ADD_TO_QUEUE, uri = it)) }) return
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 player?.addToQueue(trackUris)

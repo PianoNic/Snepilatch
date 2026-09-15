@@ -403,6 +403,8 @@
     <string name="jam_starting">Запуск...</string>
     <string name="jam_start_failed">Не удалось начать джем. Проверьте сервер ретрансляции в настройках.</string>
     <string name="jam_menu">Начать джем или присоединиться</string>
+    <string name="jam_host_only">Это может только хост. Вы всё ещё можете добавлять песни в очередь.</string>
+    <string name="jam_ended_by_host">Хост завершил джем</string>
     <string name="join_jam">Присоединиться к джему</string>
     <string name="jam_connected">Подключено к джему</string>
     <string name="jam_of">Джем %1$s</string>

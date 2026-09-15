@@ -49,10 +49,12 @@ class JamViewModel : SessionViewModel("JamVM") {
 
     /** Starts a jam this account hosts, through the relay. */
     fun start() {
+        if (starting.value || RelayJam.active) return
+        starting.value = true
         error.value = null
         launchWithSessionLoading("startJam", starting) {
             RelayJam.create()?.let { error.value = START_FAILED }
-        }
+        }.invokeOnCompletion { starting.value = false }
     }
 
     fun loadInviteLinks() {
@@ -63,6 +65,12 @@ class JamViewModel : SessionViewModel("JamVM") {
     fun join(linkOrToken: String) {
         if (linkOrToken.isBlank()) return
         error.value = null
+        RelayJamMapper.joinToken(linkOrToken)?.let { token ->
+            launchWithSessionLoading("joinRelayJam", joining) {
+                RelayJam.join(token)?.let { error.value = JamHolder.FAILED }
+            }
+            return
+        }
         launchWithSessionLoading("joinJam", joining) { sess ->
             error.value = JamHolder.join(sess, linkOrToken)
         }

@@ -417,6 +417,8 @@
     <string name="jam_starting">Wird gstartet...</string>
     <string name="jam_start_failed">De Jam het nöd chöne gstartet werde. Lueg de Relay-Server i de Istellige a.</string>
     <string name="jam_menu">Jam starte oder biitrete</string>
+    <string name="jam_host_only">Das cha nur de Host. Du chasch trotzdem Songs zur Warteschlange hinzuefüege.</string>
+    <string name="jam_ended_by_host">De Host het de Jam beendet</string>
     <string name="join_jam">Emene Jam biitrete</string>
     <string name="jam_connected">Mit em Jam verbunde</string>
     <string name="jam_of">Jam vo %1$s</string>

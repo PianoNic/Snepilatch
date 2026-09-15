@@ -401,6 +401,8 @@
     <string name="jam_starting">Wird gestartet...</string>
     <string name="jam_start_failed">Der Jam konnte nicht gestartet werden. Prüfe den Relay-Server in den Einstellungen.</string>
     <string name="jam_menu">Jam starten oder beitreten</string>
+    <string name="jam_host_only">Das kann nur der Host. Du kannst trotzdem Songs zur Warteschlange hinzufügen.</string>
+    <string name="jam_ended_by_host">Der Host hat den Jam beendet</string>
     <string name="join_jam">Einem Jam beitreten</string>
     <string name="jam_connected">Mit Jam verbunden</string>
     <string name="jam_of">Jam von %1$s</string>

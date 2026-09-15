@@ -68,6 +68,19 @@
                     android:pathPrefix="/socialsession" />
             </intent-filter>
 
+            <!-- Relay jam invites from the default Snepirelay; a self-hosted relay's links are pasted instead. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:scheme="https"
+                    android:host="snepirelay.pianonic.ch"
+                    android:pathPrefix="/jam/" />
+            </intent-filter>
+
             <!-- The share sheet's short links (and the jam invite QR code); expanded in the app. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

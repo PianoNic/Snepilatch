@@ -57,6 +57,10 @@ class RelayClient(
     @Volatile var clockOffsetMs: Long = 0
         private set
 
+    /** The relay's last welcome: whether this device came back into a jam it was already in. */
+    @Volatile var welcome: RelayEvent.Welcome? = null
+        private set
+
     private val pending = ConcurrentHashMap<String, CompletableDeferred<RelayEvent>>()
     private val nextRid = AtomicLong()
     private var attempts = 0
@@ -135,6 +139,7 @@ class RelayClient(
     }
 
     private fun welcomed(welcome: RelayEvent.Welcome) {
+        this.welcome = welcome
         attempts = 0
         clockOffsetMs = welcome.serverTime - now()
         _state.value = State.Connected(welcome.memberId)

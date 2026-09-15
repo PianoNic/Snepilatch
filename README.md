@@ -22,7 +22,7 @@
 
 | Playback | Sound |
 | --- | --- |
-| <ul><li>No ads, ever</li><li>Skip as much as you like</li><li>Pick how it sounds: normal, lossless, or YouTube Music</li><li>Push the music to your speaker or laptop and pull it back</li><li>Shuffle that mixes in songs you might like</li><li>Lock screen buttons that always show the right thing</li></ul> | <ul><li>A ten-band equalizer built in, drag the curve however you like</li><li>Turn it up without anything crackling</li><li>Plays nice with an equalizer app like Wavelet</li></ul> |
+| <ul><li>No ads, ever</li><li>Skip as much as you like</li><li>Pick how it sounds: normal, lossless, or YouTube Music</li><li>Push the music to your speaker or laptop and pull it back</li><li>Shuffle that mixes in songs you might like</li></ul> | <ul><li>A ten-band equalizer built in, drag the curve however you like</li><li>Turn it up without anything crackling</li><li>Plays nice with an equalizer app like Wavelet</li></ul> |
 | **InfiniPlay** | **Offline** |
 | <ul><li>Any song, looping forever</li><li>Beat-matched and crossfaded, so you never hear it start over</li><li>One switch, nothing to set up</li></ul> | <ul><li>Save songs, albums and whole playlists to your phone</li><li>Keeps playing when you lose signal, picks back up when it returns</li><li>Choose where the files land, pause the downloads whenever</li></ul> |
 | **Lyrics** | **Friends** |

@@ -11,6 +11,7 @@ import kotify.api.playlist.Playlist
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import ch.snepilatch.app.logic.shared.SessionViewModel
@@ -37,7 +38,16 @@ class LibraryViewModel : SessionViewModel("LibraryVM") {
     private val _isLoadingMore = MutableStateFlow(false)
     val isLoadingMore: StateFlow<Boolean> = _isLoadingMore
 
-    init { loadLibrary() }
+    init {
+        loadLibrary()
+        // A switched account gets its own library instead of the old account's (#847).
+        viewModelScope.launch {
+            SessionHolder.generation.drop(1).collect {
+                _library.value = emptyList()
+                loadLibrary()
+            }
+        }
+    }
 
     fun loadLibrary() {
         launchWithSession("loadLibrary") { sess ->

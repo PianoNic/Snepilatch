@@ -19,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import ch.snepilatch.app.logic.playback.MediaButtonReceiver
 import ch.snepilatch.app.logic.playback.MusicPlaybackService
+import ch.snepilatch.app.logic.shared.AccountStore
 import ch.snepilatch.app.logic.shared.SessionHolder
 import ch.snepilatch.app.ui.shared.UpdateDialog
 import ch.snepilatch.app.ui.screens.LoadingScreen
@@ -127,6 +128,7 @@ class MainActivity : ComponentActivity() {
             val context = this@MainActivity
             LaunchedEffect(Unit) {
                 AppSettings.load(context)
+                AccountStore.init(context)
                 // Off the main thread: opening the database and reading the index is disk work, and
                 // this effect runs on the UI dispatcher. Deliberately no prune here — validating every
                 // downloaded row costs one content-resolver round trip each, which would grow into a

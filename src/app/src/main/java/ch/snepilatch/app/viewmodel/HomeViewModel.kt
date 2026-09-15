@@ -3,7 +3,11 @@ package ch.snepilatch.app.viewmodel
 import ch.snepilatch.app.logic.shared.LokiLogger
 import kotify.api.home.Home
 import kotify.api.home.HomeData
+import androidx.lifecycle.viewModelScope
+import ch.snepilatch.app.logic.shared.SessionHolder
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.StateFlow
 import ch.snepilatch.app.logic.shared.SessionViewModel
 
@@ -22,7 +26,17 @@ class HomeViewModel : SessionViewModel("HomeVM") {
     val homeData: StateFlow<HomeData?> = _homeData
     val isLoading = MutableStateFlow(true)
 
-    init { loadHome() }
+    init {
+        loadHome()
+        // A switched account gets a fresh feed instead of the old account's (#847).
+        viewModelScope.launch {
+            SessionHolder.generation.drop(1).collect {
+                _homeData.value = null
+                isLoading.value = true
+                loadHome()
+            }
+        }
+    }
 
     fun loadHome() {
         launchWithSession("loadHome") { sess ->

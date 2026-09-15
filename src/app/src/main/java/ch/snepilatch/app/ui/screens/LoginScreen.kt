@@ -26,6 +26,9 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,6 +44,11 @@ import ch.snepilatch.app.viewmodel.PlaybackViewModel
 
 @Composable
 fun SpfyLoginScreen(vm: PlaybackViewModel) {
+    // Opened from "add account" (#847) the old session is still running, so back returns to it
+    // instead of leaving the app. Without one signed in there is nothing to go back to.
+    val signedIn by vm.isInitialized.collectAsState()
+    BackHandler(enabled = signedIn) { vm.cancelLogin() }
+
     Column(
         Modifier
             .fillMaxSize()

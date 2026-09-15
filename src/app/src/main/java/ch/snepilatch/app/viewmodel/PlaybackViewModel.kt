@@ -22,6 +22,8 @@ import ch.snepilatch.app.logic.playback.InfiniPlayViz
 import ch.snepilatch.app.logic.playback.MusicPlaybackService
 import ch.snepilatch.app.logic.playback.PlaybackCache
 import ch.snepilatch.app.logic.playback.PositionInterpolator
+import ch.snepilatch.app.logic.shared.AccountStore
+import ch.snepilatch.app.logic.shared.SavedAccount
 import ch.snepilatch.app.logic.shared.SessionHolder
 import ch.snepilatch.app.logic.download.DownloadFolder
 import ch.snepilatch.app.logic.download.DownloadNotifier
@@ -532,11 +534,7 @@ class PlaybackViewModel : ViewModel() {
      */
     private fun loadAccountInBackground(sess: Session) {
         initScope.launch {
-            try {
-                loadAccount(sess)
-            } catch (e: Exception) {
-                LokiLogger.e(TAG, "Profile load failed", e)
-            }
+            try { loadAccount(sess) } catch (e: Exception) { LokiLogger.e(TAG, "Profile load failed", e) }
         }
     }
 
@@ -565,6 +563,10 @@ class PlaybackViewModel : ViewModel() {
             playlistCount = pubProfile.publicPlaylists
         )
         LokiLogger.i(TAG, "User: $username ($displayName), premium: $isPremium")
+        // Remember this account so the account tab can switch back to it (#847). The cookies come
+        // from the live session, not from what initialize was handed, so a refreshed sp_dc is kept.
+        val cookies = runCatching { sess.snapshot().cookies }.getOrNull()
+        if (!cookies.isNullOrEmpty()) AccountStore.remember(SavedAccount(username, displayName, imageUrl, cookies))
     }
 
     /** Rewire this ViewModel to a session that is already live, without touching the network path. */
@@ -583,13 +585,28 @@ class PlaybackViewModel : ViewModel() {
     /** Re-reads the account after the profile changed, such as a new picture (#840). */
     fun refreshAccount() = launchWithSession("refreshAccount") { sess -> loadAccount(sess) }
 
-    /** Disconnects the running player and drops the holder, so the next init starts from nothing. */
+    /** Disconnects the running player, closes its connections and drops the holder, so the next init starts from nothing. */
     private fun tearDownSession() {
         JamHolder.clear()
         SessionHolder.player?.let {
             try { kotlinx.coroutines.runBlocking { it.disconnect() } } catch (_: Exception) {}
         }
+        try { SessionHolder.session?.getHttpClient()?.close() } catch (_: Exception) {}
         SessionHolder.clear()
+    }
+
+    /**
+     * Everything an account owns goes away (#847): the audio, the stream, the shown state, the
+     * account and the session with its device registration. Off the main thread, since the
+     * deregistration is a network call. What is left is a signed-out app waiting for [initialize].
+     */
+    internal suspend fun shutDownSession() = withContext(Dispatchers.IO) {
+        initJob?.cancel(); initJob = null
+        withContext(Dispatchers.Main) { MusicPlaybackService.instance?.stop() }
+        clearStream(); stopPositionTicker()
+        _playback.value = PlaybackUiState(); playingContext.value = null; _account.value = AccountInfo()
+        isInitialized.value = false; initError.value = null; username = ""
+        tearDownSession()
     }
 
     /**
@@ -661,6 +678,7 @@ class PlaybackViewModel : ViewModel() {
                 // Home and library load themselves from HomeViewModel.init / LibraryViewModel.init.
 
                 isInitialized.value = true
+                SessionHolder.generation.value++
                 initRetryCount = 0
                 authRecovering = false
                 loadAccountInBackground(sess)
@@ -1083,10 +1101,13 @@ class PlaybackViewModel : ViewModel() {
         return true
     }
 
+    /**
+     * A finished login always builds its own session (#847): adding a second account while the
+     * first one is still live would otherwise adopt the running one and sign the same user in again.
+     */
     fun onLoginComplete(cookies: Map<String, String>) {
-        needsLogin.value = false
-        initError.value = null
-        initialize(cookies)
+        needsLogin.value = false; initError.value = null
+        viewModelScope.launch { shutDownSession(); initialize(cookies) }
     }
 
     /**
@@ -1119,9 +1140,10 @@ class PlaybackViewModel : ViewModel() {
     private fun launchWithPlayer(tag: String, block: suspend (PlayerConnect) -> Unit): Job =
         launchWith(TAG, tag, { player }, block = block)
 
-    fun showLogin() {
-        needsLogin.value = true
-    }
+    fun showLogin() { needsLogin.value = true }
+
+    /** Backing out of an "add account" login: the session that is still running stays the active one (#847). */
+    fun cancelLogin() { needsLogin.value = false }
 
     fun navigateTo(screen: Screen) = Navigator.navigateTo(screen)
 
@@ -2287,9 +2309,7 @@ class PlaybackViewModel : ViewModel() {
         }
     }
 
-    fun addTrackToPlaylist(playlistId: String, trackUri: String) {
-        addTracksToPlaylist(playlistId, listOf(trackUri))
-    }
+    fun addTrackToPlaylist(playlistId: String, trackUri: String) { addTracksToPlaylist(playlistId, listOf(trackUri)) }
 
     /**
      * Add many tracks to a playlist in a single API call. Used by the detail
@@ -2310,9 +2330,7 @@ class PlaybackViewModel : ViewModel() {
     val pendingPlaylistTrackUris = MutableStateFlow<List<String>>(emptyList())
     val showPlaylistPicker = MutableStateFlow(false)
 
-    fun showPlaylistPickerForTrack(trackUri: String) {
-        showPlaylistPickerForTracks(listOf(trackUri))
-    }
+    fun showPlaylistPickerForTrack(trackUri: String) { showPlaylistPickerForTracks(listOf(trackUri)) }
 
     fun showPlaylistPickerForTracks(trackUris: List<String>) {
         if (trackUris.isEmpty()) return
@@ -2355,9 +2373,7 @@ class PlaybackViewModel : ViewModel() {
         }
     }
 
-    fun addToQueue(trackUri: String) {
-        addAllToQueue(listOf(trackUri))
-    }
+    fun addToQueue(trackUri: String) { addAllToQueue(listOf(trackUri)) }
 
     /**
      * Queue multiple tracks in a single Connect call. Used by the detail
@@ -2403,9 +2419,7 @@ class PlaybackViewModel : ViewModel() {
         refreshQueue()
     }
 
-    fun closeQueue() {
-        _queueSheetVisible.value = false
-    }
+    fun closeQueue() { _queueSheetVisible.value = false }
 
     fun openLyrics() {
         // The lyrics screen (via LyricsViewModel) fetches on its own from LaunchedEffect(track?.uri).
@@ -2798,9 +2812,7 @@ class PlaybackViewModel : ViewModel() {
      * Called both when a new ad supersedes the old one and when a real track's audio is announced.
      * Internal for tests.
      */
-    internal fun leaveAdContext() {
-        adEpoch++
-    }
+    internal fun leaveAdContext() { adEpoch++ }
 
     /**
      * ExoPlayer lifecycle events — track transitions, errors, end-of-track,
@@ -2972,25 +2984,19 @@ class PlaybackViewModel : ViewModel() {
     }
 
     /** Test seam: set the account's premium flag so [safeMediaFileId] can be exercised. */
-    internal fun setPremiumForTest(premium: Boolean) {
-        _account.value = _account.value.copy(isPremium = premium)
-    }
+    internal fun setPremiumForTest(premium: Boolean) { _account.value = _account.value.copy(isPremium = premium) }
 
     /**
      * Test seam: simulate being inside the cold-start window (or reconnect) where [suppressRemotePause]
      * is held, so [handleRemotePause] must ignore the self-inflicted restore_paused echo.
      */
-    internal fun setSuppressRemotePauseForTest(suppress: Boolean) {
-        suppressRemotePause = suppress
-    }
+    internal fun setSuppressRemotePauseForTest(suppress: Boolean) { suppressRemotePause = suppress }
 
     /**
      * Test seam: simulate another Connect device holding playback, so [togglePlayPause] must issue a
      * remote command instead of a local state report / cold start.
      */
-    internal fun setForeignDeviceActiveForTest(active: Boolean) {
-        foreignDeviceActive = active
-    }
+    internal fun setForeignDeviceActiveForTest(active: Boolean) { foreignDeviceActive = active }
 
     /**
      * Test seam: await the in-flight transport command. [togglePlayPause] and friends launch on
@@ -3355,9 +3361,7 @@ class PlaybackViewModel : ViewModel() {
      * Downloads whatever is playing. Progress and the result are reported through the notification,
      * since there is nowhere else to put them while the user is on another screen.
      */
-    fun downloadCurrentTrack(context: android.content.Context) {
-        downloadTrack(_playback.value.track ?: return, context)
-    }
+    fun downloadCurrentTrack(context: android.content.Context) { downloadTrack(_playback.value.track ?: return, context) }
 
     /** The download request for a track, so the three entry points cannot drift in what they send. */
     private fun TrackInfo.toRequest(
@@ -3449,9 +3453,7 @@ class PlaybackViewModel : ViewModel() {
      * samples, so [autoSaveIfListenedThrough] would take the cache and discard the capture anyway —
      * after paying a memcpy of every decoded buffer on the audio thread for the whole track.
      */
-    private fun standDownCapture() {
-        MusicPlaybackService.instance?.stopCapture()
-    }
+    private fun standDownCapture() { MusicPlaybackService.instance?.stopCapture() }
 
     /** The cheap checks: setting on, somewhere to put it, played far enough, not already saved. */
     private fun worthAutoSaving(track: TrackInfo, positionMs: Long): Boolean {
@@ -3530,9 +3532,7 @@ class PlaybackViewModel : ViewModel() {
     }
 
     /** Stops one queue entry. It settles its own notification and state on the way out. */
-    fun cancelDownload(id: Int) {
-        downloadJobs[id]?.cancel()
-    }
+    fun cancelDownload(id: Int) { downloadJobs[id]?.cancel() }
 
     fun downloadTracks(
         tracks: List<TrackInfo>,
@@ -3601,9 +3601,7 @@ class PlaybackViewModel : ViewModel() {
         keep(id, job)
     }
 
-    fun removeDownload(trackUri: String) {
-        viewModelScope.launch(Dispatchers.IO) { TrackDownloader.delete(trackUri) }
-    }
+    fun removeDownload(trackUri: String) { viewModelScope.launch(Dispatchers.IO) { TrackDownloader.delete(trackUri) } }
 
     /**
      * Skip rather than sit in silence, bounded by the playback-error budget so a run of unmatched

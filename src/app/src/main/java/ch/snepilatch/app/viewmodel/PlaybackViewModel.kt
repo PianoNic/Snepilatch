@@ -3817,6 +3817,12 @@ class PlaybackViewModel : ViewModel() {
                             artist ?: "Unknown",
                             art,
                             startPlaying = shouldPlay,
+                            // The lossless relays gate their stream on an API key they hand back with
+                            // the url, so a request without it is turned away (#504). Every other
+                            // resolve path passes these on; this one adopting what was already playing
+                            // was the one that did not, which is why a cold start into a lossless
+                            // track failed where tapping the same track worked.
+                            headers = result.info.headers,
                         )
                         commitStream(uri, result.info.provider)
                         LokiLogger.i(TAG, "Initial stream: ${result.info.provider} (playing=$shouldPlay)")

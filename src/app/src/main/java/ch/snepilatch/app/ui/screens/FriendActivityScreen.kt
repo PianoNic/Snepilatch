@@ -147,14 +147,14 @@ private fun FriendRow(friend: FriendActivity, onClick: () -> Unit) {
     }
 }
 
-/** Material Symbols' `screen_record` turning at a steady pace, our own now-playing glyph. */
+/** A vinyl record turning at a steady pace, the now-playing glyph. */
 @Composable
 private fun SpinningDisc(color: Color, modifier: Modifier = Modifier) {
     val angle by rememberInfiniteTransition(label = "disc").animateFloat(
         initialValue = 0f, targetValue = 360f, label = "angle",
         animationSpec = infiniteRepeatable(tween(DISC_TURN_MS, easing = LinearEasing)),
     )
-    Icon(painterResource(R.drawable.ic_screen_record), null, tint = color, modifier = modifier.rotate(angle))
+    Icon(painterResource(R.drawable.ic_vinyl_record), null, tint = color, modifier = modifier.rotate(angle))
 }
 
 private const val DISC_TURN_MS = 1800

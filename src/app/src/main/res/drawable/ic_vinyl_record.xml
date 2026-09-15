@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A vinyl record: label, spindle hole and four groove arcs, the now-playing glyph on the friend
+     activity feed. The grooves are cut out of the disc, so the whole thing is one even-odd path. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="840"
+    android:viewportHeight="840">
+    <path
+        android:fillColor="@android:color/white"
+        android:fillType="evenOdd"
+        android:pathData="M8,420A412,412 0 1 0 832,420A412,412 0 1 0 8,420Z M250,420A170,170 0 1 0 590,420A170,170 0 1 0 250,420Z M296,420A124,124 0 1 0 544,420A124,124 0 1 0 296,420Z M393,430A27,27 0 1 0 447,430A27,27 0 1 0 393,430Z M47.5,347.6A379.5,379.5 0 0 1 367.2,44.2A14.5,14.5 0 0 1 371.2,72.9A350.5,350.5 0 0 0 75.9,353.1A14.5,14.5 0 0 1 47.5,347.6Z M792.5,492.4A379.5,379.5 0 0 1 472.8,795.8A14.5,14.5 0 0 1 468.8,767.1A350.5,350.5 0 0 0 764.1,486.9A14.5,14.5 0 0 1 792.5,492.4Z M108.3,359.4A317.5,317.5 0 0 1 375.8,105.6A14.5,14.5 0 0 1 379.8,134.3A288.5,288.5 0 0 0 136.8,365A14.5,14.5 0 0 1 108.3,359.4Z M731.7,480.6A317.5,317.5 0 0 1 464.2,734.4A14.5,14.5 0 0 1 460.2,705.7A288.5,288.5 0 0 0 703.2,475A14.5,14.5 0 0 1 731.7,480.6Z M169.2,371.2A255.5,255.5 0 0 1 384.4,167A14.5,14.5 0 0 1 388.5,195.7A226.5,226.5 0 0 0 197.7,376.8A14.5,14.5 0 0 1 169.2,371.2Z M670.8,468.8A255.5,255.5 0 0 1 455.6,673A14.5,14.5 0 0 1 451.5,644.3A226.5,226.5 0 0 0 642.3,463.2A14.5,14.5 0 0 1 670.8,468.8Z" />
+</vector>

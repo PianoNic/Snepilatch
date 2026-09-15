@@ -6,7 +6,6 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,8 +36,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -148,23 +147,17 @@ private fun FriendRow(friend: FriendActivity, onClick: () -> Unit) {
     }
 }
 
-/** A spinning disc: a ring with a hole and a dark groove so the turn reads, our own now-playing glyph. */
+/** Material Symbols' `screen_record` turning at a steady pace, our own now-playing glyph. */
 @Composable
 private fun SpinningDisc(color: Color, modifier: Modifier = Modifier) {
     val angle by rememberInfiniteTransition(label = "disc").animateFloat(
         initialValue = 0f, targetValue = 360f, label = "angle",
         animationSpec = infiniteRepeatable(tween(DISC_TURN_MS, easing = LinearEasing)),
     )
-    Canvas(modifier.rotate(angle)) {
-        val r = size.minDimension / 2
-        drawCircle(color, r)
-        drawLine(color.copy(alpha = DISC_GROOVE_ALPHA), Offset(r, 0f), Offset(r, r), strokeWidth = r / 3)
-        drawCircle(Color.Black, r / 3)
-    }
+    Icon(painterResource(R.drawable.ic_screen_record), null, tint = color, modifier = modifier.rotate(angle))
 }
 
 private const val DISC_TURN_MS = 1800
-private const val DISC_GROOVE_ALPHA = 0.5f
 
 /** "now" inside the first minute, then the platform's abbreviated relative time ("56 min ago"). */
 @Composable

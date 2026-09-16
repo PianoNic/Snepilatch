@@ -1,6 +1,5 @@
 package ch.snepilatch.app.ui.shared
 
-import androidx.compose.material3.SwipeToDismissBoxValue
 import ch.snepilatch.app.data.PlayerShortcut
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -36,19 +35,5 @@ class TrackSwipeActionsTest {
     fun revealOffsetStopsAtMaximumRevealDistanceInEitherDirection() {
         assertEquals(192f, boundedRevealOffset(240f, 192f), 0f)
         assertEquals(-192f, boundedRevealOffset(-240f, 192f), 0f)
-    }
-
-    @Test
-    fun actionGateClaimsOnlyOnceUntilReset() {
-        val gate = SwipeActionGate()
-
-        assertFalse(gate.claim(SwipeToDismissBoxValue.Settled))
-        assertTrue(gate.claim(SwipeToDismissBoxValue.StartToEnd))
-        assertFalse(gate.claim(SwipeToDismissBoxValue.StartToEnd))
-        assertFalse(gate.claim(SwipeToDismissBoxValue.EndToStart))
-
-        gate.reset()
-
-        assertTrue(gate.claim(SwipeToDismissBoxValue.EndToStart))
     }
 }

@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -97,6 +98,20 @@ internal data class SwipeAction(
     val resetAfterRun: Boolean = true,
 )
 
+internal class SwipeActionGate {
+    private var claimedDirection: SwipeToDismissBoxValue? = null
+
+    fun claim(direction: SwipeToDismissBoxValue): Boolean {
+        if (direction == SwipeToDismissBoxValue.Settled || claimedDirection != null) return false
+        claimedDirection = direction
+        return true
+    }
+
+    fun reset() {
+        claimedDirection = null
+    }
+}
+
 /**
  * Adds the shared swipe gesture and action treatment to a row. The action content stays composed at
  * its full size and is clipped to the part uncovered by the moving row.
@@ -113,6 +128,7 @@ internal fun SwipeableActionRow(
 ) {
     val state = rememberSwipeToDismissBoxState()
     val scope = rememberCoroutineScope()
+    val actionGate = remember { SwipeActionGate() }
     val flashAlpha = remember { Animatable(0f) }
     var completedDirection by remember { mutableStateOf<SwipeToDismissBoxValue?>(null) }
     val density = LocalDensity.current
@@ -126,27 +142,35 @@ internal fun SwipeableActionRow(
         contentBackground
     }
 
-    SwipeToDismissBox(
-        state = state,
-        modifier = modifier,
-        enableDismissFromStartToEnd = startToEndAction != null && enableDismissFromStartToEnd,
-        enableDismissFromEndToStart = endToStartAction != null && enableDismissFromEndToStart,
-        onDismiss = { direction ->
-            val action = when (direction) {
-                SwipeToDismissBoxValue.StartToEnd -> startToEndAction
-                SwipeToDismissBoxValue.EndToStart -> endToStartAction
-                SwipeToDismissBoxValue.Settled -> null
-            }
-            action?.run?.invoke()
-            completedDirection = direction.takeUnless { it == SwipeToDismissBoxValue.Settled }
+    val latestOnDismiss = rememberUpdatedState<(SwipeToDismissBoxValue) -> Unit> { direction ->
+        val action = when (direction) {
+            SwipeToDismissBoxValue.StartToEnd -> startToEndAction
+            SwipeToDismissBoxValue.EndToStart -> endToStartAction
+            SwipeToDismissBoxValue.Settled -> null
+        }
+        if (action != null && actionGate.claim(direction)) {
+            completedDirection = direction
+            action.run.invoke()
             scope.launch {
                 flashAlpha.snapTo(0f)
                 flashAlpha.animateTo(FLASH_ALPHA, tween(FLASH_MS, easing = FastOutSlowInEasing))
                 flashAlpha.animateTo(0f, tween(FLASH_MS, easing = FastOutSlowInEasing))
                 completedDirection = null
-                if (action?.resetAfterRun == true) state.reset()
+                if (action.resetAfterRun) {
+                    state.reset()
+                    actionGate.reset()
+                }
             }
-        },
+        }
+    }
+    val onDismiss = remember { { direction: SwipeToDismissBoxValue -> latestOnDismiss.value(direction) } }
+
+    SwipeToDismissBox(
+        state = state,
+        modifier = modifier,
+        enableDismissFromStartToEnd = startToEndAction != null && enableDismissFromStartToEnd,
+        enableDismissFromEndToStart = endToStartAction != null && enableDismissFromEndToStart,
+        onDismiss = onDismiss,
         backgroundContent = {
             val direction = completedDirection ?: state.dismissDirection
             val action = when (direction) {

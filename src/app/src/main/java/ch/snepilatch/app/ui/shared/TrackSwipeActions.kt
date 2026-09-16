@@ -30,9 +30,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
@@ -42,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import ch.snepilatch.app.data.TrackInfo
 import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.logic.shared.ThemeController
+import ch.snepilatch.app.ui.theme.SnepilatchBlack
 import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import kotlinx.coroutines.launch
@@ -122,6 +120,11 @@ internal fun SwipeableActionRow(
     val cornerRadiusPx = with(density) {
         CORNER_RADIUS.toPx() * swipeProgress(offset, CORNER_RADIUS_DISTANCE.toPx())
     }
+    val foregroundBackground = if (offset > 0f && contentBackground.alpha == 0f) {
+        SnepilatchBlack
+    } else {
+        contentBackground
+    }
 
     SwipeToDismissBox(
         state = state,
@@ -156,7 +159,6 @@ internal fun SwipeableActionRow(
                     state = state,
                     action = action,
                     fromStart = direction == SwipeToDismissBoxValue.StartToEnd,
-                    cornerRadius = cornerRadiusPx,
                     flashAlpha = flashAlpha.value,
                 )
             }
@@ -166,22 +168,21 @@ internal fun SwipeableActionRow(
                 Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(with(density) { cornerRadiusPx.toDp() }))
-                    .background(contentBackground)
+                    .background(foregroundBackground)
             ) { content() }
         },
     )
 }
 
 /**
- * The full action stays anchored behind the row and is clipped to the revealed width. Flashes it
- * once the action ran.
+ * The action stays anchored behind the row. Its color fills the background while swiping, while
+ * its icon and text are clipped to the revealed width.
  */
 @Composable
 private fun SwipeActionBackground(
     state: SwipeToDismissBoxState,
     action: SwipeAction,
     fromStart: Boolean,
-    cornerRadius: Float,
     flashAlpha: Float = 0f,
 ) {
     val offset = runCatching { abs(state.requireOffset()) }.getOrDefault(0f)
@@ -197,22 +198,10 @@ private fun SwipeActionBackground(
         Modifier
             .fillMaxSize()
             .drawBehind {
-                val revealWidth = offset.coerceAtMost(size.width)
-                if (revealWidth > 0f) {
-                    val left = if (fromStart) 0f else size.width - revealWidth
-                    drawRoundRect(
-                        color = action.tint,
-                        topLeft = Offset(left, 0f),
-                        size = Size(revealWidth, size.height),
-                        cornerRadius = CornerRadius(cornerRadius),
-                    )
+                if (offset > 0f) {
+                    drawRect(action.tint)
                     if (flashAlpha > 0f) {
-                        drawRoundRect(
-                            color = SnepilatchWhite.copy(alpha = flashAlpha),
-                            topLeft = Offset(left, 0f),
-                            size = Size(revealWidth, size.height),
-                            cornerRadius = CornerRadius(cornerRadius),
-                        )
+                        drawRect(SnepilatchWhite.copy(alpha = flashAlpha))
                     }
                 }
             }

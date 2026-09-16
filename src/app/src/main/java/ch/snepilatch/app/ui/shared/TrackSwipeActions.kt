@@ -165,6 +165,7 @@ internal fun SwipeableActionRow(
         modifier = modifier,
         enableDismissFromStartToEnd = startToEndAction != null && enableDismissFromStartToEnd,
         enableDismissFromEndToStart = endToStartAction != null && enableDismissFromEndToStart,
+        onDismiss = {},
         backgroundContent = {
             val direction = completedDirection ?: state.dismissDirection
             val action = when (direction) {

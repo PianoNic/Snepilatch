@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -35,6 +36,7 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import ch.snepilatch.app.data.TrackInfo
 import ch.snepilatch.app.logic.shared.AppSettings
@@ -44,6 +46,7 @@ import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
  * Adds the configured start-to-end and end-to-start actions to a track row without changing its tap
@@ -102,6 +105,7 @@ internal data class SwipeAction(
  * its full size and is clipped to the part uncovered by the moving row.
  */
 @Composable
+@Suppress("DEPRECATION")
 internal fun SwipeableActionRow(
     startToEndAction: SwipeAction? = null,
     endToStartAction: SwipeAction? = null,
@@ -111,12 +115,23 @@ internal fun SwipeableActionRow(
     contentBackground: Color = Color.Transparent,
     content: @Composable () -> Unit,
 ) {
-    val state = rememberSwipeToDismissBoxState()
+    val density = LocalDensity.current
+    val commitThresholdPx = with(density) { SWIPE_ACTIVATION_DISTANCE.toPx() }
+    val maxRevealDistancePx = with(density) { MAX_REVEAL_DISTANCE.toPx() }
+    lateinit var state: SwipeToDismissBoxState
+    state = rememberSwipeToDismissBoxState(
+        confirmValueChange = { target ->
+            target == SwipeToDismissBoxValue.Settled ||
+                runCatching { abs(state.requireOffset()) >= commitThresholdPx }.getOrDefault(false)
+        },
+        positionalThreshold = { commitThresholdPx },
+    )
     val scope = rememberCoroutineScope()
     val flashAlpha = remember { Animatable(0f) }
     var completedDirection by remember { mutableStateOf<SwipeToDismissBoxValue?>(null) }
-    val density = LocalDensity.current
-    val offset = runCatching { abs(state.requireOffset()) }.getOrDefault(0f)
+    val rawOffset = runCatching { state.requireOffset() }.getOrDefault(0f)
+    val offset = abs(rawOffset)
+    val boundedOffset = boundedRevealOffset(rawOffset, maxRevealDistancePx)
     val cornerRadiusPx = with(density) {
         CORNER_RADIUS.toPx() * swipeProgress(offset, CORNER_RADIUS_DISTANCE.toPx())
     }
@@ -159,6 +174,7 @@ internal fun SwipeableActionRow(
                     state = state,
                     action = action,
                     fromStart = direction == SwipeToDismissBoxValue.StartToEnd,
+                    maxRevealDistancePx = maxRevealDistancePx,
                     flashAlpha = flashAlpha.value,
                 )
             }
@@ -167,6 +183,7 @@ internal fun SwipeableActionRow(
             Box(
                 Modifier
                     .fillMaxWidth()
+                    .offset { IntOffset((boundedOffset - rawOffset).roundToInt(), 0) }
                     .clip(RoundedCornerShape(with(density) { cornerRadiusPx.toDp() }))
                     .background(foregroundBackground)
             ) { content() }
@@ -183,12 +200,14 @@ private fun SwipeActionBackground(
     state: SwipeToDismissBoxState,
     action: SwipeAction,
     fromStart: Boolean,
+    maxRevealDistancePx: Float,
     flashAlpha: Float = 0f,
 ) {
     val offset = runCatching { abs(state.requireOffset()) }.getOrDefault(0f)
     val density = LocalDensity.current
+    val boundedOffset = boundedRevealOffset(offset, maxRevealDistancePx)
     val iconProgress = with(density) {
-        swipeProgress(offset, ICON_DISTANCE.toPx())
+        swipeProgress(offset, SWIPE_ACTIVATION_DISTANCE.toPx())
     }
     val iconScale = 0.5f + iconProgress * 0.5f
     val iconTranslationX = with(density) {
@@ -206,7 +225,7 @@ private fun SwipeActionBackground(
                 }
             }
             .drawWithContent {
-                val revealWidth = offset.coerceAtMost(size.width)
+                val revealWidth = boundedOffset.coerceAtMost(size.width)
                 val left = if (fromStart) 0f else size.width - revealWidth
                 clipRect(left = left, right = left + revealWidth) { this@drawWithContent.drawContent() }
             }
@@ -248,9 +267,13 @@ private fun SwipeActionBackground(
 internal fun swipeProgress(offset: Float, distance: Float): Float =
     (abs(offset) / distance).coerceIn(0f, 1f)
 
+internal fun boundedRevealOffset(offset: Float, maxDistance: Float): Float =
+    offset.coerceIn(-maxDistance, maxDistance)
+
 private val CORNER_RADIUS = 12.dp
 private val CORNER_RADIUS_DISTANCE = 48.dp
-private val ICON_DISTANCE = 96.dp
+private val SWIPE_ACTIVATION_DISTANCE = 96.dp
+private val MAX_REVEAL_DISTANCE = 192.dp
 private val ACTION_HORIZONTAL_PADDING = 16.dp
 private val ICON_START_TRANSLATION = 16.dp
 private const val FLASH_ALPHA = 0.24f

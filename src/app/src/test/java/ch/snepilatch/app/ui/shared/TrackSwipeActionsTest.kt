@@ -30,4 +30,10 @@ class TrackSwipeActionsTest {
         assertEquals(0.5f, swipeProgress(48f, 96f), 0f)
         assertEquals(1f, swipeProgress(144f, 96f), 0f)
     }
+
+    @Test
+    fun revealOffsetStopsAtMaximumRevealDistanceInEitherDirection() {
+        assertEquals(192f, boundedRevealOffset(240f, 192f), 0f)
+        assertEquals(-192f, boundedRevealOffset(-240f, 192f), 0f)
+    }
 }

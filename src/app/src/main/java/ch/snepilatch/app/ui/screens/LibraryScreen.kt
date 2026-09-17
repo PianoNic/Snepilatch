@@ -99,6 +99,8 @@ fun LibraryScreen() {
     val libraryHasMore = libraryTotal < 0 || library.size < libraryTotal
     val isLoading by libraryVm.isLoading.collectAsState()
     val isLoadingMore by libraryVm.isLoadingMore.collectAsState()
+    // Only while there is nothing to show: a background refresh must not blank the list.
+    val showLoading = isLoading && library.isEmpty()
     val folderPath by libraryVm.folderPath.collectAsState()
     val openFolder = folderPath.lastOrNull()
     // Back leaves the folder before it leaves the Library tab.
@@ -145,108 +147,126 @@ fun LibraryScreen() {
         }
     }
 
-    Column(Modifier.fillMaxSize().padding(top = 8.dp)) {
-        // Header row: avatar + title + search + add
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (openFolder != null) {
-                IconButton(onClick = { libraryVm.closeFolder() }, modifier = Modifier.size(32.dp)) {
-                    Icon(
-                        Icons.AutoMirrored.Rounded.ArrowBack,
-                        stringResource(R.string.library_folder_back, openFolder.name),
-                        tint = SnepilatchWhite,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-            }
-            Text(
-                openFolder?.name ?: stringResource(R.string.library_title),
-                color = SnepilatchWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold,
-                maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-            IconButton(onClick = { searchActive = !searchActive; if (!searchActive) searchQuery = "" }) {
-                Icon(Icons.Rounded.Search, stringResource(R.string.search), tint = SnepilatchWhite, modifier = Modifier.size(24.dp))
-            }
-            IconButton(onClick = { showCreateDialog = true }) {
-                Icon(Icons.Rounded.Add, stringResource(R.string.library_create), tint = SnepilatchWhite, modifier = Modifier.size(26.dp))
-            }
-        }
-
-        // Search field
-        androidx.compose.animation.AnimatedVisibility(visible = searchActive) {
-            TextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                modifier = Modifier
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().padding(top = 8.dp)) {
+            // Header row: avatar + title + search + add
+            Row(
+                Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 4.dp)
-                    .clip(RoundedCornerShape(8.dp)),
-                placeholder = {
-                    Text(
-                        stringResource(R.string.library_search_placeholder),
-                        color = SnepilatchLightGray.copy(alpha = 0.7f)
-                    )
-                },
-                leadingIcon = { Icon(Icons.Rounded.Search, null, tint = SnepilatchLightGray) },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Rounded.Close, stringResource(R.string.clear), tint = SnepilatchLightGray)
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (openFolder != null) {
+                    IconButton(onClick = { libraryVm.closeFolder() }, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            stringResource(R.string.library_folder_back, openFolder.name),
+                            tint = SnepilatchWhite,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text(
+                    openFolder?.name ?: stringResource(R.string.library_title),
+                    color = SnepilatchWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = { searchActive = !searchActive; if (!searchActive) searchQuery = "" }) {
+                    Icon(Icons.Rounded.Search, stringResource(R.string.search), tint = SnepilatchWhite, modifier = Modifier.size(24.dp))
+                }
+                IconButton(onClick = { showCreateDialog = true }) {
+                    Icon(Icons.Rounded.Add, stringResource(R.string.library_create), tint = SnepilatchWhite, modifier = Modifier.size(26.dp))
+                }
+            }
+
+            // Search field
+            androidx.compose.animation.AnimatedVisibility(visible = searchActive) {
+                TextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 4.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    placeholder = {
+                        Text(
+                            stringResource(R.string.library_search_placeholder),
+                            color = SnepilatchLightGray.copy(alpha = 0.7f)
+                        )
+                    },
+                    leadingIcon = { Icon(Icons.Rounded.Search, null, tint = SnepilatchLightGray) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Rounded.Close, stringResource(R.string.clear), tint = SnepilatchLightGray)
+                            }
+                        }
+                    },
+                    colors = TextFieldDefaults.colors(
+                        focusedTextColor = SnepilatchWhite,
+                        unfocusedTextColor = SnepilatchWhite,
+                        cursorColor = SnepilatchWhite,
+                        focusedContainerColor = SnepilatchGray,
+                        unfocusedContainerColor = SnepilatchGray,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
+                    ),
+                    singleLine = true
+                )
+            }
+
+            // Drop any active filter when moving between levels — an "Albums" selection carried into a
+            // folder would hide every playlist in it.
+            LaunchedEffect(folderPath) { selectedFilter = null }
+
+            // Filter chips row. Root only: Spfy offers no Playlists/Artists/Albums filter inside a
+            // folder (its availableFilters there are "By you"/"Writable"), and neither Artists nor
+            // Albums could ever match, since a folder holds only playlists and sub-folders.
+            val filters = listOf(
+                "Playlists" to stringResource(R.string.library_filter_playlists),
+                "Artists" to stringResource(R.string.library_filter_artists),
+                "Albums" to stringResource(R.string.library_filter_albums)
+            )
+            if (openFolder == null) {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(vertical = 8.dp)
+                ) {
+                    // The library lists playlists, artists and albums; downloads are individual tracks, so this
+                    // opens the downloads manager rather than filtering the list in place.
+                    item {
+                        if (downloadedItems.isNotEmpty()) {
+                            FilterChip(
+                                selected = selectedFilter == "Downloaded",
+                                onClick = {
+                                    selectedFilter = if (selectedFilter == "Downloaded") null else "Downloaded"
+                                },
+                                label = {
+                                    Text(
+                                        stringResource(R.string.library_filter_downloaded, downloadedItems.size),
+                                        fontSize = 13.sp
+                                    )
+                                },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = SnepilatchWhite,
+                                    selectedLabelColor = SnepilatchBlack,
+                                    containerColor = SnepilatchGray,
+                                    labelColor = SnepilatchWhite
+                                ),
+                                border = null
+                            )
                         }
                     }
-                },
-                colors = TextFieldDefaults.colors(
-                    focusedTextColor = SnepilatchWhite,
-                    unfocusedTextColor = SnepilatchWhite,
-                    cursorColor = SnepilatchWhite,
-                    focusedContainerColor = SnepilatchGray,
-                    unfocusedContainerColor = SnepilatchGray,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent
-                ),
-                singleLine = true
-            )
-        }
-
-        // Drop any active filter when moving between levels — an "Albums" selection carried into a
-        // folder would hide every playlist in it.
-        LaunchedEffect(folderPath) { selectedFilter = null }
-
-        // Filter chips row. Root only: Spfy offers no Playlists/Artists/Albums filter inside a
-        // folder (its availableFilters there are "By you"/"Writable"), and neither Artists nor
-        // Albums could ever match, since a folder holds only playlists and sub-folders.
-        val filters = listOf(
-            "Playlists" to stringResource(R.string.library_filter_playlists),
-            "Artists" to stringResource(R.string.library_filter_artists),
-            "Albums" to stringResource(R.string.library_filter_albums)
-        )
-        if (openFolder == null) {
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(vertical = 8.dp)
-            ) {
-                // The library lists playlists, artists and albums; downloads are individual tracks, so this
-                // opens the downloads manager rather than filtering the list in place.
-                item {
-                    if (downloadedItems.isNotEmpty()) {
+                    items(filters.size) { i ->
                         FilterChip(
-                            selected = selectedFilter == "Downloaded",
+                            selected = selectedFilter == filters[i].first,
                             onClick = {
-                                selectedFilter = if (selectedFilter == "Downloaded") null else "Downloaded"
+                                selectedFilter = if (selectedFilter == filters[i].first) null else filters[i].first
                             },
-                            label = {
-                                Text(
-                                    stringResource(R.string.library_filter_downloaded, downloadedItems.size),
-                                    fontSize = 13.sp
-                                )
-                            },
+                            label = { Text(filters[i].second, fontSize = 13.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = SnepilatchWhite,
                                 selectedLabelColor = SnepilatchBlack,
@@ -257,127 +277,116 @@ fun LibraryScreen() {
                         )
                     }
                 }
-                items(filters.size) { i ->
-                    FilterChip(
-                        selected = selectedFilter == filters[i].first,
-                        onClick = {
-                            selectedFilter = if (selectedFilter == filters[i].first) null else filters[i].first
-                        },
-                        label = { Text(filters[i].second, fontSize = 13.sp) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = SnepilatchWhite,
-                            selectedLabelColor = SnepilatchBlack,
-                            containerColor = SnepilatchGray,
-                            labelColor = SnepilatchWhite
-                        ),
-                        border = null
+            }
+
+            // Sort row: sort label on left, grid/list toggle on right
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box {
+                    Row(
+                        Modifier.clickable { showSortMenu = true }.padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Rounded.SwapVert, stringResource(R.string.library_sort), tint = SnepilatchLightGray, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        val sortLabel = when (sortMode) {
+                            "alpha" -> stringResource(R.string.library_sort_alpha)
+                            "type" -> stringResource(R.string.library_sort_by_type)
+                            else -> stringResource(R.string.library_sort_recent)
+                        }
+                        Text(sortLabel, color = SnepilatchLightGray, fontSize = 13.sp)
+                    }
+                    DropdownMenu(
+                        expanded = showSortMenu,
+                        onDismissRequest = { showSortMenu = false },
+                        containerColor = SnepilatchGray
+                    ) {
+                        listOf(
+                            "recent" to stringResource(R.string.library_sort_recent),
+                            "alpha" to stringResource(R.string.library_sort_alpha),
+                            "type" to stringResource(R.string.library_sort_by_type)
+                        ).forEach { (value, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label, color = if (sortMode == value) SnepilatchWhite else SnepilatchLightGray) },
+                                onClick = { sortMode = value; prefs.edit().putString("library_sort", value).apply(); showSortMenu = false }
+                            )
+                        }
+                    }
+                }
+                IconButton(
+                    onClick = { val newVal = !gridView; gridView = newVal; prefs.edit().putBoolean("library_grid_view", newVal).apply() },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        if (gridView) Icons.AutoMirrored.Rounded.List else Icons.Rounded.GridView,
+                        stringResource(R.string.library_toggle_view),
+                        tint = SnepilatchLightGray,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
-        }
 
-        // Sort row: sort label on left, grid/list toggle on right
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 2.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box {
-                Row(
-                    Modifier.clickable { showSortMenu = true }.padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Rounded.SwapVert, stringResource(R.string.library_sort), tint = SnepilatchLightGray, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    val sortLabel = when (sortMode) {
-                        "alpha" -> stringResource(R.string.library_sort_alpha)
-                        "type" -> stringResource(R.string.library_sort_by_type)
-                        else -> stringResource(R.string.library_sort_recent)
-                    }
-                    Text(sortLabel, color = SnepilatchLightGray, fontSize = 13.sp)
-                }
-                DropdownMenu(
-                    expanded = showSortMenu,
-                    onDismissRequest = { showSortMenu = false },
-                    containerColor = SnepilatchGray
-                ) {
-                    listOf(
-                        "recent" to stringResource(R.string.library_sort_recent),
-                        "alpha" to stringResource(R.string.library_sort_alpha),
-                        "type" to stringResource(R.string.library_sort_by_type)
-                    ).forEach { (value, label) ->
-                        DropdownMenuItem(
-                            text = { Text(label, color = if (sortMode == value) SnepilatchWhite else SnepilatchLightGray) },
-                            onClick = { sortMode = value; prefs.edit().putString("library_sort", value).apply(); showSortMenu = false }
-                        )
-                    }
-                }
-            }
-            IconButton(
-                onClick = { val newVal = !gridView; gridView = newVal; prefs.edit().putBoolean("library_grid_view", newVal).apply() },
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    if (gridView) Icons.AutoMirrored.Rounded.List else Icons.Rounded.GridView,
-                    stringResource(R.string.library_toggle_view),
-                    tint = SnepilatchLightGray,
-                    modifier = Modifier.size(20.dp)
+            Spacer(Modifier.height(4.dp))
+
+            // The spinner itself is an overlay on the whole screen (below the Column), so it lands on
+            // the middle of the screen rather than the middle of the space left under the header.
+            if (showLoading) {
+                Spacer(Modifier.weight(1f))
+            } else if (openFolder != null && sortedLibrary.isEmpty() && libraryTotal == 0) {
+                Text(
+                    stringResource(R.string.library_folder_empty),
+                    color = SnepilatchLightGray,
+                    fontSize = 14.sp,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 24.dp)
                 )
+            } else if (gridView) {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = LocalBottomOverlayHeight.current.value + 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    itemsIndexed(sortedLibrary, key = { _, item -> item.uri }) { index, item ->
+                        LibraryGridCard(item, downloadedGroup = selectedFilter == "Downloaded")
+                        // Key the near-end trigger on the VISIBLE (filtered/searched) list, not the raw
+                        // library — otherwise a filter that shrinks the list below library.size - 10 never
+                        // reaches the threshold and pagination silently stops.
+                        if (libraryHasMore && index >= sortedLibrary.size - 10) {
+                            LaunchedEffect(sortedLibrary.size) { libraryVm.loadMoreLibrary() }
+                        }
+                    }
+                    if (isLoadingMore) {
+                        item(span = { GridItemSpan(maxLineSpan) }) { LibraryLoadingMore() }
+                    }
+                }
+            } else {
+                LazyColumn(
+                    contentPadding = PaddingValues(top = 4.dp, bottom = LocalBottomOverlayHeight.current.value + 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
+                ) {
+                    itemsIndexed(sortedLibrary, key = { _, item -> item.uri }) { index, item ->
+                        LibraryListItem(item, downloadedGroup = selectedFilter == "Downloaded")
+                        // See the grid branch: trigger on the visible list size, not the raw library, so
+                        // pagination still fires when a filter/search shrinks the list.
+                        if (libraryHasMore && index >= sortedLibrary.size - 10) {
+                            LaunchedEffect(sortedLibrary.size) { libraryVm.loadMoreLibrary() }
+                        }
+                    }
+                    if (isLoadingMore) {
+                        item { LibraryLoadingMore() }
+                    }
+                }
             }
         }
 
-        Spacer(Modifier.height(4.dp))
-
-        // Only while there is nothing to show: a background refresh must not blank the list.
-        if (isLoading && library.isEmpty()) {
+        if (showLoading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 LoadingIndicator(color = SnepilatchLightGray)
-            }
-        } else if (openFolder != null && sortedLibrary.isEmpty() && libraryTotal == 0) {
-            Text(
-                stringResource(R.string.library_folder_empty),
-                color = SnepilatchLightGray,
-                fontSize = 14.sp,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 24.dp)
-            )
-        } else if (gridView) {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = LocalBottomOverlayHeight.current.value + 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                itemsIndexed(sortedLibrary, key = { _, item -> item.uri }) { index, item ->
-                    LibraryGridCard(item, downloadedGroup = selectedFilter == "Downloaded")
-                    // Key the near-end trigger on the VISIBLE (filtered/searched) list, not the raw
-                    // library — otherwise a filter that shrinks the list below library.size - 10 never
-                    // reaches the threshold and pagination silently stops.
-                    if (libraryHasMore && index >= sortedLibrary.size - 10) {
-                        LaunchedEffect(sortedLibrary.size) { libraryVm.loadMoreLibrary() }
-                    }
-                }
-                if (isLoadingMore) {
-                    item(span = { GridItemSpan(maxLineSpan) }) { LibraryLoadingMore() }
-                }
-            }
-        } else {
-            LazyColumn(
-                contentPadding = PaddingValues(top = 4.dp, bottom = LocalBottomOverlayHeight.current.value + 16.dp),
-                verticalArrangement = Arrangement.spacedBy(0.dp)
-            ) {
-                itemsIndexed(sortedLibrary, key = { _, item -> item.uri }) { index, item ->
-                    LibraryListItem(item, downloadedGroup = selectedFilter == "Downloaded")
-                    // See the grid branch: trigger on the visible list size, not the raw library, so
-                    // pagination still fires when a filter/search shrinks the list.
-                    if (libraryHasMore && index >= sortedLibrary.size - 10) {
-                        LaunchedEffect(sortedLibrary.size) { libraryVm.loadMoreLibrary() }
-                    }
-                }
-                if (isLoadingMore) {
-                    item { LibraryLoadingMore() }
-                }
             }
         }
     }

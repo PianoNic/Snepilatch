@@ -126,10 +126,11 @@ fun LibraryScreen() {
     val sortedLibrary = remember(library, downloadedItems, selectedFilter, searchQuery, sortMode) {
         val source = if (selectedFilter == "Downloaded") downloadedItems else library
         val filteredLibrary = when (selectedFilter) {
-            // Folders survive every filter: hiding one hides the playlists inside it too.
+            // A folder holds playlists, so it has to survive this one — filtering it away would
+            // hide everything inside it. It holds nothing else, so the other two drop it.
             "Playlists" -> source.filter { it.type == "playlist" || it.type == "collection" || it.type == FOLDER_TYPE }
-            "Artists" -> source.filter { it.type == "artist" || it.type == FOLDER_TYPE }
-            "Albums" -> library.filter { it.type == "album" || it.type == FOLDER_TYPE }
+            "Artists" -> source.filter { it.type == "artist" }
+            "Albums" -> library.filter { it.type == "album" }
             else -> source
         }
         val searchedLibrary = if (searchQuery.isBlank()) filteredLibrary
@@ -213,32 +214,56 @@ fun LibraryScreen() {
             )
         }
 
-        // Filter chips row
+        // Drop any active filter when moving between levels — an "Albums" selection carried into a
+        // folder would hide every playlist in it.
+        LaunchedEffect(folderPath) { selectedFilter = null }
+
+        // Filter chips row. Root only: Spfy offers no Playlists/Artists/Albums filter inside a
+        // folder (its availableFilters there are "By you"/"Writable"), and neither Artists nor
+        // Albums could ever match, since a folder holds only playlists and sub-folders.
         val filters = listOf(
             "Playlists" to stringResource(R.string.library_filter_playlists),
             "Artists" to stringResource(R.string.library_filter_artists),
             "Albums" to stringResource(R.string.library_filter_albums)
         )
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(vertical = 8.dp)
-        ) {
-            // The library lists playlists, artists and albums; downloads are individual tracks, so this
-            // opens the downloads manager rather than filtering the list in place.
-            item {
-                if (downloadedItems.isNotEmpty()) {
+        if (openFolder == null) {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(vertical = 8.dp)
+            ) {
+                // The library lists playlists, artists and albums; downloads are individual tracks, so this
+                // opens the downloads manager rather than filtering the list in place.
+                item {
+                    if (downloadedItems.isNotEmpty()) {
+                        FilterChip(
+                            selected = selectedFilter == "Downloaded",
+                            onClick = {
+                                selectedFilter = if (selectedFilter == "Downloaded") null else "Downloaded"
+                            },
+                            label = {
+                                Text(
+                                    stringResource(R.string.library_filter_downloaded, downloadedItems.size),
+                                    fontSize = 13.sp
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = SnepilatchWhite,
+                                selectedLabelColor = SnepilatchBlack,
+                                containerColor = SnepilatchGray,
+                                labelColor = SnepilatchWhite
+                            ),
+                            border = null
+                        )
+                    }
+                }
+                items(filters.size) { i ->
                     FilterChip(
-                        selected = selectedFilter == "Downloaded",
+                        selected = selectedFilter == filters[i].first,
                         onClick = {
-                            selectedFilter = if (selectedFilter == "Downloaded") null else "Downloaded"
+                            selectedFilter = if (selectedFilter == filters[i].first) null else filters[i].first
                         },
-                        label = {
-                            Text(
-                                stringResource(R.string.library_filter_downloaded, downloadedItems.size),
-                                fontSize = 13.sp
-                            )
-                        },
+                        label = { Text(filters[i].second, fontSize = 13.sp) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = SnepilatchWhite,
                             selectedLabelColor = SnepilatchBlack,
@@ -248,22 +273,6 @@ fun LibraryScreen() {
                         border = null
                     )
                 }
-            }
-            items(filters.size) { i ->
-                FilterChip(
-                    selected = selectedFilter == filters[i].first,
-                    onClick = {
-                        selectedFilter = if (selectedFilter == filters[i].first) null else filters[i].first
-                    },
-                    label = { Text(filters[i].second, fontSize = 13.sp) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = SnepilatchWhite,
-                        selectedLabelColor = SnepilatchBlack,
-                        containerColor = SnepilatchGray,
-                        labelColor = SnepilatchWhite
-                    ),
-                    border = null
-                )
             }
         }
 

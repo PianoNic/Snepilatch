@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package ch.snepilatch.app.ui.screens
 
 import ch.snepilatch.app.ui.theme.SnepilatchWhite
@@ -20,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -44,6 +47,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -93,6 +97,8 @@ fun LibraryScreen() {
     val library by libraryVm.library.collectAsState()
     val libraryTotal by libraryVm.libraryTotal.collectAsState()
     val libraryHasMore = libraryTotal < 0 || library.size < libraryTotal
+    val isLoading by libraryVm.isLoading.collectAsState()
+    val isLoadingMore by libraryVm.isLoadingMore.collectAsState()
     val folderPath by libraryVm.folderPath.collectAsState()
     val openFolder = folderPath.lastOrNull()
     // Back leaves the folder before it leaves the Library tab.
@@ -315,8 +321,12 @@ fun LibraryScreen() {
 
         Spacer(Modifier.height(4.dp))
 
-        // An empty folder would otherwise look like a library that failed to load.
-        if (openFolder != null && sortedLibrary.isEmpty() && libraryTotal == 0) {
+        // Only while there is nothing to show: a background refresh must not blank the list.
+        if (isLoading && library.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                LoadingIndicator(color = SnepilatchLightGray)
+            }
+        } else if (openFolder != null && sortedLibrary.isEmpty() && libraryTotal == 0) {
             Text(
                 stringResource(R.string.library_folder_empty),
                 color = SnepilatchLightGray,
@@ -339,6 +349,9 @@ fun LibraryScreen() {
                         LaunchedEffect(sortedLibrary.size) { libraryVm.loadMoreLibrary() }
                     }
                 }
+                if (isLoadingMore) {
+                    item(span = { GridItemSpan(maxLineSpan) }) { LibraryLoadingMore() }
+                }
             }
         } else {
             LazyColumn(
@@ -353,6 +366,9 @@ fun LibraryScreen() {
                         LaunchedEffect(sortedLibrary.size) { libraryVm.loadMoreLibrary() }
                     }
                 }
+                if (isLoadingMore) {
+                    item { LibraryLoadingMore() }
+                }
             }
         }
     }
@@ -362,6 +378,14 @@ fun LibraryScreen() {
             onDismiss = { showCreateDialog = false },
             onCreate = { libraryVm.createPlaylist(it); showCreateDialog = false }
         )
+    }
+}
+
+/** The spinner under the last row while the next page loads, as on the detail screens. */
+@Composable
+private fun LibraryLoadingMore() {
+    Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+        LoadingIndicator(color = SnepilatchLightGray, modifier = Modifier.size(24.dp))
     }
 }
 

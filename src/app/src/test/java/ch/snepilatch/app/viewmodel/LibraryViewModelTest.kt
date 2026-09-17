@@ -41,6 +41,8 @@ class LibraryViewModelTest {
         assertTrue(vm.library.value.isEmpty())
         assertEquals(-1, vm.libraryTotal.value)
         assertFalse(vm.isLoadingMore.value)
+        // launchWith bails before flipping the flag when there is no session, so no stuck spinner.
+        assertFalse(vm.isLoading.value)
     }
 
     @Test fun loadLibraryWithoutSessionKeepsListEmpty() {

@@ -4,11 +4,9 @@ import androidx.lifecycle.viewModelScope
 import ch.snepilatch.app.data.LibraryItem
 import ch.snepilatch.app.data.toUiLibraryList
 import ch.snepilatch.app.logic.shared.SessionHolder
-import ch.snepilatch.app.logic.shared.LokiLogger
 import kotify.api.album.Album
 import kotify.api.artist.Artist
 import kotify.api.playlist.Playlist
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.drop
@@ -39,6 +37,10 @@ class LibraryViewModel : SessionViewModel("LibraryVM") {
     val library: StateFlow<List<LibraryItem>> = _library
     private val _libraryTotal = MutableStateFlow(-1)
     val libraryTotal: StateFlow<Int> = _libraryTotal
+    private val _isLoading = MutableStateFlow(false)
+
+    /** A listing is being fetched — the first page of the library, or of a folder just opened. */
+    val isLoading: StateFlow<Boolean> = _isLoading
     private val _isLoadingMore = MutableStateFlow(false)
     val isLoadingMore: StateFlow<Boolean> = _isLoadingMore
     private val _folderPath = MutableStateFlow<List<LibraryFolder>>(emptyList())
@@ -83,10 +85,10 @@ class LibraryViewModel : SessionViewModel("LibraryVM") {
 
     fun loadLibrary() {
         val requested = folderUri
-        launchWithSession("loadLibrary") { sess ->
+        launchWithSessionLoading("loadLibrary", _isLoading) { sess ->
             val page = Playlist(sess).getLibrary(limit = PAGE_SIZE, offset = 0, folderUri = requested)
             // A folder opened or closed while this was in flight owns the list now.
-            if (requested != folderUri) return@launchWithSession
+            if (requested != folderUri) return@launchWithSessionLoading
             _library.value = page.toUiLibraryList()
             _libraryTotal.value = page.total
         }
@@ -98,20 +100,11 @@ class LibraryViewModel : SessionViewModel("LibraryVM") {
         val total = _libraryTotal.value
         if (total in 0..loaded) return
         val requested = folderUri
-        _isLoadingMore.value = true
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val sess = SessionHolder.session ?: return@launch
-                val page = Playlist(sess).getLibrary(limit = PAGE_SIZE, offset = loaded, folderUri = requested)
-                if (requested != folderUri) return@launch
-                val more = page.toUiLibraryList()
-                _library.value = _library.value + more
-                _libraryTotal.value = page.total
-            } catch (e: Exception) {
-                LokiLogger.e(logTag, "loadMoreLibrary", e)
-            } finally {
-                _isLoadingMore.value = false
-            }
+        launchWithSessionLoading("loadMoreLibrary", _isLoadingMore) { sess ->
+            val page = Playlist(sess).getLibrary(limit = PAGE_SIZE, offset = loaded, folderUri = requested)
+            if (requested != folderUri) return@launchWithSessionLoading
+            _library.value = _library.value + page.toUiLibraryList()
+            _libraryTotal.value = page.total
         }
     }
 

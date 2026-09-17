@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import ch.snepilatch.app.data.LibraryItem
 import ch.snepilatch.app.data.toUiLibraryList
 import ch.snepilatch.app.logic.shared.Debouncer
+import ch.snepilatch.app.logic.shared.LokiLogger
 import ch.snepilatch.app.logic.shared.SessionHolder
 import kotify.api.album.Album
 import kotify.api.artist.Artist
@@ -126,6 +127,9 @@ class LibraryViewModel : SessionViewModel("LibraryVM") {
             if (requested != folderUri) return@launchWithSessionLoading
             _library.value = page.toUiLibraryList()
             _libraryTotal.value = page.total
+            // The listing is fetched once and then only on a push, so when it reloads is the first
+            // thing worth knowing when someone reports a stale library.
+            LokiLogger.i(logTag, "Library loaded: ${page.total} items, folder=${requested ?: "root"}")
         }
     }
 

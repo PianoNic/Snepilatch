@@ -1,5 +1,6 @@
 package ch.snepilatch.app.ui.shared
 
+import androidx.compose.foundation.gestures.DraggableAnchors
 import ch.snepilatch.app.data.PlayerShortcut
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -35,5 +36,33 @@ class TrackSwipeActionsTest {
     fun revealOffsetStopsAtMaximumRevealDistanceInEitherDirection() {
         assertEquals(192f, boundedRevealOffset(240f, 192f), 0f)
         assertEquals(-192f, boundedRevealOffset(-240f, 192f), 0f)
+    }
+
+    @Test
+    fun activationDependsOnDistanceAndAvailableAnchors() {
+        val anchors = DraggableAnchors {
+            SwipeAnchor.EndToStart at -320f
+            SwipeAnchor.Settled at 0f
+            SwipeAnchor.StartToEnd at 320f
+        }
+
+        assertEquals(SwipeAnchor.Settled, swipeTarget(95f, 96f, anchors))
+        assertEquals(SwipeAnchor.StartToEnd, swipeTarget(96f, 96f, anchors))
+        assertEquals(SwipeAnchor.Settled, swipeTarget(-95f, 96f, anchors))
+        assertEquals(SwipeAnchor.EndToStart, swipeTarget(-96f, 96f, anchors))
+
+        val startOnly = DraggableAnchors {
+            SwipeAnchor.Settled at 0f
+            SwipeAnchor.StartToEnd at 320f
+        }
+        assertEquals(SwipeAnchor.Settled, swipeTarget(-200f, 96f, startOnly))
+    }
+
+    @Test
+    fun semanticRevealEdgeTracksLayoutDirection() {
+        assertTrue(revealFromLeft(fromStart = true, isLtr = true))
+        assertFalse(revealFromLeft(fromStart = false, isLtr = true))
+        assertFalse(revealFromLeft(fromStart = true, isLtr = false))
+        assertTrue(revealFromLeft(fromStart = false, isLtr = false))
     }
 }

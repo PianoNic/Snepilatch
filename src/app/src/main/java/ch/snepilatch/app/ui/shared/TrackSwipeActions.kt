@@ -2,30 +2,35 @@ package ch.snepilatch.app.ui.shared
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.AnchoredDraggableState
+import androidx.compose.foundation.gestures.DraggableAnchors
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.ScrollScope
+import androidx.compose.foundation.gestures.TargetedFlingBehavior
+import androidx.compose.foundation.gestures.anchoredDraggable
+import androidx.compose.foundation.gestures.animateTo
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxState
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,14 +42,18 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.layout.onSizeChanged
 import ch.snepilatch.app.data.TrackInfo
 import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.ui.theme.SnepilatchBlack
 import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -106,33 +115,57 @@ internal data class SwipeAction(
  * its full size and is clipped to the part uncovered by the moving row.
  */
 @Composable
-@Suppress("DEPRECATION")
+@Suppress("LongMethod", "CyclomaticComplexMethod")
 internal fun SwipeableActionRow(
+    modifier: Modifier = Modifier,
     startToEndAction: SwipeAction? = null,
     endToStartAction: SwipeAction? = null,
-    modifier: Modifier = Modifier,
     enableDismissFromStartToEnd: Boolean = startToEndAction != null,
     enableDismissFromEndToStart: Boolean = endToStartAction != null,
     contentBackground: Color = Color.Transparent,
     content: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
+    val layoutDirection = LocalLayoutDirection.current
     val commitThresholdPx = with(density) { SWIPE_ACTIVATION_DISTANCE.toPx() }
-    val maxRevealDistancePx = with(density) { MAX_REVEAL_DISTANCE.toPx() }
-    lateinit var state: SwipeToDismissBoxState
-    state = rememberSwipeToDismissBoxState(
-        confirmValueChange = { target ->
-            target == SwipeToDismissBoxValue.Settled ||
-                runCatching { abs(state.requireOffset()) >= commitThresholdPx }.getOrDefault(false)
-        },
-        positionalThreshold = { commitThresholdPx },
-    )
-    val scope = rememberCoroutineScope()
+    val state = remember {
+        AnchoredDraggableState(
+            initialValue = SwipeAnchor.Settled,
+            anchors = DraggableAnchors { SwipeAnchor.Settled at 0f },
+        )
+    }
+    val flingBehavior = remember(state, commitThresholdPx) {
+        thresholdFlingBehavior(state, commitThresholdPx)
+    }
     val flashAlpha = remember { Animatable(0f) }
-    var completedDirection by remember { mutableStateOf<SwipeToDismissBoxValue?>(null) }
-    val rawOffset = runCatching { state.requireOffset() }.getOrDefault(0f)
+    var completedDirection by remember { mutableStateOf<SwipeAnchor?>(null) }
+    var rowWidthPx by remember { mutableIntStateOf(0) }
+    var startRevealWidthPx by remember(startToEndAction?.label) { mutableFloatStateOf(commitThresholdPx) }
+    var endRevealWidthPx by remember(endToStartAction?.label) { mutableFloatStateOf(commitThresholdPx) }
+    val startEnabled = startToEndAction != null && enableDismissFromStartToEnd
+    val endEnabled = endToStartAction != null && enableDismissFromEndToStart
+    val anchors = remember(rowWidthPx, startEnabled, endEnabled) {
+        DraggableAnchors {
+            if (rowWidthPx > 0 && endEnabled) SwipeAnchor.EndToStart at -rowWidthPx.toFloat()
+            SwipeAnchor.Settled at 0f
+            if (rowWidthPx > 0 && startEnabled) SwipeAnchor.StartToEnd at rowWidthPx.toFloat()
+        }
+    }
+    SideEffect {
+        state.updateAnchors(
+            anchors,
+            newTarget = if (anchors.hasPositionFor(state.settledValue)) {
+                state.settledValue
+            } else {
+                SwipeAnchor.Settled
+            },
+        )
+    }
+    val rawOffset = state.requireOffset()
     val offset = abs(rawOffset)
+    val maxRevealDistancePx = if (rawOffset >= 0f) startRevealWidthPx else endRevealWidthPx
     val boundedOffset = boundedRevealOffset(rawOffset, maxRevealDistancePx)
+    val physicalDirection = if (layoutDirection == LayoutDirection.Ltr) 1f else -1f
     val cornerRadiusPx = with(density) {
         CORNER_RADIUS.toPx() * swipeProgress(offset, CORNER_RADIUS_DISTANCE.toPx())
     }
@@ -142,57 +175,76 @@ internal fun SwipeableActionRow(
         contentBackground
     }
 
-    val settledDirection = state.settledValue.takeUnless { it == SwipeToDismissBoxValue.Settled }
+    val settledDirection = state.settledValue.takeUnless { it == SwipeAnchor.Settled }
     val settledAction = when (settledDirection) {
-        SwipeToDismissBoxValue.StartToEnd -> startToEndAction
-        SwipeToDismissBoxValue.EndToStart -> endToStartAction
-        SwipeToDismissBoxValue.Settled, null -> null
+        SwipeAnchor.StartToEnd -> startToEndAction
+        SwipeAnchor.EndToStart -> endToStartAction
+        SwipeAnchor.Settled, null -> null
     }
 
     LaunchedEffect(settledDirection) {
         val action = settledAction ?: return@LaunchedEffect
         completedDirection = settledDirection
-        action.run.invoke()
-        flashAlpha.snapTo(0f)
-        flashAlpha.animateTo(FLASH_ALPHA, tween(FLASH_MS, easing = FastOutSlowInEasing))
-        flashAlpha.animateTo(0f, tween(FLASH_MS, easing = FastOutSlowInEasing))
+        flashAlpha.snapTo(FLASH_ALPHA)
+        if (action.resetAfterRun) {
+            action.run.invoke()
+            coroutineScope {
+                launch { flashAlpha.animateTo(0f, tween(FLASH_MS, easing = FastOutSlowInEasing)) }
+                launch { state.animateTo(SwipeAnchor.Settled) }
+            }
+        } else {
+            flashAlpha.animateTo(0f, tween(FLASH_MS, easing = FastOutSlowInEasing))
+            action.run.invoke()
+        }
         completedDirection = null
-        if (action.resetAfterRun) scope.launch { state.reset() }
     }
 
-    SwipeToDismissBox(
-        state = state,
-        modifier = modifier,
-        enableDismissFromStartToEnd = startToEndAction != null && enableDismissFromStartToEnd,
-        enableDismissFromEndToStart = endToStartAction != null && enableDismissFromEndToStart,
-        onDismiss = {},
-        backgroundContent = {
-            val direction = completedDirection ?: state.dismissDirection
-            val action = when (direction) {
-                SwipeToDismissBoxValue.StartToEnd -> startToEndAction
-                SwipeToDismissBoxValue.EndToStart -> endToStartAction
-                SwipeToDismissBoxValue.Settled -> null
-            }
-            if (action != null) {
-                SwipeActionBackground(
-                    state = state,
-                    action = action,
-                    fromStart = direction == SwipeToDismissBoxValue.StartToEnd,
-                    maxRevealDistancePx = maxRevealDistancePx,
-                    flashAlpha = flashAlpha.value,
-                )
-            }
-        },
-        content = {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .offset { IntOffset((boundedOffset - rawOffset).roundToInt(), 0) }
-                    .clip(RoundedCornerShape(with(density) { cornerRadiusPx.toDp() }))
-                    .background(foregroundBackground)
-            ) { content() }
-        },
-    )
+    Box(
+        modifier
+            .onSizeChanged { rowWidthPx = it.width }
+            .anchoredDraggable(
+                state = state,
+                orientation = Orientation.Horizontal,
+                enabled = startEnabled || endEnabled,
+                flingBehavior = flingBehavior,
+            ),
+    ) {
+        val direction = completedDirection ?: when {
+            rawOffset > 0f -> SwipeAnchor.StartToEnd
+            rawOffset < 0f -> SwipeAnchor.EndToStart
+            else -> SwipeAnchor.Settled
+        }
+        val action = when (direction) {
+            SwipeAnchor.StartToEnd -> startToEndAction
+            SwipeAnchor.EndToStart -> endToStartAction
+            SwipeAnchor.Settled -> null
+        }
+        if (action != null) {
+            SwipeActionBackground(
+                modifier = Modifier.matchParentSize(),
+                offset = offset,
+                action = action,
+                fromStart = direction == SwipeAnchor.StartToEnd,
+                flashAlpha = flashAlpha.value,
+                onMeasured = { measuredWidth ->
+                    if (direction == SwipeAnchor.StartToEnd) {
+                        startRevealWidthPx = maxOf(commitThresholdPx, measuredWidth)
+                    } else {
+                        endRevealWidthPx = maxOf(commitThresholdPx, measuredWidth)
+                    }
+                },
+            )
+        }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .offset {
+                    IntOffset((boundedOffset * physicalDirection).roundToInt(), 0)
+                }
+                .clip(RoundedCornerShape(with(density) { cornerRadiusPx.toDp() }))
+                .background(foregroundBackground)
+        ) { content() }
+    }
 }
 
 /**
@@ -201,25 +253,25 @@ internal fun SwipeableActionRow(
  */
 @Composable
 private fun SwipeActionBackground(
-    state: SwipeToDismissBoxState,
+    modifier: Modifier,
+    offset: Float,
     action: SwipeAction,
     fromStart: Boolean,
-    maxRevealDistancePx: Float,
     flashAlpha: Float = 0f,
+    onMeasured: (Float) -> Unit,
 ) {
-    val offset = runCatching { abs(state.requireOffset()) }.getOrDefault(0f)
     val density = LocalDensity.current
-    val boundedOffset = boundedRevealOffset(offset, maxRevealDistancePx)
+    val layoutDirection = LocalLayoutDirection.current
     val iconProgress = with(density) {
         swipeProgress(offset, SWIPE_ACTIVATION_DISTANCE.toPx())
     }
     val iconScale = 0.5f + iconProgress * 0.5f
+    val fromLeft = revealFromLeft(fromStart, layoutDirection == LayoutDirection.Ltr)
     val iconTranslationX = with(density) {
-        ICON_START_TRANSLATION.toPx() * (1f - iconProgress) * if (fromStart) -1f else 1f
+        ICON_START_TRANSLATION.toPx() * (1f - iconProgress) * if (fromLeft) -1f else 1f
     }
     Box(
-        Modifier
-            .fillMaxSize()
+        modifier
             .drawBehind {
                 if (offset > 0f) {
                     drawRect(action.tint)
@@ -229,8 +281,8 @@ private fun SwipeActionBackground(
                 }
             }
             .drawWithContent {
-                val revealWidth = boundedOffset.coerceAtMost(size.width)
-                val left = if (fromStart) 0f else size.width - revealWidth
+                val revealWidth = offset.coerceAtMost(size.width)
+                val left = if (fromLeft) 0f else size.width - revealWidth
                 clipRect(left = left, right = left + revealWidth) { this@drawWithContent.drawContent() }
             }
     ) {
@@ -243,6 +295,7 @@ private fun SwipeActionBackground(
             Modifier
                 .align(if (fromStart) Alignment.CenterStart else Alignment.CenterEnd)
                 .fillMaxHeight()
+                .onSizeChanged { onMeasured(it.width.toFloat()) }
                 .padding(horizontal = ACTION_HORIZONTAL_PADDING),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = if (fromStart) Arrangement.Start else Arrangement.End,
@@ -268,6 +321,45 @@ private fun SwipeActionBackground(
     }
 }
 
+private fun thresholdFlingBehavior(
+    state: AnchoredDraggableState<SwipeAnchor>,
+    threshold: Float,
+): TargetedFlingBehavior = object : TargetedFlingBehavior {
+    override suspend fun ScrollScope.performFling(
+        initialVelocity: Float,
+        onRemainingDistanceUpdated: (Float) -> Unit,
+    ): Float {
+        val start = state.requireOffset()
+        val target = swipeTarget(start, threshold, state.anchors)
+        val targetOffset = state.anchors.positionOf(target)
+        var previous = start
+        onRemainingDistanceUpdated(targetOffset - start)
+        animate(start, targetOffset, animationSpec = tween()) { value, _ ->
+            previous += scrollBy(value - previous)
+            onRemainingDistanceUpdated(targetOffset - previous)
+        }
+        return 0f
+    }
+}
+
+internal enum class SwipeAnchor {
+    EndToStart,
+    Settled,
+    StartToEnd,
+}
+
+internal fun swipeTarget(
+    offset: Float,
+    threshold: Float,
+    anchors: DraggableAnchors<SwipeAnchor>,
+): SwipeAnchor = when {
+    offset >= threshold && anchors.hasPositionFor(SwipeAnchor.StartToEnd) -> SwipeAnchor.StartToEnd
+    offset <= -threshold && anchors.hasPositionFor(SwipeAnchor.EndToStart) -> SwipeAnchor.EndToStart
+    else -> SwipeAnchor.Settled
+}
+
+internal fun revealFromLeft(fromStart: Boolean, isLtr: Boolean): Boolean = fromStart == isLtr
+
 internal fun swipeProgress(offset: Float, distance: Float): Float =
     (abs(offset) / distance).coerceIn(0f, 1f)
 
@@ -277,7 +369,6 @@ internal fun boundedRevealOffset(offset: Float, maxDistance: Float): Float =
 private val CORNER_RADIUS = 12.dp
 private val CORNER_RADIUS_DISTANCE = 48.dp
 private val SWIPE_ACTIVATION_DISTANCE = 96.dp
-private val MAX_REVEAL_DISTANCE = 192.dp
 private val ACTION_HORIZONTAL_PADDING = 16.dp
 private val ICON_START_TRANSLATION = 16.dp
 private const val FLASH_ALPHA = 0.24f

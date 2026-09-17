@@ -1149,14 +1149,14 @@ private fun NowPlayingMenu(
         // so it is nothing a configurable button or a row swipe could carry (#851).
         val canRemove = vm.canRemovePlayingFromPlaylist()
         val removeLabel = stringResource(R.string.remove_from_playlist)
-        val items = actions.map { action ->
-            MenuAction(action.icon, action.label, action.tint) { onShowMore(false); action.run() }
-        } +
-            if (canRemove) {
-                listOf(MenuAction(Icons.Rounded.PlaylistRemove, removeLabel) { onShowMore(false); vm.removePlayingFromPlaylist() })
-            } else {
-                emptyList()
-            }
+        val items = actions.flatMap { action ->
+            listOf(MenuAction(action.icon, action.label, action.tint) { onShowMore(false); action.run() }) +
+                if (canRemove && action.shortcut == PlayerShortcut.ADD_TO_PLAYLIST) {
+                    listOf(MenuAction(Icons.Rounded.PlaylistRemove, removeLabel) { onShowMore(false); vm.removePlayingFromPlaylist() })
+                } else {
+                    emptyList()
+                }
+        }
         EntityMenuSheet(
             imageUrl = track?.albumArt,
             title = track?.name,

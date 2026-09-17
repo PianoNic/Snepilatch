@@ -144,6 +144,7 @@ fun KLibraryItem.toUiLibraryItem() = UiLibraryItem(
     imageUrl = imageUrl,
     type = type,
     owner = ownerName,
+    itemCount = playlistCount?.let { it + (folderCount ?: 0) },
 )
 
 fun KLibrary.toUiLibraryList(): List<UiLibraryItem> = items.map { it.toUiLibraryItem() }

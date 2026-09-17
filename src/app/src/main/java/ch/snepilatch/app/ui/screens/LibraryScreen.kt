@@ -32,7 +32,9 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SwapVert
@@ -78,6 +80,8 @@ import ch.snepilatch.app.ui.theme.SnepilatchLightGray
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.LibraryViewModel
+import ch.snepilatch.app.viewmodel.LibraryViewModel.Companion.FOLDER_TYPE
+import androidx.activity.compose.BackHandler
 
 private const val PREFS_NAME = "kotify_prefs"
 
@@ -89,6 +93,10 @@ fun LibraryScreen() {
     val library by libraryVm.library.collectAsState()
     val libraryTotal by libraryVm.libraryTotal.collectAsState()
     val libraryHasMore = libraryTotal < 0 || library.size < libraryTotal
+    val folderPath by libraryVm.folderPath.collectAsState()
+    val openFolder = folderPath.lastOrNull()
+    // Back leaves the folder before it leaves the Library tab.
+    BackHandler(enabled = openFolder != null) { libraryVm.closeFolder() }
     var showCreateDialog by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = remember { context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE) }
@@ -112,9 +120,10 @@ fun LibraryScreen() {
     val sortedLibrary = remember(library, downloadedItems, selectedFilter, searchQuery, sortMode) {
         val source = if (selectedFilter == "Downloaded") downloadedItems else library
         val filteredLibrary = when (selectedFilter) {
-            "Playlists" -> source.filter { it.type == "playlist" || it.type == "collection" }
-            "Artists" -> source.filter { it.type == "artist" }
-            "Albums" -> library.filter { it.type == "album" }
+            // Folders survive every filter: hiding one hides the playlists inside it too.
+            "Playlists" -> source.filter { it.type == "playlist" || it.type == "collection" || it.type == FOLDER_TYPE }
+            "Artists" -> source.filter { it.type == "artist" || it.type == FOLDER_TYPE }
+            "Albums" -> library.filter { it.type == "album" || it.type == FOLDER_TYPE }
             else -> source
         }
         val searchedLibrary = if (searchQuery.isBlank()) filteredLibrary
@@ -137,8 +146,23 @@ fun LibraryScreen() {
                 .padding(horizontal = 12.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(stringResource(R.string.library_title), color = SnepilatchWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f))
+            if (openFolder != null) {
+                IconButton(onClick = { libraryVm.closeFolder() }, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        Icons.AutoMirrored.Rounded.ArrowBack,
+                        stringResource(R.string.library_folder_back, openFolder.name),
+                        tint = SnepilatchWhite,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+            }
+            Text(
+                openFolder?.name ?: stringResource(R.string.library_title),
+                color = SnepilatchWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
             IconButton(onClick = { searchActive = !searchActive; if (!searchActive) searchQuery = "" }) {
                 Icon(Icons.Rounded.Search, stringResource(R.string.search), tint = SnepilatchWhite, modifier = Modifier.size(24.dp))
             }
@@ -291,7 +315,15 @@ fun LibraryScreen() {
 
         Spacer(Modifier.height(4.dp))
 
-        if (gridView) {
+        // An empty folder would otherwise look like a library that failed to load.
+        if (openFolder != null && sortedLibrary.isEmpty() && libraryTotal == 0) {
+            Text(
+                stringResource(R.string.library_folder_empty),
+                color = SnepilatchLightGray,
+                fontSize = 14.sp,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 24.dp)
+            )
+        } else if (gridView) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = LocalBottomOverlayHeight.current.value + 16.dp),
@@ -333,8 +365,16 @@ fun LibraryScreen() {
     }
 }
 
-fun libraryItemClick(item: LibraryItem, detailVm: DetailViewModel, vm: PlaybackViewModel? = null) {
-    if (item.type == "single") {
+fun libraryItemClick(
+    item: LibraryItem,
+    detailVm: DetailViewModel,
+    vm: PlaybackViewModel? = null,
+    libraryVm: LibraryViewModel? = null,
+) {
+    if (item.type == FOLDER_TYPE) {
+        // A folder has no detail page — it is a level of the library itself.
+        libraryVm?.openFolder(item)
+    } else if (item.type == "single") {
         // A one-off download has no album or playlist to open, so it is the track itself: play it.
         val row = Downloads.find(item.uri) ?: return
         vm?.playTrack(TrackInfo(uri = item.uri, name = row.title, artist = row.artist, albumArt = row.coverUrl))
@@ -347,12 +387,20 @@ fun libraryItemClick(item: LibraryItem, detailVm: DetailViewModel, vm: PlaybackV
 private fun libraryItemIcon(type: String) = when (type) {
     "artist" -> Icons.Rounded.Person
     "album" -> Icons.Rounded.Album
+    FOLDER_TYPE -> Icons.Rounded.Folder
     else -> Icons.AutoMirrored.Rounded.QueueMusic
 }
 
-/** "Playlist · owner" style second line of a library item. */
-private fun libraryItemSubtitle(item: LibraryItem) =
-    "${item.type.replaceFirstChar { it.uppercase() }}${if (item.owner != null) " \u00B7 ${item.owner}" else ""}"
+/** "Playlist · owner" style second line of a library item; a folder shows its size instead. */
+@Composable
+private fun libraryItemSubtitle(item: LibraryItem): String {
+    if (item.type == FOLDER_TYPE) {
+        val folder = stringResource(R.string.library_folder)
+        val count = item.itemCount ?: return folder
+        return "$folder \u00B7 ${pluralStringResource(R.plurals.library_folder_items, count, count)}"
+    }
+    return "${item.type.replaceFirstChar { it.uppercase() }}${if (item.owner != null) " \u00B7 ${item.owner}" else ""}"
+}
 
 /** The remove confirmation a long press opens: for a downloaded group the download one, else the library one. */
 @Composable
@@ -365,15 +413,16 @@ private fun LibraryRemoveDialogs(item: LibraryItem, downloadedGroup: Boolean, on
 fun LibraryGridCard(item: LibraryItem, downloadedGroup: Boolean = false) {
     val detailVm: DetailViewModel = viewModel()
     val playbackVm: PlaybackViewModel = viewModel()
+    val libraryVm: LibraryViewModel = viewModel()
     val isArtist = item.type == "artist"
-    val removable = item.type != "collection"
+    val removable = item.type != "collection" && item.type != FOLDER_TYPE
     var showRemove by remember { mutableStateOf(false) }
     if (showRemove && removable) LibraryRemoveDialogs(item, downloadedGroup, onDismiss = { showRemove = false })
     Column(
         Modifier
             .fillMaxWidth()
             .combinedClickable(
-                onClick = { libraryItemClick(item, detailVm, playbackVm) },
+                onClick = { libraryItemClick(item, detailVm, playbackVm, libraryVm) },
                 onLongClick = { if (removable) showRemove = true }
             ),
         horizontalAlignment = if (isArtist) Alignment.CenterHorizontally else Alignment.Start
@@ -407,15 +456,16 @@ fun LibraryGridCard(item: LibraryItem, downloadedGroup: Boolean = false) {
 fun LibraryListItem(item: LibraryItem, downloadedGroup: Boolean = false) {
     val detailVm: DetailViewModel = viewModel()
     val playbackVm: PlaybackViewModel = viewModel()
+    val libraryVm: LibraryViewModel = viewModel()
     val isArtist = item.type == "artist"
-    val removable = item.type != "collection"
+    val removable = item.type != "collection" && item.type != FOLDER_TYPE
     var showRemove by remember { mutableStateOf(false) }
     if (showRemove && removable) LibraryRemoveDialogs(item, downloadedGroup, onDismiss = { showRemove = false })
     Row(
         Modifier
             .fillMaxWidth()
             .combinedClickable(
-                onClick = { libraryItemClick(item, detailVm, playbackVm) },
+                onClick = { libraryItemClick(item, detailVm, playbackVm, libraryVm) },
                 onLongClick = { if (removable) showRemove = true }
             )
             .padding(horizontal = 16.dp, vertical = 8.dp),

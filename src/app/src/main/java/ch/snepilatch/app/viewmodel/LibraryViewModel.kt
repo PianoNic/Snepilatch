@@ -28,6 +28,10 @@ import ch.snepilatch.app.logic.shared.spfyId
  * `followArtist`/`savePlaylist` and the add-to-playlist picker stay on [PlaybackViewModel] — they emit
  * snackbars and are triggered from non-composable search builders, i.e. "add external content to the
  * library" rather than browsing it.
+ *
+ * The library is a tree, not a flat list: a playlist filed into a folder is absent from the root
+ * listing and only reachable through that folder. [folderPath] is where in the tree we are, and
+ * every load is scoped to its last entry.
  */
 class LibraryViewModel : SessionViewModel("LibraryVM") {
 
@@ -37,21 +41,52 @@ class LibraryViewModel : SessionViewModel("LibraryVM") {
     val libraryTotal: StateFlow<Int> = _libraryTotal
     private val _isLoadingMore = MutableStateFlow(false)
     val isLoadingMore: StateFlow<Boolean> = _isLoadingMore
+    private val _folderPath = MutableStateFlow<List<LibraryFolder>>(emptyList())
+
+    /** The folders opened to get here, outermost first. Empty at the library root. */
+    val folderPath: StateFlow<List<LibraryFolder>> = _folderPath
+
+    private val folderUri: String? get() = _folderPath.value.lastOrNull()?.uri
 
     init {
         loadLibrary()
         // A switched account gets its own library instead of the old account's (#847).
         viewModelScope.launch {
             SessionHolder.generation.drop(1).collect {
+                _folderPath.value = emptyList()
                 _library.value = emptyList()
                 loadLibrary()
             }
         }
     }
 
+    /** Descend into [item] (a `folder` library entry); anything else is ignored. */
+    fun openFolder(item: LibraryItem) {
+        if (item.type != FOLDER_TYPE) return
+        moveTo(_folderPath.value + LibraryFolder(item.uri, item.name))
+    }
+
+    /** Back out one level. False when already at the root, so the caller can handle back itself. */
+    fun closeFolder(): Boolean {
+        val path = _folderPath.value
+        if (path.isEmpty()) return false
+        moveTo(path.dropLast(1))
+        return true
+    }
+
+    private fun moveTo(path: List<LibraryFolder>) {
+        _folderPath.value = path
+        _library.value = emptyList()
+        _libraryTotal.value = -1
+        loadLibrary()
+    }
+
     fun loadLibrary() {
+        val requested = folderUri
         launchWithSession("loadLibrary") { sess ->
-            val page = Playlist(sess).getLibrary(limit = 50, offset = 0)
+            val page = Playlist(sess).getLibrary(limit = PAGE_SIZE, offset = 0, folderUri = requested)
+            // A folder opened or closed while this was in flight owns the list now.
+            if (requested != folderUri) return@launchWithSession
             _library.value = page.toUiLibraryList()
             _libraryTotal.value = page.total
         }
@@ -62,11 +97,13 @@ class LibraryViewModel : SessionViewModel("LibraryVM") {
         val loaded = _library.value.size
         val total = _libraryTotal.value
         if (total in 0..loaded) return
+        val requested = folderUri
         _isLoadingMore.value = true
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val sess = SessionHolder.session ?: return@launch
-                val page = Playlist(sess).getLibrary(limit = 50, offset = loaded)
+                val page = Playlist(sess).getLibrary(limit = PAGE_SIZE, offset = loaded, folderUri = requested)
+                if (requested != folderUri) return@launch
                 val more = page.toUiLibraryList()
                 _library.value = _library.value + more
                 _libraryTotal.value = page.total
@@ -97,4 +134,13 @@ class LibraryViewModel : SessionViewModel("LibraryVM") {
             loadLibrary()
         }
     }
+
+    companion object {
+        /** The `type` a [LibraryItem] carries when it is a folder rather than something playable. */
+        const val FOLDER_TYPE = "folder"
+        private const val PAGE_SIZE = 50
+    }
 }
+
+/** One level of [LibraryViewModel.folderPath]. */
+data class LibraryFolder(val uri: String, val name: String)

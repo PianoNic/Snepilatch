@@ -417,4 +417,8 @@
     <string name="jam_listening">Слушает</string>
     <string name="jam_you">Вы</string>
     <string name="jam_controls_locked">Хост отключил воспроизведение, паузу и пропуск для гостей.</string>
+    <string name="library_folder">Папка</string>
+    <plurals name="library_folder_items"><item quantity="one">%d элемент</item><item quantity="few">%d элемента</item><item quantity="many">%d элементов</item><item quantity="other">%d элементов</item></plurals>
+    <string name="library_folder_back">Назад в %s</string>
+    <string name="library_folder_empty">Эта папка пуста</string>
 </resources>

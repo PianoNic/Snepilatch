@@ -44,6 +44,13 @@ class AppSettingsDefaultsTest {
     }
 
     @Test
+    fun freshInstallDoesNotOpenQueueFromMiniPlayerSwipe() {
+        assertFalse(AppSettings.swipeDownOpensQueue.value)
+        AppSettings.load(contextWith(emptyPrefs()))
+        assertFalse(AppSettings.swipeDownOpensQueue.value)
+    }
+
+    @Test
     fun unknownPlayerShortcutFallsBackToLike() {
         val prefs = emptyPrefs()
         every { prefs.getString("player_shortcut", null) } returns "unknown"
@@ -88,11 +95,13 @@ class AppSettingsDefaultsTest {
             every { getString("eq_mode", null) } returns AppSettings.EQ_OFF
             every { getBoolean(any(), any()) } answers { secondArg() }
             every { getBoolean("player_gradient_bg", any()) } returns true
+            every { getBoolean("swipe_down_opens_queue", any()) } returns true
             every { getFloat(any(), any()) } answers { secondArg() }
         }
         AppSettings.load(contextWith(prefs))
         assertEquals(AppSettings.EQ_OFF, AppSettings.eqMode.value)
         assertEquals(true, AppSettings.playerGradientBg.value)
+        assertEquals(true, AppSettings.swipeDownOpensQueue.value)
         // Leave the object on the defaults the rest of the suite expects.
         AppSettings.load(contextWith(emptyPrefs()))
     }

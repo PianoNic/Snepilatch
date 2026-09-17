@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * `canvasUrl` is NOT here — it's the current track's video URL (playback-derived, not persisted), so
  * it stays on [PlaybackViewModel]; `setCanvasEnabled` there wraps [setCanvasEnabled] to also clear it.
  */
+@Suppress("TooManyFunctions")
 object AppSettings {
 
     const val PREFS = "kotify_prefs"
@@ -97,6 +98,7 @@ object AppSettings {
     val playerShortcut = MutableStateFlow(PlayerShortcut.LIKE)
     val swipeLeftAction = MutableStateFlow(PlayerShortcut.ADD_TO_PLAYLIST)
     val swipeRightAction = MutableStateFlow(PlayerShortcut.ADD_TO_QUEUE)
+    val swipeDownOpensQueue = MutableStateFlow(false)
 
     // How the equalizer is handled. One choice, because the options exclude each other: the in-app EQ
     // computes its own input gain from the curve, while the headroom attenuation exists only to give an
@@ -166,6 +168,7 @@ object AppSettings {
         playerShortcut.value = PlayerShortcut.fromId(prefs.getString("player_shortcut", null))
         swipeLeftAction.value = PlayerShortcut.perTrackFromId(prefs.getString("swipe_left_action", null), PlayerShortcut.ADD_TO_PLAYLIST)
         swipeRightAction.value = PlayerShortcut.perTrackFromId(prefs.getString("swipe_right_action", null), PlayerShortcut.ADD_TO_QUEUE)
+        swipeDownOpensQueue.value = prefs.getBoolean("swipe_down_opens_queue", false)
         contentRegion.value = prefs.getString("content_region", "nearest") ?: "nearest"
         updateChannel.value = prefs.getString("update_channel", CHANNEL_STABLE) ?: CHANNEL_STABLE
         lokiEndpoint.value = prefs.getString("loki_endpoint", "") ?: ""
@@ -326,6 +329,11 @@ object AppSettings {
         swipeLeftAction.value = left
         swipeRightAction.value = right
         prefs(context).edit().putString("swipe_left_action", left.id).putString("swipe_right_action", right.id).apply()
+    }
+
+    fun setSwipeDownOpensQueue(enabled: Boolean, context: Context) {
+        swipeDownOpensQueue.value = enabled
+        prefs(context).edit().putBoolean("swipe_down_opens_queue", enabled).apply()
     }
 
     /**

@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DragHandle
@@ -29,9 +30,12 @@ import ch.snepilatch.app.R
 import ch.snepilatch.app.data.TrackInfo
 import ch.snepilatch.app.ui.shared.SheetNavBarFix
 import ch.snepilatch.app.ui.shared.SpfyImage
+import ch.snepilatch.app.ui.shared.SwipeAction
+import ch.snepilatch.app.ui.shared.SwipeableActionRow
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.logic.shared.formatTime
 import ch.snepilatch.app.logic.shared.LokiLogger
+import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import kotlin.math.roundToInt
 import ch.snepilatch.app.ui.shared.SheetDragHandle
@@ -46,6 +50,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 fun QueueSheet(vm: PlaybackViewModel) {
     val queue by vm.queue.collectAsState()
     val queuedCount by vm.queuedCount.collectAsState()
+    val offline by vm.isOffline.collectAsState()
     val playback by vm.playback.collectAsState()
     val sheetState = rememberBottomSheetState(
         initialValue = SheetValue.Hidden,
@@ -93,18 +98,11 @@ fun QueueSheet(vm: PlaybackViewModel) {
                 }
                 return@Column
             }
-            QueueList(vm, playback.track, queue, queuedCount, Modifier.weight(1f))
+            QueueList(vm, playback.track, queue, queuedCount, !offline, Modifier.weight(1f))
         }
     }
 }
 
-/**
- * A queue row you can swipe away, which is the primary way out of a track added by mistake.
- *
- * One direction only: a row also responds to a tap, and a two way swipe on top of that turns an
- * imprecise gesture into a coin flip between playing something and deleting it.
- */
-@OptIn(ExperimentalMaterial3Api::class)
 /**
  * A stable, unique key per queue row.
  *
@@ -148,6 +146,7 @@ private fun QueueList(
     nowPlaying: ch.snepilatch.app.data.TrackInfo?,
     queue: List<ch.snepilatch.app.data.TrackInfo>,
     queuedCount: Int,
+    canAddToQueue: Boolean,
     modifier: Modifier = Modifier,
 ) {
     // Keys ride with their entry, so the preview below can reorder freely without a row's identity
@@ -240,6 +239,7 @@ private fun QueueList(
                     dragFor(entry.first, entry.second, i),
                     onClick = { tap(entry.first, entry.second, i) },
                     onRemove = { vm.removeFromQueue(entry.second) },
+                    onAdd = null,
                     modifier = Modifier.animateItem(),
                 )
             }
@@ -254,6 +254,7 @@ private fun QueueList(
                     dragFor(entry.first, entry.second, queuedCount + i),
                     onClick = { tap(entry.first, entry.second, queuedCount + i) },
                     onRemove = { vm.removeFromQueue(entry.second) },
+                    onAdd = ({ vm.addToQueue(entry.second.uri) }).takeIf { canAddToQueue },
                     modifier = Modifier.animateItem(),
                 )
             }
@@ -261,41 +262,50 @@ private fun QueueList(
     }
 }
 
+/**
+ * A queue row you can swipe away, or swipe into the immediate queue when it is only up next.
+ *
+ * Explicit queue entries only support removal. Context entries support both actions because adding
+ * one to the queue is what makes it play before the rest of the context.
+ */
 @Composable
 private fun SwipeableQueueRow(
     track: ch.snepilatch.app.data.TrackInfo,
     drag: RowDrag?,
     onClick: () -> Unit,
     onRemove: () -> Unit,
+    onAdd: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-    val state = rememberSwipeToDismissBoxState()
-    SwipeToDismissBox(
-        state = state,
+    val theme by ThemeController.themeColors.collectAsState()
+    val swipeEnabled = drag?.dragging != true
+    SwipeableActionRow(
         modifier = modifier
             // The dragged row rides above the rest and follows the finger; everything else
             // holds still until the drop, so the list cannot reflow under the gesture. Rows sit
             // above the now playing item so a tapped row travelling up passes behind them.
             .zIndex(if (drag?.dragging == true) 2f else 1f)
             .offset { IntOffset(0, (drag?.offsetY ?: 0f).roundToInt()) },
-        onDismiss = { value -> if (value == SwipeToDismissBoxValue.EndToStart) onRemove() },
-        // A vertical drag on the grip must not also read as a swipe to delete.
-        enableDismissFromEndToStart = drag?.dragging != true,
-        enableDismissFromStartToEnd = false,
-        backgroundContent = {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(SnepilatchError)
-                    .padding(horizontal = 24.dp),
-                contentAlignment = Alignment.CenterEnd
-            ) {
-                Icon(Icons.Rounded.Delete, stringResource(R.string.queue_remove), tint = SnepilatchWhite)
-            }
-        }
-    ) {
-        QueueRow(track, onClick, drag)
-    }
+        startToEndAction = onAdd?.let {
+            SwipeAction(
+                Icons.AutoMirrored.Rounded.QueueMusic,
+                stringResource(R.string.add_to_queue),
+                theme.primary,
+                it,
+                resetAfterRun = true,
+            )
+        },
+        endToStartAction = SwipeAction(
+            Icons.Rounded.Delete,
+            stringResource(R.string.queue_remove),
+            SnepilatchError,
+            onRemove,
+            resetAfterRun = false,
+        ),
+        enableDismissFromEndToStart = swipeEnabled,
+        enableDismissFromStartToEnd = swipeEnabled,
+        contentBackground = SnepilatchElevated,
+    ) { QueueRow(track, onClick, drag) }
 }
 
 /** Opaque and above the now playing row, so a tapped row travelling up passes behind it. */
@@ -339,9 +349,6 @@ private fun QueueRow(
         Modifier
             .fillMaxWidth()
             .onSizeChanged { drag?.onMeasured?.invoke(it.height) }
-            // Opaque on purpose: the delete panel sits behind every row, so a transparent row shows
-            // it through and the whole list reads as though it were mid-swipe.
-            .background(SnepilatchElevated)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically

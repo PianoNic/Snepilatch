@@ -3,9 +3,11 @@ package ch.snepilatch.app.viewmodel
 import androidx.lifecycle.viewModelScope
 import ch.snepilatch.app.data.LibraryItem
 import ch.snepilatch.app.data.toUiLibraryList
+import ch.snepilatch.app.logic.shared.Debouncer
 import ch.snepilatch.app.logic.shared.SessionHolder
 import kotify.api.album.Album
 import kotify.api.artist.Artist
+import kotify.api.playerconnect.PlayerConnect
 import kotify.api.playlist.Playlist
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +32,12 @@ import ch.snepilatch.app.logic.shared.spfyId
  * The library is a tree, not a flat list: a playlist filed into a folder is absent from the root
  * listing and only reachable through that folder. [folderPath] is where in the tree we are, and
  * every load is scoped to its last entry.
+ *
+ * It is fetched once and then kept fresh by the dealer, the way the web client does it: a change to
+ * the rootlist — a playlist created, deleted, renamed, reordered, or moved between folders, from
+ * any device — arrives as a push and invalidates what we hold. Nothing refetches on navigation, so
+ * opening the tab is free. A dealer reconnect refetches too, since pushes sent while the socket was
+ * down are simply gone.
  */
 class LibraryViewModel : SessionViewModel("LibraryVM") {
 
@@ -50,15 +58,42 @@ class LibraryViewModel : SessionViewModel("LibraryVM") {
 
     private val folderUri: String? get() = _folderPath.value.lastOrNull()?.uri
 
+    /**
+     * The push arrives on the dealer's thread and can arrive in bursts — renaming a playlist moves
+     * the rootlist more than once — so it hops onto the ViewModel scope and is collapsed there.
+     */
+    private val refresh = Debouncer(
+        scope = viewModelScope,
+        waitMs = REFRESH_WAIT_MS,
+        maxWaitMs = REFRESH_MAX_WAIT_MS,
+    ) { loadLibrary() }
+
+    private var subscribedTo: PlayerConnect? = null
+
     init {
         loadLibrary()
+        subscribeToPushes()
         // A switched account gets its own library instead of the old account's (#847).
         viewModelScope.launch {
             SessionHolder.generation.drop(1).collect {
                 _folderPath.value = emptyList()
                 _library.value = emptyList()
                 loadLibrary()
+                // A new account means a new PlayerConnect, and the old subscription died with it.
+                subscribeToPushes()
             }
+        }
+    }
+
+    private fun subscribeToPushes() {
+        viewModelScope.launch {
+            val player = SessionHolder.awaitPlayer(PLAYER_WAIT_MS) ?: return@launch
+            if (player === subscribedTo) return@launch
+            subscribedTo = player
+            player.onRootlistChange { viewModelScope.launch { refresh.request() } }
+            // Whatever moved while the socket was down was never delivered, so treat coming back as
+            // a change in itself.
+            player.onReconnected { viewModelScope.launch { refresh.request() } }
         }
     }
 
@@ -132,6 +167,13 @@ class LibraryViewModel : SessionViewModel("LibraryVM") {
         /** The `type` a [LibraryItem] carries when it is a folder rather than something playable. */
         const val FOLDER_TYPE = "folder"
         private const val PAGE_SIZE = 50
+
+        // The web client's own debounce on this exact signal.
+        private const val REFRESH_WAIT_MS = 200L
+        private const val REFRESH_MAX_WAIT_MS = 1000L
+
+        /** The player registers a few seconds after launch; the listing itself does not wait on it. */
+        private const val PLAYER_WAIT_MS = 30_000L
     }
 }
 

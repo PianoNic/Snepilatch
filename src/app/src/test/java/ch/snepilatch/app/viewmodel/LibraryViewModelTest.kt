@@ -1,5 +1,6 @@
 package ch.snepilatch.app.viewmodel
 
+import ch.snepilatch.app.data.LibraryItem
 import ch.snepilatch.app.logic.shared.SessionHolder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -40,6 +41,8 @@ class LibraryViewModelTest {
         assertTrue(vm.library.value.isEmpty())
         assertEquals(-1, vm.libraryTotal.value)
         assertFalse(vm.isLoadingMore.value)
+        // launchWith bails before flipping the flag when there is no session, so no stuck spinner.
+        assertFalse(vm.isLoading.value)
     }
 
     @Test fun loadLibraryWithoutSessionKeepsListEmpty() {
@@ -57,4 +60,42 @@ class LibraryViewModelTest {
         vm.createPlaylist("My Playlist")
         assertTrue(vm.library.value.isEmpty())
     }
+
+    // --- folders (#573): the library is a tree, and a playlist filed into a folder is only
+    // reachable by descending into it.
+
+    @Test fun startsAtTheLibraryRoot() {
+        assertTrue(vm.folderPath.value.isEmpty())
+    }
+
+    @Test fun openFolderDescendsAndCloseFolderComesBackUp() {
+        vm.openFolder(folder("spotify:user:u:folder:a", "Road trips"))
+        assertEquals(listOf("Road trips"), vm.folderPath.value.map { it.name })
+
+        vm.openFolder(folder("spotify:user:u:folder:b", "Long drives"))
+        assertEquals(listOf("Road trips", "Long drives"), vm.folderPath.value.map { it.name })
+
+        assertTrue(vm.closeFolder())
+        assertEquals(listOf("Road trips"), vm.folderPath.value.map { it.name })
+        assertTrue(vm.closeFolder())
+        assertTrue(vm.folderPath.value.isEmpty())
+    }
+
+    @Test fun closeFolderAtRootReportsNothingToClose() {
+        // The screen's back handler relies on this to fall through to normal back navigation.
+        assertFalse(vm.closeFolder())
+    }
+
+    @Test fun openFolderIgnoresItemsThatAreNotFolders() {
+        vm.openFolder(LibraryItem("spotify:playlist:x", "Some playlist", null, "playlist"))
+        assertTrue(vm.folderPath.value.isEmpty())
+    }
+
+    @Test fun descendingDropsTheParentListingSoItCannotBleedThrough() {
+        vm.openFolder(folder("spotify:user:u:folder:a", "Road trips"))
+        assertTrue(vm.library.value.isEmpty())
+        assertEquals(-1, vm.libraryTotal.value)
+    }
+
+    private fun folder(uri: String, name: String) = LibraryItem(uri, name, null, "folder")
 }

@@ -431,4 +431,8 @@
     <string name="jam_listening">Lost zue</string>
     <string name="jam_you">Du</string>
     <string name="jam_controls_locked">De Host het Abspile, Pause und Überspringe für Gäst usgschaltet.</string>
+    <string name="library_folder">Ordner</string>
+    <plurals name="library_folder_items"><item quantity="one">%d Element</item><item quantity="other">%d Elemänt</item></plurals>
+    <string name="library_folder_back">Zrugg zu %s</string>
+    <string name="library_folder_empty">De Ordner isch leer</string>
 </resources>

@@ -56,7 +56,9 @@ data class LibraryItem(
     val name: String,
     val imageUrl: String?,
     val type: String,
-    val owner: String? = null
+    val owner: String? = null,
+    /** Folders only: how many playlists and sub-folders it holds. */
+    val itemCount: Int? = null
 )
 
 data class DetailData(

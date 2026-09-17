@@ -340,6 +340,9 @@ fun SpfyApp(vm: PlaybackViewModel) {
 
 @Composable
 private fun MainContent(screen: Screen, vm: PlaybackViewModel, hazeState: HazeState) {
+    // Constructed here, not read here: building it starts the one library load and subscribes it to
+    // the dealer, so the listing is ready before the Library tab or the playlist picker is opened.
+    @Suppress("UNUSED_VARIABLE")
     val libraryVm: LibraryViewModel = viewModel()
     val isOffline by vm.isOffline.collectAsState()
     Box(
@@ -363,7 +366,8 @@ private fun MainContent(screen: Screen, vm: PlaybackViewModel, hazeState: HazeSt
             when (targetScreen) {
                 Screen.HOME -> if (isOffline) OfflineHomeScreen(vm) else HomeScreen(vm)
                 Screen.SEARCH -> SearchScreen(vm)
-                Screen.LIBRARY -> { LaunchedEffect(Unit) { libraryVm.loadLibrary() }; LibraryScreen() }
+                // No reload on entry: the listing is fetched once and the dealer keeps it fresh.
+                Screen.LIBRARY -> LibraryScreen()
                 Screen.ACCOUNT -> AccountScreen(vm)
                 Screen.INTERFACE -> InterfaceScreen(vm)
                 Screen.EQUALIZER -> EqualizerScreen(vm)

@@ -8,6 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -66,7 +67,7 @@ fun InterfaceScreen(vm: PlaybackViewModel) {
 
         LanguageSection(vm, context)
         Spacer(Modifier.height(24.dp))
-        BehaviorSection(context)
+        BehaviorSection(context, animatedPrimary)
         Spacer(Modifier.height(24.dp))
         AppearanceSection(vm, context, animatedPrimary)
         Spacer(Modifier.height(24.dp))
@@ -111,7 +112,7 @@ private fun LanguageSection(vm: PlaybackViewModel, context: Context) {
 }
 
 @Composable
-private fun BehaviorSection(context: Context) {
+private fun BehaviorSection(context: Context, accent: Color) {
     SettingsSectionHeader(stringResource(R.string.behavior))
     val lyricsAnim by AppSettings.lyricsAnimDirection.collectAsState()
     var showLyricsPicker by remember { mutableStateOf(false) }
@@ -138,6 +139,16 @@ private fun BehaviorSection(context: Context) {
             onDismiss = { showLyricsPicker = false }
         )
     }
+
+    val swipeDownOpensQueue by AppSettings.swipeDownOpensQueue.collectAsState()
+    SettingToggleRow(
+        title = stringResource(R.string.mini_player_swipe_queue),
+        checked = swipeDownOpensQueue,
+        onCheckedChange = { AppSettings.setSwipeDownOpensQueue(it, context) },
+        accent = accent,
+        subtitle = stringResource(if (swipeDownOpensQueue) R.string.state_on else R.string.state_off),
+        icon = Icons.AutoMirrored.Rounded.QueueMusic,
+    )
 
     val playerShortcut by AppSettings.playerShortcut.collectAsState()
     ShortcutPickerRow(

@@ -84,6 +84,7 @@
     <string name="swipe_left_action">Свайп влево</string>
     <string name="swipe_right_action">Свайп вправо</string>
     <string name="swipe_action_desc">Выберите действие для этого направления свайпа</string>
+    <string name="mini_player_swipe_queue">Свайп вниз открывает очередь</string>
     <string name="notification_left_button">Левая кнопка уведомления</string>
     <string name="notification_right_button">Правая кнопка уведомления</string>
     <string name="notif_like">Нравится</string>

@@ -52,6 +52,7 @@ import ch.snepilatch.app.ui.shared.MiniPlayerContent
 import ch.snepilatch.app.ui.shared.miniCardBaseColor
 import ch.snepilatch.app.ui.theme.SnepilatchLightGray
 import androidx.lifecycle.viewmodel.compose.viewModel
+import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.LibraryViewModel
@@ -112,6 +113,7 @@ fun SpfyApp(vm: PlaybackViewModel) {
     // playlist picker (openable from any screen's track menu), and backs the picker's list below.
     val libraryVm: LibraryViewModel = viewModel()
     val screen by vm.currentScreen.collectAsState()
+    val swipeDownOpensQueue by AppSettings.swipeDownOpensQueue.collectAsState()
     // Only whether a track exists — collecting the whole PlaybackUiState here would recompose the
     // entire app root twice a second, since the interpolator rewrites positionMs at 2Hz.
     val currentTrackUri by vm.currentTrackUri.collectAsState()
@@ -194,7 +196,7 @@ fun SpfyApp(vm: PlaybackViewModel) {
                         .pointerInput(Unit) {
                             detectTapGestures { vm.navigateTo(Screen.NOW_PLAYING) }
                         }
-                        .pointerInput(Unit) {
+                        .pointerInput(swipeDownOpensQueue) {
                             var opened = false
                             var downwardDistance = 0f
                             // Rolling ~60ms window of (time, y) samples → an honest release
@@ -218,10 +220,12 @@ fun SpfyApp(vm: PlaybackViewModel) {
                                         } else {
                                             0f
                                         }
-                                        val queueDrag = vel > 0.7f ||
-                                            downwardDistance >= with(density) { 48.dp.toPx() }
-                                        // Flick down or drag 48dp opens the queue; flick up or
-                                        // dragging past ~14% opens the player.
+                                        val queueDrag = swipeDownOpensQueue && (
+                                            vel > 0.7f ||
+                                                downwardDistance >= with(density) { 48.dp.toPx() }
+                                            )
+                                        // If enabled, a flick down or 48dp drag opens the queue;
+                                        // flick up or dragging past ~14% opens the player.
                                         if (queueDrag) {
                                             opened = true
                                             vm.openQueue()

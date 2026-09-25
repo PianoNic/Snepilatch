@@ -609,9 +609,10 @@ private fun WholeLine(text: String, look: LineLook, animator: LineAnimator, tick
     val holder = remember { LayoutHolder() }
     val style = if (opposite) look.style.copy(textAlign = TextAlign.End) else look.style
     val slack = with(LocalDensity.current) { LyricsStyle.GLOW_SLACK_DP.dp.roundToPx() }
+    // No fillMaxWidth: a line that does not wrap reports its own width, and a forced full width would
+    // center it, while the row scales from the start edge; the row's alignment places it instead (#874).
     Spacer(
         Modifier
-            .fillMaxWidth()
             .layout { measurable, constraints ->
                 val result = measurer.measure(text, style, constraints = Constraints(maxWidth = constraints.maxWidth))
                 holder.layout = result

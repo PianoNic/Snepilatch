@@ -54,6 +54,8 @@ import ch.snepilatch.app.ui.theme.SnepilatchBlack
 import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
+import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -129,7 +131,11 @@ internal fun SwipeableActionRow(
     val endEnabled = endToStartAction != null && enableDismissFromEndToStart
     var rowWidthPx by remember { mutableIntStateOf(0) }
     val state = rememberSwipeState(rowWidthPx, startEnabled, endEnabled)
-    val flingBehavior = remember(state, commitThresholdPx) { thresholdFlingBehavior(state, commitThresholdPx) }
+    // Set the moment a release passes the threshold, so the action and its flash do not wait for the row to fly out.
+    var committed by remember { mutableStateOf<SwipeAnchor?>(null) }
+    val flingBehavior = remember(state, commitThresholdPx) {
+        thresholdFlingBehavior(state, commitThresholdPx, onCommit = { committed = it })
+    }
     val flashAlpha = remember { Animatable(0f) }
     var completedDirection by remember { mutableStateOf<SwipeAnchor?>(null) }
     var startRevealWidthPx by remember(startToEndAction?.label) { mutableFloatStateOf(commitThresholdPx) }
@@ -140,7 +146,10 @@ internal fun SwipeableActionRow(
         SwipeAnchor.Settled, null -> null
     }
 
-    RunSettledAction(state, flashAlpha, ::actionFor) { completedDirection = it }
+    RunCommittedAction(state, committed, flashAlpha, ::actionFor) { direction ->
+        completedDirection = direction
+        if (direction == null) committed = null
+    }
 
     val rawOffset = state.requireOffset()
     Box(
@@ -188,32 +197,37 @@ private fun rememberSwipeState(rowWidthPx: Int, startEnabled: Boolean, endEnable
 }
 
 /**
- * Runs the action a swipe settled on, with a flash. A resetting action runs first and the row slides
- * back; one that removes the row flashes first, then runs, and leaves the row where it is.
+ * Runs the action a swipe committed to, with a flash, as soon as the finger lets go past the
+ * threshold. A resetting action runs at once and the row comes back once it has flown out; one that
+ * removes the row flashes first, then runs, and leaves the row where it is.
  */
 @Composable
-private fun RunSettledAction(
+private fun RunCommittedAction(
     state: AnchoredDraggableState<SwipeAnchor>,
+    committed: SwipeAnchor?,
     flashAlpha: Animatable<Float, *>,
     actionFor: (SwipeAnchor?) -> SwipeAction?,
-    onCompleted: (SwipeAnchor?) -> Unit,
+    onShown: (SwipeAnchor?) -> Unit,
 ) {
-    val settledDirection = state.settledValue.takeUnless { it == SwipeAnchor.Settled }
-    LaunchedEffect(settledDirection) {
-        val action = actionFor(settledDirection) ?: return@LaunchedEffect
-        onCompleted(settledDirection)
+    LaunchedEffect(committed) {
+        val direction = committed ?: return@LaunchedEffect
+        val action = actionFor(direction) ?: return@LaunchedEffect
+        onShown(direction)
         flashAlpha.snapTo(FLASH_ALPHA)
         if (action.resetAfterRun) {
             action.run()
             coroutineScope {
                 launch { flashAlpha.animateTo(0f, tween(FLASH_MS, easing = FastOutSlowInEasing)) }
-                launch { state.animateTo(SwipeAnchor.Settled) }
+                launch {
+                    snapshotFlow { state.settledValue }.first { it == direction }
+                    state.animateTo(SwipeAnchor.Settled)
+                }
             }
         } else {
             flashAlpha.animateTo(0f, tween(FLASH_MS, easing = FastOutSlowInEasing))
             action.run()
         }
-        onCompleted(null)
+        onShown(null)
     }
 }
 
@@ -316,6 +330,7 @@ private fun SwipeActionBackground(
 private fun thresholdFlingBehavior(
     state: AnchoredDraggableState<SwipeAnchor>,
     threshold: Float,
+    onCommit: (SwipeAnchor) -> Unit,
 ): TargetedFlingBehavior = object : TargetedFlingBehavior {
     override suspend fun ScrollScope.performFling(
         initialVelocity: Float,
@@ -323,6 +338,7 @@ private fun thresholdFlingBehavior(
     ): Float {
         val start = state.requireOffset()
         val target = swipeTarget(start, threshold, state.anchors)
+        if (target != SwipeAnchor.Settled) onCommit(target)
         val targetOffset = state.anchors.positionOf(target)
         var previous = start
         onRemainingDistanceUpdated(targetOffset - start)

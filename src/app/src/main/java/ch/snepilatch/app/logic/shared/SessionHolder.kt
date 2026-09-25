@@ -2,6 +2,7 @@ package ch.snepilatch.app.logic.shared
 
 import ch.snepilatch.app.logic.playback.engine.SpfyCdnResolver
 import kotify.api.playerconnect.PlayerConnect
+import kotify.api.playerstatus.PlayerStateData
 import kotify.api.playlist.PlaylistStore
 import kotify.cdn.SpfyPlayback
 import kotify.session.Session
@@ -55,6 +56,9 @@ object SessionHolder {
      *  account reloads for the new one (#847). */
     val generation = MutableStateFlow(0)
 
+    /** The last player state from the cluster, as Kotify parsed it; play buttons ask it what they are on. */
+    val playerState = MutableStateFlow<PlayerStateData?>(null)
+
     /** True if the holder has a ready-to-use session + player + resolver. */
     val isReady: Boolean
         get() = session != null && player != null && cdnResolver != null
@@ -81,5 +85,6 @@ object SessionHolder {
         spfyPlayback = null
         cdnResolver = null
         username = ""
+        playerState.value = null
     }
 }

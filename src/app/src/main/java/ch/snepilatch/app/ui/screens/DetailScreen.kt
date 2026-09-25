@@ -55,7 +55,10 @@ import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.viewmodel.DetailRoutes
 import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
+import ch.snepilatch.app.logic.shared.SessionHolder
 import ch.snepilatch.app.logic.shared.shareLink
+import kotify.api.playerstatus.ContextPlayback
+import kotify.api.playerstatus.playbackOf
 import ch.snepilatch.app.ui.shared.trackMenuActions
 import ch.snepilatch.app.ui.shared.TrackMenuOptions
 import ch.snepilatch.app.ui.shared.SwipeableTrackRow
@@ -218,8 +221,15 @@ fun DetailScreen(vm: PlaybackViewModel) {
             // Collect unconditionally: this collectAsState() was on the RHS of && and skipped when the
             // track was null/paused, making a @Composable call conditional.
             val playingContext by vm.playingContext.collectAsState()
-            val isPlayingThis = playback.track != null && playback.isPlaying &&
-                (playingContext?.let { detail.uri.contains(it.name) || detail.name == it.name } == true)
+            // On this list the button pauses or resumes it, anything else plays it; Kotify decides which as
+            // the web player does (#262). Offline has no player state, only the offline engine's context.
+            val playerState by SessionHolder.playerState.collectAsState()
+            val offline by vm.isOffline.collectAsState()
+            val playingThisContext = when {
+                offline -> playback.track != null && playingContext?.uri == detail.uri
+                else -> playerState.playbackOf(detail.uri) != ContextPlayback.NOT_ACTIVE
+            }
+            val isPlayingThis = playingThisContext && playback.isPlaying
             val shuffling = playback.isShuffling
             val canToggleShuffle by vm.canToggleShuffleFlow.collectAsState()
             val context = androidx.compose.ui.platform.LocalContext.current
@@ -375,11 +385,11 @@ fun DetailScreen(vm: PlaybackViewModel) {
                         .background(accentColor, CircleShape)
                         .clip(CircleShape)
                         .clickable {
-                            if (isPlayingThis) {
+                            if (playingThisContext) {
                                 vm.togglePlayPause()
                             } else {
                                 val first = detail.tracks.firstOrNull() ?: return@clickable
-                                vm.playTrack(first, detail.uri, 0)
+                                vm.playTrack(first, detail.uri, 0, wholeContext = true)
                             }
                         },
                     contentAlignment = Alignment.Center

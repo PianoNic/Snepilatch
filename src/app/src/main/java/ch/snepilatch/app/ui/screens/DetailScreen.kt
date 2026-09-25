@@ -678,6 +678,7 @@ private fun ArtistTrackRow(
                 )
                 playcountLabel(playcount)?.let { Text(it, color = SnepilatchLightGray, fontSize = 12.sp) }
         }
+        DownloadStatus(track, accent)
         // 3-dot menu
         var showMenu by remember { mutableStateOf(false) }
         IconButton(onClick = { showMenu = true }, modifier = Modifier.size(36.dp)) {

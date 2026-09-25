@@ -619,11 +619,16 @@ fun DetailScreen(vm: PlaybackViewModel) {
 }
 
 /**
- * The play count under a popular track, as the web player shows it: formatted, and nothing at all
- * below 1, which is what the service sends for a track under 1000 plays (#878).
+ * The play count under a popular track, formatted. The service sends 0 for a track under 1000
+ * plays, which shows as "< 1,000" rather than a count of nothing (#878).
  */
-internal fun playcountLabel(playcount: String?): String? =
-    playcount?.toLongOrNull()?.takeIf { it >= 1 }?.let { String.format("%,d", it) }
+internal fun playcountLabel(playcount: String?): String? {
+    val count = playcount?.toLongOrNull() ?: return null
+    return if (count < 1) "< " + String.format("%,d", PLAYCOUNT_FLOOR) else String.format("%,d", count)
+}
+
+/** Below this the service reports no play count, only 0. */
+private const val PLAYCOUNT_FLOOR = 1000
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

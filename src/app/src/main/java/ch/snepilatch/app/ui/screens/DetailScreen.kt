@@ -62,6 +62,7 @@ import kotify.api.playerstatus.playbackOf
 import ch.snepilatch.app.ui.shared.trackMenuActions
 import ch.snepilatch.app.ui.shared.TrackMenuOptions
 import ch.snepilatch.app.ui.shared.SwipeableTrackRow
+import ch.snepilatch.app.ui.shared.DownloadStatus
 import ch.snepilatch.app.logic.shared.spfyId
 
 /** Header actions share a footprint so save, download and the overflow menu line up. */
@@ -741,6 +742,7 @@ private fun AlbumTrackRow(
                     )
                 }
         }
+        DownloadStatus(track, accent)
         var showMenu by remember { mutableStateOf(false) }
         IconButton(onClick = { showMenu = true }, modifier = Modifier.size(36.dp)) {
             Icon(Icons.Rounded.MoreVert, stringResource(R.string.more), tint = SnepilatchLightGray, modifier = Modifier.size(20.dp))

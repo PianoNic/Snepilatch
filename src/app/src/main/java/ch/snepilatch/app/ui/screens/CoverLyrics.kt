@@ -122,8 +122,13 @@ fun CoverLyrics(
                 current == null || current.lines.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Icon(Icons.Rounded.MusicNote, stringResource(R.string.lyrics_not_available), tint = SnepilatchLightGray, modifier = Modifier.size(40.dp))
                 }
-                !synced -> UnsyncedLyricsView(current, isLandscape = true)
-                else -> SyncedLyricsView(current, smoothPosition, isLandscape = true, lyricsAnimDirection, onSeek = null, compact = true)
+                else -> WithLyricsCredit(current, compact = true) {
+                    if (!synced) {
+                        UnsyncedLyricsView(current, isLandscape = true)
+                    } else {
+                        SyncedLyricsView(current, smoothPosition, isLandscape = true, lyricsAnimDirection, onSeek = null, compact = true)
+                    }
+                }
             }
         }
         IconButton(onClick = vm::openLyrics, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)) {

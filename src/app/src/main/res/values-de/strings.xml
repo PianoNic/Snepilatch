@@ -261,6 +261,8 @@
     <string name="lyrics_not_available">Keine Lyrics verfügbar</string>
     <string name="lyrics_written_by">Geschrieben von: %1$s</string>
     <string name="lyrics_provided_by">Bereitgestellt von: %1$s</string>
+    <string name="lyrics_uploaded_by">Hochgeladen von</string>
+    <string name="lyrics_synced_by">Synchronisiert von</string>
 
     <!-- Now Playing -->
     <string name="now_playing_playing_from">Spielt von %s</string>

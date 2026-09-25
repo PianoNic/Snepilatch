@@ -43,6 +43,14 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
+import kotify.api.lyrics.LyricsContributor
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -176,28 +184,62 @@ internal fun SyncedLyricsView(
     }
 }
 
-/** The writers and the provider under the last line, the way Spicy Lyrics credits them; nothing when neither is known. */
+/** The writers under the last line, the way Spicy Lyrics credits them; nothing when unknown. */
 @Composable
 internal fun LyricsCredits(lyrics: LyricsData, fontSize: TextUnit) {
-    val provider = remember(lyrics.providerName) { providerLabel(lyrics.providerName) }
-    if (lyrics.songwriters.isEmpty() && provider.isEmpty()) return
-    Column(Modifier.fillMaxWidth().padding(top = 16.dp)) {
-        if (lyrics.songwriters.isNotEmpty()) {
-            Text(
-                text = stringResource(R.string.lyrics_written_by, lyrics.songwriters.joinToString(", ")),
-                color = Color.White.copy(alpha = LyricsStyle.CREDITS_OPACITY),
-                style = lyricStyle(fontSize * LyricsStyle.CREDITS_SIZE_EM).copy(fontWeight = FontWeight.SemiBold),
-            )
-        }
-        if (provider.isNotEmpty()) {
-            Text(
-                text = stringResource(R.string.lyrics_provided_by, provider),
-                color = Color.White.copy(alpha = LyricsStyle.PROVIDER_OPACITY),
-                style = lyricStyle(fontSize * LyricsStyle.PROVIDER_SIZE_EM).copy(fontWeight = FontWeight.SemiBold),
-                modifier = Modifier.padding(top = 4.dp),
-            )
+    if (lyrics.songwriters.isEmpty()) return
+    Text(
+        text = stringResource(R.string.lyrics_written_by, lyrics.songwriters.joinToString(", ")),
+        color = Color.White.copy(alpha = LyricsStyle.CREDITS_OPACITY),
+        style = lyricStyle(fontSize * LyricsStyle.CREDITS_SIZE_EM).copy(fontWeight = FontWeight.SemiBold),
+        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+    )
+}
+
+/**
+ * [content] with who provided the lyrics pinned under it, on screen for as long as the lyrics are:
+ * the SpicyLyrics developer API makes that a condition, with the uploader and maker of a community
+ * sync linked (#889).
+ */
+@Composable
+internal fun WithLyricsCredit(lyrics: LyricsData, compact: Boolean = false, content: @Composable () -> Unit) {
+    Column(Modifier.fillMaxSize()) {
+        Box(Modifier.weight(1f)) { content() }
+        LyricsProviderLine(lyrics, compact)
+    }
+}
+
+/** Small and faint, as the API allows; [compact] drops the labels and keeps only the names. */
+@Composable
+private fun LyricsProviderLine(lyrics: LyricsData, compact: Boolean) {
+    val provider = remember(lyrics) { providerLabel(lyrics) }
+    if (provider.isEmpty()) return
+    val credit = lyrics.attribution
+    val uploadedBy = stringResource(R.string.lyrics_uploaded_by)
+    val syncedBy = stringResource(R.string.lyrics_synced_by)
+    val providedBy = stringResource(R.string.lyrics_provided_by, provider)
+    val linkStyle = TextLinkStyles(SpanStyle(textDecoration = TextDecoration.Underline))
+    val text = remember(lyrics, providedBy, compact) {
+        buildAnnotatedString {
+            append(if (compact) provider else providedBy)
+            fun person(label: String, who: LyricsContributor?) {
+                who ?: return
+                append(if (compact) " · " else " · $label ")
+                val url = who.url
+                if (url != null) withLink(LinkAnnotation.Url(url, linkStyle)) { append(who.name) } else append(who.name)
+            }
+            person(uploadedBy, credit?.uploader)
+            person(syncedBy, credit?.maker)
         }
     }
+    Text(
+        text = text,
+        color = Color.White.copy(alpha = LyricsStyle.ATTRIBUTION_OPACITY),
+        fontSize = 9.sp,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+    )
 }
 
 /** Lyrics without timing: every line the same, nothing moves. */

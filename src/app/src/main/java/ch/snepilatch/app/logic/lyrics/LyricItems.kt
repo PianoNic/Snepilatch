@@ -1,5 +1,6 @@
 package ch.snepilatch.app.logic.lyrics
 
+import kotify.api.lyrics.LyricsData
 import kotify.api.lyrics.Syllable
 import kotify.api.lyrics.SyncedLine
 import kotlin.math.max
@@ -84,15 +85,5 @@ fun letterWindows(startMs: Long, endMs: Long, count: Int): List<LongRange> {
     return List(count) { i -> (startMs + i * each).toLong() until (startMs + (i + 1) * each).toLong() }
 }
 
-/** The name to credit under the lyrics for a provider as Kotify names it; SpicyLyrics relays another source, so that one is named. */
-fun providerLabel(providerName: String): String {
-    val relayed = Regex("""SpicyLyrics \((\w+)\)""").matchEntire(providerName)?.groupValues?.get(1)
-    return when (relayed) {
-        null -> providerName.replace("Spotify", "Spfy")
-        "aml" -> "Apple Music"
-        "spt" -> "Spfy"
-        "spl" -> "Spicy Lyrics"
-        "ldb" -> "Spicy Lyrics local DB"
-        else -> "Spicy Lyrics"
-    }
-}
+/** Who provided the lyrics: the catalogue SpicyLyrics names, else the provider as Kotify names it. */
+fun providerLabel(lyrics: LyricsData): String = (lyrics.attribution?.provider ?: lyrics.providerName).replace("Spotify", "Spfy")

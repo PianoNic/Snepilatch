@@ -111,11 +111,12 @@ object LyricsStyle {
     /** A duet: the other singer's lines sit against the far edge, each voice kept off the other's edge by this share of the width. */
     const val DUET_INSET_FRACTION = 0.15f
 
-    /** The credits under the last line: the writers, then the provider, smaller and dimmer. */
+    /** The writers credited under the last line, smaller and dimmer. */
     const val CREDITS_SIZE_EM = 0.47f
     const val CREDITS_OPACITY = 0.6f
-    const val PROVIDER_SIZE_EM = 0.34f
-    const val PROVIDER_OPACITY = 0.5f
+
+    /** The pinned lyrics credit: on screen, as the lyrics API requires, but barely there. */
+    const val ATTRIBUTION_OPACITY = 0.3f
 
     val wordScale = CubicSpline(0f to REST_SCALE, 0.7f to 1.0505f, 1f to 1f)
     val letterScale = CubicSpline(0f to REST_SCALE, 0.7f to 1.175f, 1f to 1f)

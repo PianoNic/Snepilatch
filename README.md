@@ -49,9 +49,7 @@ Download the latest APK from the [Releases](https://github.com/PianoNic/Snepilat
 
 ## Credits
 
-The YouTube Music audio source follows the approach shown by [Meld](https://github.com/FrancescoGrazioso/Meld) and its [Metrolist](https://github.com/MetrolistGroup/Metrolist) / [OuterTune](https://github.com/DD3Boh/OuterTune) / [InnerTune](https://github.com/z-huang/InnerTune) lineage.
-
-No code of theirs is used; this is an independent implementation.
+The lyrics view is inspired by [Spicy Lyrics](https://spicylyrics.org), and the lyrics themselves come from its phenomenal [developer API](https://developers.spicylyrics.org).
 
 ## License
 

@@ -65,8 +65,13 @@ private fun LyricsBody(
                 }
             }
         }
-        lyrics.syncType == "UNSYNCED" -> UnsyncedLyricsView(lyrics, isLandscape)
-        else -> SyncedLyricsView(lyrics, smoothPosition, isLandscape, lyricsAnimDirection, onSeek)
+        else -> WithLyricsCredit(lyrics) {
+            if (lyrics.syncType == "UNSYNCED") {
+                UnsyncedLyricsView(lyrics, isLandscape)
+            } else {
+                SyncedLyricsView(lyrics, smoothPosition, isLandscape, lyricsAnimDirection, onSeek)
+            }
+        }
     }
 }
 

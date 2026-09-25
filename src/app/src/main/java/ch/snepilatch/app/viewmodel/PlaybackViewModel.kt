@@ -1268,6 +1268,7 @@ class PlaybackViewModel : ViewModel() {
 
     private suspend fun updatePlaybackFromState(state: PlayerStateData) {
         if (isOffline.value) return
+        SessionHolder.playerState.value = state
         val track = state.track
         val imageUrl = normalizeSpfyImageUrl(
             track?.imageLargeUrl ?: track?.imageUrl ?: track?.imageSmallUrl
@@ -2238,13 +2239,14 @@ class PlaybackViewModel : ViewModel() {
      * forwarded so a context with the same track more than once starts on the exact tapped occurrence,
      * matching the JS skip_to.
      */
-    fun playTrack(track: TrackInfo, contextUri: String? = null, trackIndex: Int? = null) {
+    fun playTrack(track: TrackInfo, contextUri: String? = null, trackIndex: Int? = null, wholeContext: Boolean = false) {
         if (RelayJam.redirect(RelayCommand(RelayCommand.PLAY, uri = track.uri, contextUri = contextUri))) return
         userPlayJob?.cancel()
-        userPlayJob = viewModelScope.launch(Dispatchers.IO) { startUserPlayback(track, contextUri, trackIndex) }
+        userPlayJob = viewModelScope.launch(Dispatchers.IO) { startUserPlayback(track, contextUri, trackIndex, wholeContext) }
     }
 
-    internal suspend fun startUserPlayback(track: TrackInfo, contextUri: String?, trackIndex: Int? = null) {
+    /** [wholeContext]: play the list as the web player's play button does, naming no track, so the session's shuffle picks (#262). */
+    internal suspend fun startUserPlayback(track: TrackInfo, contextUri: String?, trackIndex: Int? = null, wholeContext: Boolean = false) {
         if (isOffline.value) {
             // No Connect to echo anything back: the offline engine plays it, with the list the row
             // came from as the queue, and its state is mirrored into the playback state (#789, #791).
@@ -2261,15 +2263,18 @@ class PlaybackViewModel : ViewModel() {
             // On success it sets currentStreamUri so the echo's resolveAndPlay short-circuits; on
             // failure it does nothing and the echo path plays as usual. Runs as a child of this scope
             // so a rapid re-tap (which cancels userPlayJob) cancels it too.
-            if (shouldInstantTap(track.uri)) {
+            if (!wholeContext && shouldInstantTap(track.uri)) {
                 launch(Dispatchers.IO) { optimisticTapPlay(track) }
             }
             try {
-                try { pc.playTrack(track.uri, contextUri, track.uid, trackIndex) } catch (e: Exception) {
+                val play = suspend {
+                    if (wholeContext && contextUri != null) pc.playContext(contextUri) else pc.playTrack(track.uri, contextUri, track.uid, trackIndex)
+                }
+                try { play() } catch (e: Exception) {
                     if (e.message?.contains("PLAYER_COMMAND_REJECTED") == true) {
                         LokiLogger.i(TAG, "Command rejected, transferring playback here and retrying")
                         pc.transferPlaybackHere(); delay(500)
-                        pc.playTrack(track.uri, contextUri, track.uid, trackIndex)
+                        play()
                     } else throw e
                 }
                 delay(500); refreshState()

@@ -115,7 +115,6 @@ internal data class SwipeAction(
  * its full size and is clipped to the part uncovered by the moving row.
  */
 @Composable
-@Suppress("LongMethod", "CyclomaticComplexMethod")
 internal fun SwipeableActionRow(
     modifier: Modifier = Modifier,
     startToEndAction: SwipeAction? = null,
@@ -125,25 +124,55 @@ internal fun SwipeableActionRow(
     contentBackground: Color = Color.Transparent,
     content: @Composable () -> Unit,
 ) {
-    val density = LocalDensity.current
-    val layoutDirection = LocalLayoutDirection.current
-    val commitThresholdPx = with(density) { SWIPE_ACTIVATION_DISTANCE.toPx() }
-    val state = remember {
-        AnchoredDraggableState(
-            initialValue = SwipeAnchor.Settled,
-            anchors = DraggableAnchors { SwipeAnchor.Settled at 0f },
-        )
-    }
-    val flingBehavior = remember(state, commitThresholdPx) {
-        thresholdFlingBehavior(state, commitThresholdPx)
-    }
-    val flashAlpha = remember { Animatable(0f) }
-    var completedDirection by remember { mutableStateOf<SwipeAnchor?>(null) }
-    var rowWidthPx by remember { mutableIntStateOf(0) }
-    var startRevealWidthPx by remember(startToEndAction?.label) { mutableFloatStateOf(commitThresholdPx) }
-    var endRevealWidthPx by remember(endToStartAction?.label) { mutableFloatStateOf(commitThresholdPx) }
+    val commitThresholdPx = with(LocalDensity.current) { SWIPE_ACTIVATION_DISTANCE.toPx() }
     val startEnabled = startToEndAction != null && enableDismissFromStartToEnd
     val endEnabled = endToStartAction != null && enableDismissFromEndToStart
+    var rowWidthPx by remember { mutableIntStateOf(0) }
+    val state = rememberSwipeState(rowWidthPx, startEnabled, endEnabled)
+    val flingBehavior = remember(state, commitThresholdPx) { thresholdFlingBehavior(state, commitThresholdPx) }
+    val flashAlpha = remember { Animatable(0f) }
+    var completedDirection by remember { mutableStateOf<SwipeAnchor?>(null) }
+    var startRevealWidthPx by remember(startToEndAction?.label) { mutableFloatStateOf(commitThresholdPx) }
+    var endRevealWidthPx by remember(endToStartAction?.label) { mutableFloatStateOf(commitThresholdPx) }
+    fun actionFor(direction: SwipeAnchor?) = when (direction) {
+        SwipeAnchor.StartToEnd -> startToEndAction
+        SwipeAnchor.EndToStart -> endToStartAction
+        SwipeAnchor.Settled, null -> null
+    }
+
+    RunSettledAction(state, flashAlpha, ::actionFor) { completedDirection = it }
+
+    val rawOffset = state.requireOffset()
+    Box(
+        modifier
+            .onSizeChanged { rowWidthPx = it.width }
+            .anchoredDraggable(state, Orientation.Horizontal, enabled = startEnabled || endEnabled, flingBehavior = flingBehavior),
+    ) {
+        val direction = completedDirection ?: directionOf(rawOffset)
+        actionFor(direction)?.let { action ->
+            val fromStart = direction == SwipeAnchor.StartToEnd
+            SwipeActionBackground(
+                modifier = Modifier.matchParentSize(),
+                offset = abs(rawOffset),
+                action = action,
+                fromStart = fromStart,
+                flashAlpha = flashAlpha.value,
+                onMeasured = { width ->
+                    if (fromStart) startRevealWidthPx = maxOf(commitThresholdPx, width) else endRevealWidthPx = maxOf(commitThresholdPx, width)
+                },
+            )
+        }
+        val maxRevealPx = if (rawOffset >= 0f) startRevealWidthPx else endRevealWidthPx
+        SwipeForeground(boundedRevealOffset(rawOffset, maxRevealPx), abs(rawOffset), contentBackground, content)
+    }
+}
+
+/** The drag state, with anchors at the row's full width on each side a swipe is allowed. */
+@Composable
+private fun rememberSwipeState(rowWidthPx: Int, startEnabled: Boolean, endEnabled: Boolean): AnchoredDraggableState<SwipeAnchor> {
+    val state = remember {
+        AnchoredDraggableState(initialValue = SwipeAnchor.Settled, anchors = DraggableAnchors { SwipeAnchor.Settled at 0f })
+    }
     val anchors = remember(rowWidthPx, startEnabled, endEnabled) {
         DraggableAnchors {
             if (rowWidthPx > 0 && endEnabled) SwipeAnchor.EndToStart at -rowWidthPx.toFloat()
@@ -152,99 +181,62 @@ internal fun SwipeableActionRow(
         }
     }
     SideEffect {
-        state.updateAnchors(
-            anchors,
-            newTarget = if (anchors.hasPositionFor(state.settledValue)) {
-                state.settledValue
-            } else {
-                SwipeAnchor.Settled
-            },
-        )
+        val target = if (anchors.hasPositionFor(state.settledValue)) state.settledValue else SwipeAnchor.Settled
+        state.updateAnchors(anchors, newTarget = target)
     }
-    val rawOffset = state.requireOffset()
-    val offset = abs(rawOffset)
-    val maxRevealDistancePx = if (rawOffset >= 0f) startRevealWidthPx else endRevealWidthPx
-    val boundedOffset = boundedRevealOffset(rawOffset, maxRevealDistancePx)
-    val physicalDirection = if (layoutDirection == LayoutDirection.Ltr) 1f else -1f
-    val cornerRadiusPx = with(density) {
-        CORNER_RADIUS.toPx() * swipeProgress(offset, CORNER_RADIUS_DISTANCE.toPx())
-    }
-    val foregroundBackground = if (offset > 0f && contentBackground.alpha == 0f) {
-        SnepilatchBlack
-    } else {
-        contentBackground
-    }
+    return state
+}
 
+/**
+ * Runs the action a swipe settled on, with a flash. A resetting action runs first and the row slides
+ * back; one that removes the row flashes first, then runs, and leaves the row where it is.
+ */
+@Composable
+private fun RunSettledAction(
+    state: AnchoredDraggableState<SwipeAnchor>,
+    flashAlpha: Animatable<Float, *>,
+    actionFor: (SwipeAnchor?) -> SwipeAction?,
+    onCompleted: (SwipeAnchor?) -> Unit,
+) {
     val settledDirection = state.settledValue.takeUnless { it == SwipeAnchor.Settled }
-    val settledAction = when (settledDirection) {
-        SwipeAnchor.StartToEnd -> startToEndAction
-        SwipeAnchor.EndToStart -> endToStartAction
-        SwipeAnchor.Settled, null -> null
-    }
-
     LaunchedEffect(settledDirection) {
-        val action = settledAction ?: return@LaunchedEffect
-        completedDirection = settledDirection
+        val action = actionFor(settledDirection) ?: return@LaunchedEffect
+        onCompleted(settledDirection)
         flashAlpha.snapTo(FLASH_ALPHA)
         if (action.resetAfterRun) {
-            action.run.invoke()
+            action.run()
             coroutineScope {
                 launch { flashAlpha.animateTo(0f, tween(FLASH_MS, easing = FastOutSlowInEasing)) }
                 launch { state.animateTo(SwipeAnchor.Settled) }
             }
         } else {
             flashAlpha.animateTo(0f, tween(FLASH_MS, easing = FastOutSlowInEasing))
-            action.run.invoke()
+            action.run()
         }
-        completedDirection = null
+        onCompleted(null)
     }
+}
 
+/** The row itself, moved by [offsetPx] and rounded as it leaves its place; opaque while it moves. */
+@Composable
+private fun SwipeForeground(offsetPx: Float, distance: Float, background: Color, content: @Composable () -> Unit) {
+    val density = LocalDensity.current
+    val physicalDirection = if (LocalLayoutDirection.current == LayoutDirection.Ltr) 1f else -1f
+    val cornerRadius = CORNER_RADIUS * swipeProgress(distance, with(density) { CORNER_RADIUS_DISTANCE.toPx() })
+    val fill = if (distance > 0f && background.alpha == 0f) SnepilatchBlack else background
     Box(
-        modifier
-            .onSizeChanged { rowWidthPx = it.width }
-            .anchoredDraggable(
-                state = state,
-                orientation = Orientation.Horizontal,
-                enabled = startEnabled || endEnabled,
-                flingBehavior = flingBehavior,
-            ),
-    ) {
-        val direction = completedDirection ?: when {
-            rawOffset > 0f -> SwipeAnchor.StartToEnd
-            rawOffset < 0f -> SwipeAnchor.EndToStart
-            else -> SwipeAnchor.Settled
-        }
-        val action = when (direction) {
-            SwipeAnchor.StartToEnd -> startToEndAction
-            SwipeAnchor.EndToStart -> endToStartAction
-            SwipeAnchor.Settled -> null
-        }
-        if (action != null) {
-            SwipeActionBackground(
-                modifier = Modifier.matchParentSize(),
-                offset = offset,
-                action = action,
-                fromStart = direction == SwipeAnchor.StartToEnd,
-                flashAlpha = flashAlpha.value,
-                onMeasured = { measuredWidth ->
-                    if (direction == SwipeAnchor.StartToEnd) {
-                        startRevealWidthPx = maxOf(commitThresholdPx, measuredWidth)
-                    } else {
-                        endRevealWidthPx = maxOf(commitThresholdPx, measuredWidth)
-                    }
-                },
-            )
-        }
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .offset {
-                    IntOffset((boundedOffset * physicalDirection).roundToInt(), 0)
-                }
-                .clip(RoundedCornerShape(with(density) { cornerRadiusPx.toDp() }))
-                .background(foregroundBackground)
-        ) { content() }
-    }
+        Modifier
+            .fillMaxWidth()
+            .offset { IntOffset((offsetPx * physicalDirection).roundToInt(), 0) }
+            .clip(RoundedCornerShape(cornerRadius))
+            .background(fill),
+    ) { content() }
+}
+
+internal fun directionOf(offset: Float): SwipeAnchor = when {
+    offset > 0f -> SwipeAnchor.StartToEnd
+    offset < 0f -> SwipeAnchor.EndToStart
+    else -> SwipeAnchor.Settled
 }
 
 /**

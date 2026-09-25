@@ -35,8 +35,8 @@ android {
         // derived from the release tag, so a release build's version always matches
         // the tag it was built from. These checked-in values are only what local/dev
         // builds (and workflow_dispatch dry runs) get, since there's no tag for those.
-        versionCode = (project.findProperty("appVersionCode") as String?)?.toIntOrNull() ?: 116
-        versionName = project.findProperty("appVersionName") as String? ?: "3.0.0"
+        versionCode = (project.findProperty("appVersionCode") as String?)?.toIntOrNull() ?: 117
+        versionName = project.findProperty("appVersionName") as String? ?: "3.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -84,6 +84,7 @@
     <string name="swipe_left_action">Nach links wischen</string>
     <string name="swipe_right_action">Nach rechts wischen</string>
     <string name="swipe_action_desc">Wähle die Aktion für diese Wischrichtung</string>
+    <string name="mini_player_swipe_queue">Nach unten wischen öffnet die Warteschlange</string>
     <string name="notification_left_button">Benachrichtigung linke Taste</string>
     <string name="notification_right_button">Benachrichtigung rechte Taste</string>
     <string name="notif_like">Gefällt mir</string>

@@ -8,6 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -25,6 +26,7 @@ import ch.snepilatch.app.R
 import androidx.compose.ui.graphics.vector.ImageVector
 import ch.snepilatch.app.data.PlayerShortcut
 import ch.snepilatch.app.logic.shared.AppSettings
+import ch.snepilatch.app.logic.shared.GestureSettings
 import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.ui.shared.RadioOption
 import ch.snepilatch.app.ui.shared.RadioPickerDialog
@@ -66,7 +68,7 @@ fun InterfaceScreen(vm: PlaybackViewModel) {
 
         LanguageSection(vm, context)
         Spacer(Modifier.height(24.dp))
-        BehaviorSection(context)
+        BehaviorSection(context, animatedPrimary)
         Spacer(Modifier.height(24.dp))
         AppearanceSection(vm, context, animatedPrimary)
         Spacer(Modifier.height(24.dp))
@@ -111,7 +113,7 @@ private fun LanguageSection(vm: PlaybackViewModel, context: Context) {
 }
 
 @Composable
-private fun BehaviorSection(context: Context) {
+private fun BehaviorSection(context: Context, accent: Color) {
     SettingsSectionHeader(stringResource(R.string.behavior))
     val lyricsAnim by AppSettings.lyricsAnimDirection.collectAsState()
     var showLyricsPicker by remember { mutableStateOf(false) }
@@ -139,6 +141,16 @@ private fun BehaviorSection(context: Context) {
         )
     }
 
+    val swipeDownOpensQueue by GestureSettings.swipeDownOpensQueue.collectAsState()
+    SettingToggleRow(
+        title = stringResource(R.string.mini_player_swipe_queue),
+        checked = swipeDownOpensQueue,
+        onCheckedChange = { GestureSettings.setSwipeDownOpensQueue(it, context) },
+        accent = accent,
+        subtitle = stringResource(if (swipeDownOpensQueue) R.string.state_on else R.string.state_off),
+        icon = Icons.AutoMirrored.Rounded.QueueMusic,
+    )
+
     val playerShortcut by AppSettings.playerShortcut.collectAsState()
     ShortcutPickerRow(
         title = stringResource(R.string.player_shortcut),
@@ -149,22 +161,22 @@ private fun BehaviorSection(context: Context) {
     ) { AppSettings.setPlayerShortcut(it, context) }
 
     // The row swipes only offer what acts on the swiped track (#578).
-    val swipeLeft by AppSettings.swipeLeftAction.collectAsState()
+    val swipeLeft by GestureSettings.swipeLeftAction.collectAsState()
     ShortcutPickerRow(
         title = stringResource(R.string.swipe_left_action),
         description = stringResource(R.string.swipe_action_desc),
         icon = Icons.Rounded.SwipeLeft,
         current = swipeLeft,
         options = PlayerShortcut.perTrack,
-    ) { AppSettings.setSwipeActions(context, left = it) }
-    val swipeRight by AppSettings.swipeRightAction.collectAsState()
+    ) { GestureSettings.setSwipeActions(context, left = it) }
+    val swipeRight by GestureSettings.swipeRightAction.collectAsState()
     ShortcutPickerRow(
         title = stringResource(R.string.swipe_right_action),
         description = stringResource(R.string.swipe_action_desc),
         icon = Icons.Rounded.SwipeRight,
         current = swipeRight,
         options = PlayerShortcut.perTrack,
-    ) { AppSettings.setSwipeActions(context, right = it) }
+    ) { GestureSettings.setSwipeActions(context, right = it) }
 }
 
 /** A setting row that picks one [PlayerShortcut] out of [options], shown with its title and glyph. */

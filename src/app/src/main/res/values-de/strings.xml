@@ -345,6 +345,7 @@
     <string name="removed_from_playlist">Aus der Playlist entfernt</string>
     <string name="error_remove_playlist">Konnte nicht aus der Playlist entfernt werden</string>
     <string name="error_add_queue">Konnte nicht zur Warteschlange hinzugefügt werden</string>
+    <string name="added_to_queue">Zur Warteschlange hinzugefügt</string>
     <string name="downloads">Downloads</string>
     <string name="downloading">Wird heruntergeladen</string>
     <string name="saving_listened">Gehörtes wird behalten</string>

@@ -351,6 +351,7 @@
     <string name="removed_from_playlist">Removed from the playlist</string>
     <string name="error_remove_playlist">Could not remove from the playlist</string>
     <string name="error_add_queue">Could not add to queue</string>
+    <string name="added_to_queue">Added to queue</string>
     <string name="downloads">Downloads</string>
     <string name="downloading">Downloading</string>
     <string name="saving_listened">Keeping what you listened to</string>

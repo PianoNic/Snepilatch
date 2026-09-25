@@ -11,6 +11,11 @@ import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import ch.snepilatch.app.logic.download.Downloads
+import androidx.compose.material.icons.rounded.DownloadForOffline
+import androidx.compose.material.icons.rounded.OfflinePin
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.res.stringResource
 import ch.snepilatch.app.R
 import ch.snepilatch.app.data.TrackInfo
@@ -33,7 +38,22 @@ fun trackMenuActions(
 ): List<MenuAction> {
     val context = LocalContext.current
     val shareLabel = stringResource(R.string.share)
+    val downloadedIndex by Downloads.index.collectAsState()
+    val inFlight by Downloads.inProgress.collectAsState()
+    val isDownloaded = Downloads.isDownloaded(downloadedIndex, track.uri, track.name, track.artist)
     return listOfNotNull(
+        // Every track menu offers it, not only playlist rows (#574).
+        MenuAction(
+            if (isDownloaded) Icons.Rounded.OfflinePin else Icons.Rounded.DownloadForOffline,
+            stringResource(if (isDownloaded) R.string.remove_download else R.string.download_track),
+        ) {
+            when {
+                track.uri in inFlight -> Unit
+                isDownloaded -> vm.removeDownload(track.uri)
+                else -> vm.downloadTrack(track, context)
+            }
+            close()
+        },
         MenuAction(Icons.AutoMirrored.Rounded.QueueMusic, stringResource(R.string.add_to_queue)) {
             vm.addToQueue(track.uri)
             close()

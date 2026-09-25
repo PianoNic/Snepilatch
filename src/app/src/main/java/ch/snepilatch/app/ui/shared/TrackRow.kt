@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.runtime.collectAsState
-import androidx.compose.material.icons.rounded.DownloadForOffline
 import androidx.compose.material.icons.rounded.OfflinePin
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material3.*
@@ -56,7 +55,6 @@ fun TrackRow(
 ) {
     val detailVm: DetailViewModel = viewModel()
     var showMenu by remember { mutableStateOf(false) }
-    val context = androidx.compose.ui.platform.LocalContext.current
     // Subscribe only to the two projections that affect a row (which track is current +
     // whether it's playing), not the whole PlaybackUiState — otherwise every position tick
     // recomposes every visible row and scrolling janks.
@@ -65,10 +63,6 @@ fun TrackRow(
     val isPlaying = currentUri == track.uri && playing
     val theme by ThemeController.themeColors.collectAsState()
     val accent = theme.primary
-    val downloadedIndex by Downloads.index.collectAsState()
-    val inFlight by Downloads.inProgress.collectAsState()
-    val isDownloaded = Downloads.isDownloaded(downloadedIndex, track.uri, track.name, track.artist)
-    val isDownloading = track.uri in inFlight
 
     SwipeableTrackRow(track, vm) {
         Row(
@@ -104,23 +98,7 @@ fun TrackRow(
 
     // Bottom sheet menu
     if (showMenu) {
-        val downloadLabel = if (isDownloaded) {
-            stringResource(R.string.remove_download)
-        } else {
-            stringResource(R.string.download_track)
-        }
-        val download = MenuAction(
-            if (isDownloaded) Icons.Rounded.OfflinePin else Icons.Rounded.DownloadForOffline,
-            downloadLabel,
-        ) {
-            when {
-                isDownloading -> Unit
-                isDownloaded -> vm.removeDownload(track.uri)
-                else -> vm.downloadTrack(track, context)
-            }
-            showMenu = false
-        }
-        val items = listOf(download) + trackMenuActions(
+        val items = trackMenuActions(
             track, vm, detailVm,
             close = { showMenu = false },
             options = TrackMenuOptions(removeFromPlaylist = onRemoveFromPlaylist, radio = true),

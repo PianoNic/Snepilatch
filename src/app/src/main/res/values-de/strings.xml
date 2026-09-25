@@ -415,4 +415,8 @@
     <string name="jam_listening">Hört zu</string>
     <string name="jam_you">Du</string>
     <string name="jam_controls_locked">Der Host hat Abspielen, Pause und Überspringen für Gäste ausgeschaltet.</string>
+    <string name="library_folder">Ordner</string>
+    <plurals name="library_folder_items"><item quantity="one">%d Element</item><item quantity="other">%d Elemente</item></plurals>
+    <string name="library_folder_back">Zurück zu %s</string>
+    <string name="library_folder_empty">Dieser Ordner ist leer</string>
 </resources>

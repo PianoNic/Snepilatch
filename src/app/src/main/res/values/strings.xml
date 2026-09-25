@@ -430,4 +430,8 @@
     <string name="jam_listening">Listening</string>
     <string name="jam_you">You</string>
     <string name="jam_controls_locked">The host has turned off play, pause and skip for guests.</string>
+    <string name="library_folder">Folder</string>
+    <plurals name="library_folder_items"><item quantity="one">%d item</item><item quantity="other">%d items</item></plurals>
+    <string name="library_folder_back">Back to %s</string>
+    <string name="library_folder_empty">This folder is empty</string>
 </resources>

@@ -345,6 +345,7 @@
     <string name="removed_from_playlist">Удалено из плейлиста</string>
     <string name="error_remove_playlist">Не удалось удалить из плейлиста</string>
     <string name="error_add_queue">Не удалось добавить в очередь</string>
+    <string name="added_to_queue">Добавлено в очередь</string>
     <string name="downloads">Загрузки</string>
     <string name="downloading">Загрузка</string>
     <string name="saving_listened">Сохраняем прослушанное</string>

@@ -2413,7 +2413,8 @@ class PlaybackViewModel : ViewModel() {
         if (trackUris.all { RelayJam.redirect(RelayCommand(RelayCommand.ADD_TO_QUEUE, uri = it)) }) return
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                player?.addToQueue(trackUris)
+                player?.addToQueue(trackUris) ?: return@launch
+                _errorMessage.tryEmit(UiMessage(R.string.added_to_queue))
             }
             catch (e: Exception) {
                 LokiLogger.e(TAG, "addAllToQueue", e)

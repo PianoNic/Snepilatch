@@ -49,6 +49,7 @@ import ch.snepilatch.app.ui.shared.BottomNav
 import ch.snepilatch.app.ui.shared.DevicesDialog
 import ch.snepilatch.app.ui.shared.MiniPlayer
 import ch.snepilatch.app.ui.shared.MiniPlayerContent
+import ch.snepilatch.app.ui.shared.AppToastHost
 import ch.snepilatch.app.ui.shared.miniCardBaseColor
 import ch.snepilatch.app.ui.theme.SnepilatchLightGray
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -146,17 +147,6 @@ fun SpfyApp(vm: PlaybackViewModel) {
     }
 
     val isOffline by vm.isOffline.collectAsState()
-
-    val toastContext = androidx.compose.ui.platform.LocalContext.current
-    LaunchedEffect(Unit) {
-        vm.errorMessage.collect { message ->
-            android.widget.Toast.makeText(
-                toastContext,
-                message.resolve(toastContext),
-                android.widget.Toast.LENGTH_SHORT
-            ).show()
-        }
-    }
 
     BackHandler(screen != Screen.HOME) { vm.goBack() }
 
@@ -338,6 +328,8 @@ fun SpfyApp(vm: PlaybackViewModel) {
                 onDismiss = { vm.showPlaylistPicker.value = false },
             )
         }
+
+        AppToastHost(vm.errorMessage, bottomOverlayHeight.value, Modifier.align(Alignment.BottomCenter))
     }
     } // CompositionLocalProvider
 }

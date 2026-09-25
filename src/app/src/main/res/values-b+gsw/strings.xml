@@ -359,6 +359,7 @@
     <string name="removed_from_playlist">Us dr Playlist uusegnoh</string>
     <string name="error_remove_playlist">Het nöd us dr Playlist chöne uusegnoh werde</string>
     <string name="error_add_queue">I d Wartelischte dezuetue hät nöd funktioniert</string>
+    <string name="added_to_queue">Zur Wartelischte hinzuegfüegt</string>
 
     <!-- Downloads -->
     <string name="downloads">Downloads</string>

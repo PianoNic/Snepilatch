@@ -238,6 +238,7 @@ private fun LyricsProviderLine(lyrics: LyricsData, compact: Boolean) {
         fontSize = 9.sp,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
+        textAlign = TextAlign.Center,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
     )
 }

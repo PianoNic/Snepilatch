@@ -618,6 +618,13 @@ fun DetailScreen(vm: PlaybackViewModel) {
     }
 }
 
+/**
+ * The play count under a popular track, as the web player shows it: formatted, and nothing at all
+ * below 1, which is what the service sends for a track under 1000 plays (#878).
+ */
+internal fun playcountLabel(playcount: String?): String? =
+    playcount?.toLongOrNull()?.takeIf { it >= 1 }?.let { String.format("%,d", it) }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ArtistTrackRow(
@@ -663,13 +670,7 @@ private fun ArtistTrackRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                if (playcount != null) {
-                    val formatted = try {
-                        val num = playcount.toLong()
-                        String.format("%,d", num)
-                    } catch (_: Exception) { playcount }
-                    Text(formatted, color = SnepilatchLightGray, fontSize = 12.sp)
-                }
+                playcountLabel(playcount)?.let { Text(it, color = SnepilatchLightGray, fontSize = 12.sp) }
         }
         // 3-dot menu
         var showMenu by remember { mutableStateOf(false) }

@@ -32,7 +32,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.dp
 import ch.snepilatch.app.data.PlayerShortcut
 import ch.snepilatch.app.data.TrackInfo
-import ch.snepilatch.app.logic.shared.AppSettings
+import ch.snepilatch.app.logic.shared.GestureSettings
 import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
@@ -60,8 +60,8 @@ fun SwipeableTrackRow(
     val state = rememberSwipeToDismissBoxState()
     val scope = rememberCoroutineScope()
     val theme by ThemeController.themeColors.collectAsState()
-    val endToStart by AppSettings.swipeLeftAction.collectAsState()
-    val startToEnd by AppSettings.swipeRightAction.collectAsState()
+    val endToStart by GestureSettings.swipeLeftAction.collectAsState()
+    val startToEnd by GestureSettings.swipeRightAction.collectAsState()
     var showJam by remember { mutableStateOf(false) }
     var showCode by remember { mutableStateOf(false) }
     val actions = rememberPlayerActions(vm, track) { overlay ->

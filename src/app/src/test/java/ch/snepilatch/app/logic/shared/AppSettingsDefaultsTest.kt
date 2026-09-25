@@ -45,9 +45,9 @@ class AppSettingsDefaultsTest {
 
     @Test
     fun freshInstallDoesNotOpenQueueFromMiniPlayerSwipe() {
-        assertFalse(AppSettings.swipeDownOpensQueue.value)
+        assertFalse(GestureSettings.swipeDownOpensQueue.value)
         AppSettings.load(contextWith(emptyPrefs()))
-        assertFalse(AppSettings.swipeDownOpensQueue.value)
+        assertFalse(GestureSettings.swipeDownOpensQueue.value)
     }
 
     @Test
@@ -65,8 +65,8 @@ class AppSettingsDefaultsTest {
     fun swipeActionsUseTheirOwnDefaults() {
         AppSettings.load(contextWith(emptyPrefs()))
 
-        assertEquals(PlayerShortcut.ADD_TO_PLAYLIST, AppSettings.swipeLeftAction.value)
-        assertEquals(PlayerShortcut.ADD_TO_QUEUE, AppSettings.swipeRightAction.value)
+        assertEquals(PlayerShortcut.ADD_TO_PLAYLIST, GestureSettings.swipeLeftAction.value)
+        assertEquals(PlayerShortcut.ADD_TO_QUEUE, GestureSettings.swipeRightAction.value)
     }
 
     @Test
@@ -77,8 +77,8 @@ class AppSettingsDefaultsTest {
 
         AppSettings.load(contextWith(prefs))
 
-        assertEquals(PlayerShortcut.ADD_TO_PLAYLIST, AppSettings.swipeLeftAction.value)
-        assertEquals(PlayerShortcut.ADD_TO_QUEUE, AppSettings.swipeRightAction.value)
+        assertEquals(PlayerShortcut.ADD_TO_PLAYLIST, GestureSettings.swipeLeftAction.value)
+        assertEquals(PlayerShortcut.ADD_TO_QUEUE, GestureSettings.swipeRightAction.value)
         AppSettings.load(contextWith(emptyPrefs()))
     }
 
@@ -101,7 +101,7 @@ class AppSettingsDefaultsTest {
         AppSettings.load(contextWith(prefs))
         assertEquals(AppSettings.EQ_OFF, AppSettings.eqMode.value)
         assertEquals(true, AppSettings.playerGradientBg.value)
-        assertEquals(true, AppSettings.swipeDownOpensQueue.value)
+        assertEquals(true, GestureSettings.swipeDownOpensQueue.value)
         // Leave the object on the defaults the rest of the suite expects.
         AppSettings.load(contextWith(emptyPrefs()))
     }

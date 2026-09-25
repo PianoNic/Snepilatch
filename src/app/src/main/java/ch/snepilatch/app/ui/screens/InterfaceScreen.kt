@@ -26,6 +26,7 @@ import ch.snepilatch.app.R
 import androidx.compose.ui.graphics.vector.ImageVector
 import ch.snepilatch.app.data.PlayerShortcut
 import ch.snepilatch.app.logic.shared.AppSettings
+import ch.snepilatch.app.logic.shared.GestureSettings
 import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.ui.shared.RadioOption
 import ch.snepilatch.app.ui.shared.RadioPickerDialog
@@ -140,11 +141,11 @@ private fun BehaviorSection(context: Context, accent: Color) {
         )
     }
 
-    val swipeDownOpensQueue by AppSettings.swipeDownOpensQueue.collectAsState()
+    val swipeDownOpensQueue by GestureSettings.swipeDownOpensQueue.collectAsState()
     SettingToggleRow(
         title = stringResource(R.string.mini_player_swipe_queue),
         checked = swipeDownOpensQueue,
-        onCheckedChange = { AppSettings.setSwipeDownOpensQueue(it, context) },
+        onCheckedChange = { GestureSettings.setSwipeDownOpensQueue(it, context) },
         accent = accent,
         subtitle = stringResource(if (swipeDownOpensQueue) R.string.state_on else R.string.state_off),
         icon = Icons.AutoMirrored.Rounded.QueueMusic,
@@ -160,22 +161,22 @@ private fun BehaviorSection(context: Context, accent: Color) {
     ) { AppSettings.setPlayerShortcut(it, context) }
 
     // The row swipes only offer what acts on the swiped track (#578).
-    val swipeLeft by AppSettings.swipeLeftAction.collectAsState()
+    val swipeLeft by GestureSettings.swipeLeftAction.collectAsState()
     ShortcutPickerRow(
         title = stringResource(R.string.swipe_left_action),
         description = stringResource(R.string.swipe_action_desc),
         icon = Icons.Rounded.SwipeLeft,
         current = swipeLeft,
         options = PlayerShortcut.perTrack,
-    ) { AppSettings.setSwipeActions(context, left = it) }
-    val swipeRight by AppSettings.swipeRightAction.collectAsState()
+    ) { GestureSettings.setSwipeActions(context, left = it) }
+    val swipeRight by GestureSettings.swipeRightAction.collectAsState()
     ShortcutPickerRow(
         title = stringResource(R.string.swipe_right_action),
         description = stringResource(R.string.swipe_action_desc),
         icon = Icons.Rounded.SwipeRight,
         current = swipeRight,
         options = PlayerShortcut.perTrack,
-    ) { AppSettings.setSwipeActions(context, right = it) }
+    ) { GestureSettings.setSwipeActions(context, right = it) }
 }
 
 /** A setting row that picks one [PlayerShortcut] out of [options], shown with its title and glyph. */

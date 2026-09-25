@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * `canvasUrl` is NOT here — it's the current track's video URL (playback-derived, not persisted), so
  * it stays on [PlaybackViewModel]; `setCanvasEnabled` there wraps [setCanvasEnabled] to also clear it.
  */
-@Suppress("TooManyFunctions")
 object AppSettings {
 
     const val PREFS = "kotify_prefs"
@@ -96,9 +95,6 @@ object AppSettings {
 
     // Action assigned to the button beside the full-screen player's track details.
     val playerShortcut = MutableStateFlow(PlayerShortcut.LIKE)
-    val swipeLeftAction = MutableStateFlow(PlayerShortcut.ADD_TO_PLAYLIST)
-    val swipeRightAction = MutableStateFlow(PlayerShortcut.ADD_TO_QUEUE)
-    val swipeDownOpensQueue = MutableStateFlow(false)
 
     // How the equalizer is handled. One choice, because the options exclude each other: the in-app EQ
     // computes its own input gain from the curve, while the headroom attenuation exists only to give an
@@ -166,9 +162,7 @@ object AppSettings {
         eqBands.value = parseBands(prefs.getString("eq_bands", null))
         playerGradientBg.value = prefs.getBoolean("player_gradient_bg", false)
         playerShortcut.value = PlayerShortcut.fromId(prefs.getString("player_shortcut", null))
-        swipeLeftAction.value = PlayerShortcut.perTrackFromId(prefs.getString("swipe_left_action", null), PlayerShortcut.ADD_TO_PLAYLIST)
-        swipeRightAction.value = PlayerShortcut.perTrackFromId(prefs.getString("swipe_right_action", null), PlayerShortcut.ADD_TO_QUEUE)
-        swipeDownOpensQueue.value = prefs.getBoolean("swipe_down_opens_queue", false)
+        GestureSettings.load(prefs)
         contentRegion.value = prefs.getString("content_region", "nearest") ?: "nearest"
         updateChannel.value = prefs.getString("update_channel", CHANNEL_STABLE) ?: CHANNEL_STABLE
         lokiEndpoint.value = prefs.getString("loki_endpoint", "") ?: ""
@@ -322,18 +316,6 @@ object AppSettings {
     fun setPlayerShortcut(shortcut: PlayerShortcut, context: Context) {
         playerShortcut.value = shortcut
         prefs(context).edit().putString("player_shortcut", shortcut.id).apply()
-    }
-
-    /** One setter for both swipe directions; pass only the side that changed. */
-    fun setSwipeActions(context: Context, left: PlayerShortcut = swipeLeftAction.value, right: PlayerShortcut = swipeRightAction.value) {
-        swipeLeftAction.value = left
-        swipeRightAction.value = right
-        prefs(context).edit().putString("swipe_left_action", left.id).putString("swipe_right_action", right.id).apply()
-    }
-
-    fun setSwipeDownOpensQueue(enabled: Boolean, context: Context) {
-        swipeDownOpensQueue.value = enabled
-        prefs(context).edit().putBoolean("swipe_down_opens_queue", enabled).apply()
     }
 
     /**

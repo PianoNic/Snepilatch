@@ -52,7 +52,7 @@ import ch.snepilatch.app.ui.shared.MiniPlayerContent
 import ch.snepilatch.app.ui.shared.miniCardBaseColor
 import ch.snepilatch.app.ui.theme.SnepilatchLightGray
 import androidx.lifecycle.viewmodel.compose.viewModel
-import ch.snepilatch.app.logic.shared.AppSettings
+import ch.snepilatch.app.logic.shared.GestureSettings
 import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.LibraryViewModel
@@ -113,7 +113,7 @@ fun SpfyApp(vm: PlaybackViewModel) {
     // playlist picker (openable from any screen's track menu), and backs the picker's list below.
     val libraryVm: LibraryViewModel = viewModel()
     val screen by vm.currentScreen.collectAsState()
-    val swipeDownOpensQueue by AppSettings.swipeDownOpensQueue.collectAsState()
+    val swipeDownOpensQueue by GestureSettings.swipeDownOpensQueue.collectAsState()
     // Only whether a track exists — collecting the whole PlaybackUiState here would recompose the
     // entire app root twice a second, since the interpolator rewrites positionMs at 2Hz.
     val currentTrackUri by vm.currentTrackUri.collectAsState()

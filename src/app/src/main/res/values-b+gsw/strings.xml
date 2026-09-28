@@ -277,6 +277,7 @@
 
     <!-- Now Playing -->
     <string name="now_playing_playing_from">Lauft vo %s</string>
+    <string name="now_playing_based_on">Basierend uf</string>
     <string name="now_playing_not_playing">Es lauft nüüt</string>
     <string name="now_playing_skipping_ad">D Wärbig wird übersprunge…</string>
 

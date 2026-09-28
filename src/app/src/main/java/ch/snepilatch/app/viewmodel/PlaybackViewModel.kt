@@ -426,6 +426,7 @@ class PlaybackViewModel : ViewModel() {
     @Volatile private var foreignDeviceActive = false
 
     private val playlistNameCache = mutableMapOf<String, String>()
+    private val contextNameCache = mutableMapOf<String, String>()
 
     /** Playlists the signed-in user may edit, learned from the same lookup that names them. */
     private val playlistEditableCache = mutableMapOf<String, Boolean>()
@@ -1276,7 +1277,8 @@ class PlaybackViewModel : ViewModel() {
                 artist = track.displayArtist(),
                 albumArt = imageUrl,
                 albumName = track.albumName,
-                durationMs = state.duration
+                durationMs = state.duration,
+                isAutoplay = track.provider == "autoplay",
             )
         } else null
 
@@ -1452,6 +1454,19 @@ class PlaybackViewModel : ViewModel() {
      * the first emission uses the cached value (or a placeholder) and a
      * subsequent push updates the playingContext flow once the API returns.
      */
+    /** A context named by fetching [contextUri]'s own name once; [type] stands in until it arrives. */
+    private fun namedContext(type: String, contextUri: String, fetchName: suspend (Session, String) -> String): PlayingContext {
+        val cached = contextNameCache[contextUri]
+        if (cached == null && lastContextUri != contextUri) {
+            launchWithSession("contextName") { sess ->
+                val name = fetchName(sess, contextUri.substringAfterLast(":")).takeIf { it.isNotBlank() } ?: return@launchWithSession
+                contextNameCache[contextUri] = name
+                if (playingContext.value?.uri == contextUri) playingContext.value = PlayingContext(type, name, contextUri)
+            }
+        }
+        return PlayingContext(type, cached ?: type, contextUri)
+    }
+
     private fun resolvePlayingContext(
         contextUri: String?,
         track: kotify.api.playerstatus.PlayerTrack?
@@ -1481,8 +1496,10 @@ class PlaybackViewModel : ViewModel() {
                 }
                 PlayingContext("Playlist", cached ?: "Playlist", contextUri, playlistEditableCache[playlistId] == true)
             }
-            contextUri.contains(":album:") -> PlayingContext("Album", track?.albumName ?: "Album", contextUri)
-            contextUri.contains(":artist:") -> PlayingContext("Artist", track?.artistName ?: "Artist", contextUri)
+            // Named by their own uri, as the web player's EntityTitle does, not by the playing track:
+            // autoplay plays tracks from elsewhere under the list that ran out (#907).
+            contextUri.contains(":album:") -> namedContext("Album", contextUri) { sess, id -> kotify.api.album.Album(sess).getAlbum(id, limit = 1).name }
+            contextUri.contains(":artist:") -> namedContext("Artist", contextUri) { sess, id -> Artist(sess).getArtist(id).name }
             // A single track played with no collection context (search result, shared link, home
             // shortcut) comes back with context_uri == the track's own uri. Spfy labels this
             // "Playing from Search"; without this branch the header fell back to the bare "Now playing"

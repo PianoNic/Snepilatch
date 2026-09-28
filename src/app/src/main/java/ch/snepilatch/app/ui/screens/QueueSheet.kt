@@ -30,6 +30,7 @@ import ch.snepilatch.app.R
 import ch.snepilatch.app.data.TrackInfo
 import ch.snepilatch.app.ui.shared.SheetNavBarFix
 import ch.snepilatch.app.ui.shared.SpfyImage
+import ch.snepilatch.app.ui.shared.DownloadStatus
 import ch.snepilatch.app.ui.shared.SwipeAction
 import ch.snepilatch.app.ui.shared.SwipeableActionRow
 import ch.snepilatch.app.ui.theme.*
@@ -358,6 +359,7 @@ private fun QueueRow(
             Text(track.name, color = SnepilatchWhite, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(track.artist, color = SnepilatchLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
+        DownloadStatus(track, ThemeController.themeColors.collectAsState().value.primary)
         // A smart shuffle recommendation, marked so it is not mistaken for a track of the context.
         if (track.isRecommended) {
             Icon(
@@ -407,5 +409,6 @@ private fun NowPlayingRow(track: ch.snepilatch.app.data.TrackInfo, modifier: Mod
             Text(track.name, color = SnepilatchWhite, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(track.artist, color = SnepilatchLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
+        DownloadStatus(track, ThemeController.themeColors.collectAsState().value.primary)
     }
 }

@@ -360,6 +360,13 @@
     <string name="error_remove_playlist">Het nöd us dr Playlist chöne uusegnoh werde</string>
     <string name="error_add_queue">I d Wartelischte dezuetue hät nöd funktioniert</string>
     <string name="added_to_queue">Zur Wartelischte hinzuegfüegt</string>
+    <string name="added_to_playlist">Zu %1$s hinzuegfüegt</string>
+    <string name="added_to_playlist_generic">Zur Playlist hinzuegfüegt</string>
+    <string name="added_to_liked_songs">Zu de Lieblingssongs hinzuegfüegt</string>
+    <string name="removed_from_liked_songs">Us de Lieblingssongs entfernt</string>
+    <string name="added_to_library">Zu dinere Bibliothek hinzuegfüegt</string>
+    <string name="removed_from_library">Us dinere Bibliothek entfernt</string>
+    <string name="removed_from_queue">Us de Wartelischte entfernt</string>
 
     <!-- Downloads -->
     <string name="downloads">Downloads</string>

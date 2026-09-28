@@ -352,6 +352,13 @@
     <string name="error_remove_playlist">Could not remove from the playlist</string>
     <string name="error_add_queue">Could not add to queue</string>
     <string name="added_to_queue">Added to queue</string>
+    <string name="added_to_playlist">Added to %1$s</string>
+    <string name="added_to_playlist_generic">Added to playlist</string>
+    <string name="added_to_liked_songs">Added to Liked Songs</string>
+    <string name="removed_from_liked_songs">Removed from Liked Songs</string>
+    <string name="added_to_library">Added to Your Library</string>
+    <string name="removed_from_library">Removed from Your Library</string>
+    <string name="removed_from_queue">Removed from queue</string>
     <string name="downloads">Downloads</string>
     <string name="downloading">Downloading</string>
     <string name="saving_listened">Keeping what you listened to</string>

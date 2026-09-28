@@ -80,6 +80,7 @@ fun SearchTrack.toTrackInfo() = TrackInfo(
     artist = artists.joinToString(", ") { it.name },
     albumArt = album.coverArtUrl,
     durationMs = durationMs,
+    isPlayable = isPlayable,
 )
 
 fun TrackDetail.toTrackInfo() = TrackInfo(
@@ -97,6 +98,7 @@ fun PlaylistTrack.toTrackInfo() = TrackInfo(
     albumArt = coverArtUrl,
     durationMs = durationMs,
     uid = uid,
+    isPlayable = isPlayable,
 )
 
 fun LikedSong.toTrackInfo() = TrackInfo(
@@ -105,6 +107,7 @@ fun LikedSong.toTrackInfo() = TrackInfo(
     artist = artists.joinToString(", ") { it.name },
     albumArt = album.coverArtUrl,
     durationMs = durationMs,
+    isPlayable = isPlayable,
 )
 
 /** Album tracks don't carry their own cover art — pass the album's. */
@@ -114,6 +117,7 @@ fun AlbumTrack.toTrackInfo(albumArtUrl: String?) = TrackInfo(
     artist = artists.joinToString(", "),
     albumArt = albumArtUrl,
     durationMs = durationMs,
+    isPlayable = isPlayable,
 )
 
 /** Artist top tracks need the artist name passed in (the DTO carries a list of co-artist names). */
@@ -123,6 +127,7 @@ fun ArtistTopTrack.toTrackInfo(artistDisplayName: String) = TrackInfo(
     artist = artistDisplayName,
     albumArt = coverArtUrl,
     durationMs = durationMs,
+    isPlayable = isPlayable,
 )
 
 /** A track from the dealer cluster_update queue (state.next_tracks / state.prev_tracks). */

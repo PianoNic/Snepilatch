@@ -24,6 +24,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -68,17 +69,17 @@ fun TrackRow(
         Row(
             Modifier
                 .fillMaxWidth()
-                .clickable { vm.playTrack(track, contextUri, trackIndex) }
+                .clickable(enabled = track.isPlayable) { vm.playTrack(track, contextUri, trackIndex) }
                 .padding(horizontal = 16.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             SpfyImage(
                 url = track.albumArt,
-                modifier = Modifier.size(48.dp),
+                modifier = Modifier.size(48.dp).alpha(track.playableAlpha),
                 shape = RoundedCornerShape(4.dp)
             )
             Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f).alpha(track.playableAlpha)) {
                 Text(
                     track.name, color = if (isPlaying) accent else SnepilatchWhite, fontSize = 15.sp, fontWeight = FontWeight.Medium,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -150,3 +151,9 @@ internal fun DownloadStatus(track: TrackInfo, accent: Color) {
     }
     Spacer(Modifier.width(6.dp))
 }
+
+/** The web player's disabled track row: everything but the menu at 40% (#908). */
+internal const val UNAVAILABLE_ALPHA = 0.4f
+
+/** Full strength for a track that plays, [UNAVAILABLE_ALPHA] for one the service says cannot. */
+internal val TrackInfo.playableAlpha: Float get() = if (isPlayable) 1f else UNAVAILABLE_ALPHA

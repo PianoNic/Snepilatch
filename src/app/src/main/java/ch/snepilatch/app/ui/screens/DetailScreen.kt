@@ -34,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -63,6 +64,7 @@ import ch.snepilatch.app.ui.shared.trackMenuActions
 import ch.snepilatch.app.ui.shared.TrackMenuOptions
 import ch.snepilatch.app.ui.shared.SwipeableTrackRow
 import ch.snepilatch.app.ui.shared.DownloadStatus
+import ch.snepilatch.app.ui.shared.playableAlpha
 import ch.snepilatch.app.logic.shared.spfyId
 
 /** Header actions share a footprint so save, download and the overflow menu line up. */
@@ -365,42 +367,46 @@ fun DetailScreen(vm: PlaybackViewModel) {
 
                 Spacer(Modifier.weight(1f))
 
-                IconButton(onClick = { vm.toggleShuffle() }, enabled = canToggleShuffle) {
-                    Icon(
-                        if (playback.shuffleMode == "smart") {
-                            ImageVector.vectorResource(R.drawable.ic_shuffle_smart)
-                        } else {
-                            Icons.Rounded.Shuffle
-                        },
-                        stringResource(R.string.shuffle),
-                        tint = if (shuffling) accentColor else SnepilatchWhite,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-
-                Spacer(Modifier.width(8.dp))
-
-                Box(
-                    Modifier
-                        .size(48.dp)
-                        .background(accentColor, CircleShape)
-                        .clip(CircleShape)
-                        .clickable {
-                            if (playingThisContext) {
-                                vm.togglePlayPause()
+                // Nothing to play, nothing to offer: unlike the web player, which keeps both buttons (#908).
+                // ponytail: checks the loaded page only; a list whose first page is all unplayable hides them.
+                if (detail.tracks.any { it.isPlayable }) {
+                    IconButton(onClick = { vm.toggleShuffle() }, enabled = canToggleShuffle) {
+                        Icon(
+                            if (playback.shuffleMode == "smart") {
+                                ImageVector.vectorResource(R.drawable.ic_shuffle_smart)
                             } else {
-                                val first = detail.tracks.firstOrNull() ?: return@clickable
-                                vm.playTrack(first, detail.uri, 0, wholeContext = true)
-                            }
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        if (isPlayingThis) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        stringResource(R.string.play),
-                        tint = Color.Black,
-                        modifier = Modifier.size(36.dp)
-                    )
+                                Icons.Rounded.Shuffle
+                            },
+                            stringResource(R.string.shuffle),
+                            tint = if (shuffling) accentColor else SnepilatchWhite,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    Spacer(Modifier.width(8.dp))
+
+                    Box(
+                        Modifier
+                            .size(48.dp)
+                            .background(accentColor, CircleShape)
+                            .clip(CircleShape)
+                            .clickable {
+                                if (playingThisContext) {
+                                    vm.togglePlayPause()
+                                } else {
+                                    val first = detail.tracks.firstOrNull() ?: return@clickable
+                                    vm.playTrack(first, detail.uri, 0, wholeContext = true)
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            if (isPlayingThis) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            stringResource(R.string.play),
+                            tint = Color.Black,
+                            modifier = Modifier.size(36.dp)
+                        )
+                    }
                 }
             }
         }
@@ -650,7 +656,7 @@ private fun ArtistTrackRow(
         Row(
             Modifier
                 .fillMaxWidth()
-                .clickable { vm.playTrack(track, contextUri, number - 1) }
+                .clickable(enabled = track.isPlayable) { vm.playTrack(track, contextUri, number - 1) }
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -662,12 +668,12 @@ private fun ArtistTrackRow(
             )
             SpfyImage(
                 url = track.albumArt,
-                modifier = Modifier.size(44.dp),
+                modifier = Modifier.size(44.dp).alpha(track.playableAlpha),
                 shape = RoundedCornerShape(4.dp)
             )
             Spacer(Modifier.width(12.dp))
             // Track name only (no artist — we're on the artist page)
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f).alpha(track.playableAlpha)) {
                 Text(
                     track.name,
                     color = if (isPlaying) accent else SnepilatchWhite,
@@ -720,11 +726,11 @@ private fun AlbumTrackRow(
         Row(
             Modifier
                 .fillMaxWidth()
-                .clickable { vm.playTrack(track, contextUri, trackIndex) }
+                .clickable(enabled = track.isPlayable) { vm.playTrack(track, contextUri, trackIndex) }
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f).alpha(track.playableAlpha)) {
                 Text(
                     track.name,
                     color = if (isPlaying) accent else SnepilatchWhite,

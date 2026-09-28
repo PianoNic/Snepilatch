@@ -367,42 +367,46 @@ fun DetailScreen(vm: PlaybackViewModel) {
 
                 Spacer(Modifier.weight(1f))
 
-                IconButton(onClick = { vm.toggleShuffle() }, enabled = canToggleShuffle) {
-                    Icon(
-                        if (playback.shuffleMode == "smart") {
-                            ImageVector.vectorResource(R.drawable.ic_shuffle_smart)
-                        } else {
-                            Icons.Rounded.Shuffle
-                        },
-                        stringResource(R.string.shuffle),
-                        tint = if (shuffling) accentColor else SnepilatchWhite,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-
-                Spacer(Modifier.width(8.dp))
-
-                Box(
-                    Modifier
-                        .size(48.dp)
-                        .background(accentColor, CircleShape)
-                        .clip(CircleShape)
-                        .clickable {
-                            if (playingThisContext) {
-                                vm.togglePlayPause()
+                // Nothing to play, nothing to offer: unlike the web player, which keeps both buttons (#908).
+                // ponytail: checks the loaded page only; a list whose first page is all unplayable hides them.
+                if (detail.tracks.any { it.isPlayable }) {
+                    IconButton(onClick = { vm.toggleShuffle() }, enabled = canToggleShuffle) {
+                        Icon(
+                            if (playback.shuffleMode == "smart") {
+                                ImageVector.vectorResource(R.drawable.ic_shuffle_smart)
                             } else {
-                                val first = detail.tracks.firstOrNull() ?: return@clickable
-                                vm.playTrack(first, detail.uri, 0, wholeContext = true)
-                            }
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        if (isPlayingThis) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        stringResource(R.string.play),
-                        tint = Color.Black,
-                        modifier = Modifier.size(36.dp)
-                    )
+                                Icons.Rounded.Shuffle
+                            },
+                            stringResource(R.string.shuffle),
+                            tint = if (shuffling) accentColor else SnepilatchWhite,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    Spacer(Modifier.width(8.dp))
+
+                    Box(
+                        Modifier
+                            .size(48.dp)
+                            .background(accentColor, CircleShape)
+                            .clip(CircleShape)
+                            .clickable {
+                                if (playingThisContext) {
+                                    vm.togglePlayPause()
+                                } else {
+                                    val first = detail.tracks.firstOrNull() ?: return@clickable
+                                    vm.playTrack(first, detail.uri, 0, wholeContext = true)
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            if (isPlayingThis) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            stringResource(R.string.play),
+                            tint = Color.Black,
+                            modifier = Modifier.size(36.dp)
+                        )
+                    }
                 }
             }
         }

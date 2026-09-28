@@ -2,6 +2,11 @@
 
 package ch.snepilatch.app.ui.screens
 
+import ch.snepilatch.app.ui.shared.DownloadStatus
+import ch.snepilatch.app.logic.download.Downloads
+import ch.snepilatch.app.logic.shared.ThemeController
+import androidx.compose.material.icons.rounded.OfflinePin
+import androidx.compose.material.icons.rounded.DownloadForOffline
 import android.content.Context
 import ch.snepilatch.app.data.toTrackInfo
 import androidx.compose.animation.AnimatedVisibility
@@ -295,8 +300,25 @@ private data class UnifiedResult(
     val imageUrl: String?,
     val circular: Boolean,
     val onClick: () -> Unit,
-    val menu: List<MenuAction> = emptyList()
+    val menu: List<MenuAction> = emptyList(),
+    /** Set for a song, so its row shows whether it is downloaded (#574). */
+    val track: ch.snepilatch.app.data.TrackInfo? = null,
 )
+
+/** Download, or remove the download, as every other track menu offers it (#574). */
+private fun downloadAction(vm: PlaybackViewModel, ctx: Context, track: ch.snepilatch.app.data.TrackInfo): MenuAction {
+    val downloaded = Downloads.isDownloaded(Downloads.index.value, track.uri, track.name, track.artist)
+    return MenuAction(
+        if (downloaded) Icons.Rounded.OfflinePin else Icons.Rounded.DownloadForOffline,
+        ctx.getString(if (downloaded) R.string.remove_download else R.string.download_track),
+    ) {
+        when {
+            track.uri in Downloads.inProgress.value -> Unit
+            downloaded -> vm.removeDownload(track.uri)
+            else -> vm.downloadTrack(track, ctx)
+        }
+    }
+}
 
 /** Share action for any spfy entity. */
 private fun shareAction(ctx: Context, uri: String) = MenuAction(Icons.Rounded.Share, ctx.getString(R.string.share)) {
@@ -313,7 +335,9 @@ private fun SearchTrack.toUnified(vm: PlaybackViewModel, ctx: Context) = Unified
     // copy when the same song is in the catalogue under more than one id, and the duration decides
     // whether the auto-save capture buffer can hold the track. toTrackInfo() carries both.
     onClick = { vm.playTrack(toTrackInfo()) },
+    track = toTrackInfo(),
     menu = listOf(
+        downloadAction(vm, ctx, toTrackInfo()),
         MenuAction(Icons.AutoMirrored.Rounded.QueueMusic, ctx.getString(R.string.add_to_queue)) {
             vm.addToQueue(uri)
         },
@@ -438,13 +462,13 @@ private fun CategorizedResults(
                         SectionHeader(stringResource(labelFor(filter))) { onFilterChange(filter) }
                     }
                     items(rows.take(SECTION_PREVIEW), key = { "${type}_${it.uri}" }) { row ->
-                        ResultRow(row.title, row.subtitle, row.imageUrl, row.circular, row.menu, row.onClick)
+                        ResultRow(row.title, row.subtitle, row.imageUrl, row.circular, row.menu, row.track, row.onClick)
                     }
                 }
             } else {
                 val rows = singleFilterRows(results, vm, ctx, selectedFilter)
                 items(rows, key = { it.uri }) { row ->
-                    ResultRow(row.title, row.subtitle, row.imageUrl, row.circular, row.menu, row.onClick)
+                    ResultRow(row.title, row.subtitle, row.imageUrl, row.circular, row.menu, row.track, row.onClick)
                 }
             }
         }
@@ -616,6 +640,7 @@ private fun ResultRow(
     imageUrl: String?,
     circular: Boolean = false,
     menu: List<MenuAction> = emptyList(),
+    track: ch.snepilatch.app.data.TrackInfo? = null,
     onClick: () -> Unit
 ) {
     Row(
@@ -650,6 +675,7 @@ private fun ResultRow(
                 )
             }
         }
+        track?.let { DownloadStatus(it, ThemeController.themeColors.collectAsState().value.primary) }
         OverflowMenu(title, subtitle, imageUrl, circular, menu)
     }
 }

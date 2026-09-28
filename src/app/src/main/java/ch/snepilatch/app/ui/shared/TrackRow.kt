@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.runtime.collectAsState
-import androidx.compose.material.icons.rounded.DownloadForOffline
 import androidx.compose.material.icons.rounded.OfflinePin
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material3.*
@@ -25,6 +24,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -55,7 +55,6 @@ fun TrackRow(
 ) {
     val detailVm: DetailViewModel = viewModel()
     var showMenu by remember { mutableStateOf(false) }
-    val context = androidx.compose.ui.platform.LocalContext.current
     // Subscribe only to the two projections that affect a row (which track is current +
     // whether it's playing), not the whole PlaybackUiState — otherwise every position tick
     // recomposes every visible row and scrolling janks.
@@ -64,16 +63,6 @@ fun TrackRow(
     val isPlaying = currentUri == track.uri && playing
     val theme by ThemeController.themeColors.collectAsState()
     val accent = theme.primary
-    // One list for the whole screen, so a row costs a scan rather than a query. Falls back to
-    // title/artist like playback does, so a relinked track's checkmark agrees with what plays.
-    val downloadedIndex by Downloads.index.collectAsState()
-    val inFlight by Downloads.inProgress.collectAsState()
-    val isDownloaded = Downloads.isDownloaded(downloadedIndex, track.uri, track.name, track.artist)
-    val isDownloading = track.uri in inFlight
-    // Keyed by uri so a row costs a lookup rather than a scan of the queue. Absent until the first
-    // progress lands, which is why a row that has started still falls back to the spinner.
-    val percent by DownloadQueue.progress.collectAsState()
-    val trackPercent = percent[track.uri]
 
     SwipeableTrackRow(track, vm) {
         Row(
@@ -96,27 +85,7 @@ fun TrackRow(
                 )
                 Text(track.artist, color = SnepilatchLightGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            if (isDownloading) {
-                if (trackPercent == null) {
-                    CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
-                } else {
-                    CircularProgressIndicator(
-                        progress = { trackPercent.coerceIn(0, 100) / 100f },
-                        color = accent,
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.size(14.dp),
-                    )
-                }
-                Spacer(Modifier.width(6.dp))
-            } else if (isDownloaded) {
-                Icon(
-                    Icons.Rounded.OfflinePin,
-                    stringResource(R.string.downloaded_indicator),
-                    tint = accent,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(Modifier.width(6.dp))
-            }
+            DownloadStatus(track, accent)
             if (track.durationMs > 0) {
                 Text(formatTime(track.durationMs), color = SnepilatchLightGray, fontSize = 12.sp)
                 Spacer(Modifier.width(4.dp))
@@ -129,23 +98,7 @@ fun TrackRow(
 
     // Bottom sheet menu
     if (showMenu) {
-        val downloadLabel = if (isDownloaded) {
-            stringResource(R.string.remove_download)
-        } else {
-            stringResource(R.string.download_track)
-        }
-        val download = MenuAction(
-            if (isDownloaded) Icons.Rounded.OfflinePin else Icons.Rounded.DownloadForOffline,
-            downloadLabel,
-        ) {
-            when {
-                isDownloading -> Unit
-                isDownloaded -> vm.removeDownload(track.uri)
-                else -> vm.downloadTrack(track, context)
-            }
-            showMenu = false
-        }
-        val items = listOf(download) + trackMenuActions(
+        val items = trackMenuActions(
             track, vm, detailVm,
             close = { showMenu = false },
             options = TrackMenuOptions(removeFromPlaylist = onRemoveFromPlaylist, radio = true),
@@ -161,3 +114,39 @@ fun TrackRow(
 }
 
 // --- Reusable overflow (3-dots) context menu ---
+
+/**
+ * A row's download state before its duration: a progress ring while the track downloads, a check
+ * once it is on the phone, nothing otherwise. Shared by every track row, album rows included (#574).
+ */
+@Composable
+internal fun DownloadStatus(track: TrackInfo, accent: Color) {
+    // One list for the whole screen, so a row costs a scan rather than a query. Falls back to
+    // title/artist like playback does, so a relinked track's checkmark agrees with what plays.
+    val downloadedIndex by Downloads.index.collectAsState()
+    val inFlight by Downloads.inProgress.collectAsState()
+    // Keyed by uri so a row costs a lookup rather than a scan of the queue. Absent until the first
+    // progress lands, which is why a row that has started still falls back to the spinner.
+    val percent by DownloadQueue.progress.collectAsState()
+    val trackPercent = percent[track.uri]
+    when {
+        track.uri in inFlight -> if (trackPercent == null) {
+            CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
+        } else {
+            CircularProgressIndicator(
+                progress = { trackPercent.coerceIn(0, 100) / 100f },
+                color = accent,
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(14.dp),
+            )
+        }
+        Downloads.isDownloaded(downloadedIndex, track.uri, track.name, track.artist) -> Icon(
+            Icons.Rounded.OfflinePin,
+            stringResource(R.string.downloaded_indicator),
+            tint = accent,
+            modifier = Modifier.size(16.dp),
+        )
+        else -> return
+    }
+    Spacer(Modifier.width(6.dp))
+}

@@ -28,13 +28,7 @@ import ch.snepilatch.app.logic.shared.AccountStore
 import ch.snepilatch.app.logic.shared.SavedAccount
 import ch.snepilatch.app.logic.shared.SessionHolder
 
-import ch.snepilatch.app.logic.download.DownloadFolder
-import ch.snepilatch.app.logic.download.DownloadNotifier
-import ch.snepilatch.app.logic.download.DownloadQueue
-import ch.snepilatch.app.logic.download.Downloads
-import ch.snepilatch.app.logic.download.DownloadOutcome
-import ch.snepilatch.app.logic.download.DownloadRequest
-import ch.snepilatch.app.logic.download.TrackDownloader
+import ch.snepilatch.app.logic.download.DownloadActions
 import ch.snepilatch.app.logic.playback.AudioSourceResolver
 import ch.snepilatch.app.logic.playback.engine.SpfyCdnResolver
 import ch.snepilatch.app.logic.playback.engine.SpfyStream
@@ -1754,7 +1748,7 @@ class PlaybackViewModel : ViewModel() {
         // A paused load never reaches onReady, so nothing is left pending for it.
         handBackPending = !paused
         _playback.value = _playback.value.copy(track = track, positionMs = position, isPlaying = !paused, isPaused = paused)
-        armCapture(current.uri, track.durationMs)
+        DownloadActions.armCapture(current.uri, track.durationMs)
         ThemeController.updateFromArt(art)
         checkLikedState(current.uri)
         fetchCanvasForTrack(current.uri)
@@ -1940,7 +1934,7 @@ class PlaybackViewModel : ViewModel() {
 
     private fun cacheKeyFor(trackUri: String, provider: String?): String? {
         if (provider == AudioSourceResolver.LOCAL_PROVIDER) return null
-        standDownCapture()
+        DownloadActions.standDownCapture()
         return PlaybackCache.keyFor(trackUri, AppSettings.preferredAudioSource.value)
     }
 
@@ -2310,10 +2304,10 @@ class PlaybackViewModel : ViewModel() {
             // resolveAndPlay's own hand-over never runs and the outgoing track would go unsaved while
             // the buffer filled with the new one under the old track's uri. Save before the state
             // overwrite below, which is what still knows how far the outgoing track got.
-            autoSaveIfListenedThrough(_playback.value.track, _playback.value.positionMs)
+            DownloadActions.autoSaveIfListenedThrough(viewModelScope, _playback.value.track, _playback.value.positionMs)
             // Reflect the tapped track in the UI immediately (echo's onState corrects any stale metadata).
             _playback.value = _playback.value.copy(track = track.copy(albumArt = art), positionMs = 0)
-            armCapture(trackUri, track.durationMs)
+            DownloadActions.armCapture(trackUri, track.durationMs)
             ThemeController.updateFromArt(art)
             checkLikedState(trackUri)
             fetchCanvasForTrack(trackUri)
@@ -3183,7 +3177,7 @@ class PlaybackViewModel : ViewModel() {
             // which carries no duration on the Search and home-feed paths. This echo is the first thing
             // that knows the real length, and armCapture stands a too-long capture down rather than
             // letting it fill a 69MB buffer it can never complete. It leaves a valid one armed.
-            armCapture(trackUri, current.durationMs)
+            DownloadActions.armCapture(trackUri, current.durationMs)
             return
         }
         // NOTE: do NOT set currentStreamUri here. We commit to it on success only,
@@ -3208,7 +3202,7 @@ class PlaybackViewModel : ViewModel() {
             try { player?.pause() } catch (_: Exception) {}
         }
         // The outgoing track is still in state here, which is the one moment we know how far it got.
-        autoSaveIfListenedThrough(_playback.value.track, _playback.value.positionMs)
+        DownloadActions.autoSaveIfListenedThrough(viewModelScope, _playback.value.track, _playback.value.positionMs)
 
         val art = normalizeSpfyImageUrl(current.imageLargeUrl ?: current.imageUrl)
 
@@ -3222,7 +3216,7 @@ class PlaybackViewModel : ViewModel() {
         // Then hand the capture buffer to the incoming track. Ordered after the save above, which
         // still needs the outgoing track's samples, and after newTrack, whose duration decides
         // whether the buffer can hold it at all.
-        armCapture(trackUri, newTrack.durationMs)
+        DownloadActions.armCapture(trackUri, newTrack.durationMs)
         ThemeController.updateFromArt(art)
         checkLikedState(trackUri)
         fetchCanvasForTrack(trackUri)
@@ -3394,245 +3388,16 @@ class PlaybackViewModel : ViewModel() {
      */
     fun downloadCurrentTrack(context: android.content.Context) { downloadTrack(_playback.value.track ?: return, context) }
 
-    /** The download request for a track, so the three entry points cannot drift in what they send. */
-    private fun TrackInfo.toRequest(
-        capture: MusicPlaybackService.Capture? = null,
-        localOnly: Boolean = false,
-        contextUri: String? = null,
-        contextName: String? = null,
-        contextType: String? = null,
-    ) = DownloadRequest(
-        trackUri = uri,
-        title = name,
-        artist = artist,
-        // TrackInfo.albumName is only populated for podcast episodes, so for music the album the user
-        // downloaded from is the one thing that knows the name. Without this no download ever carried
-        // an ALBUM tag, even though both taggers write one.
-        album = albumName ?: contextName?.takeIf { contextType == "album" },
-        coverUrl = albumArt,
-        durationMs = durationMs,
-        capture = capture,
-        localOnly = localOnly,
-        contextUri = contextUri,
-        contextName = contextName,
-        contextType = contextType,
-    )
-
-    /** Tells the user a download went nowhere because there is still no folder to put it in. */
-    private fun warnNoFolder(context: android.content.Context, outcome: DownloadOutcome, title: String) {
-        if (outcome is DownloadOutcome.NoFolder) {
-            DownloadNotifier.failed(context, title, context.getString(R.string.download_needs_folder))
-        }
-    }
-
-    /**
-     * Keeps a track the user listened through, when the setting is on.
-     *
-     * A track played to the end has already been decoded in full, and the audio chain kept those
-     * samples, so this claims them and re-encodes rather than downloading the song a second time
-     * from somewhere else. The claim is synchronous because the buffer is about to be handed to the
-     * incoming track; only the encoding is deferred.
-     */
-    private fun autoSaveIfListenedThrough(track: TrackInfo?, positionMs: Long) {
-        if (track == null || !worthAutoSaving(track, positionMs)) return
-        val context = MusicPlaybackService.instance ?: return
-        // The encoded bytes win when the playback cache has them, so don't claim a capture that
-        // would only be thrown away: detaching costs the tap a fresh buffer for the next track.
-        val capture = if (TrackDownloader.needsCapture(track.uri)) {
-            context.detachCapture(track.uri, track.durationMs) ?: run {
-                // Never re-fetch here. The point of this setting is to keep the recording that was
-                // just played; downloading somebody else's upload instead is a different file, and
-                // it spends data to get something worse.
-                LokiLogger.i(TAG, "listened through '${track.name}' but it wasn't captured in full — not saving")
-                return
-            }
-        } else {
-            null
-        }
-        LokiLogger.i(TAG, "listened through '${track.name}', saving from ${if (capture != null) "the capture" else "the playback cache"}")
-        downloadTrack(track, context, capture, localOnly = true)
-    }
-
-    /**
-     * Arms the decoded-PCM capture for the track now loading, or stands it down when the setting is off.
-     *
-     * Armed for every source, not just Widevine, because whether the playback cache will hold this
-     * stream is not known yet: a selected source is no guarantee, since Deezer is encrypted and plays
-     * through the loopback proxy with no cache key, so those tracks do need the capture.
-     * [standDownCapture] drops it again at the point that turns out otherwise. That costs an allocate
-     * and free of the ~69MB buffer per track on the sources that do cache — the price of not guessing.
-     *
-     * Must run on every track change: the instant-tap path returns before resolveAndPlay's own call,
-     * and without its own the captured uri stayed on the previous track while the buffer filled with
-     * the new one, so neither could be saved.
-     *
-     * Safe to call twice for one track: [MusicPlaybackService.startCapture] leaves an armed capture
-     * alone, so a second call can only stand a stale one down.
-     */
-    private fun armCapture(trackUri: String, durationMs: Long) {
-        val service = MusicPlaybackService.instance ?: return
-        if (AppSettings.autoSaveListened.value) {
-            service.startCapture(trackUri, durationMs)
-        } else {
-            service.stopCapture()
-        }
-    }
-
-    /**
-     * Drops the decoded capture once we know the playback cache is taking these bytes. The cached
-     * encoded stream remuxes out byte-identical, while the capture is a re-encode of the decoded
-     * samples, so [autoSaveIfListenedThrough] would take the cache and discard the capture anyway —
-     * after paying a memcpy of every decoded buffer on the audio thread for the whole track.
-     */
-    private fun standDownCapture() { MusicPlaybackService.instance?.stopCapture() }
-
-    /** The cheap checks: setting on, somewhere to put it, played far enough, not already saved. */
-    private fun worthAutoSaving(track: TrackInfo, positionMs: Long): Boolean {
-        if (!AppSettings.autoSaveListened.value) return false
-        if (track.durationMs <= 0) return false
-        if (!DownloadFolder.isConfigured) return false
-        if (positionMs < track.durationMs * LISTENED_THROUGH_FRACTION) return false
-        return Downloads.find(track.uri) == null
-    }
-
-    /**
-     * Downloads one track, with its own progress notification.
-     *
-     * [localOnly] saves are the auto-save path: they never touch the network and finish in the time
-     * it takes to encode, so they stay off the manager's active list rather than flashing a card.
-     */
-    fun downloadTrack(
-        track: TrackInfo,
-        context: android.content.Context,
-        capture: MusicPlaybackService.Capture? = null,
-        localOnly: Boolean = false,
-    ) {
-        // applicationContext, or a batch outlives the Activity that started it and pins it — and its
-        // whole Compose tree — for the minutes the download runs. Nothing here needs an Activity.
-        val ctx = context.applicationContext
-        // A localOnly save is the auto-save path: it re-encodes what was played rather than fetching,
-        // so it shows as its own kind of entry. It no longer has to wait for an idle slot — every
-        // entry carries its own progress now.
-        val id = DownloadQueue.enqueue(
-            name = track.name,
-            type = if (localOnly) DownloadQueue.TYPE_REENCODE else "single",
-            imageUrl = track.albumArt,
-            total = 1,
-        )
-        val job = viewModelScope.launch(Dispatchers.IO) {
-            val progress: ((Int) -> Unit)? = if (localOnly) {
-                null
-            } else {
-                { percent ->
-                    DownloadQueue.updateJob(id, done = 1, trackPercent = percent)
-                    DownloadQueue.reportTrack(track.uri, percent)
-                }
-            }
-            var state = DownloadQueue.QueueEntry.State.Failed
-            try {
-                val outcome = TrackDownloader.download(
-                    track.toRequest(capture, localOnly), ctx, onProgress = progress
-                )
-                if (outcome is DownloadOutcome.Done) state = DownloadQueue.QueueEntry.State.Done
-                warnNoFolder(ctx, outcome, track.name)
-            } catch (e: CancellationException) {
-                state = DownloadQueue.QueueEntry.State.Cancelled
-                throw e
-            } finally {
-                DownloadQueue.clearTrack(track.uri)
-                // In a finally because cancellation (backing out of the app) has to settle the entry
-                // too; it used to be left running, so the tab claimed a download that had stopped.
-                DownloadQueue.finishJob(id, state)
-            }
-        }
-        keep(id, job)
-    }
-
-    /**
-     * Downloads a whole album or playlist, one track at a time so the per-track notifications are
-     * replaced by a single count. Tracks already on disk are skipped by the downloader itself.
-     */
-    /** Every running download by queue id, so one entry can be stopped without touching the others. */
-    private val downloadJobs = java.util.concurrent.ConcurrentHashMap<Int, Job>()
-
-    private fun keep(id: Int, job: Job) {
-        // Prune here rather than when a download ends: removing from inside the job races the put
-        // that registered it, and a job that removed itself first would linger for good.
-        downloadJobs.values.removeAll { it.isCompleted }
-        downloadJobs[id] = job
-    }
-
-    /** Stops one queue entry. It settles its own notification and state on the way out. */
-    fun cancelDownload(id: Int) { downloadJobs[id]?.cancel() }
-
+    fun downloadTrack(track: TrackInfo, context: android.content.Context) = DownloadActions.downloadTrack(viewModelScope, track, context)
+    fun cancelDownload(id: Int) = DownloadActions.cancel(id)
     fun downloadTracks(
         tracks: List<TrackInfo>,
         context: android.content.Context,
         contextUri: String? = null,
         contextName: String? = null,
         contextType: String? = null,
-    ) {
-        if (tracks.isEmpty()) return
-        val ctx = context.applicationContext
-        val id = DownloadQueue.enqueue(
-            name = contextName ?: tracks.first().name,
-            type = contextType ?: "single",
-            imageUrl = tracks.first().albumArt,
-            total = tracks.size,
-        )
-        val job = viewModelScope.launch(Dispatchers.IO) {
-            var failed = 0
-            var state = DownloadQueue.QueueEntry.State.Done
-            try {
-                tracks.forEachIndexed { index, track ->
-                    // Between tracks, not mid-file: a paused entry stops before starting the next one
-                    // rather than abandoning bytes already fetched.
-                    DownloadQueue.awaitResume(id)
-                    DownloadNotifier.batch(ctx, track.name, index + 1, tracks.size)
-                    // Cleared in a finally: a cancelled batch unwinds before the call returns, and a
-                    // percentage left behind would freeze that row's ring for the rest of the process.
-                    val outcome = try {
-                        TrackDownloader.download(
-                            track.toRequest(
-                                contextUri = contextUri,
-                                contextName = contextName,
-                                contextType = contextType,
-                            ),
-                            ctx,
-                            notify = false,
-                        ) { percent ->
-                            DownloadQueue.updateJob(id, index + 1, percent)
-                            DownloadQueue.reportTrack(track.uri, percent)
-                            DownloadNotifier.batch(ctx, track.name, index + 1, tracks.size, percent)
-                        }
-                    } finally {
-                        DownloadQueue.clearTrack(track.uri)
-                    }
-                    if (outcome !is DownloadOutcome.Done) failed++
-                    if (outcome is DownloadOutcome.NoFolder) {
-                        warnNoFolder(ctx, outcome, track.name)
-                        state = DownloadQueue.QueueEntry.State.Failed
-                        return@launch
-                    }
-                }
-                if (failed == tracks.size) state = DownloadQueue.QueueEntry.State.Failed
-                DownloadNotifier.batchFinished(ctx, tracks.size, failed)
-            } catch (e: CancellationException) {
-                // The batch posts its own ongoing notification, so notify=false keeps TrackDownloader
-                // from clearing it. Below API 34 an ongoing bar is not user-swipeable, so a batch
-                // cancelled with the Activity would leave "Downloading 7 of 30" posted for a download
-                // that is not running.
-                DownloadNotifier.clear(ctx)
-                state = DownloadQueue.QueueEntry.State.Cancelled
-                throw e
-            } finally {
-                DownloadQueue.finishJob(id, state)
-            }
-        }
-        keep(id, job)
-    }
-
-    fun removeDownload(trackUri: String) { viewModelScope.launch(Dispatchers.IO) { TrackDownloader.delete(trackUri) } }
+    ) = DownloadActions.downloadTracks(viewModelScope, tracks, context, contextUri, contextName, contextType)
+    fun removeDownload(trackUri: String) = DownloadActions.removeDownload(viewModelScope, trackUri)
 
     /**
      * Skip rather than sit in silence, bounded by the playback-error budget so a run of unmatched
@@ -4078,7 +3843,6 @@ class PlaybackViewModel : ViewModel() {
          * serves it whole and never needs the capture. The gap is only dead for DRM tracks, where the
          * capture is the sole source — those log and skip rather than save something truncated.
          */
-        private const val LISTENED_THROUGH_FRACTION = 0.9
 
         /** If skipPrevious is invoked after this many ms into the current track,
          *  restart the track instead of going to the previous one. Matches the

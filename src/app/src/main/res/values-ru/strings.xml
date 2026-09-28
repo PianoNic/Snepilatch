@@ -265,6 +265,7 @@
 
     <!-- Now Playing -->
     <string name="now_playing_playing_from">Играет из %s</string>
+    <string name="now_playing_based_on">На основе</string>
     <string name="now_playing_not_playing">Ничего не играет</string>
     <string name="now_playing_skipping_ad">Пропуск рекламы…</string>
 

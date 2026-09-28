@@ -27,6 +27,8 @@ data class TrackInfo(
     val queueIndex: Int? = null,
     /** A smart shuffle recommendation the server slid into the queue, not something from the context. */
     val isRecommended: Boolean = false,
+    /** Autoplay picked it after the list ran out, so the player says what it is based on (#907). */
+    val isAutoplay: Boolean = false,
 )
 
 data class PlaybackUiState(

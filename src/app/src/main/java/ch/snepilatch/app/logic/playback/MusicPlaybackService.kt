@@ -60,7 +60,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
          * How much of a track must be captured to count as a whole one; the tail can be clipped by
          * the decoder's last partial buffer, so an exact match never lands.
          *
-         * This is NOT the same threshold as LISTENED_THROUGH_FRACTION in PlaybackViewModel (0.9),
+         * This is NOT the same threshold as LISTENED_THROUGH_FRACTION in DownloadActions (0.9),
          * and the two must not be reconciled even though they look like they should agree. That one
          * asks whether the user heard enough of a track to want it kept; this one asks whether
          * enough of it exists to write out. Lowering this to match would hand the encoder a partial

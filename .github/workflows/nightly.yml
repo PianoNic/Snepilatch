@@ -77,6 +77,8 @@ jobs:
             echo "Forced: cutting a nightly even though main has not moved since $LAST_TAG."
           fi
           echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "unchanged=$UNCHANGED" >> "$GITHUB_OUTPUT"
+          echo "last_tag=$LAST_TAG" >> "$GITHUB_OUTPUT"
           # Mirror release-drafter's draft rather than inventing a version: it already resolves the
           # next one from the labels on everything merged since the last release, so a nightly is a
           # preview of the release it leads to. Sorted rather than first, since the drafter can
@@ -124,12 +126,28 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${{ steps.tag.outputs.tag }}" \
-            --repo "${{ github.repository }}" \
-            --title "${{ steps.tag.outputs.tag }}" \
-            --prerelease \
-            --generate-notes \
-            --notes "⚠️ Nightly build. Unreviewed, probably buggy. Install at your own risk."
+          WARNING="⚠️ Nightly build. Unreviewed, probably buggy. Install at your own risk."
+          # A forced cut on a commit that already has a nightly has nothing of its own to list, and
+          # generated notes would go back to the tag before and repeat its list (#902). What such a
+          # cut does pick up is the newest KotifyClient release, which the build fetches, so say that.
+          if [ "${{ steps.tag.outputs.unchanged }}" = "true" ]; then
+            LAST_TAG="${{ steps.tag.outputs.last_tag }}"
+            KOTIFY=$(gh release view --repo PianoNic/KotifyClient --json tagName --jq .tagName)
+            gh release create "${{ steps.tag.outputs.tag }}" \
+              --repo "${{ github.repository }}" \
+              --title "${{ steps.tag.outputs.tag }}" \
+              --prerelease \
+              --notes "$(printf '%s\n\n%s\n%s\n\n%s' "$WARNING" "## What's Changed" \
+                "* No app changes since $LAST_TAG. Rebuilt with KotifyClient $KOTIFY (https://github.com/PianoNic/KotifyClient/releases/tag/$KOTIFY)." \
+                "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$LAST_TAG...${{ steps.tag.outputs.tag }}")"
+          else
+            gh release create "${{ steps.tag.outputs.tag }}" \
+              --repo "${{ github.repository }}" \
+              --title "${{ steps.tag.outputs.tag }}" \
+              --prerelease \
+              --generate-notes \
+              --notes "$WARNING"
+          fi
 
   build:
     needs: cut-nightly

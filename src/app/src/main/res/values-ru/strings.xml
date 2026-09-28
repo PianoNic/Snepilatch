@@ -346,6 +346,13 @@
     <string name="error_remove_playlist">Не удалось удалить из плейлиста</string>
     <string name="error_add_queue">Не удалось добавить в очередь</string>
     <string name="added_to_queue">Добавлено в очередь</string>
+    <string name="added_to_playlist">Добавлено в «%1$s»</string>
+    <string name="added_to_playlist_generic">Добавлено в плейлист</string>
+    <string name="added_to_liked_songs">Добавлено в «Любимые треки»</string>
+    <string name="removed_from_liked_songs">Удалено из «Любимых треков»</string>
+    <string name="added_to_library">Добавлено в вашу библиотеку</string>
+    <string name="removed_from_library">Удалено из вашей библиотеки</string>
+    <string name="removed_from_queue">Удалено из очереди</string>
     <string name="downloads">Загрузки</string>
     <string name="downloading">Загрузка</string>
     <string name="saving_listened">Сохраняем прослушанное</string>

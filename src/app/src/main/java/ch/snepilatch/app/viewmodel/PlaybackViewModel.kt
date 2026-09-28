@@ -27,6 +27,7 @@ import ch.snepilatch.app.logic.playback.PositionInterpolator
 import ch.snepilatch.app.logic.shared.AccountStore
 import ch.snepilatch.app.logic.shared.SavedAccount
 import ch.snepilatch.app.logic.shared.SessionHolder
+import ch.snepilatch.app.logic.shared.AppMessages
 
 import ch.snepilatch.app.logic.download.DownloadFolder
 import ch.snepilatch.app.logic.download.DownloadNotifier
@@ -445,9 +446,8 @@ class PlaybackViewModel : ViewModel() {
     /** Post a one-line message to the app's snackbar; the only feedback a background action has. */
     internal fun emitMessage(@StringRes id: Int) { _errorMessage.tryEmit(UiMessage(id)) }
 
-    private val _errorMessage =
-        kotlinx.coroutines.flow.MutableSharedFlow<UiMessage>(extraBufferCapacity = 1)
-    val errorMessage: kotlinx.coroutines.flow.SharedFlow<UiMessage> = _errorMessage
+    private val _errorMessage = AppMessages.sink
+    val errorMessage: kotlinx.coroutines.flow.SharedFlow<UiMessage> = AppMessages.flow
 
     // Like state
     val currentTrackLiked = MutableStateFlow(false)
@@ -1133,13 +1133,14 @@ class PlaybackViewModel : ViewModel() {
     private fun launchWithSession(
         tag: String,
         @StringRes errorMessage: Int? = null,
+        @StringRes done: Int? = null,
         block: suspend (Session) -> Unit
     ): Job = launchWith(
         TAG,
         tag,
         { session },
         onFailure = { errorMessage?.let { _errorMessage.tryEmit(UiMessage(it)) } },
-        block = block,
+        block = { block(it); done?.let { id -> AppMessages.show(id) } },
     )
 
     /**
@@ -2345,11 +2346,12 @@ class PlaybackViewModel : ViewModel() {
      * header's "Add to Playlist" action when the user adds an entire album,
      * playlist, or the Liked Songs collection to another playlist.
      */
-    fun addTracksToPlaylist(playlistId: String, trackUris: List<String>) {
+    fun addTracksToPlaylist(playlistId: String, trackUris: List<String>, playlistName: String? = null) {
         if (trackUris.isEmpty()) return
         launchWithSession("addTracksToPlaylist", R.string.error_add_playlist) { sess ->
             kotify.api.playlist.Playlist(sess).addToPlaylist(playlistId, trackUris)
             LokiLogger.i(TAG, "Added ${trackUris.size} tracks to playlist $playlistId")
+            if (playlistName != null) AppMessages.show(R.string.added_to_playlist, playlistName) else AppMessages.show(R.string.added_to_playlist_generic)
         }
     }
 
@@ -2465,6 +2467,7 @@ class PlaybackViewModel : ViewModel() {
      * did something, and a refresh follows to reconcile with whatever the server actually did.
      */
     fun removeFromQueue(track: TrackInfo) {
+        AppMessages.show(R.string.removed_from_queue)
         if (isOffline.value) {
             OfflinePlayer.remove(track)
             return
@@ -2638,14 +2641,14 @@ class PlaybackViewModel : ViewModel() {
     }
 
     fun likeSong(trackId: String) {
-        launchWithSession("likeSong", R.string.error_like) { sess ->
+        launchWithSession("likeSong", R.string.error_like, R.string.added_to_liked_songs) { sess ->
             Song(sess).likeSong(trackId)
             currentTrackLiked.value = true
         }
     }
 
     fun unlikeSong(trackId: String) {
-        launchWithSession("unlikeSong", R.string.error_like) { sess ->
+        launchWithSession("unlikeSong", R.string.error_like, R.string.removed_from_liked_songs) { sess ->
             Song(sess).unlikeSong(trackId)
             currentTrackLiked.value = false
         }
@@ -3982,7 +3985,7 @@ class PlaybackViewModel : ViewModel() {
     fun saveToLibrary(type: String, id: String, onSaved: (() -> Unit)? = null) {
         when (type) {
             "artist" -> followArtist(id, onSaved)
-            "album" -> launchWithSession("saveAlbum", R.string.error_save_library) { sess ->
+            "album" -> launchWithSession("saveAlbum", R.string.error_save_library, R.string.added_to_library) { sess ->
                 kotify.api.album.Album(sess).saveToLibrary(id)
                 onSaved?.invoke()
             }
@@ -3992,7 +3995,7 @@ class PlaybackViewModel : ViewModel() {
 
     /** The mirror of [saveToLibrary], so a caller can undo a save without holding the library list. */
     fun removeFromLibrary(type: String, id: String, onDone: (() -> Unit)? = null) {
-        launchWithSession("removeFromLibrary", R.string.error_save_library) { sess ->
+        launchWithSession("removeFromLibrary", R.string.error_save_library, R.string.removed_from_library) { sess ->
             when (type) {
                 "artist" -> Artist(sess).unfollow(id)
                 "album" -> kotify.api.album.Album(sess).removeFromLibrary(id)
@@ -4004,14 +4007,14 @@ class PlaybackViewModel : ViewModel() {
 
     /** [onSaved] runs once the server has taken it, for a caller that shows the library. */
     fun followArtist(artistId: String, onSaved: (() -> Unit)? = null) {
-        launchWithSession("followArtist", R.string.error_follow) { sess ->
+        launchWithSession("followArtist", R.string.error_follow, R.string.added_to_library) { sess ->
             Artist(sess).follow(artistId)
             onSaved?.invoke()
         }
     }
 
     fun savePlaylist(playlistId: String, onSaved: (() -> Unit)? = null) {
-        launchWithSession("savePlaylist", R.string.error_save_library) { sess ->
+        launchWithSession("savePlaylist", R.string.error_save_library, R.string.added_to_library) { sess ->
             // Playlists live in the rootlist, not the generic library (which rejects PLAYLIST uris),
             // so saveToLibrary needs the current username.
             kotify.api.playlist.Playlist(sess).saveToLibrary(playlistId, username)

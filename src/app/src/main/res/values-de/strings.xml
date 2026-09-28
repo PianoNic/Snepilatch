@@ -346,6 +346,13 @@
     <string name="error_remove_playlist">Konnte nicht aus der Playlist entfernt werden</string>
     <string name="error_add_queue">Konnte nicht zur Warteschlange hinzugefügt werden</string>
     <string name="added_to_queue">Zur Warteschlange hinzugefügt</string>
+    <string name="added_to_playlist">Zu %1$s hinzugefügt</string>
+    <string name="added_to_playlist_generic">Zur Playlist hinzugefügt</string>
+    <string name="added_to_liked_songs">Zu Lieblingssongs hinzugefügt</string>
+    <string name="removed_from_liked_songs">Aus Lieblingssongs entfernt</string>
+    <string name="added_to_library">Zu deiner Bibliothek hinzugefügt</string>
+    <string name="removed_from_library">Aus deiner Bibliothek entfernt</string>
+    <string name="removed_from_queue">Aus der Warteschlange entfernt</string>
     <string name="downloads">Downloads</string>
     <string name="downloading">Wird heruntergeladen</string>
     <string name="saving_listened">Gehörtes wird behalten</string>

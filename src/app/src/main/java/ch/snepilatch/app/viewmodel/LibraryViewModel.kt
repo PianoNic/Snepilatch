@@ -1,11 +1,13 @@
 package ch.snepilatch.app.viewmodel
 
+import ch.snepilatch.app.R
 import androidx.lifecycle.viewModelScope
 import ch.snepilatch.app.data.LibraryItem
 import ch.snepilatch.app.data.toUiLibraryList
 import ch.snepilatch.app.logic.shared.Debouncer
 import ch.snepilatch.app.logic.shared.LokiLogger
 import ch.snepilatch.app.logic.shared.SessionHolder
+import ch.snepilatch.app.logic.shared.AppMessages
 import kotify.api.album.Album
 import kotify.api.artist.Artist
 import kotify.api.playerconnect.PlayerConnect
@@ -155,6 +157,7 @@ class LibraryViewModel : SessionViewModel("LibraryVM") {
                 "artist" -> Artist(sess).unfollow(id)
                 "playlist" -> Playlist(sess).deletePlaylist(id, SessionHolder.username)
             }
+            AppMessages.show(R.string.removed_from_library)
             loadLibrary()
         }
     }

@@ -3,6 +3,7 @@
 package ch.snepilatch.app.ui.screens
 
 import ch.snepilatch.app.ui.shared.DownloadStatus
+import ch.snepilatch.app.ui.shared.playableAlpha
 import ch.snepilatch.app.logic.download.Downloads
 import ch.snepilatch.app.logic.shared.ThemeController
 import androidx.compose.material.icons.rounded.OfflinePin
@@ -63,6 +64,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -646,17 +648,17 @@ private fun ResultRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .clickable(enabled = track?.isPlayable != false) { onClick() }
             .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         SpfyImage(
             url = imageUrl,
-            modifier = Modifier.size(56.dp),
+            modifier = Modifier.size(56.dp).alpha(track?.playableAlpha ?: 1f),
             shape = if (circular) CircleShape else RoundedCornerShape(6.dp)
         )
         Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
+        Column(Modifier.weight(1f).alpha(track?.playableAlpha ?: 1f)) {
             Text(
                 title,
                 color = SnepilatchWhite,

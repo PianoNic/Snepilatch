@@ -34,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -63,6 +64,7 @@ import ch.snepilatch.app.ui.shared.trackMenuActions
 import ch.snepilatch.app.ui.shared.TrackMenuOptions
 import ch.snepilatch.app.ui.shared.SwipeableTrackRow
 import ch.snepilatch.app.ui.shared.DownloadStatus
+import ch.snepilatch.app.ui.shared.playableAlpha
 import ch.snepilatch.app.logic.shared.spfyId
 
 /** Header actions share a footprint so save, download and the overflow menu line up. */
@@ -650,7 +652,7 @@ private fun ArtistTrackRow(
         Row(
             Modifier
                 .fillMaxWidth()
-                .clickable { vm.playTrack(track, contextUri, number - 1) }
+                .clickable(enabled = track.isPlayable) { vm.playTrack(track, contextUri, number - 1) }
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -662,12 +664,12 @@ private fun ArtistTrackRow(
             )
             SpfyImage(
                 url = track.albumArt,
-                modifier = Modifier.size(44.dp),
+                modifier = Modifier.size(44.dp).alpha(track.playableAlpha),
                 shape = RoundedCornerShape(4.dp)
             )
             Spacer(Modifier.width(12.dp))
             // Track name only (no artist — we're on the artist page)
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f).alpha(track.playableAlpha)) {
                 Text(
                     track.name,
                     color = if (isPlaying) accent else SnepilatchWhite,
@@ -720,11 +722,11 @@ private fun AlbumTrackRow(
         Row(
             Modifier
                 .fillMaxWidth()
-                .clickable { vm.playTrack(track, contextUri, trackIndex) }
+                .clickable(enabled = track.isPlayable) { vm.playTrack(track, contextUri, trackIndex) }
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f).alpha(track.playableAlpha)) {
                 Text(
                     track.name,
                     color = if (isPlaying) accent else SnepilatchWhite,

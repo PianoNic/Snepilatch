@@ -29,6 +29,8 @@ data class TrackInfo(
     val isRecommended: Boolean = false,
     /** Autoplay picked it after the list ran out, so the player says what it is based on (#907). */
     val isAutoplay: Boolean = false,
+    /** False for a track the service says cannot be played here; its row is greyed out (#908). */
+    val isPlayable: Boolean = true,
 )
 
 data class PlaybackUiState(

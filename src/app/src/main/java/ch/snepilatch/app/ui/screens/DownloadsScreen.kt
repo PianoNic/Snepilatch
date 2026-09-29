@@ -118,9 +118,15 @@ fun DownloadsScreen(vm: PlaybackViewModel) {
 /** Where the files go and how much room they take. */
 @Composable
 private fun StorageSummary(folder: android.net.Uri?, count: Int, totalMb: Int) {
+    // It says "tap to choose" when unset, so it has to open the picker, as the row in settings does.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val folderPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree()
+    ) { picked -> if (picked != null) DownloadFolder.setFolder(picked, context) }
     SettingRow(
         title = stringResource(R.string.download_folder),
         subtitle = folder?.let { readableFolder(it) } ?: stringResource(R.string.download_folder_none),
+        onClick = { folderPicker.launch(null) },
     )
     SettingRow(title = stringResource(R.string.downloads_summary, count, totalMb), icon = Icons.Rounded.CloudDone)
 }

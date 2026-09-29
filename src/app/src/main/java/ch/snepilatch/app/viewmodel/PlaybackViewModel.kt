@@ -10,6 +10,7 @@ import ch.snepilatch.app.data.UiMessage
 import ch.snepilatch.app.logic.download.toTrackInfo
 import ch.snepilatch.app.logic.playback.OfflineController
 import ch.snepilatch.app.logic.playback.OfflinePlayer
+import ch.snepilatch.app.logic.download.Downloads
 import ch.snepilatch.app.logic.playback.QueueMovePlan
 import ch.snepilatch.app.logic.playback.ResumeLoader
 import ch.snepilatch.app.logic.playback.planQueueMove
@@ -391,6 +392,11 @@ class PlaybackViewModel : ViewModel() {
             override fun trackChanged(track: TrackInfo) {
                 commitStream(track.uri, AudioSourceResolver.LOCAL_PROVIDER)
                 ThemeController.updateFromArt(track.albumArt)
+                // No server state offline to name the context, but the downloads know the list's name.
+                val contextUri = OfflinePlayer.state.value?.contextUri
+                playingContext.value = Downloads.groups().find { it.uri == contextUri }?.let {
+                    PlayingContext(it.type.replaceFirstChar(Char::uppercase), it.name, it.uri)
+                }
                 fetchCanvasForTrack(track.uri)
             }
             override fun setTickerRunning(running: Boolean) = if (running) startPositionTicker() else stopPositionTicker()

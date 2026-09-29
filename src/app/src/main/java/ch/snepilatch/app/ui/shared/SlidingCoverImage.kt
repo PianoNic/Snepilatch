@@ -154,7 +154,16 @@ private class CoverStrip(
     val translation: Float get() = if (dragging) dragOffset else offset.value
     private val stride: Float get() = width + gap
 
+    /**
+     * Whether a cover sits in [direction] (+1 previous, -1 next). With nothing there the strip stays put, so
+     * a back press on the first song restarts it rather than sliding onto an empty card (#758).
+     * ponytail: a neighbour without art counts as missing; pass a placeholder if art-less tracks show up.
+     */
+    private fun hasCover(direction: Int): Boolean =
+        !(if (direction > 0) neighbours.previous else neighbours.next).isNullOrBlank()
+
     fun skipByButton(direction: Int) {
+        if (!hasCover(direction)) return
         settleJob?.cancel()
         leftUrl = neighbours.previous
         rightUrl = neighbours.next
@@ -211,7 +220,7 @@ private class CoverStrip(
     }
 
     fun drag(amount: Float) {
-        dragOffset = (dragOffset + amount).coerceIn(-stride, stride)
+        dragOffset = (dragOffset + amount).coerceIn(if (hasCover(-1)) -stride else 0f, if (hasCover(1)) stride else 0f)
     }
 
     fun endDrag(velocity: Float) {
@@ -222,7 +231,7 @@ private class CoverStrip(
             release > width * 0.15f -> 1
             release < -width * 0.15f -> -1
             else -> 0
-        }
+        }.takeIf { hasCover(it) } ?: 0
         settleJob = scope.launch {
             offset.snapTo(release)
             dragging = false

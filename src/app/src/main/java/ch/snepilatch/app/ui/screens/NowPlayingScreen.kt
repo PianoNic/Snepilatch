@@ -46,6 +46,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import ch.snepilatch.app.logic.playback.PlaybackCache
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.draw.clip
 import ch.snepilatch.app.ui.shared.CoverNeighbours
@@ -174,6 +177,7 @@ private fun coverModifier(vw: Int, vh: Int, boxW: Float, boxH: Float, density: D
  * and the screen is foreground, so a paused song freezes the last frame instead of decoding forever.
  */
 @Composable
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 private fun CanvasVideoBackground(canvasVideoUrl: String, audioPlaying: Boolean) {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -187,7 +191,12 @@ private fun CanvasVideoBackground(canvasVideoUrl: String, audioPlaying: Boolean)
 
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(canvasVideoUrl, lifecycleOwner) {
-        val player = ExoPlayer.Builder(context).build().apply {
+        // Through the playback cache: a looping clip re-reads its file on every loop, and uncached
+        // that was the whole clip over the network again and again, ~100 MB a minute (#565).
+        // ponytail: shares the audio cache's 512 MB LRU; give canvases their own if they crowd out audio.
+        PlaybackCache.init(context.applicationContext)
+        val source = DefaultMediaSourceFactory(PlaybackCache.wrap(DefaultDataSource.Factory(context)))
+        val player = ExoPlayer.Builder(context).setMediaSourceFactory(source).build().apply {
             setMediaItem(MediaItem.fromUri(Uri.parse(canvasVideoUrl)))
             repeatMode = Player.REPEAT_MODE_ALL
             volume = 0f

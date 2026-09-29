@@ -388,8 +388,9 @@
     <string name="download_source_lossless">Verlustfrei (FLAC)</string>
     <string name="manage_downloads">Downloads verwalten</string>
     <string name="downloads_summary">%1$d Titel · %2$d MB</string>
-    <string name="remove_all">Alle entfernen</string>
-    <string name="remove_all_confirm">Alle heruntergeladenen Dateien löschen? Die Titel werden wieder gestreamt.</string>
+    <string name="remove_all">Alle Titel löschen</string>
+    <string name="remove_all_title">Alle heruntergeladenen Titel löschen?</string>
+    <string name="remove_all_confirm">Das löscht alle %1$d Titel (%2$d MB) von deinem Handy. Sie lassen sich nicht wiederherstellen; du müsstest sie neu herunterladen.</string>
     <string name="downloads_count">%1$d heruntergeladen</string>
     <string name="downloading_count">Lade %1$d von %2$d</string>
     <string name="downloaded_count">%1$d von %2$d heruntergeladen</string>

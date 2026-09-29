@@ -10,6 +10,7 @@ import ch.snepilatch.app.data.UiMessage
 import ch.snepilatch.app.logic.download.toTrackInfo
 import ch.snepilatch.app.logic.playback.OfflineController
 import ch.snepilatch.app.logic.playback.OfflinePlayer
+import ch.snepilatch.app.logic.playback.PhoneVolume
 import ch.snepilatch.app.logic.download.Downloads
 import ch.snepilatch.app.logic.playback.QueueMovePlan
 import ch.snepilatch.app.logic.playback.ResumeLoader
@@ -714,6 +715,9 @@ class PlaybackViewModel : ViewModel() {
                 pc.setPersistedDeviceId(AppSettings.persistedDeviceId())
                 // Before ready(): the registration's own current-session fetch is the first update.
                 pc.onJamUpdate { JamHolder.apply(it, pc.jamShareToken) }
+                // Registration reports this as the phone's volume. Unset, it said full volume, so the
+                // first move of another client's slider jumped the phone to wherever the slider went.
+                MusicPlaybackService.instance?.let { pc.deviceVolume = (PhoneVolume.fraction(it) * 65535).toInt() }
                 pc.ready()
                 // Assigning through the property setter publishes the player to
                 // SessionHolder — session/spfyPlayback/cdnResolver are already

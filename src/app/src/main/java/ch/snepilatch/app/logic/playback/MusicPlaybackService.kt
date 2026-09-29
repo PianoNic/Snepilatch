@@ -87,6 +87,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
+    /** Reports the phone's own volume changes to the other Connect clients (PhoneVolume). */
+    private var volumeObserver: android.database.ContentObserver? = null
+
     /** Loopback proxy that decrypts Blowfish-encrypted Deezer streams on the fly. */
     private val deezerProxy = DeezerDecryptProxy()
     lateinit var player: ExoPlayer
@@ -278,6 +281,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         createNotificationChannel()
         deezerProxy.start()
         registerNetworkCallback()
+        volumeObserver = PhoneVolume.observe(this, serviceScope)
 
         val audioAttributes = AudioAttributes.Builder()
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
@@ -1569,6 +1573,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     override fun onDestroy() {
         stopInfiniPlay()
         unregisterNetworkCallback()
+        volumeObserver?.let { PhoneVolume.unregister(this, it) }
         releaseControlPlaneLocks()
         equalizer.release()
         if (openAudioEffectSession) {

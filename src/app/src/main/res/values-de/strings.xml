@@ -363,9 +363,12 @@
     <string name="downloads_found_in_folder">%1$d Downloads im Ordner gefunden</string>
     <string name="downloads_unindexed_found">Titel im Download-Ordner, die noch nicht in deinen Downloads sind: %1$d</string>
     <plurals name="downloads_unindexed_title"><item quantity="one">%d Titel nicht in deinen Downloads</item><item quantity="other">%d Titel nicht in deinen Downloads</item></plurals>
-    <string name="downloads_unindexed_action">Tippen, um sie ihren Titeln zuzuordnen</string>
+    <string name="downloads_unindexed_action">Tippen, um sie zuzuordnen und ihre Titel-IDs zu schreiben</string>
     <string name="downloads_matching">Ordne %1$d von %2$d zu</string>
     <string name="downloads_matched">Ihren Titeln zugeordnet: %1$d von %2$d</string>
+    <plurals name="downloads_untagged_title"><item quantity="one">%d Download ohne Titel-ID</item><item quantity="other">%d Downloads ohne Titel-ID</item></plurals>
+    <string name="downloads_writing_ids">Titel-IDs schreiben: %1$d von %2$d</string>
+    <string name="downloads_ids_written">Titel-IDs in Dateien geschrieben: %1$d</string>
     <string name="download_folder_none">Nicht gesetzt, zum Wählen tippen</string>
     <string name="storage_limit">Speicherlimit</string>
     <string name="storage_limit_desc">Begrenzt, wie viel Speicherplatz deine Downloads nutzen dürfen. Leer oder 0 für kein Limit.</string>

@@ -1548,6 +1548,10 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     private fun registerNetworkCallback() {
         val cm = getSystemService(ConnectivityManager::class.java) ?: return
         connectivityManager = cm
+        // With no network at all the callback never fires, so a start in airplane mode stayed
+        // "online" and offline pages tried the network instead of the downloads. Any real network
+        // reports itself right after registering, so only its absence needs saying here.
+        if (cm.activeNetwork == null) NetworkState.set(false)
         try {
             cm.registerDefaultNetworkCallback(networkCallback)
         } catch (e: Exception) {

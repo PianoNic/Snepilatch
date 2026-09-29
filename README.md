@@ -5,12 +5,12 @@
 <h1 align="center">Snepilatch</h1>
 
 <p align="center">
-  <strong>A simplicity-focused, open-source music streaming app for Android.</strong>
+  <strong>A simple, open-source music streaming app for Android.</strong>
 </p>
 
 <p align="center">
   <a href="https://github.com/PianoNic/Snepilatch/stargazers"><img src="https://img.shields.io/github/stars/PianoNic/Snepilatch?style=flat&color=1DB954" alt="Stars"/></a>
-  <a href="https://github.com/PianoNic/Snepilatch/releases"><img src="https://img.shields.io/github/v/release/PianoNic/Snepilatch?include_prereleases&color=1DB954&label=Latest" alt="Release"/></a>
+  <a href="https://github.com/PianoNic/Snepilatch/releases"><img src="https://img.shields.io/github/v/release/PianoNic/Snepilatch?include_prereleases&color=1DB954&label=Latest" alt="Latest release"/></a>
   <a href="https://discord.gg/NJxKMSNYRG"><img src="https://img.shields.io/discord/1421178590027841618?color=1DB954&label=Discord&logo=discord&logoColor=white" alt="Discord"/></a>
 </p>
 
@@ -20,20 +20,20 @@
 
 ## Features
 
-| Playback | Sound |
-| --- | --- |
-| <ul><li>No ads, ever</li><li>Skip as much as you like</li><li>Pick how it sounds: normal, lossless, or YouTube Music</li><li>Push the music to your speaker or laptop and pull it back</li><li>Shuffle that mixes in songs you might like</li></ul> | <ul><li>A ten-band equalizer built in, drag the curve however you like</li><li>Turn it up without anything crackling</li><li>Plays nice with an equalizer app like Wavelet</li></ul> |
-| **InfiniPlay** | **Offline** |
-| <ul><li>Turns any song into an endless remix</li><li>Loops on the beat, so you never hear the seam</li></ul> | <ul><li>Save songs, albums and whole playlists to your phone</li><li>Keeps playing when you lose signal, picks back up when it returns</li><li>Choose where the files land, pause the downloads whenever</li></ul> |
-| **Lyrics** | **Friends** |
-| <ul><li>Word-by-word synced lyrics that light up as they play</li><li>Duets, backing vocals, and who wrote the song</li><li>Tap a line to jump there</li><li>Tap the cover to flip it over to the lyrics</li></ul> | <ul><li>See what your friends are playing and join in with one tap</li><li>Listen together, hop in from a link or a QR code</li><li>Several accounts, one tap to swap between them</li><li>Change your profile picture</li></ul> |
-| **Your music** | **Looks** |
-| <ul><li>Liked songs, playlists, albums, artists and podcasts</li><li>Search, a home feed, your queue one swipe away</li><li>Scan a code to open a song</li><li>Shared links open straight in the app</li></ul> | <ul><li>Colours that follow the album cover</li><li>Swipe your way around the player</li><li>Moving artwork behind the music</li><li>Built for Android, feels like it</li></ul> |
-| **Make it yours** | **Languages** |
-| <ul><li>Swipe a song left or right to do whatever you want</li><li>Choose the extra button on the player</li><li>Choose the two buttons on the notification</li><li>Looks and behaviour all in one place</li></ul> | <ul><li>🇨🇭 **Schwiizerdütsch**, we had no say in it, the app is made in Switzerland</li><li>English, German and Russian too</li><li>New versions arrive in the app</li></ul> |
+| Playback                                                                                                                                                                                                                                                                     | Sound                                                                                                                                                                                                                                                                |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <ul><li>No ads, ever</li><li>Skip as much as you want</li><li>Choose your audio source: Normal, Lossless, or YouTube Music</li><li>Cast playback to your speaker or laptop and take it back whenever you want</li><li>Smart Shuffle mixes in songs you might enjoy</li></ul> | <ul><li>Built-in 10-band equalizer with a fully customizable curve</li><li>Turn up the volume without unwanted distortion</li><li>Works nicely alongside equalizer apps like Wavelet</li></ul>                                                                       |
+| **InfiniPlay**                                                                                                                                                                                                                                                               | **Offline**                                                                                                                                                                                                                                                          |
+| <ul><li>Turn any song into an endless remix</li><li>Loop sections on the beat for seamless transitions</li></ul>                                                                                                                                                             | <ul><li>Download songs, albums, and entire playlists to your device</li><li>Keep listening without an internet connection and resume automatically when you're back online</li><li>Choose where your downloads are stored and pause them whenever you want</li></ul> |
+| **Lyrics**                                                                                                                                                                                                                                                                   | **Friends**                                                                                                                                                                                                                                                          |
+| <ul><li>Word-by-word synced lyrics that highlight as the song plays</li><li>Support for duets, backing vocals, and songwriters</li><li>Tap any line to jump to that part of the song</li><li>Flip the album artwork to reveal the lyrics</li></ul>                           | <ul><li>See what your friends are listening to and join them with one tap</li><li>Start listening together through a link or QR code</li><li>Use multiple accounts and switch between them with one tap</li><li>Set your own profile picture</li></ul>               |
+| **Your Music**                                                                                                                                                                                                                                                               | **Looks**                                                                                                                                                                                                                                                            |
+| <ul><li>Liked songs, playlists, albums, artists, and podcasts</li><li>Search, browse your home feed, and access your queue with a swipe</li><li>Scan a QR code to open a song</li><li>Shared links open directly in the app</li></ul>                                        | <ul><li>Colours that adapt to the album artwork</li><li>Swipe your way through the player</li><li>Animated artwork while your music plays</li><li>Built for Android, with a native feel</li></ul>                                                                    |
+| **Make It Yours**                                                                                                                                                                                                                                                            | **Languages**                                                                                                                                                                                                                                                        |
+| <ul><li>Choose what swiping left or right on a song does</li><li>Choose the extra button shown in the player</li><li>Choose which two actions appear in the notification</li><li>Customize the app's appearance and behaviour in one place</li></ul>                         | <ul><li>🇨🇭 **Swiss German**, because the app is made in Switzerland</li><li>English, German, and Russian</li><li>More languages can be added in future releases</li></ul>                                                                                          |
 
 > [!CAUTION]
-> This is an unofficial client, use at your own risk or with an alternative account, as account safety cannot be guaranteed.
+> Snepilatch is an unofficial client. Use it at your own risk. If you are concerned about account safety, consider using an alternative account, as I cannot guarantee the safety of your account.
 
 ## Installation
 
@@ -41,15 +41,15 @@ Download the latest APK from the [Releases](https://github.com/PianoNic/Snepilat
 
 ## Building from Source
 
-> This project depends on a private library not included in the repository. It will not compile without it. Contact me for permission to access the source code via Discord
+> This project depends on a private library that is not included in this repository. As a result, the project cannot be built from source without access to it. Contact me on Discord if you would like to request access.
 
 ## Community
 
-[Discord](https://discord.gg/NJxKMSNYRG)
+Join the community on [Discord](https://discord.gg/NJxKMSNYRG).
 
 ## Credits
 
-The lyrics view is inspired by [Spicy Lyrics](https://spicylyrics.org), and the lyrics themselves come from its phenomenal [developer API](https://developers.spicylyrics.org).
+The lyrics view is inspired by [Spicy Lyrics](https://spicylyrics.org), and the lyrics themselves are provided by its excellent [developer API](https://developers.spicylyrics.org).
 
 ## License
 

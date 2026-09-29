@@ -434,6 +434,8 @@ object TrackDownloader {
             downloadedAt = System.currentTimeMillis(),
             durationMs = request.durationMs,
             auto = request.localOnly,
+            // tagsFor writes the id for every catalogue track.
+            idTagged = request.trackUri.startsWith("spotify:track:"),
         )
         Downloads.put(record)
         LokiLogger.i(TAG, "downloaded '${request.title}' as .$finalExtension from ${info.provider}")

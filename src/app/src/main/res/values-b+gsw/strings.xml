@@ -379,9 +379,12 @@
     <string name="downloads_found_in_folder">%1$d Downloads im Ordner gfunde</string>
     <string name="downloads_unindexed_found">Songs im Download-Ordner, wo no nöd i dine Downloads sind: %1$d</string>
     <plurals name="downloads_unindexed_title"><item quantity="one">%d Song nöd i dine Downloads</item><item quantity="other">%d Songs nöd i dine Downloads</item></plurals>
-    <string name="downloads_unindexed_action">Tippe, zum si ihrne Songs zuezordne</string>
+    <string name="downloads_unindexed_action">Tippe, zum si zuezordne und ihri Song-IDs z schriibe</string>
     <string name="downloads_matching">Ordne %1$d vo %2$d zue</string>
     <string name="downloads_matched">Ihrne Songs zuegordnet: %1$d vo %2$d</string>
+    <plurals name="downloads_untagged_title"><item quantity="one">%d Download ohni Song-ID</item><item quantity="other">%d Downloads ohni Song-ID</item></plurals>
+    <string name="downloads_writing_ids">Song-IDs schriibe: %1$d vo %2$d</string>
+    <string name="downloads_ids_written">Song-IDs i Dateie gschribe: %1$d</string>
     <string name="download_folder_none">Nöd gsetzt, tipp zum Uuswähle</string>
     <string name="storage_limit">Speicherlimit</string>
     <string name="storage_limit_desc">Begränzt wieviel Platz dini Downloads bruuche dörfed. Leer oder 0 für kes Limit.</string>

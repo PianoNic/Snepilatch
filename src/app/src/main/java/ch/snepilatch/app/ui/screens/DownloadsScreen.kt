@@ -122,13 +122,25 @@ fun DownloadsScreen(vm: PlaybackViewModel) {
 private fun UnindexedFiles() {
     val unindexed by FolderScan.unindexed.collectAsState()
     val migrating by FolderScan.migrating.collectAsState()
+    val rows by Downloads.rows.collectAsState()
+    // MP3 cannot take the id, so those would stay "without" forever.
+    val untagged = rows.count {
+        !it.idTagged && ch.snepilatch.app.logic.download.TrackIdWriter.canTag(android.net.Uri.decode(it.documentUri))
+    }
     val context = androidx.compose.ui.platform.LocalContext.current
     val progress = migrating
-    if (unindexed == 0 && progress == null) return
+    if (unindexed == 0 && untagged == 0 && progress == null) return
     SettingRow(
-        title = androidx.compose.ui.res.pluralStringResource(R.plurals.downloads_unindexed_title, unindexed, unindexed),
-        subtitle = progress?.let { stringResource(R.string.downloads_matching, it.first, it.second) }
-            ?: stringResource(R.string.downloads_unindexed_action),
+        title = if (unindexed > 0) {
+            androidx.compose.ui.res.pluralStringResource(R.plurals.downloads_unindexed_title, unindexed, unindexed)
+        } else {
+            androidx.compose.ui.res.pluralStringResource(R.plurals.downloads_untagged_title, untagged, untagged)
+        },
+        subtitle = when {
+            progress == null -> stringResource(R.string.downloads_unindexed_action)
+            progress.writingIds -> stringResource(R.string.downloads_writing_ids, progress.done, progress.total)
+            else -> stringResource(R.string.downloads_matching, progress.done, progress.total)
+        },
         icon = Icons.Rounded.Downloading,
         onClick = if (progress == null) ({ FolderScan.migrate(context) }) else null,
     )

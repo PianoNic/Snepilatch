@@ -64,9 +64,11 @@ object FolderScan {
     private val _unindexed = MutableStateFlow(0)
     val unindexed: StateFlow<Int> = _unindexed.asStateFlow()
 
-    /** A running [migrate] as (done, total), or null. */
-    private val _migrating = MutableStateFlow<Pair<Int, Int>?>(null)
-    val migrating: StateFlow<Pair<Int, Int>?> = _migrating.asStateFlow()
+    /** How far a running [migrate] is: matching unknown files, then writing ids into the indexed ones. */
+    data class Progress(val writingIds: Boolean, val done: Int, val total: Int)
+
+    private val _migrating = MutableStateFlow<Progress?>(null)
+    val migrating: StateFlow<Progress?> = _migrating.asStateFlow()
 
     /** After a folder is picked: take back the tagged files, then count the rest. */
     fun start(context: Context) {
@@ -87,21 +89,44 @@ object FolderScan {
         scope.launch { count(ctx) }
     }
 
-    /** Matches the unknown files to the catalogue, on the user's request. */
+    /**
+     * On the user's request: matches the unknown files to the catalogue, then writes the track id into
+     * every indexed file that does not carry it yet, so a reinstall finds them without matching (#932).
+     */
     fun migrate(context: Context) {
         val ctx = context.applicationContext
         if (_migrating.value != null) return
-        _migrating.value = 0 to _unindexed.value
+        _migrating.value = Progress(writingIds = false, done = 0, total = _unindexed.value)
         scope.launch {
-            val matched = runCatching { importFiles(ctx, CatalogueLookup()) }
-                .onFailure { LokiLogger.e(TAG, "migration failed", it) }
+            if (_unindexed.value > 0) {
+                val matched = runCatching { importFiles(ctx, CatalogueLookup()) }
+                    .onFailure { LokiLogger.e(TAG, "migration failed", it) }
+                    .getOrDefault(0)
+                val total = _migrating.value?.total ?: 0
+                LokiLogger.i(TAG, "matched $matched of $total file(s) to the catalogue")
+                AppMessages.show(R.string.downloads_matched, matched, total)
+            }
+            val written = runCatching { writeIds(ctx) }
+                .onFailure { LokiLogger.e(TAG, "writing ids failed", it) }
                 .getOrDefault(0)
-            val total = _migrating.value?.second ?: 0
+            if (written > 0) AppMessages.show(R.string.downloads_ids_written, written)
             _migrating.value = null
-            LokiLogger.i(TAG, "matched $matched of $total file(s) to the catalogue")
-            AppMessages.show(R.string.downloads_matched, matched, total)
             count(ctx)
         }
+    }
+
+    /** One file at a time: each is read, rewritten and read back whole, and it is the user's music. */
+    private fun writeIds(ctx: Context): Int {
+        val untagged = Downloads.rows.value.filter { !it.idTagged && TrackIdWriter.canTag(Uri.decode(it.documentUri)) }
+        var written = 0
+        untagged.forEachIndexed { i, row ->
+            _migrating.value = Progress(writingIds = true, done = i, total = untagged.size)
+            val result = FileRetagger.tag(ctx, row) ?: return@forEachIndexed
+            Downloads.put(result.row)
+            if (result.wrote) written++
+        }
+        LokiLogger.i(TAG, "wrote the track id into $written of ${untagged.size} file(s)")
+        return written
     }
 
     /** Also tells the user, but only when the number went up since they were last told, not on every start. */
@@ -147,7 +172,7 @@ object FolderScan {
         val knownDocs = Downloads.rows.value.mapTo(HashSet()) { it.documentUri }
         val knownTracks = Downloads.rows.value.mapTo(HashSet()) { it.trackUri }
         val files = listFiles(ctx).filter { it.uri.toString() !in knownDocs }
-        if (lookup != null) _migrating.value = 0 to files.size
+        if (lookup != null) _migrating.value = Progress(writingIds = false, done = 0, total = files.size)
         var added = 0
         var done = 0
         val copies = mutableListOf<String>()
@@ -173,7 +198,7 @@ object FolderScan {
                             }
                         }
                         done++
-                        if (lookup != null) _migrating.value = done to files.size
+                        if (lookup != null) _migrating.value = Progress(writingIds = false, done = done, total = files.size)
                     }
                 }
             }
@@ -197,7 +222,8 @@ object FolderScan {
      */
     private suspend fun rowFor(ctx: Context, file: FoundFile, lookup: CatalogueLookup?): DownloadedTrack? {
         val meta = readMeta(ctx, file) ?: return null
-        val id = readTrackId(ctx, file) ?: lookup?.find(meta.title, meta.artist, meta.durationMs) ?: return null
+        val tagged = readTrackId(ctx, file)
+        val id = tagged ?: lookup?.find(meta.title, meta.artist, meta.durationMs) ?: return null
         return DownloadedTrack(
             trackUri = "spotify:track:$id",
             documentUri = file.uri.toString(),
@@ -213,6 +239,7 @@ object FolderScan {
             artist = meta.artist,
             downloadedAt = file.modified,
             durationMs = meta.durationMs,
+            idTagged = tagged != null,
         )
     }
 

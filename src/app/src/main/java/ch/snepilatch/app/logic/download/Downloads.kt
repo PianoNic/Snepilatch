@@ -33,6 +33,8 @@ data class DownloadedTrack(
     val durationMs: Long = 0L,
     /** Saved on its own after a listen, not asked for; only these make room when the storage cap is hit (#581). */
     val auto: Boolean = false,
+    /** The file carries its track id tag (#566), so a reinstall finds it again without matching (#932). */
+    val idTagged: Boolean = false,
 )
 
 /** The row as the screens and the offline player see it. */
@@ -48,7 +50,7 @@ fun DownloadedTrack.toTrackInfo() = TrackInfo(uri = trackUri, name = title, arti
 object Downloads {
 
     private const val DB_NAME = "downloads.db"
-    private const val DB_VERSION = 6
+    private const val DB_VERSION = 7
     private const val TABLE = "downloads"
 
     private var helper: Helper? = null
@@ -107,7 +109,8 @@ object Downloads {
                     artist TEXT NOT NULL,
                     downloaded_at INTEGER NOT NULL,
                     duration_ms INTEGER NOT NULL DEFAULT 0,
-                    auto INTEGER NOT NULL DEFAULT 0
+                    auto INTEGER NOT NULL DEFAULT 0,
+                    id_tagged INTEGER NOT NULL DEFAULT 0
                 )
                 """.trimIndent()
             )
@@ -133,6 +136,9 @@ object Downloads {
             // v6 tells auto-saves from asked-for downloads. Older rows count as asked for, so the cap
             // never deletes something the user may have wanted.
             if (oldVersion < 6) db.execSQL("ALTER TABLE $TABLE ADD COLUMN auto INTEGER NOT NULL DEFAULT 0")
+            // v7 knows which files carry their track id. Older rows count as not, and are checked when
+            // the user has the ids written; one that already has it is only marked.
+            if (oldVersion < 7) db.execSQL("ALTER TABLE $TABLE ADD COLUMN id_tagged INTEGER NOT NULL DEFAULT 0")
         }
 
         /** Sideloading an older build must not crash; the default implementation throws. */
@@ -319,6 +325,7 @@ object Downloads {
         put("downloaded_at", downloadedAt)
         put("duration_ms", durationMs)
         put("auto", if (auto) 1 else 0)
+        put("id_tagged", if (idTagged) 1 else 0)
     }
 
     private fun android.database.Cursor.toTrack() = DownloadedTrack(
@@ -338,6 +345,7 @@ object Downloads {
         downloadedAt = getLong(getColumnIndexOrThrow("downloaded_at")),
         durationMs = getLong(getColumnIndexOrThrow("duration_ms")),
         auto = getInt(getColumnIndexOrThrow("auto")) == 1,
+        idTagged = getInt(getColumnIndexOrThrow("id_tagged")) == 1,
     )
 
     private fun android.database.Cursor.getStringOrNull(column: String): String? =

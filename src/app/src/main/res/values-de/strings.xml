@@ -361,6 +361,11 @@
     <string name="download_failed">Download fehlgeschlagen</string>
     <string name="download_folder">Download-Ordner</string>
     <string name="downloads_found_in_folder">%1$d Downloads im Ordner gefunden</string>
+    <string name="downloads_unindexed_found">Titel im Download-Ordner, die noch nicht in deinen Downloads sind: %1$d</string>
+    <plurals name="downloads_unindexed_title"><item quantity="one">%d Titel nicht in deinen Downloads</item><item quantity="other">%d Titel nicht in deinen Downloads</item></plurals>
+    <string name="downloads_unindexed_action">Tippen, um sie ihren Titeln zuzuordnen</string>
+    <string name="downloads_matching">Ordne %1$d von %2$d zu</string>
+    <string name="downloads_matched">Ihren Titeln zugeordnet: %1$d von %2$d</string>
     <string name="download_folder_none">Nicht gesetzt, zum Wählen tippen</string>
     <string name="storage_limit">Speicherlimit</string>
     <string name="storage_limit_desc">Begrenzt, wie viel Speicherplatz deine Downloads nutzen dürfen. Leer oder 0 für kein Limit.</string>

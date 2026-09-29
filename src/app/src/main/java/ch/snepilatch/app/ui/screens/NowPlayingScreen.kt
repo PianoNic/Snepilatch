@@ -195,7 +195,10 @@ private fun CanvasVideoBackground(canvasVideoUrl: String, audioPlaying: Boolean)
         // that was the whole clip over the network again and again, ~100 MB a minute (#565).
         // ponytail: shares the audio cache's 512 MB LRU; give canvases their own if they crowd out audio.
         PlaybackCache.init(context.applicationContext)
-        val source = DefaultMediaSourceFactory(PlaybackCache.wrap(DefaultDataSource.Factory(context)))
+        // A kept clip is already a file; caching it would only store a second copy.
+        val upstream = DefaultDataSource.Factory(context)
+        val cached = if (canvasVideoUrl.startsWith("file:")) upstream else PlaybackCache.wrap(upstream)
+        val source = DefaultMediaSourceFactory(cached)
         val player = ExoPlayer.Builder(context).setMediaSourceFactory(source).build().apply {
             setMediaItem(MediaItem.fromUri(Uri.parse(canvasVideoUrl)))
             repeatMode = Player.REPEAT_MODE_ALL

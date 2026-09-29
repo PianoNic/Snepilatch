@@ -89,7 +89,10 @@ object TrackDownloader {
             // Anything unexpected becomes a failed notification; a download must not crash the app.
             Downloads.markStarted(request.trackUri)
             try {
-                downloadInner(request, context, notify, onProgress)
+                downloadInner(request, context, notify, onProgress).also {
+                    // Only while canvas is on: with it off the clip would be data nobody asked for.
+                    if (it is DownloadOutcome.Done && AppSettings.canvasEnabled.value) CanvasStore.save(request.trackUri, http)
+                }
             } catch (e: CancellationException) {
                 // Backing out of the app cancels the scope. The file may well have landed, so this is
                 // not a failure to report — but the ongoing progress bar has to go, or it sits there

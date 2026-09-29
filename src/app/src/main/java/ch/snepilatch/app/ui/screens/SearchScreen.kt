@@ -301,9 +301,25 @@ private data class UnifiedResult(
     val track: ch.snepilatch.app.data.TrackInfo? = null,
 )
 
+/**
+ * The menu with Download first, labelled from the live index. The rest of a result's menu is built with
+ * the results, and Download used to be too, so it kept saying "Download" after the song was saved.
+ */
+@Composable
+private fun liveMenu(menu: List<MenuAction>, track: ch.snepilatch.app.data.TrackInfo?, vm: PlaybackViewModel): List<MenuAction> {
+    track ?: return menu
+    val index by Downloads.index.collectAsState()
+    return listOf(downloadAction(vm, LocalContext.current, track, index)) + menu
+}
+
 /** Download, or remove the download, as every other track menu offers it (#574). */
-private fun downloadAction(vm: PlaybackViewModel, ctx: Context, track: ch.snepilatch.app.data.TrackInfo): MenuAction {
-    val downloaded = Downloads.isDownloaded(Downloads.index.value, track.uri, track.name, track.artist)
+private fun downloadAction(
+    vm: PlaybackViewModel,
+    ctx: Context,
+    track: ch.snepilatch.app.data.TrackInfo,
+    index: Set<String>,
+): MenuAction {
+    val downloaded = Downloads.isDownloaded(index, track.uri, track.name, track.artist)
     return MenuAction(
         if (downloaded) Icons.Rounded.OfflinePin else Icons.Rounded.DownloadForOffline,
         ctx.getString(if (downloaded) R.string.remove_download else R.string.download_track),
@@ -333,7 +349,6 @@ private fun SearchTrack.toUnified(vm: PlaybackViewModel, ctx: Context) = Unified
     onClick = { vm.playTrack(toTrackInfo()) },
     track = toTrackInfo(),
     menu = listOf(
-        downloadAction(vm, ctx, toTrackInfo()),
         MenuAction(Icons.AutoMirrored.Rounded.QueueMusic, ctx.getString(R.string.add_to_queue)) {
             vm.addToQueue(uri)
         },
@@ -449,7 +464,7 @@ private fun CategorizedResults(
                 // section in Spfy's per-query chipOrder, capped with a "Show all".
                 results.topResult?.let { top ->
                     val unified = top.toUnified(vm, ctx)
-                    item(key = "top") { TopResultCard(unified) }
+                    item(key = "top") { TopResultCard(unified.copy(menu = liveMenu(unified.menu, unified.track, vm))) }
                 }
                 results.chipOrder.ifEmpty { DEFAULT_CHIP_ORDER }.forEach { type ->
                     val (filter, rows) = sectionFor(type, results, vm, ctx) ?: return@forEach
@@ -458,13 +473,13 @@ private fun CategorizedResults(
                         SectionHeader(stringResource(labelFor(filter))) { onFilterChange(filter) }
                     }
                     items(rows.take(SECTION_PREVIEW), key = { "${type}_${it.uri}" }) { row ->
-                        ResultRow(row.title, row.subtitle, row.imageUrl, row.circular, row.menu, row.track, row.onClick)
+                        ResultRow(row.title, row.subtitle, row.imageUrl, row.circular, liveMenu(row.menu, row.track, vm), row.track, row.onClick)
                     }
                 }
             } else {
                 val rows = singleFilterRows(results, vm, ctx, selectedFilter)
                 items(rows, key = { it.uri }) { row ->
-                    ResultRow(row.title, row.subtitle, row.imageUrl, row.circular, row.menu, row.track, row.onClick)
+                    ResultRow(row.title, row.subtitle, row.imageUrl, row.circular, liveMenu(row.menu, row.track, vm), row.track, row.onClick)
                 }
             }
         }

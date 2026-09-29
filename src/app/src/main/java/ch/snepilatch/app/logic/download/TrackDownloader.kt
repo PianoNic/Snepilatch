@@ -29,6 +29,7 @@ data class DownloadRequest(
     val contextUri: String? = null,
     val contextName: String? = null,
     val contextType: String? = null,
+    val contextImageUrl: String? = null,
     /**
      * Decoded audio already taken off the player, used instead of fetching anything. Set on the
      * track-change path, where the capture has to be claimed before the next track overwrites it.
@@ -125,7 +126,7 @@ object TrackDownloader {
             existingRow?.let { existing ->
                 // Only a definite "not there" re-downloads; an inconclusive check keeps the row.
                 if (DownloadFolder.exists(existing.documentUri) != false) {
-                    return@withContext DownloadOutcome.Done(existing)
+                    return@withContext DownloadOutcome.Done(adoptContextImage(existing, request))
                 }
                 // The row's own uri, not the requested one: on a metadata match they differ, and
                 // removing the requested uri would delete nothing and leave the dead row forever.
@@ -216,6 +217,16 @@ object TrackDownloader {
      * actually listened to. Spfy's stream is Widevine, so its encoded bytes can never be written
      * out; the decoded samples can. Everything else re-fetches a different upload of the same song.
      */
+    /**
+     * A row saved before the context cover was kept picks it up from the same list's repeat download,
+     * so an old group can drop the track art it borrowed (#876). Anything else comes back unchanged.
+     */
+    private fun adoptContextImage(existing: DownloadedTrack, request: DownloadRequest): DownloadedTrack {
+        val image = request.contextImageUrl
+        if (existing.contextImageUrl != null || image == null || existing.contextUri != request.contextUri) return existing
+        return existing.copy(contextImageUrl = image).also(Downloads::put)
+    }
+
     private fun fromCapturedPcm(request: DownloadRequest, temp: File): StreamInfo? {
         val capture = request.capture
             ?: MusicPlaybackService.instance?.captureOf(request.trackUri, request.durationMs)
@@ -407,6 +418,7 @@ object TrackDownloader {
             contextUri = request.contextUri,
             contextName = request.contextName,
             contextType = request.contextType,
+            contextImageUrl = request.contextImageUrl,
             sizeBytes = written,
             title = request.title,
             artist = request.artist,

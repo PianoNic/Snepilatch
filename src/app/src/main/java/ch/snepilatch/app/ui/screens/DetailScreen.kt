@@ -759,7 +759,7 @@ private fun AlbumTrackRow(
             val items = trackMenuActions(
                 track, vm, detailVm,
                 close = { showMenu = false },
-                options = TrackMenuOptions(visitAlbum = false),
+                options = TrackMenuOptions(visitAlbum = false, pageUri = contextUri),
             )
             EntityMenuSheet(
                 imageUrl = track.albumArt,

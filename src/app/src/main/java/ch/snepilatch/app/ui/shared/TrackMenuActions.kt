@@ -50,7 +50,16 @@ fun trackMenuActions(
             when {
                 track.uri in inFlight -> Unit
                 isDownloaded -> vm.removeDownload(track.uri)
-                else -> vm.downloadTrack(track, context)
+                else -> {
+                    // From an album or playlist page the track is filed under it, so it shows there
+                    // offline and in its Downloaded group; anywhere else it stays a single (#876).
+                    val page = detailVm.detail.value
+                    if (options.pageUri != null && options.pageUri == page.uri && page.type in setOf("album", "playlist")) {
+                        vm.downloadTracks(listOf(track), context, page.uri, page.name, page.type, page.imageUrl)
+                    } else {
+                        vm.downloadTrack(track, context)
+                    }
+                }
             }
             close()
         },

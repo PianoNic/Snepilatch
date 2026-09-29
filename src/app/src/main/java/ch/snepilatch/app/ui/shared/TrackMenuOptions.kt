@@ -6,4 +6,6 @@ data class TrackMenuOptions(
     val radio: Boolean = false,
     val visitAlbum: Boolean = true,
     val visitArtist: Boolean = true,
+    /** The list the row sits in; a download from it joins that album or playlist, not a lone single. */
+    val pageUri: String? = null,
 )

@@ -87,10 +87,20 @@ object DownloadNotifier {
         manager(context).notify(NOTIFICATION_ID, builder.build())
     }
 
-    fun batchFinished(context: Context, total: Int, failed: Int) {
+    /** Names the [failed] titles in the expanded text, so a retry does not mean checking every row (#569). */
+    fun batchFinished(context: Context, total: Int, failed: List<String>) {
+        val count = context.getString(R.string.downloaded_count, total - failed.size, total)
         val builder = base(context, "")
             .setContentTitle(context.getString(R.string.download_complete))
-            .setContentText(context.getString(R.string.downloaded_count, total - failed, total))
+            .setContentText(count)
+        if (failed.isNotEmpty()) {
+            val names = failed.joinToString(", ")
+            builder.setStyle(
+                NotificationCompat.BigTextStyle()
+                    .bigText("$count\n${context.getString(R.string.download_failed)}: $names")
+            )
+        }
+        builder
             .setOngoing(false)
             .setAutoCancel(true)
         manager(context).notify(NOTIFICATION_ID, builder.build())

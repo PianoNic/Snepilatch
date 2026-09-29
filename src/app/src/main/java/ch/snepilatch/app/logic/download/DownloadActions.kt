@@ -212,7 +212,7 @@ object DownloadActions {
             total = tracks.size,
         )
         val job = scope.launch(Dispatchers.IO) {
-            var failed = 0
+            val failed = mutableListOf<String>()
             var state = DownloadQueue.QueueEntry.State.Done
             try {
                 tracks.forEachIndexed { index, track ->
@@ -239,14 +239,14 @@ object DownloadActions {
                     } finally {
                         DownloadQueue.clearTrack(track.uri)
                     }
-                    if (outcome !is DownloadOutcome.Done) failed++
+                    if (outcome !is DownloadOutcome.Done) failed += track.name
                     if (outcome is DownloadOutcome.NoFolder) {
                         warnNoFolder(ctx, outcome, track.name)
                         state = DownloadQueue.QueueEntry.State.Failed
                         return@launch
                     }
                 }
-                if (failed == tracks.size) state = DownloadQueue.QueueEntry.State.Failed
+                if (failed.size == tracks.size) state = DownloadQueue.QueueEntry.State.Failed
                 DownloadNotifier.batchFinished(ctx, tracks.size, failed)
             } catch (e: CancellationException) {
                 // The batch posts its own ongoing notification, so notify=false keeps TrackDownloader

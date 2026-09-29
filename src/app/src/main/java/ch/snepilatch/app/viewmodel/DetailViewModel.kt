@@ -2,6 +2,9 @@ package ch.snepilatch.app.viewmodel
 
 import androidx.lifecycle.viewModelScope
 import ch.snepilatch.app.data.*
+import ch.snepilatch.app.logic.download.Downloads
+import ch.snepilatch.app.logic.download.toTrackInfo
+import ch.snepilatch.app.logic.shared.NetworkState
 import ch.snepilatch.app.logic.shared.SessionHolder
 import ch.snepilatch.app.logic.shared.LokiLogger
 import kotify.api.album.Album
@@ -53,17 +56,37 @@ class DetailViewModel : SessionViewModel("DetailVM") {
     }
 
     /** Navigate to a detail screen and load it under [isLoading]; a null result leaves the previous
-     *  detail unchanged (used by openShow when the podcast has no info). */
-    private fun openDetail(screen: Screen, op: String, load: suspend (Session) -> DetailData?) {
+     *  detail unchanged (used by openShow when the podcast has no info). Offline, an album or playlist
+     *  ([offlineUri]) is built from its downloads instead: the fetch would fail and leave the previous
+     *  page on screen under the new one's name (#876). */
+    private fun openDetail(screen: Screen, op: String, offlineUri: String? = null, load: suspend (Session) -> DetailData?) {
         Navigator.navigateTo(screen)
+        if (offlineUri != null && !NetworkState.online.value) {
+            _detail.value = downloadedDetail(offlineUri)
+            return
+        }
         launchWithSessionLoading(op, isLoading) { sess -> load(sess)?.let { _detail.value = it } }
+    }
+
+    /** What the downloads know about [uri]: its name, cover and the tracks on the phone. */
+    private fun downloadedDetail(uri: String): DetailData {
+        val rows = Downloads.tracksInGroup(uri)
+        val group = Downloads.groupsOf(rows).firstOrNull()
+        return DetailData(
+            name = group?.name.orEmpty(),
+            imageUrl = group?.imageUrl,
+            tracks = rows.map { it.toTrackInfo() },
+            uri = uri,
+            type = uri.split(":").getOrNull(1).orEmpty(),
+            totalCount = rows.size,
+        )
     }
 
     fun openLikedSongs() = openDetail(Screen.PLAYLIST_DETAIL, "openLikedSongs") { sess ->
         Playlist(sess).getLikedSongs(limit = 50).toDetailData(offset = 0)
     }
 
-    fun openPlaylist(playlistId: String) = openDetail(Screen.PLAYLIST_DETAIL, "openPlaylist") { sess ->
+    fun openPlaylist(playlistId: String) = openDetail(Screen.PLAYLIST_DETAIL, "openPlaylist", "spotify:playlist:$playlistId") { sess ->
         playlistPage(sess, playlistId, limit = 50, offset = 0).toDetailData(playlistId)
     }
 
@@ -109,7 +132,7 @@ class DetailViewModel : SessionViewModel("DetailVM") {
         }
     }
 
-    fun openAlbum(albumId: String) = openDetail(Screen.ALBUM_DETAIL, "openAlbum") { sess ->
+    fun openAlbum(albumId: String) = openDetail(Screen.ALBUM_DETAIL, "openAlbum", "spotify:album:$albumId") { sess ->
         Album(sess).getAlbum(albumId, limit = 50).toDetailData(albumId)
     }
 

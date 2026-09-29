@@ -23,6 +23,8 @@ data class DownloadedTrack(
     val contextUri: String?,
     val contextName: String?,
     val contextType: String?,
+    /** The album or playlist's own cover, so its group does not wear the first track's art (#876). */
+    val contextImageUrl: String? = null,
     val sizeBytes: Long,
     val title: String,
     val artist: String,
@@ -44,7 +46,7 @@ fun DownloadedTrack.toTrackInfo() = TrackInfo(uri = trackUri, name = title, arti
 object Downloads {
 
     private const val DB_NAME = "downloads.db"
-    private const val DB_VERSION = 4
+    private const val DB_VERSION = 5
     private const val TABLE = "downloads"
 
     private var helper: Helper? = null
@@ -97,6 +99,7 @@ object Downloads {
                     context_uri TEXT,
                     context_name TEXT,
                     context_type TEXT,
+                    context_image TEXT,
                     size_bytes INTEGER NOT NULL,
                     title TEXT NOT NULL,
                     artist TEXT NOT NULL,
@@ -122,6 +125,8 @@ object Downloads {
             }
             // v4 stores the duration so the offline player and its rows know the length up front.
             if (oldVersion < 4) db.execSQL("ALTER TABLE $TABLE ADD COLUMN duration_ms INTEGER NOT NULL DEFAULT 0")
+            // v5 keeps the album or playlist cover; older rows fall back to their own track art.
+            if (oldVersion < 5) db.execSQL("ALTER TABLE $TABLE ADD COLUMN context_image TEXT")
         }
 
         /** Sideloading an older build must not crash; the default implementation throws. */
@@ -273,7 +278,7 @@ object Downloads {
                 uri = uri,
                 name = first.contextName ?: first.title,
                 type = first.contextType ?: "single",
-                imageUrl = first.coverUrl,
+                imageUrl = tracks.firstNotNullOfOrNull { it.contextImageUrl } ?: first.coverUrl,
                 trackCount = tracks.size,
             )
         }
@@ -296,6 +301,7 @@ object Downloads {
         put("context_uri", contextUri)
         put("context_name", contextName)
         put("context_type", contextType)
+        put("context_image", contextImageUrl)
         put("size_bytes", sizeBytes)
         put("title", title)
         put("artist", artist)
@@ -313,6 +319,7 @@ object Downloads {
         contextUri = getStringOrNull("context_uri"),
         contextName = getStringOrNull("context_name"),
         contextType = getStringOrNull("context_type"),
+        contextImageUrl = getStringOrNull("context_image"),
         sizeBytes = getLong(getColumnIndexOrThrow("size_bytes")),
         title = getString(getColumnIndexOrThrow("title")),
         artist = getString(getColumnIndexOrThrow("artist")),

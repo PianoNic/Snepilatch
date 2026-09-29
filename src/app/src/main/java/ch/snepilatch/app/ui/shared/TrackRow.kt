@@ -102,7 +102,7 @@ fun TrackRow(
         val items = trackMenuActions(
             track, vm, detailVm,
             close = { showMenu = false },
-            options = TrackMenuOptions(removeFromPlaylist = onRemoveFromPlaylist, radio = true),
+            options = TrackMenuOptions(removeFromPlaylist = onRemoveFromPlaylist, radio = true, pageUri = contextUri),
         )
         EntityMenuSheet(
             imageUrl = track.albumArt,

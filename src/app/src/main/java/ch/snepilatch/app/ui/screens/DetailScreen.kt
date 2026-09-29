@@ -310,8 +310,9 @@ fun DetailScreen(vm: PlaybackViewModel) {
                                 val uri = detail.uri
                                 val name = detail.name
                                 val type = detail.type
+                                val image = detail.imageUrl
                                 detailVm.loadAllTracks(uri) { all ->
-                                    vm.downloadTracks(all, context, uri, name, type)
+                                    vm.downloadTracks(all, context, uri, name, type, image)
                                 }
                             }
                         },
@@ -758,7 +759,7 @@ private fun AlbumTrackRow(
             val items = trackMenuActions(
                 track, vm, detailVm,
                 close = { showMenu = false },
-                options = TrackMenuOptions(visitAlbum = false),
+                options = TrackMenuOptions(visitAlbum = false, pageUri = contextUri),
             )
             EntityMenuSheet(
                 imageUrl = track.albumArt,

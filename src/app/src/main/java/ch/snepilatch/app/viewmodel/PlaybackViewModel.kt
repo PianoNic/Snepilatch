@@ -3416,7 +3416,8 @@ class PlaybackViewModel : ViewModel() {
         contextUri: String? = null,
         contextName: String? = null,
         contextType: String? = null,
-    ) = DownloadActions.downloadTracks(viewModelScope, tracks, context, contextUri, contextName, contextType)
+        contextImageUrl: String? = null,
+    ) = DownloadActions.downloadTracks(viewModelScope, tracks, context, contextUri, contextName, contextType, contextImageUrl)
     fun removeDownload(trackUri: String) = DownloadActions.removeDownload(viewModelScope, trackUri)
 
     /**

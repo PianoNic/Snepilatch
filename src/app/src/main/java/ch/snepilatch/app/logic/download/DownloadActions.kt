@@ -30,6 +30,7 @@ object DownloadActions {
         contextUri: String? = null,
         contextName: String? = null,
         contextType: String? = null,
+        contextImageUrl: String? = null,
     ) = DownloadRequest(
         trackUri = uri,
         title = name,
@@ -45,6 +46,7 @@ object DownloadActions {
         contextUri = contextUri,
         contextName = contextName,
         contextType = contextType,
+        contextImageUrl = contextImageUrl,
     )
 
     /** Tells the user a download went nowhere because there is still no folder to put it in. */
@@ -202,13 +204,14 @@ object DownloadActions {
         contextUri: String? = null,
         contextName: String? = null,
         contextType: String? = null,
+        contextImageUrl: String? = null,
     ) {
         if (tracks.isEmpty()) return
         val ctx = context.applicationContext
         val id = DownloadQueue.enqueue(
             name = contextName ?: tracks.first().name,
             type = contextType ?: "single",
-            imageUrl = tracks.first().albumArt,
+            imageUrl = contextImageUrl ?: tracks.first().albumArt,
             total = tracks.size,
         )
         val job = scope.launch(Dispatchers.IO) {
@@ -228,6 +231,7 @@ object DownloadActions {
                                 contextUri = contextUri,
                                 contextName = contextName,
                                 contextType = contextType,
+                                contextImageUrl = contextImageUrl,
                             ),
                             ctx,
                             notify = false,

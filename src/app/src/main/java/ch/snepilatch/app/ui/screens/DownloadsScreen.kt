@@ -47,6 +47,8 @@ fun DownloadsScreen(vm: PlaybackViewModel) {
 
     if (confirmClearAll) {
         ClearAllDialog(
+            count = stored.size,
+            totalMb = totalMb,
             onConfirm = {
                 stored.forEach { vm.removeDownload(it.trackUri) }
                 confirmClearAll = false
@@ -231,15 +233,16 @@ private fun QueuedDownload(job: DownloadQueue.QueueEntry, onCancel: () -> Unit) 
 }
 
 @Composable
-private fun ClearAllDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+/** Says exactly what goes, with the confirm in red, since the files cannot be brought back. */
+private fun ClearAllDialog(count: Int, totalMb: Int, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = SnepilatchGray,
-        title = { Text(stringResource(R.string.remove_all), color = SnepilatchWhite) },
-        text = { Text(stringResource(R.string.remove_all_confirm), color = SnepilatchLightGray) },
+        title = { Text(stringResource(R.string.remove_all_title), color = SnepilatchWhite) },
+        text = { Text(stringResource(R.string.remove_all_confirm, count, totalMb), color = SnepilatchLightGray) },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text(stringResource(R.string.remove_all), color = SnepilatchWhite)
+                Text(stringResource(R.string.remove_all), color = Color.Red)
             }
         },
         dismissButton = {

@@ -366,6 +366,7 @@
     <string name="download_complete">Download complete</string>
     <string name="download_failed">Download failed</string>
     <string name="download_folder">Download folder</string>
+    <string name="downloads_found_in_folder">Found %1$d downloads in the folder</string>
     <string name="download_folder_none">Not set, tap to choose</string>
     <string name="storage_limit">Storage Limit</string>
     <string name="storage_limit_desc">Cap how much space your downloads can use. Leave empty or 0 for no limit.</string>

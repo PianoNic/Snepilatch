@@ -51,6 +51,8 @@ object DownloadFolder {
         prefs(context).edit().putString(PREF_KEY, uri.toString()).apply()
         _folder.value = uri
         LokiLogger.i(TAG, "download folder set")
+        // Files already in it, from before a reinstall, come back into the index instead of being fetched twice.
+        FolderScan.start(context)
     }
 
     fun clear(context: Context) {

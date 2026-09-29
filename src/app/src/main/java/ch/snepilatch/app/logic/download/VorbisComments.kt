@@ -8,11 +8,21 @@ data class TrackTags(
     val artist: String,
     val album: String? = null,
     val cover: Cover? = null,
+    /** The track's catalogue id, so a file can be matched back to its track from its own tags (#566). */
+    val trackId: String? = null,
 ) {
     data class Cover(val bytes: ByteArray, val mimeType: String) {
         override fun equals(other: Any?) = other is Cover && mimeType == other.mimeType &&
             bytes.contentEquals(other.bytes)
         override fun hashCode() = 31 * mimeType.hashCode() + bytes.contentHashCode()
+    }
+
+    companion object {
+        /**
+         * One key for every container: a Vorbis comment in Opus and FLAC, a freeform `----` atom in MP4,
+         * the way tools like Picard store MusicBrainz ids, so it reads the same in any tag editor.
+         */
+        const val TRACK_ID_KEY = "SPOTIFY_TRACK_ID"
     }
 }
 
@@ -65,6 +75,7 @@ internal object VorbisComments {
             add("TITLE" to tags.title)
             add("ARTIST" to tags.artist)
             tags.album?.let { add("ALBUM" to it) }
+            tags.trackId?.let { add(TrackTags.TRACK_ID_KEY to it) }
             if (includeCover) tags.cover?.let { add("METADATA_BLOCK_PICTURE" to encodePicture(it)) }
         }.filter { it.second.isNotBlank() }
 

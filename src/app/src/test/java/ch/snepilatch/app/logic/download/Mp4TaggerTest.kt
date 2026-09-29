@@ -13,7 +13,7 @@ import java.io.ByteArrayOutputStream
  */
 class Mp4TaggerTest {
 
-    private val tags = TrackTags(title = "Song", artist = "Band", album = "Record")
+    private val tags = TrackTags(title = "Song", artist = "Band", album = "Record", trackId = "4uLU6hMCjMI75M1A2tKUQC")
 
     /** A minimal file in the layout MediaMuxer produces: ftyp, then mdat, with moov last. */
     private fun mp4(moovLast: Boolean = true): ByteArray {
@@ -115,5 +115,15 @@ class Mp4TaggerTest {
         var value = 0
         for (i in 0 until 4) value = (value shl 8) or (bytes[at + i].toInt() and 0xFF)
         return value
+    }
+
+    @Test
+    fun `writes the track id as an iTunes freeform atom`() {
+        val text = String(tag(mp4()).second, Charsets.ISO_8859_1)
+
+        assertTrue(text.contains("----"))
+        assertTrue(text.contains("com.apple.iTunes"))
+        assertTrue(text.contains("SPOTIFY_TRACK_ID"))
+        assertTrue(text.contains("4uLU6hMCjMI75M1A2tKUQC"))
     }
 }

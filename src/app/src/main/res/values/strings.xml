@@ -376,7 +376,7 @@
     <string name="storage_policy_stop">Stop downloading</string>
     <string name="storage_policy_stop_desc">Refuse new downloads once the limit is reached</string>
     <string name="storage_policy_evict">Delete oldest</string>
-    <string name="storage_policy_evict_desc">Remove the oldest-added downloads to make room</string>
+    <string name="storage_policy_evict_desc">Remove the oldest songs kept from listening to make room</string>
     <string name="download_track">Download</string>
     <string name="remove_download">Remove download</string>
     <string name="download_needs_folder">Choose a download folder first</string>

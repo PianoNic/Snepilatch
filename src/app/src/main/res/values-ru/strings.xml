@@ -360,6 +360,7 @@
     <string name="download_complete">Загрузка завершена</string>
     <string name="download_failed">Ошибка загрузки</string>
     <string name="download_folder">Папка загрузок</string>
+    <string name="downloads_found_in_folder">Найдено загрузок в папке: %1$d</string>
     <string name="download_folder_none">Не задана, нажмите чтобы выбрать</string>
     <string name="storage_limit">Лимит хранилища</string>
     <string name="storage_limit_desc">Ограничьте объём места для загрузок. Оставьте пустым или 0 без ограничения.</string>

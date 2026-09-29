@@ -376,6 +376,7 @@
     <string name="download_complete">Download fertig</string>
     <string name="download_failed">Download hät nöd funktioniert</string>
     <string name="download_folder">Download-Ordner</string>
+    <string name="downloads_found_in_folder">%1$d Downloads im Ordner gfunde</string>
     <string name="download_folder_none">Nöd gsetzt, tipp zum Uuswähle</string>
     <string name="storage_limit">Speicherlimit</string>
     <string name="storage_limit_desc">Begränzt wieviel Platz dini Downloads bruuche dörfed. Leer oder 0 für kes Limit.</string>

@@ -530,6 +530,7 @@ object TrackDownloader {
         artist = request.artist,
         album = request.album,
         cover = request.coverUrl?.let { fetchCover(it) },
+        trackId = request.trackUri.takeIf { it.startsWith("spotify:track:") }?.removePrefix("spotify:track:"),
     )
 
     /**

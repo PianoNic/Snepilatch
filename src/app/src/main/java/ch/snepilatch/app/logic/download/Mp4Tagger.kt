@@ -93,6 +93,7 @@ internal object Mp4Tagger {
         text(out, "©nam", tags.title)
         text(out, "©ART", tags.artist)
         tags.album?.let { text(out, "©alb", it) }
+        tags.trackId?.let { freeform(out, TrackTags.TRACK_ID_KEY, it) }
         tags.cover?.let { cover ->
             val type = if (cover.mimeType.contains("png")) TYPE_PNG else TYPE_JPEG
             out.write(box("covr", data(type, cover.bytes)))
@@ -107,6 +108,14 @@ internal object Mp4Tagger {
     private fun text(out: ByteArrayOutputStream, atom: String, value: String) {
         if (value.isBlank()) return
         out.write(box(atom, data(TYPE_UTF8, value.toByteArray(Charsets.UTF_8))))
+    }
+
+    /** A `----` atom: iTunes' mean, a name, then the value, for keys the fixed atoms have no slot for. */
+    private fun freeform(out: ByteArrayOutputStream, name: String, value: String) {
+        if (value.isBlank()) return
+        val mean = box("mean", fullBoxVersion() + "com.apple.iTunes".toByteArray(Charsets.US_ASCII))
+        val key = box("name", fullBoxVersion() + name.toByteArray(Charsets.US_ASCII))
+        out.write(box("----", mean + key + data(TYPE_UTF8, value.toByteArray(Charsets.UTF_8))))
     }
 
     /** The `data` box every metadata atom wraps its value in: a type, a locale, then the payload. */

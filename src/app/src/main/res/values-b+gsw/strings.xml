@@ -386,7 +386,7 @@
     <string name="storage_policy_stop">Downloads stoppe</string>
     <string name="storage_policy_stop_desc">Neui Downloads ablehne sobald s Limit erreicht isch</string>
     <string name="storage_policy_evict">Ältesti lösche</string>
-    <string name="storage_policy_evict_desc">Die zersch derzuegfüegte Downloads entferne für Platz z schaffe</string>
+    <string name="storage_policy_evict_desc">Die ältiste bim Lose bhaltene Songs entferne für Platz z schaffe</string>
     <string name="download_track">Abelade</string>
     <string name="remove_download">Download lösche</string>
     <string name="download_needs_folder">Wähl zerscht en Download-Ordner uus</string>

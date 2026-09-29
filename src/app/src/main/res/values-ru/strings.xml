@@ -370,7 +370,7 @@
     <string name="storage_policy_stop">Остановить загрузки</string>
     <string name="storage_policy_stop_desc">Отклонять новые загрузки по достижении лимита</string>
     <string name="storage_policy_evict">Удалить старые</string>
-    <string name="storage_policy_evict_desc">Удалять самые старые загрузки, чтобы освободить место</string>
+    <string name="storage_policy_evict_desc">Удалять самые старые треки, сохранённые при прослушивании, чтобы освободить место</string>
     <string name="download_track">Скачать</string>
     <string name="remove_download">Удалить загрузку</string>
     <string name="download_needs_folder">Сначала выберите папку загрузок</string>

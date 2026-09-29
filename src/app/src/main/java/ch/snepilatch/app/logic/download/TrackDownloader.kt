@@ -129,7 +129,7 @@ object TrackDownloader {
             existingRow?.let { existing ->
                 // Only a definite "not there" re-downloads; an inconclusive check keeps the row.
                 if (DownloadFolder.exists(existing.documentUri) != false) {
-                    return@withContext DownloadOutcome.Done(adoptContextImage(existing, request))
+                    return@withContext DownloadOutcome.Done(refreshExisting(existing, request))
                 }
                 // The row's own uri, not the requested one: on a metadata match they differ, and
                 // removing the requested uri would delete nothing and leave the dead row forever.
@@ -138,9 +138,9 @@ object TrackDownloader {
 
             val capBytes = AppSettings.downloadCapBytes()
             if (capBytes != null) {
-                if (AppSettings.downloadCapPolicy.value == AppSettings.CAP_POLICY_EVICT_OLDEST) {
-                    evictToFit(capBytes)
-                } else if (Downloads.totalSizeBytes() >= capBytes) {
+                if (AppSettings.downloadCapPolicy.value == AppSettings.CAP_POLICY_EVICT_OLDEST) evictToFit(capBytes)
+                // Also after evicting: with only asked-for downloads left there is nothing it may take.
+                if (Downloads.totalSizeBytes() >= capBytes) {
                     LokiLogger.i(TAG, "storage cap reached, refusing '${request.title}'")
                     DownloadNotifier.failed(context, request.title, "storage cap reached")
                     return@withContext DownloadOutcome.Failed("storage cap reached")
@@ -221,13 +221,19 @@ object TrackDownloader {
      * out; the decoded samples can. Everything else re-fetches a different upload of the same song.
      */
     /**
-     * A row saved before the context cover was kept picks it up from the same list's repeat download,
-     * so an old group can drop the track art it borrowed (#876). Anything else comes back unchanged.
+     * What a repeat request adds to a row already on the phone. A row saved before the context cover was
+     * kept picks it up from the same list's download, so an old group drops the track art it borrowed
+     * (#876). An auto-save the user now asks for becomes theirs, out of the cap's reach (#581).
      */
-    private fun adoptContextImage(existing: DownloadedTrack, request: DownloadRequest): DownloadedTrack {
+    private fun refreshExisting(existing: DownloadedTrack, request: DownloadRequest): DownloadedTrack {
         val image = request.contextImageUrl
-        if (existing.contextImageUrl != null || image == null || existing.contextUri != request.contextUri) return existing
-        return existing.copy(contextImageUrl = image).also(Downloads::put)
+        val adoptImage = existing.contextImageUrl == null && image != null && existing.contextUri == request.contextUri
+        val claim = existing.auto && !request.localOnly
+        if (!adoptImage && !claim) return existing
+        return existing.copy(
+            contextImageUrl = if (adoptImage) image else existing.contextImageUrl,
+            auto = existing.auto && !claim,
+        ).also(Downloads::put)
     }
 
     private fun fromCapturedPcm(request: DownloadRequest, temp: File): StreamInfo? {
@@ -427,6 +433,7 @@ object TrackDownloader {
             artist = request.artist,
             downloadedAt = System.currentTimeMillis(),
             durationMs = request.durationMs,
+            auto = request.localOnly,
         )
         Downloads.put(record)
         LokiLogger.i(TAG, "downloaded '${request.title}' as .$finalExtension from ${info.provider}")
@@ -576,13 +583,17 @@ object TrackDownloader {
     private fun evictToFit(capBytes: Long) {
         var total = Downloads.totalSizeBytes()
         if (total <= capBytes) return
-        for (track in Downloads.rows.value.sortedBy { it.downloadedAt }) {
+        for (track in evictionOrder(Downloads.rows.value)) {
             if (total <= capBytes) break
             delete(track.trackUri)
             total -= track.sizeBytes
             LokiLogger.i(TAG, "evicted '${track.title}' to stay under the storage cap")
         }
     }
+
+    /** Oldest first, and only auto-saves: a download the user asked for is never deleted to make room (#581). */
+    internal fun evictionOrder(rows: List<DownloadedTrack>): List<DownloadedTrack> =
+        rows.filter { it.auto }.sortedBy { it.downloadedAt }
 
     private fun extensionFor(mimeType: String?): String = when {
         mimeType == null -> "m4a"

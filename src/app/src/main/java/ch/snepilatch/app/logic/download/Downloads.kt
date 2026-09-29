@@ -31,6 +31,8 @@ data class DownloadedTrack(
     val downloadedAt: Long,
     /** From the download request; 0 for rows written before it was stored, ExoPlayer fills those in when the file opens. */
     val durationMs: Long = 0L,
+    /** Saved on its own after a listen, not asked for; only these make room when the storage cap is hit (#581). */
+    val auto: Boolean = false,
 )
 
 /** The row as the screens and the offline player see it. */
@@ -46,7 +48,7 @@ fun DownloadedTrack.toTrackInfo() = TrackInfo(uri = trackUri, name = title, arti
 object Downloads {
 
     private const val DB_NAME = "downloads.db"
-    private const val DB_VERSION = 5
+    private const val DB_VERSION = 6
     private const val TABLE = "downloads"
 
     private var helper: Helper? = null
@@ -104,7 +106,8 @@ object Downloads {
                     title TEXT NOT NULL,
                     artist TEXT NOT NULL,
                     downloaded_at INTEGER NOT NULL,
-                    duration_ms INTEGER NOT NULL DEFAULT 0
+                    duration_ms INTEGER NOT NULL DEFAULT 0,
+                    auto INTEGER NOT NULL DEFAULT 0
                 )
                 """.trimIndent()
             )
@@ -127,6 +130,9 @@ object Downloads {
             if (oldVersion < 4) db.execSQL("ALTER TABLE $TABLE ADD COLUMN duration_ms INTEGER NOT NULL DEFAULT 0")
             // v5 keeps the album or playlist cover; older rows fall back to their own track art.
             if (oldVersion < 5) db.execSQL("ALTER TABLE $TABLE ADD COLUMN context_image TEXT")
+            // v6 tells auto-saves from asked-for downloads. Older rows count as asked for, so the cap
+            // never deletes something the user may have wanted.
+            if (oldVersion < 6) db.execSQL("ALTER TABLE $TABLE ADD COLUMN auto INTEGER NOT NULL DEFAULT 0")
         }
 
         /** Sideloading an older build must not crash; the default implementation throws. */
@@ -312,6 +318,7 @@ object Downloads {
         put("artist", artist)
         put("downloaded_at", downloadedAt)
         put("duration_ms", durationMs)
+        put("auto", if (auto) 1 else 0)
     }
 
     private fun android.database.Cursor.toTrack() = DownloadedTrack(
@@ -330,6 +337,7 @@ object Downloads {
         artist = getString(getColumnIndexOrThrow("artist")),
         downloadedAt = getLong(getColumnIndexOrThrow("downloaded_at")),
         durationMs = getLong(getColumnIndexOrThrow("duration_ms")),
+        auto = getInt(getColumnIndexOrThrow("auto")) == 1,
     )
 
     private fun android.database.Cursor.getStringOrNull(column: String): String? =

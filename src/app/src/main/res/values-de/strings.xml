@@ -370,7 +370,7 @@
     <string name="storage_policy_stop">Downloads stoppen</string>
     <string name="storage_policy_stop_desc">Neue Downloads ablehnen, sobald das Limit erreicht ist</string>
     <string name="storage_policy_evict">Älteste löschen</string>
-    <string name="storage_policy_evict_desc">Die zuerst hinzugefügten Downloads entfernen, um Platz zu schaffen</string>
+    <string name="storage_policy_evict_desc">Die ältesten beim Hören behaltenen Titel entfernen, um Platz zu schaffen</string>
     <string name="download_track">Herunterladen</string>
     <string name="remove_download">Download entfernen</string>
     <string name="download_needs_folder">Wähle zuerst einen Download-Ordner</string>

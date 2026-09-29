@@ -137,6 +137,8 @@ class MainActivity : ComponentActivity() {
                 withContext(Dispatchers.IO) {
                     Downloads.init(context)
                     DownloadFolder.load(context)
+                    // Only a folder listing; tells the user if it holds songs the index does not know (#930).
+                    ch.snepilatch.app.logic.download.FolderScan.check(context)
                     // A download lives in viewModelScope, so one killed with the app never cleared its
                     // own ongoing progress bar. Once per process, so a rotation mid-download keeps it.
                     DownloadNotifier.clearStaleProgress(context)

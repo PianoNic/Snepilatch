@@ -7,24 +7,40 @@ import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
 import ch.snepilatch.app.R
 import ch.snepilatch.app.logic.shared.AppMessages
+import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.logic.shared.LokiLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import java.io.File
 import java.io.FileInputStream
 import java.io.InputStream
 
 /**
- * Rebuilds index rows from the files already in the download folder, by the track id each one carries
- * in its tags (#566). The index lives in app storage and is gone after a reinstall while the folder
- * survives, so without this every re-download wrote a duplicate next to the file it had lost (#567).
- * Runs when a folder is picked, which a reinstall has to do anyway since the grant is gone too.
+ * Brings files already in the download folder into the index. The index lives in app storage and is
+ * gone after a reinstall while the folder survives, so without this every re-download wrote a duplicate
+ * next to the file it had lost (#567).
+ *
+ * Picking a folder takes back every file that carries its track id (#566): that is exact. A file without
+ * one is only counted, and the user is told; matching those to the catalogue is a guess, so it runs when
+ * the user asks for it ([migrate], #930).
  */
 object FolderScan {
 
     private const val TAG = "FolderScan"
+    private const val PREF_NOTIFIED = "folder_unindexed_notified"
+
+    /** Files a migration found to be a second copy of an indexed track; not counted as unknown again. */
+    private const val PREF_DUPLICATES = "folder_duplicates"
 
     /** Opus and FLAC keep their tags near the start; the cover may sit before them, so this is generous. */
     private const val HEAD_BYTES = 2 * 1024 * 1024
@@ -32,6 +48,7 @@ object FolderScan {
     /** MP4 keeps them in `moov`, which the muxer writes last. */
     private const val TAIL_BYTES = 512 * 1024
     private const val CHUNK = 64 * 1024
+    private const val PARALLEL_LOOKUPS = 4
 
     private val AUDIO = setOf("opus", "ogg", "flac", "m4a", "mp4", "mp3", "webm")
 
@@ -43,41 +60,126 @@ object FolderScan {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    /** Audio files in the folder that are not in the index, from the last count. */
+    private val _unindexed = MutableStateFlow(0)
+    val unindexed: StateFlow<Int> = _unindexed.asStateFlow()
+
+    /** A running [migrate] as (done, total), or null. */
+    private val _migrating = MutableStateFlow<Pair<Int, Int>?>(null)
+    val migrating: StateFlow<Pair<Int, Int>?> = _migrating.asStateFlow()
+
+    /** After a folder is picked: take back the tagged files, then count the rest. */
     fun start(context: Context) {
         val ctx = context.applicationContext
         scope.launch {
-            val found = runCatching { scan(ctx) }
+            val found = runCatching { importFiles(ctx, lookup = null) }
                 .onFailure { LokiLogger.e(TAG, "folder scan failed", it) }
                 .getOrDefault(0)
-            LokiLogger.i(TAG, "folder scan found $found download(s) the index did not know")
+            LokiLogger.i(TAG, "folder scan took back $found tagged download(s)")
             if (found > 0) AppMessages.show(R.string.downloads_found_in_folder, found)
+            count(ctx)
         }
     }
 
-    private fun scan(ctx: Context): Int {
-        val tree = DownloadFolder.folder.value ?: return 0
-        val knownDocs = Downloads.rows.value.mapTo(HashSet()) { it.documentUri }
-        val knownTracks = Downloads.rows.value.mapTo(HashSet()) { it.trackUri }
+    /** Counts the files the index does not know, from the folder listing alone: cheap enough for every start. */
+    fun check(context: Context) {
+        val ctx = context.applicationContext
+        scope.launch { count(ctx) }
+    }
+
+    /** Matches the unknown files to the catalogue, on the user's request. */
+    fun migrate(context: Context) {
+        val ctx = context.applicationContext
+        if (_migrating.value != null) return
+        _migrating.value = 0 to _unindexed.value
+        scope.launch {
+            val matched = runCatching { importFiles(ctx, CatalogueLookup()) }
+                .onFailure { LokiLogger.e(TAG, "migration failed", it) }
+                .getOrDefault(0)
+            val total = _migrating.value?.second ?: 0
+            _migrating.value = null
+            LokiLogger.i(TAG, "matched $matched of $total file(s) to the catalogue")
+            AppMessages.show(R.string.downloads_matched, matched, total)
+            count(ctx)
+        }
+    }
+
+    /** Also tells the user, but only when the number went up since they were last told, not on every start. */
+    private fun count(ctx: Context) {
+        val known = Downloads.rows.value.mapTo(HashSet()) { it.documentUri } + duplicates(ctx)
+        val unknown = runCatching { listFiles(ctx).count { it.uri.toString() !in known } }
+            .onFailure { LokiLogger.w(TAG, "could not list the folder: ${it.message}") }
+            .getOrNull() ?: return
+        _unindexed.value = unknown
+        val prefs = ctx.getSharedPreferences(AppSettings.PREFS, Context.MODE_PRIVATE)
+        if (unknown > prefs.getInt(PREF_NOTIFIED, 0)) AppMessages.show(R.string.downloads_unindexed_found, unknown)
+        prefs.edit().putInt(PREF_NOTIFIED, unknown).apply()
+    }
+
+    private fun duplicates(ctx: Context): Set<String> =
+        ctx.getSharedPreferences(AppSettings.PREFS, Context.MODE_PRIVATE).getStringSet(PREF_DUPLICATES, emptySet()).orEmpty()
+
+    private fun rememberDuplicates(ctx: Context, uris: Collection<String>) {
+        if (uris.isEmpty()) return
+        val prefs = ctx.getSharedPreferences(AppSettings.PREFS, Context.MODE_PRIVATE)
+        prefs.edit().putStringSet(PREF_DUPLICATES, duplicates(ctx) + uris).apply()
+    }
+
+    private fun listFiles(ctx: Context): List<FoundFile> {
+        val tree = DownloadFolder.folder.value ?: return emptyList()
         val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
         val columns = arrayOf(
             Document.COLUMN_DOCUMENT_ID, Document.COLUMN_DISPLAY_NAME, Document.COLUMN_MIME_TYPE,
             Document.COLUMN_SIZE, Document.COLUMN_LAST_MODIFIED,
         )
-        val files = buildList {
+        return buildList {
             ctx.contentResolver.query(children, columns, null, null, null)?.use { c ->
                 while (c.moveToNext()) fileAt(c, tree)?.let(::add)
             }
         }
-        var found = 0
-        for (file in files.filter { it.uri.toString() !in knownDocs }) {
-            val row = rowFor(ctx, file)
-            // add() is false for a track already indexed, or a second copy of one this scan just took.
-            if (row != null && knownTracks.add(row.trackUri)) {
-                Downloads.put(row)
-                found++
+    }
+
+    /**
+     * Adds a row for each unknown file that says which track it is: by its tag, and with a [lookup] also
+     * by a catalogue match. Returns how many were added.
+     */
+    private suspend fun importFiles(ctx: Context, lookup: CatalogueLookup?): Int {
+        val knownDocs = Downloads.rows.value.mapTo(HashSet()) { it.documentUri }
+        val knownTracks = Downloads.rows.value.mapTo(HashSet()) { it.trackUri }
+        val files = listFiles(ctx).filter { it.uri.toString() !in knownDocs }
+        if (lookup != null) _migrating.value = 0 to files.size
+        var added = 0
+        var done = 0
+        val copies = mutableListOf<String>()
+        // A lookup is a network round trip of about a second; one at a time a folder of a few hundred
+        // files took minutes. A few in flight, like the web player's own requests.
+        val gate = Semaphore(PARALLEL_LOOKUPS)
+        val index = Mutex()
+        coroutineScope {
+            for (file in files) {
+                launch {
+                    val row = gate.withPermit { rowFor(ctx, file, lookup) }
+                    index.withLock {
+                        // add() is false for a track already indexed, or a second copy of one just taken.
+                        when {
+                            row == null -> LokiLogger.i(TAG, "no track found for ${file.name}")
+                            !knownTracks.add(row.trackUri) -> {
+                                LokiLogger.i(TAG, "${file.name} is another copy of ${row.trackUri}")
+                                copies += file.uri.toString()
+                            }
+                            else -> {
+                                Downloads.put(row)
+                                added++
+                            }
+                        }
+                        done++
+                        if (lookup != null) _migrating.value = done to files.size
+                    }
+                }
             }
         }
-        return found
+        rememberDuplicates(ctx, copies)
+        return added
     }
 
     /** The audio file at the cursor's row, or null for anything else in the folder. */
@@ -89,28 +191,44 @@ object FolderScan {
 
     private class FoundFile(val uri: Uri, val name: String, val mimeType: String?, val size: Long, val modified: Long)
 
-    private fun rowFor(ctx: Context, file: FoundFile): DownloadedTrack? {
-        val id = readTrackId(ctx, file) ?: return null
+    /**
+     * The row for [file]: its own track id when it carries one, else the catalogue match for its title,
+     * artist and length (#930). Null when neither says which track it is.
+     */
+    private suspend fun rowFor(ctx: Context, file: FoundFile, lookup: CatalogueLookup?): DownloadedTrack? {
+        val meta = readMeta(ctx, file) ?: return null
+        val id = readTrackId(ctx, file) ?: lookup?.find(meta.title, meta.artist, meta.durationMs) ?: return null
+        return DownloadedTrack(
+            trackUri = "spotify:track:$id",
+            documentUri = file.uri.toString(),
+            source = "folder",
+            provider = null,
+            mimeType = file.mimeType,
+            coverUrl = meta.picture?.let { keepCover(ctx, id, it) },
+            contextUri = null,
+            contextName = null,
+            contextType = null,
+            sizeBytes = file.size,
+            title = meta.title,
+            artist = meta.artist,
+            downloadedAt = file.modified,
+            durationMs = meta.durationMs,
+        )
+    }
+
+    private class Meta(val title: String, val artist: String, val durationMs: Long, val picture: ByteArray?)
+
+    private fun readMeta(ctx: Context, file: FoundFile): Meta? {
         val retriever = MediaMetadataRetriever()
         return try {
             retriever.setDataSource(ctx, file.uri)
             // "Artist - Title" is how downloads are named, for a file whose tags the reader cannot see.
             val stem = file.name.substringBeforeLast('.')
-            DownloadedTrack(
-                trackUri = "spotify:track:$id",
-                documentUri = file.uri.toString(),
-                source = "folder",
-                provider = null,
-                mimeType = file.mimeType,
-                coverUrl = retriever.embeddedPicture?.let { keepCover(ctx, id, it) },
-                contextUri = null,
-                contextName = null,
-                contextType = null,
-                sizeBytes = file.size,
+            Meta(
                 title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE) ?: stem.substringAfter(" - "),
                 artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: stem.substringBefore(" - "),
-                downloadedAt = file.modified,
                 durationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L,
+                picture = retriever.embeddedPicture,
             )
         } catch (e: Exception) {
             LokiLogger.d(TAG, "could not read ${file.name}: ${e.message}")

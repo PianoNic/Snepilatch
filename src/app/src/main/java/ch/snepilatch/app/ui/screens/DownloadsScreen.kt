@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
 import ch.snepilatch.app.logic.download.DownloadFolder
 import ch.snepilatch.app.logic.download.DownloadQueue
+import ch.snepilatch.app.logic.download.FolderScan
 import ch.snepilatch.app.logic.download.Downloads
 import ch.snepilatch.app.ui.shared.SpfyImage
 import ch.snepilatch.app.ui.theme.*
@@ -77,6 +78,7 @@ fun DownloadsScreen(vm: PlaybackViewModel) {
         }
 
         StorageSummary(folder = folder, count = stored.size, totalMb = totalMb)
+        UnindexedFiles()
 
         HorizontalDivider(color = SnepilatchLightGray.copy(alpha = 0.15f))
         Row(
@@ -113,6 +115,23 @@ fun DownloadsScreen(vm: PlaybackViewModel) {
             }
         }
     }
+}
+
+/** Songs in the folder the downloads do not know, and matching them on request (#930). */
+@Composable
+private fun UnindexedFiles() {
+    val unindexed by FolderScan.unindexed.collectAsState()
+    val migrating by FolderScan.migrating.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val progress = migrating
+    if (unindexed == 0 && progress == null) return
+    SettingRow(
+        title = androidx.compose.ui.res.pluralStringResource(R.plurals.downloads_unindexed_title, unindexed, unindexed),
+        subtitle = progress?.let { stringResource(R.string.downloads_matching, it.first, it.second) }
+            ?: stringResource(R.string.downloads_unindexed_action),
+        icon = Icons.Rounded.Downloading,
+        onClick = if (progress == null) ({ FolderScan.migrate(context) }) else null,
+    )
 }
 
 /** Where the files go and how much room they take. */

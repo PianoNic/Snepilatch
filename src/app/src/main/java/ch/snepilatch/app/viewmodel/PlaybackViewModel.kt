@@ -30,6 +30,7 @@ import ch.snepilatch.app.logic.shared.SessionHolder
 import ch.snepilatch.app.logic.shared.AppMessages
 
 import ch.snepilatch.app.logic.download.DownloadActions
+import ch.snepilatch.app.logic.download.CanvasStore
 import ch.snepilatch.app.logic.playback.AudioSourceResolver
 import ch.snepilatch.app.logic.playback.engine.SpfyCdnResolver
 import ch.snepilatch.app.logic.playback.engine.SpfyStream
@@ -390,6 +391,7 @@ class PlaybackViewModel : ViewModel() {
             override fun trackChanged(track: TrackInfo) {
                 commitStream(track.uri, AudioSourceResolver.LOCAL_PROVIDER)
                 ThemeController.updateFromArt(track.albumArt)
+                fetchCanvasForTrack(track.uri)
             }
             override fun setTickerRunning(running: Boolean) = if (running) startPositionTicker() else stopPositionTicker()
             override fun startSession() = restartSessionFromSavedCookies()
@@ -2699,6 +2701,11 @@ class PlaybackViewModel : ViewModel() {
         // Canvas is a track-only visual; podcast episodes have none. Skip the futile lookup + clear.
         if (!trackUri.startsWith("spotify:track:")) {
             canvasUrl.value = null
+            return
+        }
+        // A downloaded track's clip is on the phone: no lookup, no fetch, and it works offline (#565).
+        CanvasStore.localUri(trackUri)?.let {
+            canvasUrl.value = it
             return
         }
         val trackId = trackUri.removePrefix("spotify:track:")

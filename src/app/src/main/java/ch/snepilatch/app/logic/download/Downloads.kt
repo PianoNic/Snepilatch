@@ -135,6 +135,7 @@ object Downloads {
 
     fun init(context: Context) {
         if (helper != null) return
+        CanvasStore.init(context)
         helper = Helper(context.applicationContext)
         refresh()
     }
@@ -229,6 +230,7 @@ object Downloads {
     fun remove(trackUri: String) {
         val db = helper?.writableDatabase ?: return
         db.delete(TABLE, "track_uri = ?", arrayOf(trackUri))
+        CanvasStore.delete(trackUri)
         refresh()
     }
 
@@ -237,7 +239,10 @@ object Downloads {
         val stale = _rows.value.filter { exists(it.documentUri) == false }
         if (stale.isEmpty()) return
         val db = helper?.writableDatabase ?: return
-        stale.forEach { db.delete(TABLE, "track_uri = ?", arrayOf(it.trackUri)) }
+        stale.forEach {
+            db.delete(TABLE, "track_uri = ?", arrayOf(it.trackUri))
+            CanvasStore.delete(it.trackUri)
+        }
         refresh()
     }
 

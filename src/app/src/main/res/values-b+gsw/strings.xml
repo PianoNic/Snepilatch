@@ -196,6 +196,7 @@
     <string name="release_fallback_title">Version %s</string>
 
     <!-- Loading / Connection -->
+    <string name="service_down">Spotify isch grad nöd erreichbar. Probier\'s spöter nomal.</string>
     <string name="rate_limited">Z vill Aafrage</string>
     <string name="retrying_in">Nomal i %ds</string>
     <string name="login_different_account">Mit emene andere Konto aamälde</string>

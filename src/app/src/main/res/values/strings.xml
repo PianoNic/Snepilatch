@@ -188,6 +188,7 @@
     <string name="release_fallback_title">Release %s</string>
 
     <!-- Loading / Connection -->
+    <string name="service_down">Spotify is down right now. Try again later.</string>
     <string name="rate_limited">Rate limited</string>
     <string name="retrying_in">Retrying in %ds</string>
     <string name="login_different_account">Login with different account</string>

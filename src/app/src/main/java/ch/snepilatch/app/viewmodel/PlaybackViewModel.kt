@@ -763,6 +763,13 @@ class PlaybackViewModel : ViewModel() {
                     isInitialized.value = true
                     return@launch
                 }
+                // Spfy's own outage (#940): its "Page not available" page or a 5xx. Said as such, not shown as
+                // the page's HTML, and not retried: the user tries again later.
+                if ((e as? kotify.http.HttpException)?.isServiceDown == true) {
+                    LokiLogger.w(TAG, "Spfy is down (HTTP ${e.code}), asking the user to try again later")
+                    initError.value = UiMessage(R.string.service_down)
+                    return@launch
+                }
                 if (msg.contains("Unauthorized") || msg.contains("401") || msg.contains("code\":400")) {
                     initRetryCount++
                     if (initRetryCount > 5) {

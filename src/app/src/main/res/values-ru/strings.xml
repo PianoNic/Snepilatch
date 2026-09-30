@@ -186,6 +186,7 @@
     <string name="release_fallback_title">Версия %s</string>
 
     <!-- Loading / Connection -->
+    <string name="service_down">Spotify сейчас не работает. Попробуйте позже.</string>
     <string name="rate_limited">Превышен лимит запросов</string>
     <string name="retrying_in">Повтор через %d с</string>
     <string name="login_different_account">Войти под другим аккаунтом</string>

@@ -63,6 +63,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -1597,6 +1598,7 @@ class PlaybackViewModel : ViewModel() {
                     return@launch
                 }
                 if (action == "resume") {
+                    ensureService()
                     // `isStreaming` says we loaded a stream at some point, not that ExoPlayer still
                     // holds it: the service can be reclaimed or the player released while paused, and
                     // nothing clears the flag when that happens. Resuming on the flag alone flipped the
@@ -2280,6 +2282,7 @@ class PlaybackViewModel : ViewModel() {
         // Honor the resulting onTrackChange even if we're starting from idle (no local audio yet).
         pendingUserPlay = true
         val pc = player ?: return
+        ensureService()
         coroutineScope {
             // Instant tap-to-play (always on): self-resolve the tapped track's audio and start
             // ExoPlayer NOW, in parallel with the Connect play command, instead of waiting for the WS
@@ -2743,8 +2746,31 @@ class PlaybackViewModel : ViewModel() {
 
     fun startService(context: Context) {
         ThemeController.setContext(context)
+        serviceContext = context.applicationContext
         val intent = Intent(context, MusicPlaybackService::class.java)
         context.startForegroundService(intent)
+    }
+
+    /** What [ensureService] starts the player service with; set on the first start. */
+    private var serviceContext: Context? = null
+
+    /**
+     * The player service, started again when it is gone. Android stops it while playback sits paused
+     * in the background, and every play path reached it through `instance?.`, so after a long pause a
+     * tap on play was swallowed without a trace and the cold start waited forever for a player that
+     * did not exist. Its callbacks are wired again too, or onReady would never reach this model.
+     */
+    private suspend fun ensureService(): MusicPlaybackService? {
+        MusicPlaybackService.instance?.let { return it }
+        val ctx = serviceContext ?: return null
+        LokiLogger.w(TAG, "The player service was gone, starting it again")
+        val started = runCatching { withContext(Dispatchers.Main) { startService(ctx) } }
+            .onFailure { LokiLogger.e(TAG, "Could not start the player service again", it) }
+            .isSuccess
+        if (!started) return null
+        MusicPlaybackService.serviceReady.first { it }
+        withContext(Dispatchers.Main) { wireServiceControls() }
+        return MusicPlaybackService.instance
     }
 
     fun updateAudioOutput(context: Context) {

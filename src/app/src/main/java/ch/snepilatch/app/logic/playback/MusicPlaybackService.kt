@@ -517,6 +517,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 }
 
                 override fun onStop() {
+                    // Who stops the service is otherwise invisible, and a stopped service is why a play
+                    // tap after a long pause did nothing.
+                    LokiLogger.i(TAG, "Media session stop, stopping the service")
                     player.stop()
                     stopForeground(STOP_FOREGROUND_REMOVE)
                     stopSelf()
@@ -1478,6 +1481,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
+        LokiLogger.i(TAG, "Task removed, stopping the service")
         // App swiped from recents — kill everything
         stopInfiniPlay()
         player.stop()
@@ -1592,6 +1596,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         // so the next launch can resume.
         instance = null
         serviceReady.value = false
+        LokiLogger.i(TAG, "Service destroyed")
         super.onDestroy()
     }
 }

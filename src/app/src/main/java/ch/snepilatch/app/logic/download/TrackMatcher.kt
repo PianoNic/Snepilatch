@@ -50,7 +50,13 @@ internal object TrackMatcher {
  */
 internal class CatalogueLookup {
 
+    /** What a file's tags are filled in from (#946). */
+    data class TrackInfo(val title: String, val artist: String, val album: String?, val coverUrl: String?)
+
     private var session: Session? = null
+
+    /** The details of each track a search matched, so filling in its tags asks nothing more. */
+    private val matched = java.util.concurrent.ConcurrentHashMap<String, TrackInfo>()
 
     @Volatile private var unavailable = false
     private val starting = Mutex()
@@ -66,14 +72,40 @@ internal class CatalogueLookup {
     suspend fun find(title: String, artist: String, durationMs: Long): String? {
         if (unavailable || title.isBlank()) return null
         return try {
-            val hits = Song(session()).search("$artist $title", limit = 10).tracks.items.map { hit ->
+            val found = Song(session()).search("$artist $title", limit = 10).tracks.items
+            val hits = found.map { hit ->
                 TrackMatcher.Candidate(hit.id, hit.name, hit.artists.map { it.name }, hit.durationMs)
             }
-            TrackMatcher.match(title, artist, durationMs, hits)
+            TrackMatcher.match(title, artist, durationMs, hits)?.also { id ->
+                found.firstOrNull { it.id == id }?.let { hit ->
+                    matched[id] = TrackInfo(hit.name, hit.artists.joinToString(", ") { it.name }, hit.album?.name, hit.album?.coverArtUrl)
+                }
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             LokiLogger.w("CatalogueLookup", "lookup failed for '$title': ${e.message}")
+            if (session == null) unavailable = true
+            null
+        }
+    }
+
+    /**
+     * The title, artists, album and cover of track [id]: from the search that matched it, or else the
+     * track page query the web player answers logged out, on this lookup's anonymous session, so the
+     * account never makes these requests.
+     */
+    suspend fun info(id: String): TrackInfo? {
+        matched[id]?.let { return it }
+        if (unavailable) return null
+        return try {
+            Song(session()).getSong(id)?.let { track ->
+                TrackInfo(track.name, track.artists.joinToString(", ") { it.name }, track.album.name, track.album.coverArtUrl)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            LokiLogger.w("CatalogueLookup", "no details for $id: ${e.message}")
             if (session == null) unavailable = true
             null
         }

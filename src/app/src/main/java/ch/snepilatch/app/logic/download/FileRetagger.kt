@@ -19,24 +19,56 @@ internal object FileRetagger {
     /** The row after tagging, and whether the file was written or already carried the id. */
     class Result(val row: DownloadedTrack, val wrote: Boolean)
 
-    /** Null when the file was left alone. */
-    fun tag(ctx: Context, row: DownloadedTrack): Result? {
+    /**
+     * Writes the id and whatever of the title, artist, album and cover the file lacks (#946), taking those
+     * from [lookup]. Null when the file was left alone.
+     */
+    suspend fun tag(ctx: Context, row: DownloadedTrack, lookup: CatalogueLookup): Result? {
         val id = row.trackUri.takeIf { it.startsWith("spotify:track:") }?.removePrefix("spotify:track:") ?: return null
-        val resolver = ctx.contentResolver
-        val original = Uri.parse(row.documentUri)
         return try {
-            val bytes = resolver.openInputStream(original)?.use { it.readBytes() } ?: return null
-            // Already there (a download from after #566): nothing to write, only the index to update.
-            if (FolderScan.trackIdIn(String(bytes, Charsets.ISO_8859_1)) == id) return Result(row.copy(idTagged = true), wrote = false)
-            val tagged = TrackIdWriter.withTrackId(bytes, id)
-                ?.takeIf { FolderScan.trackIdIn(String(it, Charsets.ISO_8859_1)) == id }
-                ?: return null.also { LokiLogger.i(TAG, "no safe way to tag ${row.title}, left as it was") }
-            val replaced = replace(ctx, original, tagged) ?: return null
-            Result(row.copy(documentUri = replaced.toString(), idTagged = true, sizeBytes = tagged.size.toLong()), wrote = true)
+            retag(ctx, row, id, lookup)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             LokiLogger.w(TAG, "could not tag ${row.title}: ${e.message}")
             null
         }
+    }
+
+    private suspend fun retag(ctx: Context, row: DownloadedTrack, id: String, lookup: CatalogueLookup): Result? {
+        val original = Uri.parse(row.documentUri)
+        val bytes = ctx.contentResolver.openInputStream(original)?.use { it.readBytes() } ?: return null
+        val missing = TrackIdWriter.missing(bytes) ?: return leftAlone(row)
+        val hasId = FolderScan.trackIdIn(String(bytes, Charsets.ISO_8859_1)) == id
+        // Asked only when something is missing. Without the details the id alone is still written, and the
+        // row stays unchecked so a later migration fills in the rest.
+        val info = if (missing.isEmpty()) null else lookup.info(id)
+        val checked = missing.isEmpty() || info != null
+        val tagged = if (hasId && info == null) {
+            bytes
+        } else {
+            val tags = TrackTags(
+                title = info?.title.orEmpty(),
+                artist = info?.artist.orEmpty(),
+                album = info?.album,
+                cover = info?.coverUrl?.takeIf { TrackIdWriter.Field.COVER in missing }?.let { TrackDownloader.fetchCover(it) },
+                trackId = id.takeUnless { hasId },
+            )
+            TrackIdWriter.withTags(bytes, tags)?.takeIf { FolderScan.trackIdIn(String(it, Charsets.ISO_8859_1)) == id }
+                ?: return leftAlone(row)
+        }
+        if (tagged.contentEquals(bytes)) return Result(row.copy(idTagged = true, tagsChecked = checked), wrote = false)
+        val replaced = replace(ctx, original, tagged) ?: return null
+        LokiLogger.i(TAG, "tagged ${row.title}: ${if (hasId) "" else "id "}${missing.joinToString(" ").lowercase()}".trimEnd())
+        return Result(
+            row.copy(documentUri = replaced.toString(), idTagged = true, tagsChecked = checked, sizeBytes = tagged.size.toLong()),
+            wrote = true,
+        )
+    }
+
+    private fun leftAlone(row: DownloadedTrack): Result? {
+        LokiLogger.i(TAG, "no safe way to tag ${row.title}, left as it was")
+        return null
     }
 
     private fun replace(ctx: Context, original: Uri, bytes: ByteArray): Uri? {

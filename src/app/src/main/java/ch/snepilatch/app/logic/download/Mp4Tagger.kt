@@ -72,7 +72,8 @@ internal object Mp4Tagger {
         return null
     }
 
-    private fun udta(tags: TrackTags): ByteArray = box("udta", box("meta", fullBoxVersion() + hdlr() + ilst(tags)))
+    /** A whole udta holding [tags]; also what [TrackIdWriter] adds to a file whose tags live nowhere yet. */
+    internal fun udta(tags: TrackTags): ByteArray = box("udta", box("meta", fullBoxVersion() + hdlr() + ilst(tags)))
 
     /** `meta` is a full box: a version byte and three flag bytes before its children. */
     private fun fullBoxVersion() = ByteArray(4)
@@ -87,7 +88,10 @@ internal object Mp4Tagger {
         ByteArray(8) + "mdir".toByteArray(Charsets.US_ASCII) + "appl".toByteArray(Charsets.US_ASCII) + ByteArray(9)
     )
 
-    private fun ilst(tags: TrackTags): ByteArray {
+    private fun ilst(tags: TrackTags): ByteArray = box("ilst", ilstEntries(tags))
+
+    /** The atoms inside ilst for [tags]; blank text and null fields write none. */
+    internal fun ilstEntries(tags: TrackTags): ByteArray {
         val out = ByteArrayOutputStream()
         // "©" is the 0xA9 byte the iTunes atom names start with, not a copyright sign in UTF-8.
         text(out, "©nam", tags.title)
@@ -98,7 +102,7 @@ internal object Mp4Tagger {
             val type = if (cover.mimeType.contains("png")) TYPE_PNG else TYPE_JPEG
             out.write(box("covr", data(type, cover.bytes)))
         }
-        return box("ilst", out.toByteArray())
+        return out.toByteArray()
     }
 
     private const val TYPE_UTF8 = 1

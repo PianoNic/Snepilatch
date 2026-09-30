@@ -186,6 +186,7 @@
     <string name="release_fallback_title">Version %s</string>
 
     <!-- Loading / Connection -->
+    <string name="service_down">Spotify ist gerade nicht erreichbar. Versuche es später erneut.</string>
     <string name="rate_limited">Ratenbegrenzung</string>
     <string name="retrying_in">Neuer Versuch in %ds</string>
     <string name="login_different_account">Mit anderem Konto anmelden</string>

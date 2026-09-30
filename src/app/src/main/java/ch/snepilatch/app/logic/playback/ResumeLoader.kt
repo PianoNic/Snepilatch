@@ -35,6 +35,10 @@ class ResumeLoader(private val hooks: Hooks) {
         val artist = track.artist.ifBlank { "Unknown" }
         val art = track.albumArt
         val resolver = checkNotNull(hooks.cdnResolver) { "CdnResolver not initialized" }
+        // Every load below goes through `instance?.`: with no service it would do nothing and still
+        // report success, leaving the caller waiting for a ready that never comes. Fail instead, so
+        // the cold start falls back and the spinner does not stay forever.
+        checkNotNull(MusicPlaybackService.instance) { "the player service is not running" }
         // A downloaded copy plays from disk whatever the source, and this is the path the first
         // track after opening the app takes. The spfy branch below goes straight to the CDN, so
         // without this a downloaded track streamed on launch and only played locally once it had

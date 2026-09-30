@@ -3,6 +3,11 @@ package ch.snepilatch.app.ui.screens
 import androidx.compose.material.icons.rounded.AddCircleOutline
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Groups
+import ch.snepilatch.app.logic.shared.ThemeController
+import ch.snepilatch.app.viewmodel.WhatsNewViewModel
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Badge
+import androidx.compose.material.icons.rounded.NotificationsNone
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -116,6 +121,14 @@ fun HomeScreen(vm: PlaybackViewModel) {
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
                 )
+                // The web player's bell (#884), left of the friends button as there, with its dot for news.
+                val whatsNewVm: WhatsNewViewModel = viewModel()
+                val hasNew by whatsNewVm.hasNew.collectAsState()
+                IconButton(onClick = { vm.navigateTo(Screen.WHATS_NEW) }) {
+                    BadgedBox(badge = { if (hasNew) Badge(containerColor = ThemeController.themeColors.collectAsState().value.primary) }) {
+                        Icon(Icons.Rounded.NotificationsNone, stringResource(R.string.whats_new_title), tint = SnepilatchWhite)
+                    }
+                }
                 // What friends are listening to (#843), the web player's buddy feed.
                 IconButton(onClick = { vm.navigateTo(Screen.FRIEND_ACTIVITY) }) {
                     Icon(Icons.Rounded.Groups, stringResource(R.string.friend_activity), tint = SnepilatchWhite)

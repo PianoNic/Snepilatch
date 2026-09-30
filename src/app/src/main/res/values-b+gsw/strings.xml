@@ -457,4 +457,19 @@
     <plurals name="library_folder_items"><item quantity="one">%d Element</item><item quantity="other">%d Elemänt</item></plurals>
     <string name="library_folder_back">Zrugg zu %s</string>
     <string name="library_folder_empty">De Ordner isch leer</string>
+    <string name="whats_new_title">Neuigkeite</string>
+    <string name="whats_new_subtitle">Di neuste Releases vo Künstler, Podcasts und Sendige, wo du folgsch.</string>
+    <string name="whats_new_filter_music">Musig</string>
+    <string name="whats_new_filter_podcasts">Podcasts &amp; Sendige</string>
+    <string name="whats_new_section_new">Neu</string>
+    <string name="whats_new_section_earlier">Früener</string>
+    <string name="whats_new_empty_all_title">Mir händ no kei Neuigkeite für dich</string>
+    <string name="whats_new_empty_all_message">Sobald öppis Neus da isch, findsch es da. Folg dine Lieblingskünstler und -podcasts, dänn bisch uf em Laufende.</string>
+    <string name="whats_new_empty_music_title">Nüt Neus bi de Musig</string>
+    <string name="whats_new_empty_music_message">Folg dine Lieblingskünstler, dänn haltet mer dich uf em Laufende.</string>
+    <string name="whats_new_empty_podcasts_title">Nüt Neus bi de Podcasts</string>
+    <string name="whats_new_empty_podcasts_message">Folg dine Lieblingspodcasts, dänn haltet mer dich uf em Laufende.</string>
+    <string name="whats_new_error">Lueg dini Internetverbindig aa und probier\'s nomal</string>
+    <string name="whats_new_error_title">Öppis isch schiefgloffe.</string>
+    <string name="whats_new_try_again">Nomal probiere</string>
 </resources>

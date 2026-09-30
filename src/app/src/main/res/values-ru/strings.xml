@@ -443,4 +443,19 @@
     <plurals name="library_folder_items"><item quantity="one">%d элемент</item><item quantity="few">%d элемента</item><item quantity="many">%d элементов</item><item quantity="other">%d элементов</item></plurals>
     <string name="library_folder_back">Назад в %s</string>
     <string name="library_folder_empty">Эта папка пуста</string>
+    <string name="whats_new_title">Что нового</string>
+    <string name="whats_new_subtitle">Последние релизы артистов, подкастов и шоу, на которые вы подписаны.</string>
+    <string name="whats_new_filter_music">Музыка</string>
+    <string name="whats_new_filter_podcasts">Подкасты и шоу</string>
+    <string name="whats_new_section_new">Новое</string>
+    <string name="whats_new_section_earlier">Ранее</string>
+    <string name="whats_new_empty_all_title">У нас пока нет новостей для вас</string>
+    <string name="whats_new_empty_all_message">Когда появятся новости, они будут здесь. Подпишитесь на любимых артистов и подкасты, чтобы следить за ними.</string>
+    <string name="whats_new_empty_music_title">В музыке ничего нового</string>
+    <string name="whats_new_empty_music_message">Подпишитесь на любимых артистов, и мы будем держать вас в курсе.</string>
+    <string name="whats_new_empty_podcasts_title">В подкастах ничего нового</string>
+    <string name="whats_new_empty_podcasts_message">Подпишитесь на любимые подкасты, и мы будем держать вас в курсе.</string>
+    <string name="whats_new_error">Проверьте подключение к интернету и попробуйте снова</string>
+    <string name="whats_new_error_title">Что-то пошло не так.</string>
+    <string name="whats_new_try_again">Повторить</string>
 </resources>

@@ -125,10 +125,7 @@ private fun UnindexedFiles() {
     val unindexed by FolderScan.unindexed.collectAsState()
     val migrating by FolderScan.migrating.collectAsState()
     val rows by Downloads.rows.collectAsState()
-    // MP3 cannot take the id, so those would stay "without" forever.
-    val untagged = rows.count {
-        !it.idTagged && ch.snepilatch.app.logic.download.TrackIdWriter.canTag(android.net.Uri.decode(it.documentUri))
-    }
+    val untagged = rows.count { FolderScan.needsTags(it) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val progress = migrating
     if (unindexed == 0 && untagged == 0 && progress == null) return

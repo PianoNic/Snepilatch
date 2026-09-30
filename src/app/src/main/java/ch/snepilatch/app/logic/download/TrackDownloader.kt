@@ -434,8 +434,9 @@ object TrackDownloader {
             downloadedAt = System.currentTimeMillis(),
             durationMs = request.durationMs,
             auto = request.localOnly,
-            // tagsFor writes the id for every catalogue track.
+            // tagsFor writes the id for every catalogue track, with the title, artist, album and cover.
             idTagged = request.trackUri.startsWith("spotify:track:"),
+            tagsChecked = request.trackUri.startsWith("spotify:track:"),
         )
         Downloads.put(record)
         LokiLogger.i(TAG, "downloaded '${request.title}' as .$finalExtension from ${info.provider}")
@@ -544,7 +545,7 @@ object TrackDownloader {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, TrackTags.Cover>) = size > 4
     }
 
-    private fun fetchCover(url: String): TrackTags.Cover? {
+    internal fun fetchCover(url: String): TrackTags.Cover? {
         synchronized(coverCache) { coverCache[url] }?.let { return it }
         val fetched = downloadCover(url) ?: return null
         synchronized(coverCache) { coverCache[url] = fetched }

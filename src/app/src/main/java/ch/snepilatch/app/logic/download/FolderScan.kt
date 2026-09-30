@@ -98,13 +98,15 @@ object FolderScan {
         if (_migrating.value != null) return
         _migrating.value = Progress(writingIds = false, done = 0, total = _unindexed.value)
         scope.launch {
-            if (_unindexed.value > 0) {
+            // Remembered copies are looked at again too: one may be the only file left of its track (#948).
+            if (_unindexed.value > 0 || duplicates(ctx).isNotEmpty()) {
+                val unindexed = _unindexed.value
                 val matched = runCatching { importFiles(ctx, CatalogueLookup()) }
                     .onFailure { LokiLogger.e(TAG, "migration failed", it) }
                     .getOrDefault(0)
                 val total = _migrating.value?.total ?: 0
                 LokiLogger.i(TAG, "matched $matched of $total file(s) to the catalogue")
-                AppMessages.show(R.string.downloads_matched, matched, total)
+                if (unindexed > 0) AppMessages.show(R.string.downloads_matched, matched, total)
             }
             val written = runCatching { writeIds(ctx) }
                 .onFailure { LokiLogger.e(TAG, "writing ids failed", it) }
@@ -171,6 +173,7 @@ object FolderScan {
     private suspend fun importFiles(ctx: Context, lookup: CatalogueLookup?): Int {
         val knownDocs = Downloads.rows.value.mapTo(HashSet()) { it.documentUri }
         val knownTracks = Downloads.rows.value.mapTo(HashSet()) { it.trackUri }
+        val rowOf = Downloads.rows.value.associateByTo(HashMap()) { it.trackUri }
         val files = listFiles(ctx).filter { it.uri.toString() !in knownDocs }
         if (lookup != null) _migrating.value = Progress(writingIds = false, done = 0, total = files.size)
         var added = 0
@@ -189,8 +192,20 @@ object FolderScan {
                         when {
                             row == null -> LokiLogger.i(TAG, "no track found for ${file.name}")
                             !knownTracks.add(row.trackUri) -> {
-                                LokiLogger.i(TAG, "${file.name} is another copy of ${row.trackUri}")
-                                copies += file.uri.toString()
+                                val lost = rowOf[row.trackUri]?.takeIf { isLost(it) }
+                                if (lost != null) {
+                                    // The row's own file is out of reach, so this one takes its place (#948).
+                                    val moved = lost.copy(
+                                        documentUri = row.documentUri, mimeType = row.mimeType, sizeBytes = row.sizeBytes,
+                                        idTagged = row.idTagged,
+                                    )
+                                    Downloads.put(moved)
+                                    rowOf[row.trackUri] = moved
+                                    LokiLogger.i(TAG, "${file.name} takes over ${row.trackUri} from a file that is gone")
+                                } else {
+                                    LokiLogger.i(TAG, "${file.name} is another copy of ${row.trackUri}")
+                                    copies += file.uri.toString()
+                                }
                             }
                             else -> {
                                 Downloads.put(row)
@@ -205,6 +220,19 @@ object FolderScan {
         }
         rememberDuplicates(ctx, copies)
         return added
+    }
+
+    /**
+     * Whether [row]'s file is out of reach: outside the download folder (one that was moved or renamed,
+     * which the app can no longer open) or gone from inside it. An inconclusive check is not a yes.
+     */
+    private fun isLost(row: DownloadedTrack): Boolean {
+        val tree = DownloadFolder.folder.value ?: return false
+        val inFolder = runCatching {
+            DocumentsContract.getDocumentId(Uri.parse(row.documentUri))
+                .startsWith(DocumentsContract.getTreeDocumentId(tree) + "/")
+        }.getOrDefault(true)
+        return !inFolder || DownloadFolder.exists(row.documentUri) == false
     }
 
     /** The audio file at the cursor's row, or null for anything else in the folder. */

@@ -174,6 +174,37 @@ class TrackIdWriterTest {
         assertEquals("the offset still points at the audio", mdatPayload.toList(), tagged.copyOfRange(newOffset, newOffset + mdatPayload.size).toList())
     }
 
+    /** A box with a 64-bit size field, as Samsung's recorder writes mdat. */
+    private fun largeBox(type: String, payload: ByteArray): ByteArray {
+        val size = 16L + payload.size
+        return byteArrayOf(0, 0, 0, 1) + type.toByteArray(Charsets.ISO_8859_1) +
+            ByteArray(8) { ((size ushr (8 * (7 - it))) and 0xFF).toByte() } + payload
+    }
+
+    /**
+     * The layout of the files on the phone that were all left untagged (#944): a 64-bit mdat, and Samsung's
+     * own udta before the one that holds the tags.
+     */
+    @Test
+    fun mp4WithALargeMdatAndARecorderUdtaGetsTheIdInTheTags() {
+        val ftyp = box("ftyp", "M4A ".toByteArray())
+        val mdat = largeBox("mdat", mdatPayload)
+        val samsung = box("udta", box("SDLN", ByteArray(8)) + box("smrd", ByteArray(8)))
+        val ilst = box("ilst", box("©nam", box("data", ByteArray(8) + "Song".toByteArray())))
+        val tagsUdta = box("udta", box("meta", ByteArray(4) + ilst))
+        val moovPayload = box("mvhd", ByteArray(8)) + samsung + tagsUdta
+        val original = ftyp + mdat + box("moov", moovPayload)
+        val tagged = TrackIdWriter.withTrackId(original, id)!!
+
+        assertEquals(id, FolderScan.trackIdIn(latin1(tagged)))
+        val text = latin1(tagged)
+        assertTrue("the id sits after the title, in the same ilst", text.indexOf("Song") < text.indexOf(TrackTags.TRACK_ID_KEY))
+        assertArrayEquals("Samsung's udta is untouched", samsung, tagged.copyOfRange(text.indexOf("SDLN") - 12, text.indexOf("SDLN") - 12 + samsung.size))
+        val moovAt = ftyp.size + mdat.size
+        assertEquals("moov runs to the end of the file", tagged.size - moovAt, be32(tagged, moovAt))
+        assertArrayEquals(mdatPayload, tagged.copyOfRange(ftyp.size + 16, ftyp.size + 16 + mdatPayload.size))
+    }
+
     @Test
     fun anUnknownFormatIsLeftAlone() {
         assertNull(TrackIdWriter.withTrackId("ID3".toByteArray() + ByteArray(100), id))

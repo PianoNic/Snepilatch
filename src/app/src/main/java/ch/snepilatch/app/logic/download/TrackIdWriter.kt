@@ -203,35 +203,43 @@ internal object TrackIdWriter {
     }
 
     /**
-     * MP4: a `----` atom is appended to `moov/udta/meta/ilst`, and every box on that path grows by its
-     * size. If `moov` sits before the audio, the chunk offsets in `stco`/`co64` move by the same amount.
+     * MP4: a `----` atom is appended to the `moov/udta/meta/ilst` that holds the tags, and every box on that
+     * path grows by its size. If `moov` sits before the audio, the chunk offsets in `stco`/`co64` move by the
+     * same amount.
      */
     private object Mp4 {
         private const val HEADER = 8
 
-        private class Box(val start: Int, val size: Int, val type: String) {
+        /** [large] for a box with a 64-bit size field: it can be walked past but not grown. */
+        private class Box(val start: Int, val size: Int, val type: String, val large: Boolean = false) {
             val end get() = start + size
         }
 
         fun withFreeform(bytes: ByteArray, name: String, value: String): ByteArray? {
             val top = children(bytes, 0, bytes.size) ?: return null
-            val moov = top.firstOrNull { it.type == "moov" } ?: return null
+            // A box with a 64-bit size can be walked past but not grown, so none on the path may have one.
+            val moov = top.firstOrNull { it.type == "moov" && !it.large } ?: return null
             val atom = freeform(name, value)
-            val udta = children(bytes, moov.start + HEADER, moov.end)?.firstOrNull { it.type == "udta" }
-            val meta = udta?.let { children(bytes, it.start + HEADER, it.end) }?.firstOrNull { it.type == "meta" }
-            val ilst = meta?.let { children(bytes, it.start + HEADER + 4, it.end) }?.firstOrNull { it.type == "ilst" }
+            val udtas = children(bytes, moov.start + HEADER, moov.end)?.filter { it.type == "udta" } ?: return null
+            // Some recorders put a udta of their own (Samsung's SDLN, smrd, smta) before the one that
+            // holds the tags, so the tags are looked for in each, not only the first.
+            val tags = udtas.firstNotNullOfOrNull { udta ->
+                val meta = children(bytes, udta.start + HEADER, udta.end)?.firstOrNull { it.type == "meta" }
+                val ilst = meta?.let { children(bytes, it.start + HEADER + 4, it.end) }?.firstOrNull { it.type == "ilst" }
+                ilst?.let { listOf(moov, udta, meta, it) }?.takeIf { path -> path.none { it.large } }
+            }
 
             // Where the new bytes go, what they are, and which boxes enclose that point.
             val (insertAt, inserted, enclosing) = when {
-                ilst != null -> Triple(ilst.end, atom, listOf(moov, udta, meta, ilst))
-                udta == null -> Triple(moov.end, box("udta", box("meta", ByteArray(4) + hdlr() + box("ilst", atom))), listOf(moov))
+                tags != null -> Triple(tags.last().end, atom, tags)
+                udtas.isEmpty() -> Triple(moov.end, box("udta", box("meta", ByteArray(4) + hdlr() + box("ilst", atom))), listOf(moov))
                 else -> return null
             }
             val delta = inserted.size
             val out = bytes.copyOf(bytes.size + delta)
             inserted.copyInto(out, insertAt)
             bytes.copyInto(out, insertAt + delta, insertAt, bytes.size)
-            enclosing.filterNotNull().forEach { writeBe32(out, it.start, it.size + delta) }
+            enclosing.forEach { writeBe32(out, it.start, it.size + delta) }
             // Audio after moov moved by delta, so its chunk offsets have to follow.
             if (top.any { it.type == "mdat" && it.start > moov.start }) {
                 val grown = Box(moov.start, moov.size + delta, "moov")
@@ -244,10 +252,13 @@ internal object TrackIdWriter {
             val boxes = ArrayList<Box>()
             var at = from
             while (at + HEADER <= to) {
-                val size = readBe32(bytes, at)
-                if (size < HEADER || at + size > to) return null // 64-bit or broken sizes: leave the file alone
-                boxes += Box(at, size, String(bytes, at + 4, 4, Charsets.ISO_8859_1))
-                at += size
+                val type = String(bytes, at + 4, 4, Charsets.ISO_8859_1)
+                // Size 1 means a 64-bit size follows: some recorders write mdat that way even when it is small.
+                val large = readBe32(bytes, at) == 1
+                val size = if (large && at + 16 <= to) readBe64(bytes, at + 8) else readBe32(bytes, at).toLong()
+                if (size < HEADER || at + size > to || size > Int.MAX_VALUE) return null // broken sizes: leave the file alone
+                boxes += Box(at, size.toInt(), type, large)
+                at += size.toInt()
             }
             return boxes
         }
@@ -258,7 +269,7 @@ internal object TrackIdWriter {
             fun walk(from: Int, to: Int): Boolean {
                 for (child in children(bytes, from, to) ?: return false) {
                     when (child.type) {
-                        in CONTAINERS -> if (!walk(child.start + HEADER, child.end)) return false
+                        in CONTAINERS -> if (child.large || !walk(child.start + HEADER, child.end)) return false
                         "stco" -> {
                             val count = readBe32(bytes, child.start + 12)
                             for (i in 0 until count) {
@@ -314,6 +325,9 @@ internal object TrackIdWriter {
     private fun readBe32(b: ByteArray, at: Int): Int =
         ((b[at].toInt() and 0xFF) shl 24) or ((b[at + 1].toInt() and 0xFF) shl 16) or
             ((b[at + 2].toInt() and 0xFF) shl 8) or (b[at + 3].toInt() and 0xFF)
+
+    private fun readBe64(b: ByteArray, at: Int): Long =
+        (readBe32(b, at).toLong() shl 32) or (readBe32(b, at + 4).toLong() and 0xFFFFFFFFL)
 
     private fun writeBe32(b: ByteArray, at: Int, v: Int) {
         for (i in 0 until 4) b[at + i] = ((v ushr (8 * (3 - i))) and 0xFF).toByte()

@@ -372,6 +372,7 @@ private fun MainContent(screen: Screen, vm: PlaybackViewModel, hazeState: HazeSt
                 Screen.INTERFACE -> InterfaceScreen(vm)
                 Screen.EQUALIZER -> EqualizerScreen(vm)
                 Screen.FRIEND_ACTIVITY -> FriendActivityScreen(vm)
+                Screen.WHATS_NEW -> WhatsNewScreen(vm)
                 Screen.DOWNLOADS -> DownloadsScreen(vm)
                 Screen.PLAYLIST_DETAIL, Screen.ALBUM_DETAIL, Screen.ARTIST_DETAIL, Screen.SHOW_DETAIL -> DetailScreen(vm)
                 Screen.NOW_PLAYING, Screen.LYRICS, Screen.LOGIN -> {}

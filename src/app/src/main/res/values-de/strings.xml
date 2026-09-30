@@ -441,4 +441,17 @@
     <plurals name="library_folder_items"><item quantity="one">%d Element</item><item quantity="other">%d Elemente</item></plurals>
     <string name="library_folder_back">Zurück zu %s</string>
     <string name="library_folder_empty">Dieser Ordner ist leer</string>
+    <string name="whats_new_title">Neuigkeiten</string>
+    <string name="whats_new_subtitle">Die neuesten Releases von Künstlern, Podcasts und Sendungen, denen du folgst.</string>
+    <string name="whats_new_filter_music">Musik</string>
+    <string name="whats_new_filter_podcasts">Podcasts &amp; Sendungen</string>
+    <string name="whats_new_section_new">Neu</string>
+    <string name="whats_new_section_earlier">Früher</string>
+    <string name="whats_new_empty_all_title">Wir haben noch keine Neuigkeiten für dich</string>
+    <string name="whats_new_empty_all_message">Sobald es Neuigkeiten gibt, findest du sie hier. Folge deinen Lieblingskünstlern und -podcasts, um auf dem Laufenden zu bleiben.</string>
+    <string name="whats_new_empty_music_title">Nichts Neues bei Musik</string>
+    <string name="whats_new_empty_music_message">Folge deinen Lieblingskünstlern, dann halten wir dich auf dem Laufenden.</string>
+    <string name="whats_new_empty_podcasts_title">Nichts Neues bei Podcasts</string>
+    <string name="whats_new_empty_podcasts_message">Folge deinen Lieblingspodcasts, dann halten wir dich auf dem Laufenden.</string>
+    <string name="whats_new_error">Prüfe deine Internetverbindung und versuche es erneut</string>
 </resources>

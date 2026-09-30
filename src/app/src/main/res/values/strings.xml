@@ -456,4 +456,17 @@
     <plurals name="library_folder_items"><item quantity="one">%d item</item><item quantity="other">%d items</item></plurals>
     <string name="library_folder_back">Back to %s</string>
     <string name="library_folder_empty">This folder is empty</string>
+    <string name="whats_new_title">What\'s New</string>
+    <string name="whats_new_subtitle">The latest releases from artists, podcasts and shows you follow.</string>
+    <string name="whats_new_filter_music">Music</string>
+    <string name="whats_new_filter_podcasts">Podcast &amp; Shows</string>
+    <string name="whats_new_section_new">New</string>
+    <string name="whats_new_section_earlier">Earlier</string>
+    <string name="whats_new_empty_all_title">We don\'t have any updates for you yet</string>
+    <string name="whats_new_empty_all_message">When there\'s news, we\'ll post it here. Follow your favourite artists and podcasts to stay updated on them too.</string>
+    <string name="whats_new_empty_music_title">Nothing new in music</string>
+    <string name="whats_new_empty_music_message">Follow your favourite artists and we\'ll keep you updated on them.</string>
+    <string name="whats_new_empty_podcasts_title">Nothing new in podcasts</string>
+    <string name="whats_new_empty_podcasts_message">Follow your favourite podcasts and we\'ll keep you updated on them.</string>
+    <string name="whats_new_error">Check your internet connection and try again</string>
 </resources>

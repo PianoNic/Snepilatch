@@ -93,7 +93,7 @@ internal object VorbisComments {
      */
     // java.util.Base64 rather than android.util.Base64: identical output, available from API 26, and
     // it does not return null under unit tests, which is what hid the oversized-packet bug.
-    private fun encodePicture(cover: TrackTags.Cover): String =
+    fun encodePicture(cover: TrackTags.Cover): String =
         java.util.Base64.getEncoder().encodeToString(pictureBlock(cover))
 
     private fun writeLe(out: ByteArrayOutputStream, value: Int) {

@@ -52,9 +52,12 @@ object FolderScan {
 
     private val AUDIO = setOf("opus", "ogg", "flac", "m4a", "mp4", "mp3", "webm")
 
-    /** The key's value: after `=` in a Vorbis comment, after the `data` box header in an MP4 freeform atom. */
+    /**
+     * The key's value: after `=` in a Vorbis comment, after the `data` box header in an MP4 freeform atom,
+     * after the terminating zero in an ID3 TXXX frame.
+     */
     private val TRACK_ID = Regex(
-        Regex.escape(TrackTags.TRACK_ID_KEY) + "(?:=|.{0,24}?data.{8})([A-Za-z0-9]{22})",
+        Regex.escape(TrackTags.TRACK_ID_KEY) + "(?:=|\\u0000|.{0,24}?data.{8})([A-Za-z0-9]{22})",
         RegexOption.DOT_MATCHES_ALL,
     )
 
@@ -98,17 +101,19 @@ object FolderScan {
         if (_migrating.value != null) return
         _migrating.value = Progress(writingIds = false, done = 0, total = _unindexed.value)
         scope.launch {
+            // One lookup for both steps: the details of each track the matching found fill in its tags.
+            val lookup = CatalogueLookup()
             // Remembered copies are looked at again too: one may be the only file left of its track (#948).
             if (_unindexed.value > 0 || duplicates(ctx).isNotEmpty()) {
                 val unindexed = _unindexed.value
-                val matched = runCatching { importFiles(ctx, CatalogueLookup()) }
+                val matched = runCatching { importFiles(ctx, lookup) }
                     .onFailure { LokiLogger.e(TAG, "migration failed", it) }
                     .getOrDefault(0)
                 val total = _migrating.value?.total ?: 0
                 LokiLogger.i(TAG, "matched $matched of $total file(s) to the catalogue")
                 if (unindexed > 0) AppMessages.show(R.string.downloads_matched, matched, total)
             }
-            val written = runCatching { writeIds(ctx) }
+            val written = runCatching { writeTags(ctx, lookup) }
                 .onFailure { LokiLogger.e(TAG, "writing ids failed", it) }
                 .getOrDefault(0)
             if (written > 0) AppMessages.show(R.string.downloads_ids_written, written)
@@ -117,19 +122,26 @@ object FolderScan {
         }
     }
 
-    /** One file at a time: each is read, rewritten and read back whole, and it is the user's music. */
-    private fun writeIds(ctx: Context): Int {
-        val untagged = Downloads.rows.value.filter { !it.idTagged && TrackIdWriter.canTag(Uri.decode(it.documentUri)) }
+    /**
+     * The id and the missing tags into every file not checked yet (#946). One file at a time: each is read,
+     * rewritten and read back whole, and it is the user's music.
+     */
+    private suspend fun writeTags(ctx: Context, lookup: CatalogueLookup): Int {
+        val unchecked = Downloads.rows.value.filter { needsTags(it) }
         var written = 0
-        untagged.forEachIndexed { i, row ->
-            _migrating.value = Progress(writingIds = true, done = i, total = untagged.size)
-            val result = FileRetagger.tag(ctx, row) ?: return@forEachIndexed
+        unchecked.forEachIndexed { i, row ->
+            _migrating.value = Progress(writingIds = true, done = i, total = unchecked.size)
+            val result = FileRetagger.tag(ctx, row, lookup) ?: return@forEachIndexed
             Downloads.put(result.row)
             if (result.wrote) written++
         }
-        LokiLogger.i(TAG, "wrote the track id into $written of ${untagged.size} file(s)")
+        LokiLogger.i(TAG, "wrote tags into $written of ${unchecked.size} file(s)")
         return written
     }
+
+    /** A row whose file may still lack its id or tags, in a format the writer can change. */
+    fun needsTags(row: DownloadedTrack): Boolean =
+        !(row.idTagged && row.tagsChecked) && TrackIdWriter.canTag(Uri.decode(row.documentUri))
 
     /** Also tells the user, but only when the number went up since they were last told, not on every start. */
     private fun count(ctx: Context) {

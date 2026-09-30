@@ -369,12 +369,12 @@
     <string name="downloads_found_in_folder">Found %1$d downloads in the folder</string>
     <string name="downloads_unindexed_found">Songs in your download folder not in your downloads yet: %1$d</string>
     <plurals name="downloads_unindexed_title"><item quantity="one">%d song not in your downloads</item><item quantity="other">%d songs not in your downloads</item></plurals>
-    <string name="downloads_unindexed_action">Tap to match them and write their track ids</string>
+    <string name="downloads_unindexed_action">Tap to match them and fill in their tags</string>
     <string name="downloads_matching">Matching %1$d of %2$d</string>
     <string name="downloads_matched">Matched to their tracks: %1$d of %2$d</string>
-    <plurals name="downloads_untagged_title"><item quantity="one">%d download without its track id</item><item quantity="other">%d downloads without their track id</item></plurals>
-    <string name="downloads_writing_ids">Writing track ids: %1$d of %2$d</string>
-    <string name="downloads_ids_written">Track ids written into files: %1$d</string>
+    <plurals name="downloads_untagged_title"><item quantity="one">%d download to check for missing tags</item><item quantity="other">%d downloads to check for missing tags</item></plurals>
+    <string name="downloads_writing_ids">Writing tags: %1$d of %2$d</string>
+    <string name="downloads_ids_written">Tags written into files: %1$d</string>
     <string name="download_folder_none">Not set, tap to choose</string>
     <string name="storage_limit">Storage Limit</string>
     <string name="storage_limit_desc">Cap how much space your downloads can use. Leave empty or 0 for no limit.</string>

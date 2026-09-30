@@ -35,6 +35,8 @@ data class DownloadedTrack(
     val auto: Boolean = false,
     /** The file carries its track id tag (#566), so a reinstall finds it again without matching (#932). */
     val idTagged: Boolean = false,
+    /** The file was checked for a missing title, artist, album or cover, and given what it lacked (#946). */
+    val tagsChecked: Boolean = false,
 )
 
 /** The row as the screens and the offline player see it. */
@@ -50,7 +52,7 @@ fun DownloadedTrack.toTrackInfo() = TrackInfo(uri = trackUri, name = title, arti
 object Downloads {
 
     private const val DB_NAME = "downloads.db"
-    private const val DB_VERSION = 7
+    private const val DB_VERSION = 8
     private const val TABLE = "downloads"
 
     private var helper: Helper? = null
@@ -110,7 +112,8 @@ object Downloads {
                     downloaded_at INTEGER NOT NULL,
                     duration_ms INTEGER NOT NULL DEFAULT 0,
                     auto INTEGER NOT NULL DEFAULT 0,
-                    id_tagged INTEGER NOT NULL DEFAULT 0
+                    id_tagged INTEGER NOT NULL DEFAULT 0,
+                    tags_checked INTEGER NOT NULL DEFAULT 0
                 )
                 """.trimIndent()
             )
@@ -139,6 +142,9 @@ object Downloads {
             // v7 knows which files carry their track id. Older rows count as not, and are checked when
             // the user has the ids written; one that already has it is only marked.
             if (oldVersion < 7) db.execSQL("ALTER TABLE $TABLE ADD COLUMN id_tagged INTEGER NOT NULL DEFAULT 0")
+            // v8 knows which files were checked for missing tags. Older rows count as not: a download of the
+            // app's own can lack them too, so each is checked once when the user migrates.
+            if (oldVersion < 8) db.execSQL("ALTER TABLE $TABLE ADD COLUMN tags_checked INTEGER NOT NULL DEFAULT 0")
         }
 
         /** Sideloading an older build must not crash; the default implementation throws. */
@@ -326,6 +332,7 @@ object Downloads {
         put("duration_ms", durationMs)
         put("auto", if (auto) 1 else 0)
         put("id_tagged", if (idTagged) 1 else 0)
+        put("tags_checked", if (tagsChecked) 1 else 0)
     }
 
     private fun android.database.Cursor.toTrack() = DownloadedTrack(
@@ -346,6 +353,7 @@ object Downloads {
         durationMs = getLong(getColumnIndexOrThrow("duration_ms")),
         auto = getInt(getColumnIndexOrThrow("auto")) == 1,
         idTagged = getInt(getColumnIndexOrThrow("id_tagged")) == 1,
+        tagsChecked = getInt(getColumnIndexOrThrow("tags_checked")) == 1,
     )
 
     private fun android.database.Cursor.getStringOrNull(column: String): String? =

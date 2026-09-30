@@ -470,4 +470,6 @@
     <string name="whats_new_empty_podcasts_title">Nüt Neus bi de Podcasts</string>
     <string name="whats_new_empty_podcasts_message">Folg dine Lieblingspodcasts, dänn haltet mer dich uf em Laufende.</string>
     <string name="whats_new_error">Lueg dini Internetverbindig aa und probier\'s nomal</string>
+    <string name="whats_new_error_title">Öppis isch schiefgloffe.</string>
+    <string name="whats_new_try_again">Nomal probiere</string>
 </resources>

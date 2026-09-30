@@ -454,4 +454,6 @@
     <string name="whats_new_empty_podcasts_title">Nichts Neues bei Podcasts</string>
     <string name="whats_new_empty_podcasts_message">Folge deinen Lieblingspodcasts, dann halten wir dich auf dem Laufenden.</string>
     <string name="whats_new_error">Prüfe deine Internetverbindung und versuche es erneut</string>
+    <string name="whats_new_error_title">Etwas ist schiefgelaufen.</string>
+    <string name="whats_new_try_again">Erneut versuchen</string>
 </resources>

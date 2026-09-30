@@ -469,4 +469,6 @@
     <string name="whats_new_empty_podcasts_title">Nothing new in podcasts</string>
     <string name="whats_new_empty_podcasts_message">Follow your favourite podcasts and we\'ll keep you updated on them.</string>
     <string name="whats_new_error">Check your internet connection and try again</string>
+    <string name="whats_new_error_title">Something went wrong.</string>
+    <string name="whats_new_try_again">Try again</string>
 </resources>

@@ -456,4 +456,6 @@
     <string name="whats_new_empty_podcasts_title">В подкастах ничего нового</string>
     <string name="whats_new_empty_podcasts_message">Подпишитесь на любимые подкасты, и мы будем держать вас в курсе.</string>
     <string name="whats_new_error">Проверьте подключение к интернету и попробуйте снова</string>
+    <string name="whats_new_error_title">Что-то пошло не так.</string>
+    <string name="whats_new_try_again">Повторить</string>
 </resources>

@@ -18,8 +18,9 @@ import kotlinx.coroutines.launch
 
 /**
  * The web player's bell (#884): new releases from followed artists and new episodes of followed
- * podcasts. [hasNew] is the dot, checked every [POLL_MS] as the web player does; opening the feed
- * clears it and marks every NEW item seen, as the web player does once its feed is on screen.
+ * podcasts. [hasNew] is the dot: as in the web player it is first checked one [POLL_MS] after start,
+ * then every [POLL_MS], and lights only when the answer turns from no to yes. Opening the feed clears
+ * it, loads the first 50 items as the web player does, and marks every NEW one seen.
  */
 class WhatsNewViewModel : SessionViewModel("WhatsNew") {
 
@@ -28,9 +29,8 @@ class WhatsNewViewModel : SessionViewModel("WhatsNew") {
     val failed = MutableStateFlow(false)
     val hasNew = MutableStateFlow(false)
 
-    /** Where the next page starts, or null once the last one is in. */
-    private var nextOffset: Int? = null
-    val loadingMore = MutableStateFlow(false)
+    /** The last answer of the check; the dot lights only when it turns true. */
+    private var lastHasNew = false
 
     /** The filter chip that is on, or null for everything. */
     val filter = MutableStateFlow<WhatsNewContentType?>(null)
@@ -38,8 +38,8 @@ class WhatsNewViewModel : SessionViewModel("WhatsNew") {
     init {
         viewModelScope.launch(Dispatchers.IO) {
             while (isActive) {
-                checkForNew()
                 delay(POLL_MS)
+                checkForNew()
             }
         }
         // A switched account has its own feed.
@@ -47,7 +47,7 @@ class WhatsNewViewModel : SessionViewModel("WhatsNew") {
             SessionHolder.generation.drop(1).collect {
                 items.value = emptyList()
                 hasNew.value = false
-                launch(Dispatchers.IO) { checkForNew() }
+                lastHasNew = false
             }
         }
     }
@@ -55,7 +55,9 @@ class WhatsNewViewModel : SessionViewModel("WhatsNew") {
     private suspend fun checkForNew() {
         val sess = SessionHolder.session ?: return
         try {
-            if (WhatsNewFeed(sess).hasNewItems()) hasNew.value = true
+            val now = WhatsNewFeed(sess).hasNewItems()
+            if (now && !lastHasNew) hasNew.value = true
+            lastHasNew = now
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -82,9 +84,9 @@ class WhatsNewViewModel : SessionViewModel("WhatsNew") {
             val page = feed.getFeed(types = setOfNotNull(filter.value))
             // A chapter or a feed notification has nothing the app shows.
             items.value = page.items.filter { it.content != null }
-            nextOffset = page.nextOffset
-            LokiLogger.i(logTag, "Feed: ${page.items.size} of ${page.totalCount}, next page at ${page.nextOffset}")
-            markSeen(page.items)
+            LokiLogger.i(logTag, "Feed: ${page.items.size} of ${page.totalCount}")
+            val fresh = page.items.filter { it.state == WhatsNewItemState.NEW }.map { it.id }
+            if (fresh.isNotEmpty()) feed.markSeen(fresh)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -93,35 +95,8 @@ class WhatsNewViewModel : SessionViewModel("WhatsNew") {
         }
     }
 
-    /**
-     * The next page, appended, for scrolling past the first one. The web player shows only the first 50;
-     * the feed pages on through older releases, as the desktop app does.
-     */
-    fun loadMore() {
-        val offset = nextOffset ?: return
-        if (loadingMore.value || loading.value) return
-        launchWithSessionLoading("loadMore", loadingMore) { sess ->
-            val feed = WhatsNewFeed(sess)
-            val page = feed.getFeed(offset = offset, types = setOfNotNull(filter.value))
-            val known = items.value.mapTo(HashSet()) { it.id }
-            items.value = items.value + page.items.filter { it.content != null && it.id !in known }
-            nextOffset = page.nextOffset
-            LokiLogger.i(logTag, "Feed page at $offset: ${page.items.size} more of ${page.totalCount}, next at ${page.nextOffset}")
-            markSeen(page.items)
-        }
-    }
-
-    /**
-     * Outside the loading flag: holding it for this second request turned away a scroll to the end that
-     * came in meanwhile, and the list then never loaded its next page.
-     */
-    private fun markSeen(page: List<WhatsNewItem>) {
-        val fresh = page.filter { it.state == WhatsNewItemState.NEW }.map { it.id }
-        if (fresh.isNotEmpty()) launchWithSession("markSeen") { sess -> WhatsNewFeed(sess).markSeen(fresh) }
-    }
-
     private companion object {
-        /** The web player's interval for whatsNewFeedNewItems. */
-        const val POLL_MS = 144_000L
+        /** The web player's interval for whatsNewFeedNewItems: 144e5 ms, four hours. */
+        const val POLL_MS = 14_400_000L
     }
 }

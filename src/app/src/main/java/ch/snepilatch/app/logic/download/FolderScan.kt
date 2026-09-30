@@ -191,6 +191,7 @@ object FolderScan {
         var added = 0
         var done = 0
         val copies = mutableListOf<String>()
+        val copyRows = mutableListOf<DownloadedTrack>()
         // A lookup is a network round trip of about a second; one at a time a folder of a few hundred
         // files took minutes. A few in flight, like the web player's own requests.
         val gate = Semaphore(PARALLEL_LOOKUPS)
@@ -216,7 +217,7 @@ object FolderScan {
                                     LokiLogger.i(TAG, "${file.name} takes over ${row.trackUri} from a file that is gone")
                                 } else {
                                     LokiLogger.i(TAG, "${file.name} is another copy of ${row.trackUri}")
-                                    copies += file.uri.toString()
+                                    copyRows += row
                                 }
                             }
                             else -> {
@@ -229,6 +230,12 @@ object FolderScan {
                     }
                 }
             }
+        }
+        // A copy is the user's music as much as the file the downloads know, so it gets the same tags (#950).
+        // Tagging writes a new file, so the copy is remembered under the name it has afterwards.
+        for (copy in copyRows) {
+            val tagged = lookup?.let { FileRetagger.tag(ctx, copy, it) }?.row
+            copies += tagged?.documentUri ?: copy.documentUri
         }
         rememberDuplicates(ctx, copies)
         return added

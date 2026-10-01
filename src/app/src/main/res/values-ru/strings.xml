@@ -461,4 +461,5 @@
     <string name="whats_new_error">Проверьте подключение к интернету и попробуйте снова</string>
     <string name="whats_new_error_title">Что-то пошло не так.</string>
     <string name="whats_new_try_again">Повторить</string>
+    <string name="quality_none">Нет аудио</string>
 </resources>

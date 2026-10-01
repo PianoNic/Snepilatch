@@ -81,6 +81,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         // True once onCreate has published `instance` (and false after teardown). Lets the Activity
         // await genuine service readiness instead of guessing with a fixed delay before wiring controls.
         val serviceReady: MutableStateFlow<Boolean> = MutableStateFlow(false)
+
+        /** The audio format ExoPlayer plays right now, for the quality chip (#959); null when nothing is loaded. */
+        val playingFormat: MutableStateFlow<androidx.media3.common.Format?> = MutableStateFlow(null)
     }
 
     private var mediaSession: MediaSessionCompat? = null
@@ -336,6 +339,13 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         player.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 updateNotification()
+            }
+
+            override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
+                val audio = tracks.groups.firstOrNull { it.type == C.TRACK_TYPE_AUDIO && it.isSelected }
+                playingFormat.value = audio?.let { group ->
+                    (0 until group.length).firstOrNull { group.isTrackSelected(it) }?.let { group.getTrackFormat(it) }
+                }
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {

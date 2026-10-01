@@ -475,4 +475,5 @@
     <string name="whats_new_error">Lueg dini Internetverbindig aa und probier\'s nomal</string>
     <string name="whats_new_error_title">Öppis isch schiefgloffe.</string>
     <string name="whats_new_try_again">Nomal probiere</string>
+    <string name="quality_none">Kei Audio</string>
 </resources>

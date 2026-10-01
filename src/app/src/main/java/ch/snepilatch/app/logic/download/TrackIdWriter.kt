@@ -45,6 +45,34 @@ internal object TrackIdWriter {
 
     fun withTrackId(bytes: ByteArray, id: String): ByteArray? = withTags(bytes, TrackTags("", "", trackId = id))
 
+    /** How much of a FLAC or MP3 is read to tag it: their tags sit in front of the audio (#953). */
+    const val HEAD_BYTES = 16 * 1024 * 1024
+
+    /** Ogg and MP4 are rewritten whole in memory, so a larger one is left alone rather than run out of it. */
+    const val WHOLE_FILE_LIMIT = 48L * 1024 * 1024
+
+    /** The file with its first [replaced] bytes swapped for [prefix]; every byte after them stays as it is. */
+    class Edit(val prefix: ByteArray, val replaced: Int) {
+        fun changes(head: ByteArray) = prefix.size != replaced || !prefix.contentEquals(head.copyOf(replaced))
+    }
+
+    private fun front(end: Int, rebuilt: ByteArray?): Edit? = rebuilt?.let { Edit(it, end) }
+
+    /** FLAC and MP3 keep their tags in front of the audio, so their start is all [edit] needs. */
+    fun tagsInFront(head: ByteArray): Boolean = head.startsWith("fLaC") || Id3Tags.isMp3(head)
+
+    /**
+     * [withTags] as an [Edit], so a large file never has to be held in memory (#953): for FLAC and MP3 [head]
+     * may be only the start of the file, and only their tag area is rebuilt; any other format needs the whole
+     * file, which [whole] says [head] is. Null when the tags lie past [head] or the layout is not one this changes.
+     */
+    fun edit(head: ByteArray, whole: Boolean, tags: TrackTags): Edit? = when {
+        head.startsWith("fLaC") -> Flac.audioAt(head)?.let { front(it, Flac.withTags(head.copyOf(it), tags)) }
+        Id3Tags.isMp3(head) -> Id3Tags.audioAt(head)?.let { front(it, Id3Tags.withTags(head.copyOf(it), tags)) }
+        whole -> withTags(head, tags)?.let { Edit(it, head.size) }
+        else -> null
+    }
+
     private fun isMp4(bytes: ByteArray) = bytes.size > 8 && String(bytes, 4, 4, Charsets.ISO_8859_1) == "ftyp"
 
     private fun ByteArray.startsWith(magic: String) =
@@ -275,6 +303,9 @@ internal object TrackIdWriter {
             out.write(bytes, metadata.audioAt, bytes.size - metadata.audioAt)
             return out.toByteArray()
         }
+
+        /** Where the audio frames start, once every metadata block lies within [bytes]. */
+        fun audioAt(bytes: ByteArray): Int? = metadata(bytes)?.audioAt
 
         private fun metadata(bytes: ByteArray): Metadata? {
             val blocks = ArrayList<Block>()

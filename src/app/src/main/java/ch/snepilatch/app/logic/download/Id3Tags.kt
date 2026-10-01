@@ -47,6 +47,9 @@ internal object Id3Tags {
         return Tag(version, frames, frames.mapTo(HashSet()) { String(it, 0, 4, Charsets.ISO_8859_1) }, end)
     }
 
+    /** Where the audio starts: after the tag, or at 0 without one. Null when the tag lies past [bytes]. */
+    fun audioAt(bytes: ByteArray): Int? = read(bytes)?.audioAt
+
     fun missing(bytes: ByteArray): Set<TrackIdWriter.Field>? {
         val tag = read(bytes) ?: return null
         return FRAME_OF.filterValues { it !in tag.ids }.keys

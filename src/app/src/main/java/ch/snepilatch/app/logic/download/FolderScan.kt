@@ -42,6 +42,9 @@ object FolderScan {
     /** Files a migration found to be a second copy of an indexed track; not counted as unknown again. */
     private const val PREF_DUPLICATES = "folder_duplicates"
 
+    /** Files the last migration looked up and found no track for; a new migration replaces the set. */
+    private const val PREF_UNMATCHED = "folder_unmatched"
+
     /** Opus and FLAC keep their tags near the start; the cover may sit before them, so this is generous. */
     private const val HEAD_BYTES = 2 * 1024 * 1024
 
@@ -66,6 +69,10 @@ object FolderScan {
     /** Audio files in the folder that are not in the index, from the last count. */
     private val _unindexed = MutableStateFlow(0)
     val unindexed: StateFlow<Int> = _unindexed.asStateFlow()
+
+    /** Of those, the ones a migration already looked up and found no track for (#957). */
+    private val _unmatched = MutableStateFlow(0)
+    val unmatched: StateFlow<Int> = _unmatched.asStateFlow()
 
     /** How far a running [migrate] is: matching unknown files, then writing ids into the indexed ones. */
     data class Progress(val writingIds: Boolean, val done: Int, val total: Int)
@@ -153,10 +160,12 @@ object FolderScan {
     /** Also tells the user, but only when the number went up since they were last told, not on every start. */
     private fun count(ctx: Context) {
         val known = Downloads.rows.value.mapTo(HashSet()) { it.documentUri } + duplicates(ctx)
-        val unknown = runCatching { listFiles(ctx).count { it.uri.toString() !in known } }
+        val unknownUris = runCatching { listFiles(ctx).map { it.uri.toString() }.filter { it !in known } }
             .onFailure { LokiLogger.w(TAG, "could not list the folder: ${it.message}") }
             .getOrNull() ?: return
+        val unknown = unknownUris.size
         _unindexed.value = unknown
+        _unmatched.value = unmatchedFiles(ctx).let { tried -> unknownUris.count { it in tried } }
         val prefs = ctx.getSharedPreferences(AppSettings.PREFS, Context.MODE_PRIVATE)
         if (unknown > prefs.getInt(PREF_NOTIFIED, 0)) AppMessages.show(R.string.downloads_unindexed_found, unknown)
         prefs.edit().putInt(PREF_NOTIFIED, unknown).apply()
@@ -164,6 +173,9 @@ object FolderScan {
 
     private fun duplicates(ctx: Context): Set<String> =
         ctx.getSharedPreferences(AppSettings.PREFS, Context.MODE_PRIVATE).getStringSet(PREF_DUPLICATES, emptySet()).orEmpty()
+
+    private fun unmatchedFiles(ctx: Context): Set<String> =
+        ctx.getSharedPreferences(AppSettings.PREFS, Context.MODE_PRIVATE).getStringSet(PREF_UNMATCHED, emptySet()).orEmpty()
 
     private fun rememberDuplicates(ctx: Context, uris: Collection<String>) {
         if (uris.isEmpty()) return
@@ -199,6 +211,7 @@ object FolderScan {
         var done = 0
         val copies = mutableListOf<String>()
         val copyRows = mutableListOf<DownloadedTrack>()
+        val unmatched = mutableListOf<String>()
         // A lookup is a network round trip of about a second; one at a time a folder of a few hundred
         // files took minutes. A few in flight, like the web player's own requests.
         val gate = Semaphore(PARALLEL_LOOKUPS)
@@ -210,7 +223,10 @@ object FolderScan {
                     index.withLock {
                         // add() is false for a track already indexed, or a second copy of one just taken.
                         when {
-                            row == null -> LokiLogger.i(TAG, "no track found for ${file.name}")
+                            row == null -> {
+                                LokiLogger.i(TAG, "no track found for ${file.name}")
+                                unmatched += file.uri.toString()
+                            }
                             !knownTracks.add(row.trackUri) -> {
                                 val lost = rowOf[row.trackUri]?.takeIf { isLost(it) }
                                 if (lost != null) {
@@ -245,6 +261,11 @@ object FolderScan {
             copies += tagged?.documentUri ?: copy.documentUri
         }
         rememberDuplicates(ctx, copies)
+        // Only a migration looks files up, so only it says which ones nothing was found for.
+        if (lookup != null) {
+            ctx.getSharedPreferences(AppSettings.PREFS, Context.MODE_PRIVATE).edit()
+                .putStringSet(PREF_UNMATCHED, unmatched.toSet()).apply()
+        }
         return added
     }
 

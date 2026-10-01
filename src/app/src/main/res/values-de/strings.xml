@@ -368,6 +368,8 @@
     <string name="downloads_matching">Ordne %1$d von %2$d zu</string>
     <string name="downloads_matched">Ihren Titeln zugeordnet: %1$d von %2$d</string>
     <plurals name="downloads_untagged_title"><item quantity="one">%d Download auf fehlende Tags prüfen</item><item quantity="other">%d Downloads auf fehlende Tags prüfen</item></plurals>
+    <plurals name="downloads_unmatched_title"><item quantity="one">%d Song wurde auf Spotify nicht gefunden</item><item quantity="other">%d Songs wurden auf Spotify nicht gefunden</item></plurals>
+    <string name="downloads_unmatched_action">Tippen, um es erneut zu versuchen</string>
     <string name="downloads_writing_ids">Tags schreiben: %1$d von %2$d</string>
     <string name="downloads_ids_written">Tags in Dateien geschrieben: %1$d</string>
     <string name="download_folder_none">Nicht gesetzt, zum Wählen tippen</string>

@@ -123,19 +123,23 @@ fun DownloadsScreen(vm: PlaybackViewModel) {
 @Composable
 private fun UnindexedFiles() {
     val unindexed by FolderScan.unindexed.collectAsState()
+    val unmatched by FolderScan.unmatched.collectAsState()
     val migrating by FolderScan.migrating.collectAsState()
     val rows by Downloads.rows.collectAsState()
     val untagged = rows.count { FolderScan.needsTags(it) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val progress = migrating
     if (unindexed == 0 && untagged == 0 && progress == null) return
+    // Everything left was already looked up and not found: saying "tap to match" again would promise too much (#957).
+    val onlyUnmatched = unindexed > 0 && unmatched == unindexed && untagged == 0
     SettingRow(
-        title = if (unindexed > 0) {
-            androidx.compose.ui.res.pluralStringResource(R.plurals.downloads_unindexed_title, unindexed, unindexed)
-        } else {
-            androidx.compose.ui.res.pluralStringResource(R.plurals.downloads_untagged_title, untagged, untagged)
+        title = when {
+            onlyUnmatched -> androidx.compose.ui.res.pluralStringResource(R.plurals.downloads_unmatched_title, unmatched, unmatched)
+            unindexed > 0 -> androidx.compose.ui.res.pluralStringResource(R.plurals.downloads_unindexed_title, unindexed, unindexed)
+            else -> androidx.compose.ui.res.pluralStringResource(R.plurals.downloads_untagged_title, untagged, untagged)
         },
         subtitle = when {
+            progress == null && onlyUnmatched -> stringResource(R.string.downloads_unmatched_action)
             progress == null -> stringResource(R.string.downloads_unindexed_action)
             progress.writingIds -> stringResource(R.string.downloads_writing_ids, progress.done, progress.total)
             else -> stringResource(R.string.downloads_matching, progress.done, progress.total)

@@ -131,6 +131,13 @@ object FolderScan {
         var written = 0
         unchecked.forEachIndexed { i, row ->
             _migrating.value = Progress(writingIds = true, done = i, total = unchecked.size)
+            // A file deleted outside the app is gone for good: its row goes, rather than being tried again on
+            // every migration and keeping the prompt up (#954).
+            if (DownloadFolder.exists(row.documentUri) == false) {
+                Downloads.remove(row.trackUri)
+                LokiLogger.i(TAG, "${row.title} is no longer in the folder, removed from the downloads")
+                return@forEachIndexed
+            }
             val result = FileRetagger.tag(ctx, row, lookup) ?: return@forEachIndexed
             Downloads.put(result.row)
             if (result.wrote) written++

@@ -97,8 +97,18 @@ object DownloadFolder {
                 arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID),
                 null, null, null
             ).use { it != null && it.moveToFirst() }
-        }.getOrNull()
+        }.getOrElse { if (isMissingFile(it)) false else null }
     }
+
+    /**
+     * The storage provider answers a query for a deleted file with an exception rather than an empty
+     * cursor: a FileNotFoundException, or one wrapped as "Failed to determine if … is child of …:
+     * java.io.FileNotFoundException: Missing file" (#954). That is a definite "gone"; anything else stays
+     * inconclusive.
+     */
+    internal fun isMissingFile(e: Throwable): Boolean =
+        generateSequence(e) { it.cause }.any { it is java.io.FileNotFoundException } ||
+            e.message?.contains("java.io.FileNotFoundException") == true
 
     fun delete(documentUri: String): Boolean {
         val ctx = appContext ?: return false

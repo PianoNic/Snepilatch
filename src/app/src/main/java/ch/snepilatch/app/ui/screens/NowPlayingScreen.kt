@@ -871,18 +871,46 @@ private fun PlayerShortcutButton(
     ) { Icon(action.icon, action.label, modifier = Modifier.size(iconSize)) }
 }
 
+/**
+ * What the audio is, as ExoPlayer plays it (#959). Always shown, like the source pill: dimmed "No audio" while
+ * nothing plays on this phone. A download whose header has no bitrate has it measured from the file played.
+ */
 @Composable
-private fun InfoPill(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+private fun QualityPill(trackDurationMs: Long, provider: String?) {
+    val format by ch.snepilatch.app.logic.playback.MusicPlaybackService.playingFormat.collectAsState()
+    val context = LocalContext.current
+    // Keyed on the format: once ExoPlayer has the file's tracks it also knows its own length, which can differ
+    // from the catalogue's by seconds and would skew the bitrate.
+    val measuredKbps by produceState<Int?>(null, provider, format) {
+        val player = ch.snepilatch.app.logic.playback.MusicPlaybackService.instance?.player
+        val file = player?.currentMediaItem?.localConfiguration?.uri
+        val fileMs = player?.duration?.takeIf { it > 0 } ?: trackDurationMs
+        value = if (file != null && provider == ch.snepilatch.app.logic.playback.AudioSourceResolver.LOCAL_PROVIDER) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                ch.snepilatch.app.logic.playback.PayloadBitrate.ofFile(context, file, fileMs)
+            }
+        } else {
+            null
+        }
+    }
+    val label = if (provider != null) ch.snepilatch.app.logic.playback.AudioQuality.label(format, measuredKbps) else null
+    InfoPill(null, label ?: stringResource(R.string.quality_none), dimmed = label == null)
+}
+
+@Composable
+private fun InfoPill(icon: androidx.compose.ui.graphics.vector.ImageVector?, text: String, dimmed: Boolean = false) {
+    // The same dimming the source pill uses for its idle "No CDN".
+    val fg = SnepilatchWhite.copy(alpha = if (dimmed) 0.55f else 1f)
     Row(
         Modifier
             .height(20.dp)
-            .background(Color.White.copy(alpha = 0.10f), RoundedCornerShape(50))
+            .background(Color.White.copy(alpha = if (dimmed) 0.06f else 0.10f), RoundedCornerShape(50))
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
-        Icon(icon, null, tint = SnepilatchWhite, modifier = Modifier.size(9.dp))
-        Text(text, color = SnepilatchWhite, fontSize = 9.sp, maxLines = 1)
+        icon?.let { Icon(it, null, tint = fg, modifier = Modifier.size(9.dp)) }
+        Text(text, color = fg, fontSize = 9.sp, maxLines = 1)
     }
 }
 
@@ -1090,8 +1118,12 @@ private fun PlayerBottomBar(
                 } else {
                     audioOutput?.let { InfoPill(audioIcon, it) }
                 }
-                // Always show the source pill (idle "No CDN" state when nothing streams).
-                SourcePill(provider)
+                // Always show the source pill (idle "No CDN" state when nothing streams), and beside it what
+                // the audio is, as ExoPlayer plays it (#959), whenever this phone is the one playing.
+                Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                    SourcePill(provider)
+                    QualityPill(track?.durationMs ?: 0L, provider)
+                }
             }
         }
         Row(

@@ -2,6 +2,7 @@
 
 package ch.snepilatch.app.ui.screens
 
+import ch.snepilatch.app.ui.shared.SwipeableTrackRow
 import ch.snepilatch.app.ui.shared.DownloadStatus
 import ch.snepilatch.app.ui.shared.playableAlpha
 import ch.snepilatch.app.logic.download.Downloads
@@ -61,6 +62,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -464,7 +466,7 @@ private fun CategorizedResults(
                 // section in Spfy's per-query chipOrder, capped with a "Show all".
                 results.topResult?.let { top ->
                     val unified = top.toUnified(vm, ctx)
-                    item(key = "top") { TopResultCard(unified.copy(menu = liveMenu(unified.menu, unified.track, vm))) }
+                    item(key = "top") { TopResultCard(unified.copy(menu = liveMenu(unified.menu, unified.track, vm)), vm) }
                 }
                 results.chipOrder.ifEmpty { DEFAULT_CHIP_ORDER }.forEach { type ->
                     val (filter, rows) = sectionFor(type, results, vm, ctx) ?: return@forEach
@@ -473,13 +475,17 @@ private fun CategorizedResults(
                         SectionHeader(stringResource(labelFor(filter))) { onFilterChange(filter) }
                     }
                     items(rows.take(SECTION_PREVIEW), key = { "${type}_${it.uri}" }) { row ->
-                        ResultRow(row.title, row.subtitle, row.imageUrl, row.circular, liveMenu(row.menu, row.track, vm), row.track, row.onClick)
+                        SearchResultSwipeActions(row, vm) {
+                            ResultRow(row.title, row.subtitle, row.imageUrl, row.circular, liveMenu(row.menu, row.track, vm), row.track, row.onClick)
+                        }
                     }
                 }
             } else {
                 val rows = singleFilterRows(results, vm, ctx, selectedFilter)
                 items(rows, key = { it.uri }) { row ->
-                    ResultRow(row.title, row.subtitle, row.imageUrl, row.circular, liveMenu(row.menu, row.track, vm), row.track, row.onClick)
+                    SearchResultSwipeActions(row, vm) {
+                        ResultRow(row.title, row.subtitle, row.imageUrl, row.circular, liveMenu(row.menu, row.track, vm), row.track, row.onClick)
+                    }
                 }
             }
         }
@@ -541,43 +547,59 @@ private fun SearchTopResult.toUnified(vm: PlaybackViewModel, ctx: Context): Unif
     is SearchTopResult.User -> user.toUnified(ctx)
 }
 
+/** Only song results carry a track; reuse the same configured gestures as detail lists. */
 @Composable
-private fun TopResultCard(r: UnifiedResult) {
+private fun SearchResultSwipeActions(result: UnifiedResult, vm: PlaybackViewModel, content: @Composable () -> Unit) {
+    // The top-result slot is reused across searches, so its gesture state must follow the result.
+    key(result.uri) {
+        val track = result.track
+        if (track != null) {
+            SwipeableTrackRow(track, vm, content = content)
+        } else {
+            content()
+        }
+    }
+}
+
+@Composable
+private fun TopResultCard(r: UnifiedResult, vm: PlaybackViewModel) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(
             stringResource(R.string.search_top_result),
             color = SnepilatchWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 8.dp)
         )
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(SnepilatchLightGray.copy(alpha = 0.10f))
-                .clickable { r.onClick() }
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            SpfyImage(
-                url = r.imageUrl,
-                modifier = Modifier.size(80.dp),
-                shape = if (r.circular) CircleShape else RoundedCornerShape(6.dp)
-            )
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    r.title, color = SnepilatchWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis
+        SearchResultSwipeActions(r, vm) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(SnepilatchLightGray.copy(alpha = 0.10f))
+                    .clickable { r.onClick() }
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SpfyImage(
+                    url = r.imageUrl,
+                    modifier = Modifier.size(80.dp),
+                    shape = if (r.circular) CircleShape else RoundedCornerShape(6.dp)
                 )
-                if (r.subtitle.isNotBlank()) {
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
                     Text(
-                        r.subtitle, color = SnepilatchLightGray, fontSize = 13.sp,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 2.dp)
+                        r.title, color = SnepilatchWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis
                     )
+                    if (r.subtitle.isNotBlank()) {
+                        Text(
+                            r.subtitle, color = SnepilatchLightGray, fontSize = 13.sp,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    }
                 }
+                OverflowMenu(r.title, r.subtitle, r.imageUrl, r.circular, r.menu)
             }
-            OverflowMenu(r.title, r.subtitle, r.imageUrl, r.circular, r.menu)
         }
     }
 }

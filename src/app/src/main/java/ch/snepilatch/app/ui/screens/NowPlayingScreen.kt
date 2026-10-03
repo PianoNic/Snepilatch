@@ -12,7 +12,6 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -66,7 +65,6 @@ import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import ch.snepilatch.app.viewmodel.canRemovePlayingFromPlaylist
 import ch.snepilatch.app.viewmodel.removePlayingFromPlaylist
-import ch.snepilatch.app.logic.shared.shareSpfyUri
 import ch.snepilatch.app.ui.shared.LikeToggleButton
 import ch.snepilatch.app.ui.shared.PlaylistPickerDialog
 import ch.snepilatch.app.ui.shared.PlayerAction
@@ -429,6 +427,10 @@ fun NowPlayingScreen(
 
     val animatedPrimary by animateColorAsState(theme.primary, tween(800), label = "primary")
     val buttonBg = Color.White.copy(alpha = 0.12f)
+    val buttonColors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = buttonBg, contentColor = SnepilatchWhite)
+    val detailButtonColors = IconButtonDefaults.filledTonalIconButtonColors(
+        containerColor = buttonBg, contentColor = SnepilatchWhite.copy(alpha = 0.7f),
+    )
 
     var showMore by remember { mutableStateOf(false) }
     var showPlaylistPicker by remember { mutableStateOf(false) }
@@ -441,8 +443,8 @@ fun NowPlayingScreen(
             PlayerOverlay.Code -> showCode = true
         }
     }
-    val shareContext = LocalContext.current
-    val shareTrackLabel = stringResource(R.string.share_track_chooser)
+    val shortcut by AppSettings.playerShortcut.collectAsState()
+    val topRightShortcut by AppSettings.playerTopRightShortcut.collectAsState()
     val canvasVideoUrl by vm.canvasUrl.collectAsState()
     val canvasOn by AppSettings.canvasEnabled.collectAsState()
     val hasCanvas = canvasOn && canvasVideoUrl != null
@@ -600,7 +602,7 @@ fun NowPlayingScreen(
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
-                            PlayerShortcutButton(playerActions, vm, track, buttonBg, animatedPrimary, 40.dp, 24.dp)
+                            PlayerShortcutButton(playerActions, vm, detailButtonColors, animatedPrimary, 40.dp, 24.dp, shortcut)
                         }
 
                         Spacer(Modifier.height(8.dp))
@@ -620,7 +622,7 @@ fun NowPlayingScreen(
 
                         Spacer(Modifier.weight(0.2f))
 
-                        PlayerBottomBar(vm, animatedPrimary, buttonBg, shareTrackLabel, compact = true)
+                        PlayerBottomBar(vm, animatedPrimary, buttonBg, playerActions, compact = true)
 
                         Spacer(Modifier.height(8.dp))
                     }
@@ -707,18 +709,9 @@ fun NowPlayingScreen(
                                     )
                                 }
                             }
-                            // EQ button: our screen when the in-app EQ owns the session, the system
-                            // effect panel otherwise (see PlaybackViewModel.openEqualizer).
-                            FilledTonalIconButton(
-                                onClick = { vm.openEqualizer(shareContext) },
-                                modifier = Modifier.size(44.dp),
-                                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                    containerColor = buttonBg,
-                                    contentColor = SnepilatchWhite,
-                                ),
-                            ) {
-                                Icon(Icons.Rounded.Tune, stringResource(R.string.equalizer), modifier = Modifier.size(22.dp))
-                            }
+                            PlayerShortcutButton(
+                                playerActions, vm, buttonColors, animatedPrimary, 44.dp, 22.dp, topRightShortcut,
+                            )
                     }
 
                     Spacer(Modifier.weight(0.3f))
@@ -784,7 +777,7 @@ fun NowPlayingScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            PlayerShortcutButton(playerActions, vm, track, buttonBg, animatedPrimary, 48.dp, 28.dp)
+                            PlayerShortcutButton(playerActions, vm, detailButtonColors, animatedPrimary, 48.dp, 28.dp, shortcut)
                             NowPlayingMenu(
                                 showMore = showMore,
                                 onShowMore = { showMore = it },
@@ -813,7 +806,7 @@ fun NowPlayingScreen(
 
                     Spacer(Modifier.weight(0.2f))
 
-                    PlayerBottomBar(vm, animatedPrimary, buttonBg, shareTrackLabel, compact = false)
+                    PlayerBottomBar(vm, animatedPrimary, buttonBg, playerActions, compact = false)
 
                     Spacer(Modifier.height(12.dp))
                 }
@@ -842,21 +835,21 @@ fun NowPlayingScreen(
     }
 }
 
-/** The button beside the track details: the like toggle by default, or whichever [PlayerAction] the setting picked. */
+/** A configured player action, with a toggle when the chosen action is Like. */
 @Composable
 private fun PlayerShortcutButton(
     actions: List<PlayerAction>,
     vm: PlaybackViewModel,
-    track: ch.snepilatch.app.data.TrackInfo?,
-    buttonBg: Color,
+    colors: IconButtonColors,
     accent: Color,
     size: Dp,
     iconSize: Dp,
+    shortcut: PlayerShortcut,
 ) {
-    val shortcut by AppSettings.playerShortcut.collectAsState()
+    val track by vm.currentTrack.collectAsState()
     if (shortcut == PlayerShortcut.LIKE) {
         val isLiked by vm.currentTrackLiked.collectAsState()
-        LikeToggleButton(isLiked, track?.uri, vm, buttonBg, accent, size, iconSize)
+        LikeToggleButton(isLiked, track?.uri, vm, colors.containerColor, accent, size, iconSize)
         return
     }
     val action = actions.first { it.shortcut == shortcut }
@@ -864,10 +857,7 @@ private fun PlayerShortcutButton(
         onClick = action.run,
         enabled = action.enabled,
         modifier = Modifier.size(size),
-        colors = IconButtonDefaults.filledTonalIconButtonColors(
-            containerColor = buttonBg,
-            contentColor = SnepilatchWhite.copy(alpha = 0.7f),
-        ),
+        colors = colors,
     ) { Icon(action.icon, action.label, modifier = Modifier.size(iconSize)) }
 }
 
@@ -1066,16 +1056,18 @@ private fun PlayerBottomBar(
     vm: PlaybackViewModel,
     animatedPrimary: Color,
     buttonBg: Color,
-    shareTrackLabel: String,
+    actions: List<PlayerAction>,
     compact: Boolean,
 ) {
+    val buttonColors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = buttonBg, contentColor = SnepilatchWhite)
     val track by vm.currentTrack.collectAsState()
     val provider by vm.streamProvider.collectAsState()
     val streaming by vm.isStreaming.collectAsState()
     val audioOutput by vm.audioOutputName.collectAsState()
     val audioType by vm.audioOutputType.collectAsState()
     val activeDevice by vm.activeDeviceName.collectAsState()
-    val context = LocalContext.current
+    val shareShortcut by AppSettings.playerShareShortcut.collectAsState()
+    val queueShortcut by AppSettings.playerQueueShortcut.collectAsState()
     val audioIcon = when (audioType) {
         "bluetooth" -> Icons.Rounded.Bluetooth
         "wired" -> Icons.Rounded.Headphones
@@ -1130,16 +1122,12 @@ private fun PlayerBottomBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(rightSpacing)
         ) {
-            TonalIconBtn({ track?.uri?.let { shareSpfyUri(context, it, shareTrackLabel) } }, actionBtn, buttonBg) {
-                Icon(Icons.Rounded.Share, stringResource(R.string.share), modifier = Modifier.size(actionIcon))
-            }
-            TonalIconBtn({ vm.openQueue() }, actionBtn, buttonBg) {
-                Icon(
-                    Icons.AutoMirrored.Rounded.QueueMusic,
-                    stringResource(R.string.queue),
-                    modifier = Modifier.size(actionIcon)
-                )
-            }
+            PlayerShortcutButton(
+                actions, vm, buttonColors, animatedPrimary, actionBtn, actionIcon, shareShortcut,
+            )
+            PlayerShortcutButton(
+                actions, vm, buttonColors, animatedPrimary, actionBtn, actionIcon, queueShortcut,
+            )
         }
     }
 }
@@ -1204,7 +1192,7 @@ private fun NowPlayingMenu(
         // so it is nothing a configurable button or a row swipe could carry (#851).
         val canRemove = vm.canRemovePlayingFromPlaylist()
         val removeLabel = stringResource(R.string.remove_from_playlist)
-        val items = actions.flatMap { action ->
+        val items = actions.filter { it.shortcut != PlayerShortcut.EQUALIZER }.flatMap { action ->
             listOf(MenuAction(action.icon, action.label, action.tint) { onShowMore(false); action.run() }) +
                 if (canRemove && action.shortcut == PlayerShortcut.ADD_TO_PLAYLIST) {
                     listOf(MenuAction(Icons.Rounded.PlaylistRemove, removeLabel) { onShowMore(false); vm.removePlayingFromPlaylist() })

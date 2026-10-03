@@ -151,14 +151,7 @@ private fun BehaviorSection(context: Context, accent: Color) {
         icon = Icons.AutoMirrored.Rounded.QueueMusic,
     )
 
-    val playerShortcut by AppSettings.playerShortcut.collectAsState()
-    ShortcutPickerRow(
-        title = stringResource(R.string.player_shortcut),
-        description = stringResource(R.string.player_shortcut_desc),
-        icon = Icons.Rounded.TouchApp,
-        current = playerShortcut,
-        options = PlayerShortcut.entries,
-    ) { AppSettings.setPlayerShortcut(it, context) }
+    PlayerButtonSettings(context)
 
     // The row swipes only offer what acts on the swiped track (#578).
     val swipeLeft by GestureSettings.swipeLeftAction.collectAsState()
@@ -177,6 +170,43 @@ private fun BehaviorSection(context: Context, accent: Color) {
         current = swipeRight,
         options = PlayerShortcut.perTrack,
     ) { GestureSettings.setSwipeActions(context, right = it) }
+}
+
+@Composable
+private fun PlayerButtonSettings(context: Context) {
+    val playerShortcut by AppSettings.playerShortcut.collectAsState()
+    ShortcutPickerRow(
+        title = stringResource(R.string.player_shortcut),
+        description = stringResource(R.string.player_shortcut_desc),
+        icon = Icons.Rounded.TouchApp,
+        current = playerShortcut,
+        options = PlayerShortcut.entries,
+    ) { AppSettings.setPlayerShortcut(it, context) }
+
+    val topRightShortcut by AppSettings.playerTopRightShortcut.collectAsState()
+    ShortcutPickerRow(
+        title = stringResource(R.string.player_top_right_button),
+        description = stringResource(R.string.player_button_action_desc),
+        icon = playerShortcutIcon(topRightShortcut),
+        current = topRightShortcut,
+        options = PlayerShortcut.entries,
+    ) { AppSettings.setPlayerButtonActions(context, topRight = it) }
+    val shareShortcut by AppSettings.playerShareShortcut.collectAsState()
+    ShortcutPickerRow(
+        title = stringResource(R.string.player_share_button),
+        description = stringResource(R.string.player_button_action_desc),
+        icon = playerShortcutIcon(shareShortcut),
+        current = shareShortcut,
+        options = PlayerShortcut.entries,
+    ) { AppSettings.setPlayerButtonActions(context, share = it) }
+    val queueShortcut by AppSettings.playerQueueShortcut.collectAsState()
+    ShortcutPickerRow(
+        title = stringResource(R.string.player_queue_button),
+        description = stringResource(R.string.player_button_action_desc),
+        icon = playerShortcutIcon(queueShortcut),
+        current = queueShortcut,
+        options = PlayerShortcut.entries,
+    ) { AppSettings.setPlayerButtonActions(context, queue = it) }
 }
 
 /** A setting row that picks one [PlayerShortcut] out of [options], shown with its title and glyph. */

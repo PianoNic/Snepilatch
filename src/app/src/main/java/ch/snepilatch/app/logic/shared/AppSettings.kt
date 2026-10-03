@@ -95,6 +95,9 @@ object AppSettings {
 
     // Action assigned to the button beside the full-screen player's track details.
     val playerShortcut = MutableStateFlow(PlayerShortcut.LIKE)
+    val playerTopRightShortcut = MutableStateFlow(PlayerShortcut.EQUALIZER)
+    val playerShareShortcut = MutableStateFlow(PlayerShortcut.SHARE)
+    val playerQueueShortcut = MutableStateFlow(PlayerShortcut.QUEUE)
 
     // How the equalizer is handled. One choice, because the options exclude each other: the in-app EQ
     // computes its own input gain from the curve, while the headroom attenuation exists only to give an
@@ -162,6 +165,9 @@ object AppSettings {
         eqBands.value = parseBands(prefs.getString("eq_bands", null))
         playerGradientBg.value = prefs.getBoolean("player_gradient_bg", false)
         playerShortcut.value = PlayerShortcut.fromId(prefs.getString("player_shortcut", null))
+        playerTopRightShortcut.value = PlayerShortcut.fromId(prefs.getString("player_top_right_shortcut", null), PlayerShortcut.EQUALIZER)
+        playerShareShortcut.value = PlayerShortcut.fromId(prefs.getString("player_share_shortcut", null), PlayerShortcut.SHARE)
+        playerQueueShortcut.value = PlayerShortcut.fromId(prefs.getString("player_queue_shortcut", null), PlayerShortcut.QUEUE)
         GestureSettings.load(prefs)
         contentRegion.value = prefs.getString("content_region", "nearest") ?: "nearest"
         updateChannel.value = prefs.getString("update_channel", CHANNEL_STABLE) ?: CHANNEL_STABLE
@@ -316,6 +322,22 @@ object AppSettings {
     fun setPlayerShortcut(shortcut: PlayerShortcut, context: Context) {
         playerShortcut.value = shortcut
         prefs(context).edit().putString("player_shortcut", shortcut.id).apply()
+    }
+
+    fun setPlayerButtonActions(
+        context: Context,
+        topRight: PlayerShortcut = playerTopRightShortcut.value,
+        share: PlayerShortcut = playerShareShortcut.value,
+        queue: PlayerShortcut = playerQueueShortcut.value,
+    ) {
+        playerTopRightShortcut.value = topRight
+        playerShareShortcut.value = share
+        playerQueueShortcut.value = queue
+        prefs(context).edit()
+            .putString("player_top_right_shortcut", topRight.id)
+            .putString("player_share_shortcut", share.id)
+            .putString("player_queue_shortcut", queue.id)
+            .apply()
     }
 
     /**

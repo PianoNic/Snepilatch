@@ -80,6 +80,10 @@
     <string name="lyrics_vertical">Von oben nach unten</string>
     <string name="lyrics_horizontal">Von links nach rechts</string>
     <string name="player_shortcut">Player-Taste</string>
+    <string name="player_top_right_button">Player-Taste oben rechts</string>
+    <string name="player_share_button">Teilen-Taste im Player</string>
+    <string name="player_queue_button">Warteschlangen-Taste im Player</string>
+    <string name="player_button_action_desc">Wähle die Aktion für diese Player-Taste</string>
     <string name="player_shortcut_desc">Wähle die Taste neben dem Player-Menü</string>
     <string name="swipe_left_action">Nach links wischen</string>
     <string name="swipe_right_action">Nach rechts wischen</string>

@@ -372,6 +372,9 @@
     <string name="removed_from_liked_songs">Us de Lieblingssongs entfernt</string>
     <string name="added_to_library">Zu dinere Bibliothek hinzuegfüegt</string>
     <string name="removed_from_library">Us dinere Bibliothek entfernt</string>
+    <string name="queue_update_pending">D Wartelischte wird grad aktualisiert. Probier s grad nomal.</string>
+    <string name="error_skip_queue">Zum nächschte Song i de Wartelischte springe hät nöd funktioniert. Probier s nomal.</string>
+    <string name="error_remove_queue">S Entferne us de Wartelischte isch nöd bestätigt worde. Probier s nomal.</string>
     <string name="removed_from_queue">Us de Wartelischte entfernt</string>
 
     <!-- Downloads -->

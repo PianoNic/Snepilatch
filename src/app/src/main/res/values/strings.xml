@@ -364,6 +364,9 @@
     <string name="removed_from_liked_songs">Removed from Liked Songs</string>
     <string name="added_to_library">Added to Your Library</string>
     <string name="removed_from_library">Removed from Your Library</string>
+    <string name="queue_update_pending">Queue is updating. Please try again in a moment.</string>
+    <string name="error_skip_queue">Could not skip to the next queued track. Please try again.</string>
+    <string name="error_remove_queue">Could not confirm queue removal. Please try again.</string>
     <string name="removed_from_queue">Removed from queue</string>
     <string name="downloads">Downloads</string>
     <string name="downloading">Downloading</string>

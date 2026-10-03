@@ -2,6 +2,8 @@ package ch.snepilatch.app.viewmodel
 
 import ch.snepilatch.app.data.TrackInfo
 import io.mockk.coVerify
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.cancel
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -21,7 +23,10 @@ class RemoveFromQueueTest {
     fun setUp() = rig.install()
 
     @After
-    fun tearDown() = rig.uninstall()
+    fun tearDown() {
+        rig.vm.viewModelScope.cancel()
+        rig.uninstall()
+    }
 
     private fun track(qid: String?, name: String) =
         TrackInfo(uri = "spotify:track:$name", name = name, artist = "artist", albumArt = null, qid = qid)

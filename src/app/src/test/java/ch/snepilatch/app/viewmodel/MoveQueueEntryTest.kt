@@ -2,6 +2,11 @@ package ch.snepilatch.app.viewmodel
 
 import ch.snepilatch.app.data.TrackInfo
 import io.mockk.coVerify
+import io.mockk.coEvery
+import io.mockk.every
+import io.mockk.mockk
+import kotify.api.playerstatus.QueueTrack
+import kotify.api.playerstatus.PlayerStateData
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -19,7 +24,19 @@ class MoveQueueEntryTest {
     private val rig = PlaybackTestRig()
 
     @Before
-    fun setUp() = rig.install()
+    fun setUp() {
+        rig.install()
+        coEvery { rig.player.getState() } coAnswers {
+            val rows = rig.vm.queue.value
+            val entries = MutableList((rows.maxOfOrNull { it.queueIndex ?: 0 } ?: -1) + 1) {
+                mockk<QueueTrack>(relaxed = true)
+            }
+            rows.forEach { row ->
+                entries[row.queueIndex!!] = mockk<QueueTrack> { every { qid } returns row.qid!! }
+            }
+            mockk<PlayerStateData> { every { next_tracks } returns entries }
+        }
+    }
 
     @After
     fun tearDown() = rig.uninstall()
@@ -41,7 +58,7 @@ class MoveQueueEntryTest {
 
         rig.vm.moveQueueEntry(rig.vm.queue.value[0], 2)
 
-        coVerify { rig.player.moveInQueue("a", 4) }
+        coVerify(timeout = 1_000) { rig.player.moveInQueue("a", 4) }
     }
 
     @Test

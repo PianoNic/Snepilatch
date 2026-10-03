@@ -45,7 +45,7 @@ class PlaybackTestRig {
         every { MusicPlaybackService.instance } returns service
         player = mockk(relaxed = true)
         SessionHolder.player = player
-        vm = PlaybackViewModel()
+        vm = PlaybackViewModel(queueIoDispatcher = testDispatcher)
     }
 
     fun uninstall() {

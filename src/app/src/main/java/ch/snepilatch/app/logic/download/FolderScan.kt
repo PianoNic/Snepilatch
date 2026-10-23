@@ -159,6 +159,8 @@ object FolderScan {
 
     /** Also tells the user, but only when the number went up since they were last told, not on every start. */
     private fun count(ctx: Context) {
+        runCatching { renameMislabelled(ctx) }
+            .onFailure { LokiLogger.w(TAG, "could not rename mislabelled files: ${it.message}") }
         val known = Downloads.rows.value.mapTo(HashSet()) { it.documentUri } + duplicates(ctx)
         val unknownUris = runCatching { listFiles(ctx).map { it.uri.toString() }.filter { it !in known } }
             .onFailure { LokiLogger.w(TAG, "could not list the folder: ${it.message}") }
@@ -169,6 +171,43 @@ object FolderScan {
         val prefs = ctx.getSharedPreferences(AppSettings.PREFS, Context.MODE_PRIVATE)
         if (unknown > prefs.getInt(PREF_NOTIFIED, 0)) AppMessages.show(R.string.downloads_unindexed_found, unknown)
         prefs.edit().putInt(PREF_NOTIFIED, unknown).apply()
+    }
+
+    /**
+     * Saves from the playback capture used to be AAC in MP4 written under a `.mp3` name, and untagged
+     * while their rows said otherwise (#968). Each gets the name its bytes have, and its row is marked
+     * untagged so the migration gives it its tags. A real MP3 starts with a frame or an ID3 header, never
+     * `ftyp`, so only these are touched, and the rename changes no bytes.
+     */
+    private fun renameMislabelled(ctx: Context) {
+        val resolver = ctx.contentResolver
+        val renamed = listFiles(ctx)
+            .filter { it.name.endsWith(".mp3", ignoreCase = true) && isMp4(ctx, it.uri) }
+            .mapNotNull { file ->
+                // A file of that name already there makes the provider refuse; that one stays as it is.
+                runCatching { DocumentsContract.renameDocument(resolver, file.uri, file.name.dropLast(4) + ".m4a") }
+                    .getOrNull()?.let { file.uri.toString() to it.toString() }
+            }
+            .toMap()
+        Downloads.rows.value.forEach { row ->
+            val moved = renamed[row.documentUri] ?: return@forEach
+            Downloads.put(row.copy(documentUri = moved, mimeType = "audio/mp4", idTagged = false, tagsChecked = false))
+        }
+        if (renamed.isEmpty()) return
+        // A remembered copy or miss is remembered by its uri, which the rename changed.
+        val prefs = ctx.getSharedPreferences(AppSettings.PREFS, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putStringSet(PREF_DUPLICATES, duplicates(ctx).mapTo(HashSet()) { renamed[it] ?: it })
+            .putStringSet(PREF_UNMATCHED, unmatchedFiles(ctx).mapTo(HashSet()) { renamed[it] ?: it })
+            .apply()
+        LokiLogger.i(TAG, "renamed ${renamed.size} mislabelled .mp3 file(s) to .m4a")
+    }
+
+    /** Whether [uri] holds an MP4 whatever it is called: its first box is `ftyp`. */
+    private fun isMp4(ctx: Context, uri: Uri): Boolean {
+        val head = ByteArray(8)
+        val read = ctx.contentResolver.openInputStream(uri)?.use { it.read(head) } ?: return false
+        return read == head.size && String(head, 4, 4, Charsets.ISO_8859_1) == "ftyp"
     }
 
     private fun duplicates(ctx: Context): Set<String> =

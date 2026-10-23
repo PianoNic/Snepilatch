@@ -101,6 +101,10 @@ internal class CatalogueLookup {
         return try {
             Song(session()).getSong(id)?.let { track ->
                 TrackInfo(track.name, track.artists.joinToString(", ") { it.name }, track.album.name, track.album.coverArtUrl)
+            } ?: null.also {
+                // An empty answer, not an error: while the anonymous session is rate limited the query
+                // comes back blank. The row stays unchecked, so the next migration asks again.
+                LokiLogger.w("CatalogueLookup", "no details for $id in the answer")
             }
         } catch (e: CancellationException) {
             throw e

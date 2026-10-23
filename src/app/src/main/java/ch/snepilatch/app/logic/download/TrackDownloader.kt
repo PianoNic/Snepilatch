@@ -244,7 +244,9 @@ object TrackDownloader {
             return null
         }
         LokiLogger.i(TAG, "'${request.title}' encoded from the decoded capture (${temp.length()} bytes)")
-        return StreamInfo(url = "pcm-capture", provider = "Decoded audio", mimeType = "audio/mpeg")
+        // PcmAacEncoder writes AAC into an MP4 container, so it is an m4a and gets the MP4 tags. Labelled
+        // audio/mpeg it was saved as an untagged .mp3 that only played because players sniff the bytes.
+        return StreamInfo(url = "pcm-capture", provider = "Decoded audio", mimeType = "audio/mp4")
     }
 
     /**

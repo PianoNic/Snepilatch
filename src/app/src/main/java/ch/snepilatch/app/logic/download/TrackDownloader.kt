@@ -194,7 +194,15 @@ object TrackDownloader {
                         is StreamResult.Failure -> return@withContext DownloadOutcome.Failed(resolved.message)
                     }
                 }
+                // One more go after a dropped connection: in a bulk download about one in twenty of
+                // ArgonFetch's streams is reset mid-file (HTTP/2 INTERNAL_ERROR), and the url it gave
+                // is good for an hour. fetchTo rewrites the file from the start.
                 val fetched = runCatching { fetchTo(info, temp, report) }
+                    .recoverCatching {
+                        if (it !is java.io.IOException) throw it
+                        LokiLogger.w(TAG, "fetch for ${request.title} dropped (${it.message}), trying once more")
+                        fetchTo(info, temp, report)
+                    }
                     .getOrElse {
                         if (it is CancellationException) throw it
                         LokiLogger.e(TAG, "fetch failed for ${request.title}: ${it.message}")

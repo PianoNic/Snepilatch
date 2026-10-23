@@ -123,7 +123,10 @@ object DownloadActions {
         if (track.durationMs <= 0) return false
         if (!DownloadFolder.isConfigured) return false
         if (positionMs < track.durationMs * LISTENED_THROUGH_FRACTION) return false
-        return Downloads.find(track.uri) == null
+        // The same match playback uses: a song saved under another of its ids played from that copy,
+        // so there is nothing captured to keep and nothing missing.
+        return Downloads.find(track.uri) == null &&
+            (track.name.isBlank() || Downloads.findByMetadata(track.name, track.artist) == null)
     }
 
     /**

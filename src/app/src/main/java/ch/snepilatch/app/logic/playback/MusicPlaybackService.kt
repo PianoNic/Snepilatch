@@ -419,31 +419,23 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             }
 
             /**
-             * A seek invalidates the decoded capture, so stand it down.
+             * A seek re-anchors the decoded capture where playback lands, so the recording survives it.
              *
-             * The tap only ever appends what the decoder hands it, and nothing re-anchors it on a
-             * seek: jumping forward leaves a hole, jumping back records a stretch twice. The
-             * completeness check counts frames rather than mapping coverage, so a backward seek can
-             * even reach its threshold with audio audibly repeated — the one way this could write a
-             * wrong file rather than simply refuse. Hooked here rather than at each seekTo so no
-             * caller can miss it: the media session, both Connect sync paths and the infiniPlay jumps
-             * all land on this. The playback cache is byte-exact and unaffected, so a non-DRM track
-             * still saves from there; only Widevine, which has no cache, loses the ability to save
-             * this track — correctly, since what was recorded is not the track.
+             * It used to be dropped on any seek, and the small ones are constant: the sync seek after
+             * a notification ducks the audio cost about two of every three auto-saves that failed.
+             * Writing by position makes a jump back record over itself and a jump forward leave a
+             * hole the completeness check refuses, so neither can write a wrong file. Hooked here
+             * rather than at each seekTo so no caller can miss it: the media session, both Connect
+             * sync paths and the infiniPlay jumps all land on this.
              */
             override fun onPositionDiscontinuity(
                 oldPosition: Player.PositionInfo,
                 newPosition: Player.PositionInfo,
                 reason: Int,
             ) {
-                // capturedFrames guard: loading a track with a start position is not a seek, but if a
-                // device ever reported one it would arrive before anything was recorded.
-                if (reason == Player.DISCONTINUITY_REASON_SEEK &&
-                    captureUri != null &&
-                    infiniPlayTap.capturedFrames() > 0
-                ) {
-                    LokiLogger.i(TAG, "seek during capture, dropping it for $captureUri")
-                    stopCapture()
+                if (reason == Player.DISCONTINUITY_REASON_SEEK && captureUri != null) {
+                    LokiLogger.i(TAG, "seek during capture to ${newPosition.positionMs}ms, recording on from there for $captureUri")
+                    infiniPlayTap.markPosition(newPosition.positionMs)
                 }
             }
 
@@ -719,6 +711,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             // (the anandserver Qobuz mirror) need those headers on the HTTP data
             // source, so they go through a dedicated header-injecting MediaSource.
             // Both accept a start position so resume-from-idle seeks on load.
+            infiniPlayTap.markPosition(startPositionMs)
             if (headers.isEmpty() && cacheKey == null) {
                 player.setMediaItem(buildMediaItem(url), startPositionMs)
             } else {
@@ -953,8 +946,17 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         val rate = infiniPlayTap.sampleRate()
         val channels = infiniPlayTap.channelCount()
         if (rate <= 0 || channels <= 0) return null
-        val expected = durationMs.toDouble() * rate / 1000
-        if (infiniPlayTap.capturedFrames() < expected * CAPTURE_COMPLETE_FRACTION) return null
+        val needed = (durationMs.toDouble() * rate / 1000 * CAPTURE_COMPLETE_FRACTION).toInt()
+        // Every stretch, not a count: a track resumed a second in, or skipped through, has a hole
+        // that a frame count would have let through as long as the rest added up.
+        if (!infiniPlayTap.isCovered(needed)) {
+            LokiLogger.i(
+                TAG,
+                "capture of $trackUri has a hole: it reaches ${infiniPlayTap.capturedFrames() / rate}s " +
+                    "of the ${needed / rate}s needed, but not all of it was played"
+            )
+            return null
+        }
         return rate to channels
     }
 
@@ -1254,6 +1256,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             // seek, and reach STATE_READY at that exact position. No post-prepare seek
             // dance — eliminates the race where the post-ready seek fails to actually
             // produce audio (the bug in the cold-start sync).
+            infiniPlayTap.markPosition(startPositionMs)
             if (pssh != null) {
                 player.setMediaSource(buildPsshDrmSource(url, licenseUrl, licenseHeaders, pssh), startPositionMs)
             } else {

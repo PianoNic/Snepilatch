@@ -32,15 +32,37 @@ class InfiniPlayAudioTap : BaseAudioProcessor() {
 
     // Rolling interleaved capture of the current track (cap ~5.5 min so memory is bounded).
     private var pcm = ShortArray(0)
-    private var len = 0 // number of shorts written (interleaved)
+    private var len = 0 // the furthest short written (interleaved)
+    private var cursor = 0 // where the next decoded buffer lands, in shorts
+    private val covered = java.util.BitSet() // which CHUNK_FRAMES-sized stretches were written
     private var capturedRate = 0
     private var capturedChannels = 0
+
+    /** Where playback jumps to, applied at the flush that seek causes; negative when none is waiting. */
+    @Volatile private var pendingPositionMs = -1L
 
     fun sampleRate(): Int = capturedRate
     fun channelCount(): Int = capturedChannels
 
-    /** Frames captured so far (a frame = one sample per channel). */
+    /** Frames captured so far (a frame = one sample per channel), up to the furthest one written. */
     fun capturedFrames(): Int = if (capturedChannels > 0) len / capturedChannels else 0
+
+    /**
+     * Playback is about to continue from [positionMs]: a seek, or a track loaded part way in.
+     *
+     * Applied at the flush the jump causes rather than now, because buffers decoded before the seek
+     * can still arrive until then and belong where the cursor already is. The samples after it are
+     * written at their place in the track, so jumping back records the same stretch over itself
+     * instead of twice, and jumping forward leaves a hole that [isCovered] sees.
+     */
+    fun markPosition(positionMs: Long) { pendingPositionMs = positionMs.coerceAtLeast(0) }
+
+    /** Whether every stretch of the first [frames] frames was written at least once. */
+    @Synchronized
+    fun isCovered(frames: Int): Boolean {
+        val chunks = frames / CHUNK_FRAMES
+        return covered.nextClearBit(0) >= chunks
+    }
 
     /** Interleaved stereo (or mono) PCM captured so far — for the playback engine. */
     @Synchronized
@@ -56,7 +78,7 @@ class InfiniPlayAudioTap : BaseAudioProcessor() {
     fun detach(): Pair<ShortArray, Int> {
         val detached = pcm to len
         pcm = ShortArray(0) // the next ensureBuffer() allocates rather than overwriting theirs
-        len = 0
+        clear()
         return detached
     }
 
@@ -87,14 +109,34 @@ class InfiniPlayAudioTap : BaseAudioProcessor() {
     @Synchronized
     fun resetCapture() {
         ensureBuffer()
-        len = 0
+        clear()
     }
 
     /** Release the ~63MB capture buffer when analysis stops, instead of holding it for the sink lifetime. */
     @Synchronized
     fun releaseBuffer() {
         pcm = ShortArray(0)
+        clear()
+    }
+
+    // A pending position is left alone: a track loaded part way in marks it before or after the
+    // capture is armed, and either way it belongs to the recording that is starting.
+    private fun clear() {
         len = 0
+        cursor = 0
+        covered.clear()
+    }
+
+    override fun onFlush() { applyPendingPosition() }
+
+    @Synchronized
+    private fun applyPendingPosition() {
+        val ms = pendingPositionMs
+        if (ms < 0) return
+        pendingPositionMs = -1
+        if (capturedRate <= 0 || capturedChannels <= 0) return
+        val frame = ms * capturedRate / 1000
+        cursor = (frame * capturedChannels).coerceAtMost(pcm.size.toLong()).toInt()
     }
 
     // Only participate in the audio chain while something wants the samples: with neither the
@@ -136,16 +178,22 @@ class InfiniPlayAudioTap : BaseAudioProcessor() {
     private fun capture(buf: ByteBuffer) {
         // Bulk copy instead of per-sample buf.short: asShortBuffer() inherits the duplicate's
         // LITTLE_ENDIAN order; count is clamped to the remaining capacity to keep the overflow guard.
-        val count = minOf(buf.remaining() / 2, pcm.size - len)
-        if (count > 0) {
-            buf.asShortBuffer().get(pcm, len, count)
-            len += count
+        val count = minOf(buf.remaining() / 2, pcm.size - cursor)
+        if (count > 0 && capturedChannels > 0) {
+            buf.asShortBuffer().get(pcm, cursor, count)
+            val firstFrame = cursor / capturedChannels
+            cursor += count
+            covered.set(firstFrame / CHUNK_FRAMES, (cursor / capturedChannels + CHUNK_FRAMES - 1) / CHUNK_FRAMES)
+            len = maxOf(len, cursor)
         }
     }
 
     companion object {
         private const val TAG = "InfiniPlayTap"
         private const val MAX_MINUTES = 6
+
+        /** About a tenth of a second: a hole smaller than this, from a seek landing mid-frame, is not one. */
+        const val CHUNK_FRAMES = 4096
 
         /** How much audio the capture buffer holds. Past this, capture() clamps and the tail is lost. */
         const val MAX_CAPTURE_MS = MAX_MINUTES * 60 * 1000L

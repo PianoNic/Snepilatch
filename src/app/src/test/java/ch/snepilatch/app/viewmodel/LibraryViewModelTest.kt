@@ -97,5 +97,12 @@ class LibraryViewModelTest {
         assertEquals(-1, vm.libraryTotal.value)
     }
 
+    @Test fun aRowRepeatedByTheNextPageIsKeptOnce() {
+        val a = LibraryItem("spotify:playlist:a", "A", null, "playlist")
+        val b = LibraryItem("spotify:artist:b", "B", null, "artist")
+        val c = LibraryItem("spotify:album:c", "C", null, "album")
+        assertEquals(listOf(a, b, c), LibraryViewModel.appendPage(listOf(a, b), listOf(b, c)))
+    }
+
     private fun folder(uri: String, name: String) = LibraryItem(uri, name, null, "folder")
 }

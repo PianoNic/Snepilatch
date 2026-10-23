@@ -144,7 +144,7 @@ class LibraryViewModel : SessionViewModel("LibraryVM") {
         launchWithSessionLoading("loadMoreLibrary", _isLoadingMore) { sess ->
             val page = Playlist(sess).getLibrary(limit = PAGE_SIZE, offset = loaded, folderUri = requested)
             if (requested != folderUri) return@launchWithSessionLoading
-            _library.value = _library.value + page.toUiLibraryList()
+            _library.value = appendPage(_library.value, page.toUiLibraryList())
             _libraryTotal.value = page.total
         }
     }
@@ -174,6 +174,14 @@ class LibraryViewModel : SessionViewModel("LibraryVM") {
         /** The `type` a [LibraryItem] carries when it is a folder rather than something playable. */
         const val FOLDER_TYPE = "folder"
         private const val PAGE_SIZE = 50
+
+        /**
+         * The listing is ordered by recent use, so playing something between two pages moves it to
+         * the top and shifts the next page by one, which then repeats a row. The list is keyed by
+         * uri, and a repeated key crashes it.
+         */
+        internal fun appendPage(loaded: List<LibraryItem>, page: List<LibraryItem>): List<LibraryItem> =
+            (loaded + page).distinctBy { it.uri }
 
         // The web client's own debounce on this exact signal.
         private const val REFRESH_WAIT_MS = 200L

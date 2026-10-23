@@ -2312,6 +2312,9 @@ class PlaybackViewModel : ViewModel() {
                     } else throw e
                 }
                 delay(500); refreshState()
+            } catch (e: CancellationException) {
+                // A second tap cancels the first one's job, and that is not a failure.
+                throw e
             } catch (e: Exception) { isStreamLoading.value = false; LokiLogger.e(TAG, "playTrack", e) }
         }
     }
@@ -2705,6 +2708,8 @@ class PlaybackViewModel : ViewModel() {
         try {
             val state = player?.getState() ?: return
             updatePlaybackFromState(state)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) { LokiLogger.e(TAG, "refreshState", e) }
     }
 

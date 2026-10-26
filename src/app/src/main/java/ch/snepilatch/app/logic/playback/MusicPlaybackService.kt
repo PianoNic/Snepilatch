@@ -9,6 +9,7 @@ import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import android.net.NetworkCapabilities
 import ch.snepilatch.app.logic.shared.NetworkState
+import kotify.api.playerstatus.DealerState
 import coil.request.ImageRequest
 import android.media.audiofx.AudioEffect
 import android.net.ConnectivityManager
@@ -1551,10 +1552,17 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
         // The offline engine's cue: a validated route is online, losing the default network is not.
         override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
-            NetworkState.set(
-                caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                    caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-            )
+            val online = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            val cameBack = online && !NetworkState.online.value
+            NetworkState.set(online)
+            // The web player's online event: a dealer that gave up, or is waiting out a backoff, while
+            // the network was gone tries again now. A live socket is left alone (#793).
+            val player = SessionHolder.player
+            if (cameBack && player != null && player.connectionState.value != DealerState.CONNECTED) {
+                LokiLogger.i(TAG, "Network back, reconnecting dealer")
+                player.onNetworkChanged()
+            }
         }
 
         override fun onLost(network: Network) {

@@ -27,6 +27,7 @@ import ch.snepilatch.app.logic.playback.MusicPlaybackService
 import ch.snepilatch.app.logic.playback.PlaybackCache
 import ch.snepilatch.app.logic.playback.PositionInterpolator
 import ch.snepilatch.app.logic.shared.AccountStore
+import ch.snepilatch.app.logic.shared.SessionResume
 import ch.snepilatch.app.logic.shared.SavedAccount
 import ch.snepilatch.app.logic.shared.SessionHolder
 import ch.snepilatch.app.logic.shared.AppMessages
@@ -674,7 +675,8 @@ class PlaybackViewModel : ViewModel() {
                     // phone's Widevine CDM belongs to, registered as the ordinary web player.
                     deviceProfile = kotify.config.DeviceProfile.CHROME_ANDROID_DESKTOP
                 ))
-                sess.load()
+                sess.load(SessionResume.forCookies(cookies))
+                SessionResume.save(sess)
 
                 // KotifyClient now fires this ONLY when the login is genuinely dead (Spfy handed
                 // back an anonymous token — an expired/revoked sp_dc). Transient dealer/network trouble

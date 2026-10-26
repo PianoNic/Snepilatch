@@ -56,7 +56,7 @@ class ResumeLoader(private val hooks: Hooks) {
         hooks.markPlayUrl()
         withContext(Dispatchers.Main) {
             MusicPlaybackService.instance?.playDrmUrl(
-                stream.cdnUrl, stream.licenseUrl, stream.licenseHeaders, title, artist, art,
+                stream.cdnUrl, stream.certificate, title, artist, art,
                 startPlaying = startPlaying,
                 startPositionMs = positionMs,
                 pssh = stream.pssh,

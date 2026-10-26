@@ -687,7 +687,7 @@ class PlaybackViewModel : ViewModel() {
                 session = sess
                 val sp = SpfyPlayback(sess)
                 spfyPlayback = sp
-                cdnResolver = spfyResolver(sess, sp)
+                cdnResolver = spfyResolver(sp)
                 LokiLogger.i(TAG, "Session loaded")
 
                 // Home and library load themselves from HomeViewModel.init / LibraryViewModel.init.
@@ -1675,7 +1675,7 @@ class PlaybackViewModel : ViewModel() {
      * still gets audio, just slower.
      */
     /** The resolver reports every stream it resolves to the player, for the playback telemetry. */
-    private fun spfyResolver(sess: Session, sp: SpfyPlayback) = SpfyCdnResolver(sess, sp).also { r ->
+    private fun spfyResolver(sp: SpfyPlayback) = SpfyCdnResolver(sp).also { r ->
         r.onResolved = { info -> player?.reportStreamResolved(info) }
     }
 
@@ -1939,7 +1939,7 @@ class PlaybackViewModel : ViewModel() {
         playUrlAt = System.currentTimeMillis()
         withContext(Dispatchers.Main) {
             MusicPlaybackService.instance?.playDrmUrl(
-                stream.cdnUrl, stream.licenseUrl, stream.licenseHeaders, title, artist, art,
+                stream.cdnUrl, stream.certificate, title, artist, art,
                 startPlaying = true, startPositionMs = positionMs, pssh = stream.pssh,
             )
         }
@@ -3325,7 +3325,7 @@ class PlaybackViewModel : ViewModel() {
                 val coldStart = coldStartPending
                 withContext(Dispatchers.Main) {
                     MusicPlaybackService.instance?.playDrmUrl(
-                        stream.cdnUrl, stream.licenseUrl, stream.licenseHeaders, title, artist, art,
+                        stream.cdnUrl, stream.certificate, title, artist, art,
                         startPlaying = !coldStart,
                         pssh = stream.pssh,
                     )
@@ -3533,7 +3533,7 @@ class PlaybackViewModel : ViewModel() {
                     playUrlAt = System.currentTimeMillis()
                     withContext(Dispatchers.Main) {
                         MusicPlaybackService.instance?.playDrmUrl(
-                            stream.cdnUrl, stream.licenseUrl, stream.licenseHeaders, title, artist, art,
+                            stream.cdnUrl, stream.certificate, title, artist, art,
                             startPlaying = !coldStart, pssh = stream.pssh,
                         )
                     }
@@ -3611,7 +3611,7 @@ class PlaybackViewModel : ViewModel() {
                 playUrlAt = System.currentTimeMillis()
                 withContext(Dispatchers.Main) {
                     MusicPlaybackService.instance?.playDrmUrl(
-                        stream.cdnUrl, stream.licenseUrl, stream.licenseHeaders, title, artist, art,
+                        stream.cdnUrl, stream.certificate, title, artist, art,
                         startPlaying = !coldStart, pssh = stream.pssh,
                     )
                 }

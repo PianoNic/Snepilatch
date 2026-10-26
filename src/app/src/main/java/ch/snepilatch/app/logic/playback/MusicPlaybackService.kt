@@ -49,6 +49,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import ch.snepilatch.app.logic.shared.SessionHolder
+import ch.snepilatch.app.logic.playback.engine.KotifyDrmCallback
+import ch.snepilatch.app.logic.playback.engine.PsshInjectingDrmSessionManager
+import ch.snepilatch.app.logic.playback.engine.widevineWithCertificate
 import ch.snepilatch.app.logic.shared.normalizeSpfyImageUrl
 
 class MusicPlaybackService : MediaBrowserServiceCompat() {
@@ -1208,42 +1211,30 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         return ProgressiveMediaSource.Factory(factory).createMediaSource(item)
     }
 
-    fun buildDrmMediaItem(url: String, licenseUrl: String, licenseHeaders: Map<String, String>): MediaItem {
-        return MediaItem.Builder()
-            .setMediaId(url)
-            .setUri(url)
-            .setDrmConfiguration(
-                MediaItem.DrmConfiguration.Builder(C.WIDEVINE_UUID)
-                    .setLicenseUri(licenseUrl)
-                    .setLicenseRequestHeaders(licenseHeaders)
-                    .build()
-            )
-            .build()
-    }
-
     /**
-     * Progressive media source that injects a Widevine PSSH (base64 from Spfy's seektable) into
-     * the DRM session. Needed because many Spfy files are cenc-encrypted but embed no Widevine
-     * pssh box, so ExoPlayer's default in-file DRM throws MissingSchemeDataException and plays silent.
+     * Progressive Widevine source whose license goes through Kotify, on a CDM with the service
+     * certificate set. With [psshBase64] (from Spfy's seektable) the PSSH is injected into the DRM
+     * session: many Spfy files are cenc-encrypted but embed no Widevine pssh box, so ExoPlayer's
+     * default in-file DRM throws MissingSchemeDataException and plays silent.
      */
     @OptIn(UnstableApi::class)
-    private fun buildPsshDrmSource(url: String, licenseUrl: String, licenseHeaders: Map<String, String>, psshBase64: String): MediaSource {
-        val callback = androidx.media3.exoplayer.drm.HttpMediaDrmCallback(licenseUrl, DefaultHttpDataSource.Factory())
-        licenseHeaders.forEach { (k, v) -> callback.setKeyRequestProperty(k, v) }
+    private fun buildDrmSource(url: String, certificate: ByteArray?, psshBase64: String?): MediaSource {
+        val playback = SessionHolder.spfyPlayback ?: error("No SpfyPlayback to license with")
         val base = androidx.media3.exoplayer.drm.DefaultDrmSessionManager.Builder()
-            .setUuidAndExoMediaDrmProvider(C.WIDEVINE_UUID, androidx.media3.exoplayer.drm.FrameworkMediaDrm.DEFAULT_PROVIDER)
+            .setUuidAndExoMediaDrmProvider(C.WIDEVINE_UUID) { uuid -> widevineWithCertificate(uuid, certificate) }
             .setMultiSession(true)
-            .build(callback)
-        val psshBytes = android.util.Base64.decode(psshBase64, android.util.Base64.DEFAULT)
-        val injecting = ch.snepilatch.app.logic.playback.engine.PsshInjectingDrmSessionManager(base, psshBytes)
+            .build(KotifyDrmCallback(playback))
+        val manager = psshBase64?.let {
+            PsshInjectingDrmSessionManager(base, android.util.Base64.decode(it, android.util.Base64.DEFAULT))
+        } ?: base
         return ProgressiveMediaSource.Factory(DefaultDataSource.Factory(this))
-            .setDrmSessionManagerProvider { injecting }
-            .createMediaSource(MediaItem.fromUri(url))
+            .setDrmSessionManagerProvider { manager }
+            .createMediaSource(MediaItem.Builder().setMediaId(url).setUri(url).build())
     }
 
     @OptIn(UnstableApi::class)
     @Suppress("LongParameterList")
-    fun playDrmUrl(url: String, licenseUrl: String, licenseHeaders: Map<String, String>,
+    fun playDrmUrl(url: String, certificate: ByteArray?,
                    title: String, artist: String, albumArtUrl: String?,
                    startPlaying: Boolean = true,
                    startPositionMs: Long = 0L,
@@ -1258,11 +1249,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             // dance — eliminates the race where the post-ready seek fails to actually
             // produce audio (the bug in the cold-start sync).
             infiniPlayTap.markPosition(startPositionMs)
-            if (pssh != null) {
-                player.setMediaSource(buildPsshDrmSource(url, licenseUrl, licenseHeaders, pssh), startPositionMs)
-            } else {
-                player.setMediaItem(buildDrmMediaItem(url, licenseUrl, licenseHeaders), startPositionMs)
-            }
+            player.setMediaSource(buildDrmSource(url, certificate, pssh), startPositionMs)
             player.playWhenReady = startPlaying
             // Register listener BEFORE prepare() so we catch STATE_READY
             player.addListener(object : Player.Listener {

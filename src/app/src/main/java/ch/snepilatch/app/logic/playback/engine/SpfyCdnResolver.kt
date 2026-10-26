@@ -1,7 +1,6 @@
 package ch.snepilatch.app.logic.playback.engine
 
 import kotify.cdn.SpfyPlayback
-import kotify.session.Session
 
 /**
  * Bundles a resolved Spfy CDN URL with the Widevine license metadata
@@ -9,8 +8,6 @@ import kotify.session.Session
  */
 data class SpfyStream(
     val cdnUrl: String,
-    val licenseUrl: String,
-    val licenseHeaders: Map<String, String>,
     val mirrorCount: Int,
     // Base64 Widevine PSSH from the seektable. Many Spfy files don't embed a Widevine pssh box, so
     // we inject this one into ExoPlayer's DRM session (see PsshInjectingDrmSessionManager). Null if the
@@ -18,7 +15,10 @@ data class SpfyStream(
     val pssh: String? = null,
     // Every mirror storage-resolve returned and how long it took, for the playback telemetry.
     val cdnUrls: List<String> = listOf(cdnUrl),
-    val msResolveLatency: Long = 0
+    val msResolveLatency: Long = 0,
+    // Widevine's service certificate for the CDM, from Kotify's cache. Null if it could not be fetched:
+    // the license then goes without it, as the web player's does.
+    val certificate: ByteArray? = null
 )
 
 /**
@@ -27,7 +27,6 @@ data class SpfyStream(
  * duplication between coldStartPlay and resolveAndPlay.
  */
 class SpfyCdnResolver(
-    private val session: Session,
     private val spfyPlayback: SpfyPlayback
 ) {
     /** Told what every resolve produced, so KotifyClient's playback telemetry carries the real stream. */
@@ -51,8 +50,7 @@ class SpfyCdnResolver(
         val cdnUrl = cdnUrls[mirrorIndex.mod(cdnUrls.size)]
         return SpfyStream(
             cdnUrl = cdnUrl,
-            licenseUrl = session.spclientUrl("widevine-license/v1/audio/license"),
-            licenseHeaders = buildLicenseHeaders(),
+            certificate = certificate(),
             mirrorCount = cdnUrls.size,
             pssh = runCatching { spfyPlayback.getPssh(fileId) }.getOrNull(),
             cdnUrls = cdnUrls,
@@ -64,12 +62,11 @@ class SpfyCdnResolver(
      * Wrap a previously-resolved CDN URL (from the pre-resolve cache) in the
      * Widevine license metadata needed to hand it to ExoPlayer, without
      * re-hitting getCdnUrls. Use when the caller already has a valid URL and
-     * only needs fresh license headers.
+     * only needs a fresh pssh and certificate.
      */
     suspend fun buildStreamForCachedUrl(cdnUrl: String, fileId: String?): SpfyStream = SpfyStream(
         cdnUrl = cdnUrl,
-        licenseUrl = session.spclientUrl("widevine-license/v1/audio/license"),
-        licenseHeaders = buildLicenseHeaders(),
+        certificate = certificate(),
         mirrorCount = 1,
         pssh = fileId?.let { id -> runCatching { spfyPlayback.getPssh(id) }.getOrNull() }
     )
@@ -118,12 +115,7 @@ class SpfyCdnResolver(
 
     /** One license exchange for [stream] with no player, through the same browser-shaped client. */
     suspend fun license(stream: SpfyStream): Long =
-        WidevineLicenser.license(session, stream.licenseUrl, stream.pssh ?: error("no pssh"))
+        WidevineLicenser.license(spfyPlayback, stream.pssh ?: error("no pssh"))
 
-    private fun buildLicenseHeaders(): Map<String, String> {
-        val headers = mutableMapOf<String, String>()
-        session.baseClient.accessToken?.let { headers["Authorization"] = "Bearer $it" }
-        session.baseClient.clientToken?.let { headers["client-token"] = it }
-        return headers
-    }
+    private suspend fun certificate(): ByteArray? = runCatching { spfyPlayback.getWidevineCertificate() }.getOrNull()
 }

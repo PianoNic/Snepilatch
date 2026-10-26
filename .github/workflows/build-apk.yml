@@ -85,35 +85,12 @@ jobs:
           storeFile=snepilatch-release.keystore
           EOF
 
-      - name: Refresh kotlin-tls-client native binaries (latest)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Always pull the latest release of PianoNic/kotlin-tls-client-natives
-          # so the bundled .so stays in lock-step with whatever KotifyClient was
-          # compiled against. Each ABI ships as android-<abi>.zip containing
-          # libtls_client_go.so + a header; we only need the .so.
-          set -e
-          mkdir -p /tmp/tls-natives
-          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
-            zip="/tmp/tls-natives/android-${abi}.zip"
-            gh release download \
-              --repo PianoNic/kotlin-tls-client-natives \
-              --pattern "android-${abi}.zip" \
-              --output "$zip"
-            target="src/app/src/main/jniLibs/${abi}"
-            mkdir -p "$target"
-            unzip -o "$zip" "libtls_client_go.so" -d "$target"
-          done
-          echo "Natives in place:"
-          ls -lh src/app/src/main/jniLibs/*/libtls_client_go.so
-
       - name: Refresh JNA jnidispatch native (latest)
         run: |
           # KotifyClient's shadow jar bundles JNA's Java classes, but Android
           # can't extract JNA's per-ABI libjnidispatch.so from inside the jar at
           # runtime (W^X). Pull the latest JNA AAR from Maven Central and drop
-          # the four Android .so files into jniLibs/ alongside libtls_client_go.so.
+          # the four Android .so files into jniLibs/ alongside libcurl-impersonate.so.
           set -e
           JNA_META=$(curl -fsSL https://repo1.maven.org/maven2/net/java/dev/jna/jna/maven-metadata.xml)
           JNA_VERSION=$(echo "$JNA_META" | grep -oP '(?<=<release>)[^<]+' | head -1)

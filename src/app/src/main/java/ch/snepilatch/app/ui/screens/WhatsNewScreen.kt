@@ -164,7 +164,7 @@ private fun ReleaseRow(release: WhatsNewContent.Release, onClick: () -> Unit) {
 }
 
 @Composable
-private fun EpisodeRow(episode: WhatsNewContent.Episode, onClick: () -> Unit) {
+internal fun EpisodeRow(episode: WhatsNewContent.Episode, onClick: () -> Unit) {
     val minutes = (episode.durationMs / 60_000).takeIf { it > 0 }?.let { "$it min" }
     val details = listOfNotNull(episode.releaseDate?.let { relativeDate(it) }, minutes)
     FeedRow(episode.coverUrl, episode.name, episode.podcastName.orEmpty(), details.joinToString(" · "), onClick)

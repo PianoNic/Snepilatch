@@ -4,6 +4,9 @@ import ch.snepilatch.app.logic.shared.LokiLogger
 import kotify.api.home.Home
 import kotify.api.home.HomeChip
 import kotify.api.home.HomeData
+import kotify.api.whatsnew.WhatsNewContentType
+import kotify.api.whatsnew.WhatsNewFeed
+import kotify.api.whatsnew.WhatsNewItem
 import androidx.lifecycle.viewModelScope
 import ch.snepilatch.app.logic.shared.SessionHolder
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -57,8 +60,20 @@ class HomeViewModel : SessionViewModel("HomeVM") {
         loadHome()
     }
 
+    /**
+     * The followed podcasts' new episodes, for the podcasts "Following" chip. The web player does not ask
+     * the home query for that chip, which answers it with the music releases; it lists
+     * `spotify:list:whats-new:podcasts`, the What's New feed's episodes.
+     */
+    private val _episodes = MutableStateFlow<List<WhatsNewItem>>(emptyList())
+    val episodes: StateFlow<List<WhatsNewItem>> = _episodes
+
     fun loadHome() {
         val facet = _facet.value
+        if (facet == PODCASTS_FOLLOWING_CHIP) {
+            loadFollowedEpisodes()
+            return
+        }
         launchWithSession("loadHome") { sess ->
             try {
                 var shown = facet
@@ -83,5 +98,24 @@ class HomeViewModel : SessionViewModel("HomeVM") {
                 isLoading.value = false
             }
         }
+    }
+
+    private fun loadFollowedEpisodes() {
+        launchWithSession("loadFollowedEpisodes") { sess ->
+            try {
+                val page = WhatsNewFeed(sess).getFeed(types = setOf(WhatsNewContentType.EPISODES))
+                if (_facet.value != PODCASTS_FOLLOWING_CHIP) return@launchWithSession
+                _episodes.value = page.items
+                // An empty feed stands in for the home data, so the screen stops waiting for one.
+                _homeData.value = HomeData(greeting = "", sections = emptyList(), chips = _chips.value)
+                LokiLogger.i(logTag, "Followed episodes loaded: ${page.items.size}")
+            } finally {
+                isLoading.value = false
+            }
+        }
+    }
+
+    companion object {
+        const val PODCASTS_FOLLOWING_CHIP = "podcasts-following-chip"
     }
 }

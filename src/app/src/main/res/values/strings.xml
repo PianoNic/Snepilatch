@@ -478,4 +478,9 @@
     <string name="home_filter_all">All</string>
     <string name="profile_menu_view_account">View account</string>
     <string name="profile_menu_switch_account">Switch account</string>
+    <string name="home_following_music_header">Latest releases</string>
+    <string name="home_following_podcasts_header">Latest episodes</string>
+    <string name="home_following_caught_up_title">You\'re all caught up</string>
+    <string name="home_following_music_caught_up">There are no more new releases from artists you follow.</string>
+    <string name="home_following_podcasts_caught_up">There are no more new releases from creators you follow.</string>
 </resources>

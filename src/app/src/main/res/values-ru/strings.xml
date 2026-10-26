@@ -465,4 +465,9 @@
     <string name="home_filter_all">Все</string>
     <string name="profile_menu_view_account">Открыть аккаунт</string>
     <string name="profile_menu_switch_account">Сменить аккаунт</string>
+    <string name="home_following_music_header">Последние релизы</string>
+    <string name="home_following_podcasts_header">Последние выпуски</string>
+    <string name="home_following_caught_up_title">Вы в курсе всех новинок</string>
+    <string name="home_following_music_caught_up">Больше нет новых релизов от исполнителей, на которых вы подписаны.</string>
+    <string name="home_following_podcasts_caught_up">Больше нет новых выпусков от авторов, на которых вы подписаны.</string>
 </resources>

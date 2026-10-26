@@ -479,4 +479,9 @@
     <string name="home_filter_all">Alli</string>
     <string name="profile_menu_view_account">Konto aaluege</string>
     <string name="profile_menu_switch_account">Konto wächsle</string>
+    <string name="home_following_music_header">Zletscht usecho</string>
+    <string name="home_following_podcasts_header">Nöischti Folge</string>
+    <string name="home_following_caught_up_title">Du bisch uf em neuschte Stand</string>
+    <string name="home_following_music_caught_up">Es git kei wiiteri Neuerschiinige vo Künstler, dene du folgsch.</string>
+    <string name="home_following_podcasts_caught_up">Es git kei wiiteri nöii Folge vo Creator, dene du folgsch.</string>
 </resources>

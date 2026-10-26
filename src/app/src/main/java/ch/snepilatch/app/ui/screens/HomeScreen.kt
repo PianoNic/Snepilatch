@@ -79,6 +79,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.lazy.LazyListScope
 import ch.snepilatch.app.ui.shared.Avatar
 import ch.snepilatch.app.ui.shared.LocalOpenProfileMenu
 import ch.snepilatch.app.ui.theme.SnepilatchLightGray
@@ -96,9 +98,10 @@ import ch.snepilatch.app.logic.shared.spfyId
 
 /**
  * The profile picture, which opens the profile menu, and the feed's filter chips, laid out as the
- * official app does (#976): every chip stays in the row, a chosen chip's sub-chips follow it, a chosen
- * sub-chip joins its parent in one pill, and tapping what is chosen goes back to the whole feed. The
- * picture stays put while the chips scroll under it.
+ * official app does (#976). Every chip stays in the row. A chosen chip becomes a group with its
+ * sub-chips: grey with the chip as a pill on it, or, once a sub-chip is chosen, all in the accent with
+ * the chip in a lighter pill, so which one is chosen always shows. Tapping a chosen chip goes back to
+ * the whole feed. The picture stays put while the chips scroll under it.
  */
 @Composable
 private fun HomeHeader(vm: PlaybackViewModel, homeVm: HomeViewModel) {
@@ -107,12 +110,12 @@ private fun HomeHeader(vm: PlaybackViewModel, homeVm: HomeViewModel) {
     val facet by homeVm.facet.collectAsState()
     val openMenu = LocalOpenProfileMenu.current
     val allLabel = stringResource(R.string.home_filter_all)
-    val pills = remember(chips, facet, allLabel) { chipPills(chips, facet, allLabel) }
+    val groups = remember(chips, facet, allLabel) { chipGroups(chips, facet, allLabel) }
     val rowState = rememberLazyListState()
     // A chosen chip cut off at the edge scrolls into view, as in the official row; one already in full
     // view leaves the row where it is, so "All" does not slide away under the picture.
     LaunchedEffect(facet) {
-        val chosen = pills.indexOfFirst { it.selected }
+        val chosen = groups.indexOfFirst { it.chosen }
         if (chosen < 0) return@LaunchedEffect
         val info = rowState.layoutInfo
         val shown = info.visibleItemsInfo.firstOrNull { it.index == chosen }
@@ -134,49 +137,121 @@ private fun HomeHeader(vm: PlaybackViewModel, homeVm: HomeViewModel) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            items(pills, key = { it.key }) { pill ->
-                FilterPill(pill.label, pill.subLabel, pill.selected) {
-                    homeVm.selectChip(pill.target)
-                }
-            }
+            items(groups, key = { it.key }) { group -> ChipGroupView(group) { homeVm.selectChip(it) } }
         }
     }
 }
 
-/** One pill in the chip row: what it says, whether it is chosen, and which feed a tap asks for (null: all). */
-private data class ChipPill(val key: String, val label: String, val subLabel: String?, val selected: Boolean, val target: String?)
+private const val SHORTCUTS_SECTION = "HomeShortsSectionData"
+private const val MUSIC_FOLLOWING_CHIP = "music-following-chip"
 
-private fun chipPills(chips: List<kotify.api.home.HomeChip>, facet: String, allLabel: String): List<ChipPill> = buildList {
-    add(ChipPill("all", allLabel, null, facet.isEmpty(), null))
+/**
+ * One stretch of the chip row: a lone chip, or a chosen chip with its sub-chips. [filled] paints the
+ * whole stretch in the accent; a [ChipSegment.raised] segment sits on it as a pill of its own.
+ */
+private data class ChipGroup(val key: String, val filled: Boolean, val segments: List<ChipSegment>) {
+    val chosen get() = filled || segments.any { it.raised }
+}
+
+/** What a segment says, whether it is raised as a pill, and which feed a tap asks for (null: all). */
+private data class ChipSegment(val label: String, val raised: Boolean, val target: String?)
+
+private fun chipGroups(chips: List<kotify.api.home.HomeChip>, facet: String, allLabel: String): List<ChipGroup> = buildList {
+    add(ChipGroup("all", filled = facet.isEmpty(), listOf(ChipSegment(allLabel, raised = false, target = null))))
     chips.forEach { chip ->
         val chosenSub = chip.subChips.firstOrNull { it.id == facet }
-        when {
-            chosenSub != null -> add(ChipPill(chip.id, chip.label, chosenSub.label, true, null))
-            facet == chip.id -> {
-                add(ChipPill(chip.id, chip.label, null, true, null))
-                chip.subChips.forEach { sub -> add(ChipPill(sub.id, sub.label, null, false, sub.id)) }
-            }
-            else -> add(ChipPill(chip.id, chip.label, null, false, chip.id))
+        val chipChosen = facet == chip.id
+        val segments = when {
+            chosenSub != null || chipChosen -> listOf(ChipSegment(chip.label, raised = true, target = null)) +
+                // A chosen sub-chip tapped again goes back to its chip, not to the whole feed.
+                chip.subChips.map { sub -> ChipSegment(sub.label, raised = false, target = if (sub == chosenSub) chip.id else sub.id) }
+            else -> listOf(ChipSegment(chip.label, raised = false, target = chip.id))
         }
+        add(ChipGroup(chip.id, filled = chosenSub != null, segments))
     }
 }
 
 @Composable
-private fun FilterPill(label: String, subLabel: String?, selected: Boolean, onClick: () -> Unit) {
+private fun ChipGroupView(group: ChipGroup, onSelect: (String?) -> Unit) {
     val theme by ThemeController.themeColors.collectAsState()
-    val textColor = if (selected) Color.Black else SnepilatchWhite
+    val accent = theme.primary
+    // On the filled group the raised chip is a lighter accent, as the official row shades it.
+    val raisedColor = if (group.filled) lerp(accent, Color.White, RAISED_LIGHTEN) else accent
     Row(
         Modifier
             .height(32.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(if (selected) theme.primary else SnepilatchGray)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+            .background(if (group.filled) accent else SnepilatchGray),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, color = textColor, fontSize = 14.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
-        if (subLabel != null) Text(subLabel, color = textColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        group.segments.forEach { segment ->
+            val dark = group.filled || segment.raised
+            Box(
+                Modifier
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(if (segment.raised) raisedColor else Color.Transparent)
+                    .clickable { onSelect(segment.target) }
+                    .padding(horizontal = 14.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    segment.label,
+                    color = if (dark) Color.Black else SnepilatchWhite,
+                    fontSize = 14.sp,
+                    fontWeight = if (dark) FontWeight.SemiBold else FontWeight.Normal,
+                )
+            }
+        }
+    }
+}
+
+private const val RAISED_LIGHTEN = 0.3f
+
+/**
+ * What the two Following feeds add around their cards (#976): the heading the web player gives them,
+ * since they come without titles, a "caught up" note in its words when there is nothing new, and for
+ * podcasts the new episodes themselves, which come from the What's New feed rather than the home query.
+ */
+private fun LazyListScope.followingFeed(
+    facet: String,
+    loaded: Boolean,
+    noSections: Boolean,
+    episodes: List<kotify.api.whatsnew.WhatsNewItem>,
+    vm: PlaybackViewModel,
+) {
+    val podcasts = facet == HomeViewModel.PODCASTS_FOLLOWING_CHIP
+    if (facet != MUSIC_FOLLOWING_CHIP && !podcasts) return
+    item {
+        Text(
+            stringResource(if (podcasts) R.string.home_following_podcasts_header else R.string.home_following_music_header),
+            color = SnepilatchWhite,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp)
+        )
+    }
+    val empty = if (podcasts) episodes.isEmpty() else noSections
+    if (loaded && empty) {
+        item {
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 48.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(stringResource(R.string.home_following_caught_up_title), color = SnepilatchWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    stringResource(if (podcasts) R.string.home_following_podcasts_caught_up else R.string.home_following_music_caught_up),
+                    color = SnepilatchLightGray, fontSize = 14.sp, textAlign = TextAlign.Center,
+                )
+            }
+        }
+    }
+    if (podcasts) {
+        items(episodes, key = { it.id }) { item ->
+            val episode = item.content as? kotify.api.whatsnew.WhatsNewContent.Episode ?: return@items
+            EpisodeRow(episode) { vm.playTrack(episode.uri) }
+        }
     }
 }
 
@@ -187,6 +262,8 @@ fun HomeScreen(vm: PlaybackViewModel) {
     val homeData by homeVm.homeData.collectAsState()
     val isHomeLoading by homeVm.isLoading.collectAsState()
     val chips by homeVm.chips.collectAsState()
+    val facet by homeVm.facet.collectAsState()
+    val episodes by homeVm.episodes.collectAsState()
 
     // Only the very first load shimmers; a chip's feed loads under the row with nothing below it,
     // as the official app shows it.
@@ -201,15 +278,18 @@ fun HomeScreen(vm: PlaybackViewModel) {
     ) {
         stickyHeader { HomeHeader(vm, homeVm) }
 
-        // Quick-pick grid (first section as compact grid)
-        val firstSection = homeData?.sections?.firstOrNull()
-        if (firstSection != null && firstSection.items.isNotEmpty()) {
+        // The quick picks are the shortcuts section the whole feed opens with. A chip's feed opens with an
+        // ordinary section instead (Following's first release card), which the grid used to swallow.
+        val sections = homeData?.sections.orEmpty()
+        val shortcuts = sections.firstOrNull()?.takeIf { it.type == SHORTCUTS_SECTION && it.items.isNotEmpty() }
+        if (shortcuts != null) {
             item {
-                QuickPickGrid(firstSection.items.take(8), vm)
+                QuickPickGrid(shortcuts.items.take(8), vm)
             }
         }
+        followingFeed(facet, loaded = homeData != null, sections.isEmpty(), episodes, vm)
 
-        homeData?.sections?.drop(1)?.forEach { section ->
+        sections.drop(if (shortcuts != null) 1 else 0).forEach { section ->
             if (section.items.isNotEmpty()) {
                 // A chip's feed can send sections without a title (Following's new releases); an empty
                 // title row would only leave a gap above them.
@@ -227,7 +307,9 @@ fun HomeScreen(vm: PlaybackViewModel) {
                 // A section holding one thing reads as a lone tile in a row that goes nowhere, so it
                 // gets a card wide enough to say what it is instead.
                 if (section.items.size == 1) {
-                    item { HomeSingleCard(section.items.first(), vm) }
+                    // Spaced like the official feed, where untitled cards follow one another with nothing
+                    // else between them.
+                    item { Box(Modifier.padding(top = 20.dp)) { HomeSingleCard(section.items.first(), vm) } }
                     return@forEach
                 }
                 item {

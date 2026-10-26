@@ -63,7 +63,9 @@ internal class CatalogueLookup {
 
     /** One session for the whole scan, however many lookups ask for it at once. */
     private suspend fun session(): Session = starting.withLock {
-        session ?: Session(SessionConfig(identifier = "folder-scan", anonymous = true)).also {
+        session ?: Session(
+            SessionConfig(identifier = "folder-scan", anonymous = true, deviceProfile = kotify.config.DeviceProfile.CHROME_ANDROID_DESKTOP)
+        ).also {
             it.load()
             session = it
         }

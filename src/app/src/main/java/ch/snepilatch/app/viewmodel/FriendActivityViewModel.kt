@@ -21,7 +21,9 @@ class FriendActivityViewModel : SessionViewModel("FriendActivity") {
     private var live: FriendFeed? = null
 
     fun load() = launchWithSessionLoading("load", loading) { sess ->
-        val friends = live ?: FriendFeed(sess, SessionHolder.player ?: return@launchWithSessionLoading, viewModelScope).also {
+        // Waits for the player rather than giving up: the profile menu asks for the feed while the app is
+        // still starting, before the player has registered (#976).
+        val friends = live ?: FriendFeed(sess, SessionHolder.nextPlayer(), viewModelScope).also {
             live = it
             viewModelScope.launch { it.feed.collect { list -> feed.value = list } }
         }

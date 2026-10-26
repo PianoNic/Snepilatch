@@ -460,4 +460,12 @@
     <string name="whats_new_error_title">Etwas ist schiefgelaufen.</string>
     <string name="whats_new_try_again">Erneut versuchen</string>
     <string name="quality_none">Kein Audio</string>
+    <string name="home_filter_all">Alle</string>
+    <string name="profile_menu_view_account">Konto ansehen</string>
+    <string name="profile_menu_switch_account">Konto wechseln</string>
+    <string name="home_following_music_header">Zuletzt erschienen</string>
+    <string name="home_following_podcasts_header">Neueste Folgen</string>
+    <string name="home_following_caught_up_title">Du bist auf dem neuesten Stand</string>
+    <string name="home_following_music_caught_up">Es gibt keine weiteren Neuerscheinungen von Künstler*innen, denen du folgst.</string>
+    <string name="home_following_podcasts_caught_up">Es gibt keine weiteren neuen Folgen von Creator*innen, denen du folgst.</string>
 </resources>

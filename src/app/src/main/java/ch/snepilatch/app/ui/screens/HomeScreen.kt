@@ -2,12 +2,7 @@ package ch.snepilatch.app.ui.screens
 
 import androidx.compose.material.icons.rounded.AddCircleOutline
 import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.Groups
 import ch.snepilatch.app.logic.shared.ThemeController
-import ch.snepilatch.app.viewmodel.WhatsNewViewModel
-import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.Badge
-import androidx.compose.material.icons.rounded.NotificationsNone
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -19,7 +14,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import ch.snepilatch.app.R
-import ch.snepilatch.app.data.Screen
 import ch.snepilatch.app.data.LIKED_SONGS_COVER_URL
 import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import androidx.compose.foundation.background
@@ -80,6 +74,17 @@ import ch.snepilatch.app.ui.shared.EntityMenuSheet
 import ch.snepilatch.app.ui.shared.MenuAction
 import ch.snepilatch.app.ui.shared.SpfyImage
 import ch.snepilatch.app.ui.theme.SnepilatchGray
+import ch.snepilatch.app.ui.theme.SnepilatchBlack
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.State
+import ch.snepilatch.app.ui.shared.Avatar
+import ch.snepilatch.app.ui.shared.LocalOpenProfileMenu
 import ch.snepilatch.app.ui.theme.SnepilatchLightGray
 import ch.snepilatch.app.logic.shared.CardColors
 import ch.snepilatch.app.logic.shared.extractCardColorsFromArt
@@ -93,72 +98,236 @@ import ch.snepilatch.app.logic.shared.spfyId
 
 // --- Home Screen ---
 
+/**
+ * The profile picture, which opens the profile menu, and the feed's filter chips, laid out as the
+ * official app does (#976). Every chip stays in the row. A chosen chip becomes a group with its
+ * sub-chips: grey with the chip as a pill on it, or, once a sub-chip is chosen, all in the accent with
+ * the chip in a lighter pill, so which one is chosen always shows. Tapping a chosen chip goes back to
+ * the whole feed. The picture stays put while the chips scroll under it.
+ */
+@Composable
+private fun HomeHeader(vm: PlaybackViewModel, homeVm: HomeViewModel) {
+    val account by vm.account.collectAsState()
+    val chips by homeVm.chips.collectAsState()
+    val facet by homeVm.facet.collectAsState()
+    val openMenu = LocalOpenProfileMenu.current
+    val allLabel = stringResource(R.string.home_filter_all)
+    val groups = remember(chips, facet, allLabel) { chipGroups(chips, facet, allLabel) }
+    val rowState = rememberLazyListState()
+    // A chosen chip cut off at the edge scrolls into view, as in the official row; one already in full
+    // view leaves the row where it is, so "All" does not slide away under the picture.
+    LaunchedEffect(facet) {
+        val chosen = groups.indexOfFirst { it.chosen }
+        if (chosen < 0) return@LaunchedEffect
+        val info = rowState.layoutInfo
+        val shown = info.visibleItemsInfo.firstOrNull { it.index == chosen }
+        val whole = shown != null && shown.offset >= info.viewportStartOffset && shown.offset + shown.size <= info.viewportEndOffset
+        if (!whole) rowState.animateScrollToItem(chosen)
+    }
+
+    Row(
+        Modifier.fillMaxWidth().background(SnepilatchBlack).padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Spacer(Modifier.width(12.dp))
+        IconButton(onClick = openMenu, modifier = Modifier.size(40.dp)) {
+            Avatar(account.profileImageUrl, 34.dp)
+        }
+        LazyRow(
+            state = rowState,
+            contentPadding = PaddingValues(start = 6.dp, end = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            items(groups, key = { it.key }) { group -> ChipGroupView(group) { homeVm.selectChip(it) } }
+        }
+    }
+}
+
+private const val SHORTCUTS_SECTION = "HomeShortsSectionData"
+private const val MUSIC_FOLLOWING_CHIP = "music-following-chip"
+
+/**
+ * One stretch of the chip row: a lone chip, or a chosen chip with its sub-chips. [filled] paints the
+ * whole stretch in the accent; a [ChipSegment.raised] segment sits on it as a pill of its own.
+ */
+private data class ChipGroup(val key: String, val filled: Boolean, val segments: List<ChipSegment>) {
+    val chosen get() = filled || segments.any { it.raised }
+}
+
+/** What a segment says, whether it is raised as a pill, and which feed a tap asks for (null: all). */
+private data class ChipSegment(val label: String, val raised: Boolean, val target: String?)
+
+private fun chipGroups(chips: List<kotify.api.home.HomeChip>, facet: String, allLabel: String): List<ChipGroup> = buildList {
+    add(ChipGroup("all", filled = facet.isEmpty(), listOf(ChipSegment(allLabel, raised = false, target = null))))
+    chips.forEach { chip ->
+        val chosenSub = chip.subChips.firstOrNull { it.id == facet }
+        val chipChosen = facet == chip.id
+        val segments = when {
+            chosenSub != null || chipChosen -> listOf(ChipSegment(chip.label, raised = true, target = null)) +
+                // A chosen sub-chip tapped again goes back to its chip, not to the whole feed.
+                chip.subChips.map { sub -> ChipSegment(sub.label, raised = false, target = if (sub == chosenSub) chip.id else sub.id) }
+            else -> listOf(ChipSegment(chip.label, raised = false, target = chip.id))
+        }
+        add(ChipGroup(chip.id, filled = chosenSub != null, segments))
+    }
+}
+
+@Composable
+private fun ChipGroupView(group: ChipGroup, onSelect: (String?) -> Unit) {
+    val theme by ThemeController.themeColors.collectAsState()
+    val accent = theme.primary
+    // On the filled group the raised chip is a lighter accent, as the official row shades it.
+    val raisedColor = if (group.filled) lerp(accent, Color.White, RAISED_LIGHTEN) else accent
+    Row(
+        Modifier
+            .height(32.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (group.filled) accent else SnepilatchGray),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        group.segments.forEach { segment ->
+            val dark = group.filled || segment.raised
+            Box(
+                Modifier
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(if (segment.raised) raisedColor else Color.Transparent)
+                    .clickable { onSelect(segment.target) }
+                    .padding(horizontal = 14.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    segment.label,
+                    color = if (dark) Color.Black else SnepilatchWhite,
+                    fontSize = 14.sp,
+                    fontWeight = if (dark) FontWeight.SemiBold else FontWeight.Normal,
+                )
+            }
+        }
+    }
+}
+
+private const val RAISED_LIGHTEN = 0.3f
+
+/**
+ * What the two Following feeds add around their cards (#976): the heading the web player gives them,
+ * since they come without titles, a "caught up" note in its words when there is nothing new, and for
+ * podcasts the new episodes themselves, which come from the What's New feed rather than the home query.
+ */
+private fun LazyListScope.followingFeed(
+    facet: String,
+    loaded: Boolean,
+    noSections: Boolean,
+    episodes: List<kotify.api.whatsnew.WhatsNewItem>,
+    vm: PlaybackViewModel,
+) {
+    val podcasts = facet == HomeViewModel.PODCASTS_FOLLOWING_CHIP
+    // Still loading: the skeleton stands in for the heading as well.
+    if (facet != MUSIC_FOLLOWING_CHIP && !podcasts || !loaded) return
+    item {
+        Text(
+            stringResource(if (podcasts) R.string.home_following_podcasts_header else R.string.home_following_music_header),
+            color = SnepilatchWhite,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp)
+        )
+    }
+    val empty = if (podcasts) episodes.isEmpty() else noSections
+    if (loaded && empty) {
+        item {
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 48.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(stringResource(R.string.home_following_caught_up_title), color = SnepilatchWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    stringResource(if (podcasts) R.string.home_following_podcasts_caught_up else R.string.home_following_music_caught_up),
+                    color = SnepilatchLightGray, fontSize = 14.sp, textAlign = TextAlign.Center,
+                )
+            }
+        }
+    }
+    if (podcasts) {
+        items(episodes, key = { it.id }) { item ->
+            val episode = item.content as? kotify.api.whatsnew.WhatsNewContent.Episode ?: return@items
+            EpisodeRow(episode) { vm.playTrack(episode.uri) }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(vm: PlaybackViewModel) {
     val homeVm: HomeViewModel = viewModel()
     val homeData by homeVm.homeData.collectAsState()
     val isHomeLoading by homeVm.isLoading.collectAsState()
+    val chips by homeVm.chips.collectAsState()
+    val facet by homeVm.facet.collectAsState()
+    val episodes by homeVm.episodes.collectAsState()
 
-    if (isHomeLoading && homeData == null) {
+    // Home shown again, or the app back in front: the feed is asked for again only once it is stale,
+    // as the web player's home query does on mount and window focus. Adding the observer delivers the
+    // current ON_START, which covers opening the tab.
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_START) homeVm.refreshIfStale()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // Only the very first load shimmers; a chip's feed loads under the row with nothing below it,
+    // as the official app shows it.
+    if (isHomeLoading && homeData == null && chips.isEmpty()) {
         HomeShimmer()
         return
     }
 
     LazyColumn(
         Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(top = 8.dp, bottom = LocalBottomOverlayHeight.current.value + 16.dp)
+        contentPadding = PaddingValues(bottom = LocalBottomOverlayHeight.current.value + 16.dp)
     ) {
-        item {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    homeData?.greeting ?: stringResource(R.string.greeting_fallback),
-                    color = SnepilatchWhite,
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f),
-                )
-                // The web player's bell (#884), left of the friends button as there, with its dot for news.
-                val whatsNewVm: WhatsNewViewModel = viewModel()
-                val hasNew by whatsNewVm.hasNew.collectAsState()
-                IconButton(onClick = { vm.navigateTo(Screen.WHATS_NEW) }) {
-                    BadgedBox(badge = { if (hasNew) Badge(containerColor = ThemeController.themeColors.collectAsState().value.primary) }) {
-                        Icon(Icons.Rounded.NotificationsNone, stringResource(R.string.whats_new_title), tint = SnepilatchWhite)
-                    }
-                }
-                // What friends are listening to (#843), the web player's buddy feed.
-                IconButton(onClick = { vm.navigateTo(Screen.FRIEND_ACTIVITY) }) {
-                    Icon(Icons.Rounded.Groups, stringResource(R.string.friend_activity), tint = SnepilatchWhite)
-                }
-            }
-        }
+        stickyHeader { HomeHeader(vm, homeVm) }
+        // A chip's feed not seen yet: the skeleton under the row until it is in, not a blank page.
+        if (homeData == null) item { HomeShimmer(homeSkeletonFor(facet)) }
 
-        // Quick-pick grid (first section as compact grid)
-        val firstSection = homeData?.sections?.firstOrNull()
-        if (firstSection != null && firstSection.items.isNotEmpty()) {
+        // The quick picks are the shortcuts section the whole feed opens with. A chip's feed opens with an
+        // ordinary section instead (Following's first release card), which the grid used to swallow.
+        val sections = homeData?.sections.orEmpty()
+        val shortcuts = sections.firstOrNull()?.takeIf { it.type == SHORTCUTS_SECTION && it.items.isNotEmpty() }
+        if (shortcuts != null) {
             item {
-                QuickPickGrid(firstSection.items.take(8), vm)
+                QuickPickGrid(shortcuts.items.take(8), vm)
             }
         }
+        followingFeed(facet, loaded = homeData != null, sections.isEmpty(), episodes, vm)
 
-        homeData?.sections?.drop(1)?.forEach { section ->
+        sections.drop(if (shortcuts != null) 1 else 0).forEach { section ->
             if (section.items.isNotEmpty()) {
-                item {
-                    Text(
-                        section.title,
-                        color = SnepilatchWhite,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 10.dp)
-                    )
+                // A chip's feed can send sections without a title (Following's new releases); an empty
+                // title row would only leave a gap above them.
+                if (section.title.isNotBlank()) {
+                    item {
+                        Text(
+                            section.title,
+                            color = SnepilatchWhite,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 10.dp)
+                        )
+                    }
                 }
                 // A section holding one thing reads as a lone tile in a row that goes nowhere, so it
                 // gets a card wide enough to say what it is instead.
                 if (section.items.size == 1) {
-                    item { HomeSingleCard(section.items.first(), vm) }
+                    // Untitled cards that follow one another get room between them, as in the official
+                    // feed; one under a heading sits right below it, the heading's own gap is enough.
+                    val gap = if (section.title.isBlank()) 20.dp else 0.dp
+                    item { Box(Modifier.padding(top = gap)) { HomeSingleCard(section.items.first(), vm) } }
                     return@forEach
                 }
                 item {
@@ -229,8 +398,21 @@ fun QuickPickGrid(items: List<kotify.api.home.HomeSectionItem>, vm: PlaybackView
     }
 }
 
+/** Which shape the skeleton takes: the one the feed about to load will have. */
+enum class HomeSkeleton { SHORTCUTS, CARDS, EPISODES }
+
+/**
+ * The skeleton for [facet]'s feed. The whole feed and Music open with the shortcuts and rows of tiles;
+ * Following, Podcasts and Audiobooks are a heading over big cards; podcasts' Following is episode rows.
+ */
+fun homeSkeletonFor(facet: String): HomeSkeleton = when (facet) {
+    "", "music-chip" -> HomeSkeleton.SHORTCUTS
+    HomeViewModel.PODCASTS_FOLLOWING_CHIP -> HomeSkeleton.EPISODES
+    else -> HomeSkeleton.CARDS
+}
+
 @Composable
-fun HomeShimmer() {
+fun HomeShimmer(layout: HomeSkeleton = HomeSkeleton.SHORTCUTS) {
     // One shared transition drives every placeholder; ShimmerBox reads phase in the draw phase, so the
     // sweep animates without recomposing any box. Keep `phase` as State<Float> (no `by`, never read
     // .value here) so this composable is not invalidated each frame.
@@ -240,23 +422,20 @@ fun HomeShimmer() {
         animationSpec = infiniteRepeatable(tween(1200, easing = LinearEasing)),
         label = "shimmer"
     )
-    Column(
-        Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        ShimmerBox(phase, Modifier.width(180.dp).height(28.dp).clip(RoundedCornerShape(4.dp)))
-        Spacer(Modifier.height(16.dp))
-        repeat(3) {
+    when (layout) {
+        HomeSkeleton.SHORTCUTS -> ShortcutsSkeleton(phase)
+        HomeSkeleton.CARDS -> CardsSkeleton(phase)
+        HomeSkeleton.EPISODES -> EpisodesSkeleton(phase)
+    }
+}
+
+@Composable
+private fun ShortcutsSkeleton(phase: State<Float>) {
+    Column(Modifier.fillMaxWidth().padding(16.dp)) {
+        repeat(4) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 repeat(2) {
-                    ShimmerBox(
-                        phase,
-                        Modifier
-                            .weight(1f)
-                            .height(56.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                    )
+                    ShimmerBox(phase, Modifier.weight(1f).height(56.dp).clip(RoundedCornerShape(6.dp)))
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -270,6 +449,47 @@ fun HomeShimmer() {
                     ShimmerBox(phase, Modifier.size(140.dp).clip(RoundedCornerShape(8.dp)))
                     Spacer(Modifier.height(8.dp))
                     ShimmerBox(phase, Modifier.width(100.dp).height(14.dp).clip(RoundedCornerShape(4.dp)))
+                }
+            }
+        }
+    }
+}
+
+/** A heading over the big single-item cards, sized as [HomeSingleCard] draws them. */
+@Composable
+private fun CardsSkeleton(phase: State<Float>) {
+    // Each card under its own heading, as Podcasts and Audiobooks send them; the same paddings as the
+    // section title and the card, so the loaded feed lands where the skeleton stood.
+    Column(Modifier.fillMaxWidth()) {
+        repeat(2) {
+            ShimmerBox(
+                phase,
+                Modifier.padding(start = 16.dp, top = 20.dp, bottom = 10.dp).width(180.dp).height(24.dp).clip(RoundedCornerShape(4.dp)),
+            )
+            ShimmerBox(phase, Modifier.padding(horizontal = 16.dp).fillMaxWidth().height(170.dp).clip(RoundedCornerShape(12.dp)))
+        }
+    }
+}
+
+/** A heading over episode rows, sized as the What's New rows the feed shows. */
+@Composable
+private fun EpisodesSkeleton(phase: State<Float>) {
+    Column(Modifier.fillMaxWidth()) {
+        ShimmerBox(
+            phase,
+            Modifier.padding(start = 16.dp, top = 12.dp, bottom = 8.dp).width(200.dp).height(28.dp).clip(RoundedCornerShape(4.dp)),
+        )
+        repeat(6) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ShimmerBox(phase, Modifier.size(64.dp).clip(RoundedCornerShape(4.dp)))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    ShimmerBox(phase, Modifier.fillMaxWidth(0.75f).height(15.dp).clip(RoundedCornerShape(4.dp)))
+                    ShimmerBox(phase, Modifier.fillMaxWidth(0.5f).height(13.dp).clip(RoundedCornerShape(4.dp)))
+                    ShimmerBox(phase, Modifier.fillMaxWidth(0.3f).height(12.dp).clip(RoundedCornerShape(4.dp)))
                 }
             }
         }

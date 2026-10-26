@@ -1,5 +1,6 @@
 package ch.snepilatch.app.logic.playback.engine
 
+import ch.snepilatch.app.logic.shared.LokiLogger
 import kotify.cdn.SpfyPlayback
 
 /**
@@ -117,5 +118,7 @@ class SpfyCdnResolver(
     suspend fun license(stream: SpfyStream): Long =
         WidevineLicenser.license(spfyPlayback, stream.pssh ?: error("no pssh"))
 
-    private suspend fun certificate(): ByteArray? = runCatching { spfyPlayback.getWidevineCertificate() }.getOrNull()
+    private suspend fun certificate(): ByteArray? = runCatching { spfyPlayback.getWidevineCertificate() }
+        .onFailure { LokiLogger.w("SpfyCdnResolver", "No service certificate: ${it.message}") }
+        .getOrNull()
 }

@@ -36,5 +36,6 @@ fun widevineWithCertificate(uuid: UUID, certificate: ByteArray?): FrameworkMedia
         if (certificate == null) return@also
         // Not fatal, as for the web player, which licenses without it when setting it fails.
         runCatching { drm.setPropertyByteArray("serviceCertificate", certificate) }
+            .onSuccess { LokiLogger.i("KotifyDrm", "Service certificate set (${certificate.size} bytes)") }
             .onFailure { LokiLogger.w("KotifyDrm", "Service certificate not set: ${it.message}") }
     }

@@ -29,13 +29,20 @@ class KotifyDrmCallback(private val playback: SpfyPlayback) : MediaDrmCallback {
         MediaDrmCallback.Response(runBlocking { playback.getWidevineLicense(request.data) })
 }
 
-/** A Widevine CDM with the service certificate set, which the web player sets before every license. */
+/**
+ * A Widevine CDM with the service certificate set, which the web player sets before every license.
+ * Set the way Chrome's Android MediaDrmBridge sets it: privacy mode on, or the plugin ignores the
+ * certificate and the challenge carries the client id in the clear.
+ */
 @OptIn(UnstableApi::class)
 fun widevineWithCertificate(uuid: UUID, certificate: ByteArray?): FrameworkMediaDrm =
     FrameworkMediaDrm.newInstance(uuid).also { drm ->
         if (certificate == null) return@also
         // Not fatal, as for the web player, which licenses without it when setting it fails.
-        runCatching { drm.setPropertyByteArray("serviceCertificate", certificate) }
+        runCatching {
+            drm.setPropertyString("privacyMode", "enable")
+            drm.setPropertyByteArray("serviceCertificate", certificate)
+        }
             .onSuccess { LokiLogger.i("KotifyDrm", "Service certificate set (${certificate.size} bytes)") }
             .onFailure { LokiLogger.w("KotifyDrm", "Service certificate not set: ${it.message}") }
     }

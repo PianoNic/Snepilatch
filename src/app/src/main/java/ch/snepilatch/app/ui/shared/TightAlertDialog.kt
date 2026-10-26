@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ProvideTextStyle
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,7 +45,8 @@ fun TightAlertDialog(
         ) {
             Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
                 if (title != null) {
-                    Box(Modifier.padding(bottom = 12.dp)) { title() }
+                    // The size Material's own AlertDialog gives its title; without it the title fell back to body text.
+                    Box(Modifier.padding(bottom = 12.dp)) { ProvideTextStyle(MaterialTheme.typography.headlineSmall) { title() } }
                 }
                 if (text != null) {
                     Box(

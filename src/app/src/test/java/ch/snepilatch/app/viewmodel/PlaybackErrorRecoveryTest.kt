@@ -41,8 +41,6 @@ class PlaybackErrorRecoveryTest {
         coEvery { resolver.resolveMediaEntries("spotify:track:test") } returns listOf("fileXYZ" to "10")
         coEvery { resolver.resolveForFileId(eq("fileXYZ"), any()) } returns SpfyStream(
             cdnUrl = "https://cdn.example/audio",
-            licenseUrl = "https://license.example",
-            licenseHeaders = emptyMap(),
             mirrorCount = 3,
             pssh = null,
         )
@@ -55,7 +53,7 @@ class PlaybackErrorRecoveryTest {
         coVerify(exactly = 1) { resolver.resolveForFileId(eq("fileXYZ"), any()) }
         verify {
             rig.service.playDrmUrl(
-                "https://cdn.example/audio", "https://license.example", emptyMap(),
+                "https://cdn.example/audio", null,
                 any(), any(), any(), startPlaying = true, startPositionMs = 42_000L, pssh = null
             )
         }
@@ -70,8 +68,6 @@ class PlaybackErrorRecoveryTest {
         coEvery { resolver.resolveMediaEntries("spotify:track:test") } returns listOf("fileXYZ" to "10")
         coEvery { resolver.resolveForFileId(eq("fileXYZ"), any()) } returns SpfyStream(
             cdnUrl = "https://cdn.example/audio",
-            licenseUrl = "https://license.example",
-            licenseHeaders = emptyMap(),
             mirrorCount = 6,
             pssh = null,
         )
@@ -110,7 +106,7 @@ class PlaybackErrorRecoveryTest {
         // sit in silence on the dead track.
         rig.vm.recoverFromPlaybackError("spotify:track:test", 10_000L)
 
-        verify(exactly = 0) { rig.service.playDrmUrl(any(), any(), any(), any(), any(), any(), any(), any(), any()) }
+        verify(exactly = 0) { rig.service.playDrmUrl(any(), any(), any(), any(), any(), any(), any(), any()) }
         coVerify(atLeast = 1) { pc.localNext() }
     }
 }

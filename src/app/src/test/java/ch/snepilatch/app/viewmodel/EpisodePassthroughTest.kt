@@ -48,7 +48,7 @@ class EpisodePassthroughTest {
         verify {
             rig.service.playUrl("https://mcdn.podbean.com/show/ep1.mp3", "Ep One", "Some Show", null, startPlaying = any(), headers = emptyMap())
         }
-        verify(exactly = 0) { rig.service.playDrmUrl(any(), any(), any(), any(), any(), any(), any(), any(), any()) }
+        verify(exactly = 0) { rig.service.playDrmUrl(any(), any(), any(), any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -62,7 +62,7 @@ class EpisodePassthroughTest {
             passthroughUrl = null,
         )
         coEvery { resolver.resolveForFileId(eq("wideFileId"), any()) } returns SpfyStream(
-            cdnUrl = "https://cdn/enc", licenseUrl = "https://lic", licenseHeaders = emptyMap(),
+            cdnUrl = "https://cdn/enc",
             mirrorCount = 1, pssh = "PSSHBYTES",
         )
         SessionHolder.cdnResolver = resolver
@@ -71,7 +71,7 @@ class EpisodePassthroughTest {
 
         assert(handled)
         verify {
-            rig.service.playDrmUrl("https://cdn/enc", "https://lic", emptyMap(), any(), any(), any(), any(), any(), pssh = "PSSHBYTES")
+            rig.service.playDrmUrl("https://cdn/enc", null, any(), any(), any(), any(), any(), pssh = "PSSHBYTES")
         }
     }
 }

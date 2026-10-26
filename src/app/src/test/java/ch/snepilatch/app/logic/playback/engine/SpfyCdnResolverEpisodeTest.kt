@@ -19,7 +19,7 @@ class SpfyCdnResolverEpisodeTest {
     @Test
     fun `episode uri returns null without a track metadata lookup`() = runBlocking {
         val playback = mockk<SpfyPlayback>(relaxed = true)
-        val resolver = SpfyCdnResolver(mockk(relaxed = true), playback)
+        val resolver = SpfyCdnResolver(playback)
 
         val result = resolver.fetchFileIdFromMetadata("spotify:episode:1f6tXaeR1XNYwSF0tqpEDT")
 
@@ -33,7 +33,7 @@ class SpfyCdnResolverEpisodeTest {
         every { playback.trackIdToGid(any()) } returns "gid123"
         coEvery { playback.getTrackMetadata(any()) } returns mockk(relaxed = true)
         every { playback.findFile(any(), any()) } returns null
-        val resolver = SpfyCdnResolver(mockk(relaxed = true), playback)
+        val resolver = SpfyCdnResolver(playback)
 
         resolver.fetchFileIdFromMetadata("spotify:track:4uLU6hMCjMI75M1A2tKUQC")
 

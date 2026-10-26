@@ -1,6 +1,8 @@
 package ch.snepilatch.app.viewmodel
 
+import ch.snepilatch.app.logic.shared.LoadError
 import ch.snepilatch.app.logic.shared.LokiLogger
+import ch.snepilatch.app.logic.shared.loadErrorOf
 import kotify.api.home.Home
 import kotify.api.home.HomeChip
 import kotify.api.home.HomeData
@@ -29,6 +31,9 @@ class HomeViewModel : SessionViewModel("HomeVM") {
     private val _homeData = MutableStateFlow<HomeData?>(null)
     val homeData: StateFlow<HomeData?> = _homeData
     val isLoading = MutableStateFlow(true)
+
+    /** Why the feed failed with nothing to show, for the error state in place of a blank Home. */
+    val loadError = MutableStateFlow<LoadError?>(null)
 
     /** The chip whose feed is shown, or "" for the whole feed, the way the web player's facet works. */
     private val _facet = MutableStateFlow("")
@@ -96,13 +101,20 @@ class HomeViewModel : SessionViewModel("HomeVM") {
     private val _episodes = MutableStateFlow<List<WhatsNewItem>>(emptyList())
     val episodes: StateFlow<List<WhatsNewItem>> = _episodes
 
+    /** "Try again" on the error state. */
+    fun retry() {
+        isLoading.value = true
+        loadHome()
+    }
+
     fun loadHome() {
         val facet = _facet.value
         if (facet == PODCASTS_FOLLOWING_CHIP) {
             loadFollowedEpisodes()
             return
         }
-        launchWithSession("loadHome") { sess ->
+        loadError.value = null
+        launchWithSession("loadHome", onFailure = { if (_homeData.value == null) loadError.value = loadErrorOf(it) }) { sess ->
             try {
                 var shown = facet
                 val feed = try {

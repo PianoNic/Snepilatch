@@ -4,7 +4,9 @@ import androidx.lifecycle.viewModelScope
 import ch.snepilatch.app.data.*
 import ch.snepilatch.app.logic.download.Downloads
 import ch.snepilatch.app.logic.download.toTrackInfo
+import ch.snepilatch.app.logic.shared.LoadError
 import ch.snepilatch.app.logic.shared.NetworkState
+import ch.snepilatch.app.logic.shared.loadErrorOf
 import ch.snepilatch.app.logic.shared.SessionHolder
 import ch.snepilatch.app.logic.shared.LokiLogger
 import kotify.api.album.Album
@@ -43,6 +45,10 @@ class DetailViewModel : SessionViewModel("DetailVM") {
 
     val isLoading = MutableStateFlow(false)
 
+    /** Why the open page failed to load, shown in place of an empty page; null while it is fine. */
+    val loadError = MutableStateFlow<LoadError?>(null)
+    private var reload: (() -> Unit)? = null
+
     private val _isLoadingMore = MutableStateFlow(false)
     val isLoadingMore: StateFlow<Boolean> = _isLoadingMore
 
@@ -61,12 +67,22 @@ class DetailViewModel : SessionViewModel("DetailVM") {
      *  page on screen under the new one's name (#876). */
     private fun openDetail(screen: Screen, op: String, offlineUri: String? = null, load: suspend (Session) -> DetailData?) {
         Navigator.navigateTo(screen)
+        loadError.value = null
         if (offlineUri != null && !NetworkState.online.value) {
             _detail.value = downloadedDetail(offlineUri)
             return
         }
-        launchWithSessionLoading(op, isLoading) { sess -> load(sess)?.let { _detail.value = it } }
+        reload = {
+            launchWithSessionLoading(op, isLoading, onFailure = { loadError.value = loadErrorOf(it) }) { sess ->
+                load(sess)?.let { _detail.value = it }
+                loadError.value = null
+            }
+        }
+        reload?.invoke()
     }
+
+    /** "Try again" on the error state: the same load again, without navigating a second time. */
+    fun retry() = reload?.invoke()
 
     /** What the downloads know about [uri]: its name, cover and the tracks on the phone. */
     private fun downloadedDetail(uri: String): DetailData {

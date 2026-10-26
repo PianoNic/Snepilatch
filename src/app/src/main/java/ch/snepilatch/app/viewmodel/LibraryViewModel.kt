@@ -5,7 +5,9 @@ import androidx.lifecycle.viewModelScope
 import ch.snepilatch.app.data.LibraryItem
 import ch.snepilatch.app.data.toUiLibraryList
 import ch.snepilatch.app.logic.shared.Debouncer
+import ch.snepilatch.app.logic.shared.LoadError
 import ch.snepilatch.app.logic.shared.LokiLogger
+import ch.snepilatch.app.logic.shared.loadErrorOf
 import ch.snepilatch.app.logic.shared.SessionHolder
 import ch.snepilatch.app.logic.shared.AppMessages
 import kotify.api.album.Album
@@ -48,6 +50,10 @@ class LibraryViewModel : SessionViewModel("LibraryVM") {
     val library: StateFlow<List<LibraryItem>> = _library
     private val _libraryTotal = MutableStateFlow(-1)
     val libraryTotal: StateFlow<Int> = _libraryTotal
+
+    /** Why the listing failed with nothing to show, for the error state in place of an empty library. */
+    val loadError = MutableStateFlow<LoadError?>(null)
+
     private val _isLoading = MutableStateFlow(false)
 
     /** A listing is being fetched — the first page of the library, or of a folder just opened. */
@@ -123,7 +129,9 @@ class LibraryViewModel : SessionViewModel("LibraryVM") {
 
     fun loadLibrary() {
         val requested = folderUri
-        launchWithSessionLoading("loadLibrary", _isLoading) { sess ->
+        loadError.value = null
+        val onFailure: (Exception) -> Unit = { if (_library.value.isEmpty()) loadError.value = loadErrorOf(it) }
+        launchWithSessionLoading("loadLibrary", _isLoading, onFailure) { sess ->
             val page = Playlist(sess).getLibrary(limit = PAGE_SIZE, offset = 0, folderUri = requested)
             // A folder opened or closed while this was in flight owns the list now.
             if (requested != folderUri) return@launchWithSessionLoading

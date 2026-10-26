@@ -4,13 +4,11 @@ Living notes about non-obvious things in this repo. Keep this short and only add
 
 ## Native TLS binary lives in `jniLibs/` and must match KotifyClient
 
-KotifyClient's JAR is code only; the JNA-loaded `libtls_client_go.so` ships separately from [`PianoNic/kotlin-tls-client-natives`](https://github.com/PianoNic/kotlin-tls-client-natives/releases/latest). We commit one `.so` per ABI under `src/app/src/main/jniLibs/<abi>/` so local debug builds work without a network step.
+KotifyClient's JAR is code only. It speaks TLS through `libcurl-impersonate` ([lexiforest/curl-impersonate](https://github.com/lexiforest/curl-impersonate/releases), curl on BoringSSL), which links against the NDK's `libc++_shared.so`. Both are committed per ABI under `src/app/src/main/jniLibs/<abi>/`, and CI builds with exactly those: the committed files are the pinned version (curl-impersonate v2.3.1, `libc++_shared.so` from NDK 29). CI fetches none of them, because Kotify's binding is tied to a curl-impersonate version (its option numbers and patched options), and an unpinned "latest" is what broke the old Go natives' build.
 
-CI (`.github/workflows/build-and-release.yml`) re-fetches the latest natives release on every release build, overwriting whatever is in the tree, so production APKs always ship matching binaries even if the committed copies have drifted.
+**When Kotify moves to a new curl-impersonate version**, replace `libcurl-impersonate.so` in all four ABIs (`arm64-v8a` = `aarch64-linux-android`, `armeabi-v7a` = `armv7-linux-android`, `x86` = `x86-linux-android`, `x86_64` = `x86_64-linux-android`) from that release, in the same PR as the Kotify jar.
 
-**When you bump KotifyClient locally**, refresh the four ABIs (`arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64`) from the natives release matching the kotlin-tls-client version your new KotifyClient depends on. Otherwise you'll get `UnsatisfiedLinkError` for any FFI symbol added since your last refresh (e.g. `wsOpen` after the WebSocket migration).
-
-`libjnidispatch.so` (JNA's own dispatcher) sits next to `libtls_client_go.so` in each ABI directory. KotifyClient's shadow jar bundles JNA's Java classes but not its per-ABI native; Android's W^X rules forbid extracting `.so` files from inside a jar at runtime, so the file must be on disk in `jniLibs/`. CI re-extracts the latest from the JNA AAR alongside the natives step; locally, the committed copies are fine unless KotifyClient bumps its JNA dependency.
+`libjnidispatch.so` (JNA's own dispatcher) sits next to `libcurl-impersonate.so` in each ABI directory. KotifyClient's shadow jar bundles JNA's Java classes but not its per-ABI native; Android's W^X rules forbid extracting `.so` files from inside a jar at runtime, so the file must be on disk in `jniLibs/`. CI re-extracts the latest from the JNA AAR; locally, the committed copies are fine unless KotifyClient bumps its JNA dependency.
 
 ## Verification before merging anything
 

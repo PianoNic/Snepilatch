@@ -670,7 +670,9 @@ class PlaybackViewModel : ViewModel() {
                     identifier = "kotify-android",
                     language = AppSettings.effectiveLanguage(),
                     initialCookies = cookies,
-                    deviceProfile = kotify.config.DeviceProfile.CHROME_WINDOWS
+                    // What Chrome on an Android phone presents with "Desktop site" on: the browser this
+                    // phone's Widevine CDM belongs to, registered as the ordinary web player.
+                    deviceProfile = kotify.config.DeviceProfile.CHROME_ANDROID_DESKTOP
                 ))
                 sess.load()
 

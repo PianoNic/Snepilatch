@@ -127,7 +127,7 @@ class InfiniPlayAudioTap : BaseAudioProcessor() {
         covered.clear()
     }
 
-    override fun onFlush() { applyPendingPosition() }
+    override fun onFlush(streamMetadata: AudioProcessor.StreamMetadata) { applyPendingPosition() }
 
     @Synchronized
     private fun applyPendingPosition() {

@@ -6,9 +6,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material3.HorizontalDivider
@@ -27,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -118,16 +121,19 @@ fun RadioPickerDialog(
                     Spacer(Modifier.height(12.dp))
                 }
                 options.forEach { opt ->
+                    // The whole row is the one touch target. A radio with its own onClick would add a
+                    // 48 dp target of its own inside the padding, which is what spaced the rows apart.
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .clickable { onSelect(opt.value) }
-                            .padding(vertical = 12.dp, horizontal = 4.dp),
+                            .heightIn(min = 48.dp)
+                            .selectable(selected = selected == opt.value, role = Role.RadioButton) { onSelect(opt.value) }
+                            .padding(vertical = 6.dp, horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         RadioButton(
                             selected = selected == opt.value,
-                            onClick = { onSelect(opt.value) },
+                            onClick = null,
                         )
                         Spacer(Modifier.width(8.dp))
                         opt.icon?.let {

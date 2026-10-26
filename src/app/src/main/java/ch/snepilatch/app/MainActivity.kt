@@ -231,7 +231,7 @@ class MainActivity : ComponentActivity() {
                                 error = error,
                                 isRateLimited = cooldown,
                                 cooldownSecondsRemaining = seconds,
-                                onLogin = { if (!cooldown) vm.showLogin() },
+                                onLogin = { vm.showLogin() },
                                 onRetry = {
                                     if (!cooldown) {
                                         val cookies = loadCookies(context)

@@ -536,10 +536,6 @@ fun LoadingScreen(
                         color = SnepilatchWhite,
                         trackColor = SnepilatchLightGray.copy(alpha = 0.2f)
                     )
-                    Spacer(Modifier.height(24.dp))
-                    TextButton(onClick = onLogin) {
-                        Text(stringResource(R.string.login_different_account), color = SnepilatchLightGray, fontSize = 13.sp)
-                    }
                 }
                 error != null -> {
                     Icon(Icons.Rounded.CloudOff, null, tint = SnepilatchLightGray, modifier = Modifier.size(48.dp))

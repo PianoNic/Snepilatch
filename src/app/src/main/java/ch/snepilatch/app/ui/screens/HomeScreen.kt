@@ -2,12 +2,7 @@ package ch.snepilatch.app.ui.screens
 
 import androidx.compose.material.icons.rounded.AddCircleOutline
 import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.Groups
 import ch.snepilatch.app.logic.shared.ThemeController
-import ch.snepilatch.app.viewmodel.WhatsNewViewModel
-import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.Badge
-import androidx.compose.material.icons.rounded.NotificationsNone
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -19,7 +14,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import ch.snepilatch.app.R
-import ch.snepilatch.app.data.Screen
 import ch.snepilatch.app.data.LIKED_SONGS_COVER_URL
 import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import androidx.compose.foundation.background
@@ -80,6 +74,13 @@ import ch.snepilatch.app.ui.shared.EntityMenuSheet
 import ch.snepilatch.app.ui.shared.MenuAction
 import ch.snepilatch.app.ui.shared.SpfyImage
 import ch.snepilatch.app.ui.theme.SnepilatchGray
+import ch.snepilatch.app.ui.theme.SnepilatchBlack
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.ExperimentalFoundationApi
+import ch.snepilatch.app.ui.shared.Avatar
+import ch.snepilatch.app.ui.shared.LocalOpenProfileMenu
 import ch.snepilatch.app.ui.theme.SnepilatchLightGray
 import ch.snepilatch.app.logic.shared.CardColors
 import ch.snepilatch.app.logic.shared.extractCardColorsFromArt
@@ -93,48 +94,112 @@ import ch.snepilatch.app.logic.shared.spfyId
 
 // --- Home Screen ---
 
+/**
+ * The profile picture, which opens the profile menu, and the feed's filter chips, laid out as the
+ * official app does (#976): every chip stays in the row, a chosen chip's sub-chips follow it, a chosen
+ * sub-chip joins its parent in one pill, and tapping what is chosen goes back to the whole feed. The
+ * picture stays put while the chips scroll under it.
+ */
+@Composable
+private fun HomeHeader(vm: PlaybackViewModel, homeVm: HomeViewModel) {
+    val account by vm.account.collectAsState()
+    val chips by homeVm.chips.collectAsState()
+    val facet by homeVm.facet.collectAsState()
+    val openMenu = LocalOpenProfileMenu.current
+    val allLabel = stringResource(R.string.home_filter_all)
+    val pills = remember(chips, facet, allLabel) { chipPills(chips, facet, allLabel) }
+    val rowState = rememberLazyListState()
+    // A chosen chip cut off at the edge scrolls into view, as in the official row; one already in full
+    // view leaves the row where it is, so "All" does not slide away under the picture.
+    LaunchedEffect(facet) {
+        val chosen = pills.indexOfFirst { it.selected }
+        if (chosen < 0) return@LaunchedEffect
+        val info = rowState.layoutInfo
+        val shown = info.visibleItemsInfo.firstOrNull { it.index == chosen }
+        val whole = shown != null && shown.offset >= info.viewportStartOffset && shown.offset + shown.size <= info.viewportEndOffset
+        if (!whole) rowState.animateScrollToItem(chosen)
+    }
+
+    Row(
+        Modifier.fillMaxWidth().background(SnepilatchBlack).padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Spacer(Modifier.width(12.dp))
+        IconButton(onClick = openMenu, modifier = Modifier.size(40.dp)) {
+            Avatar(account.profileImageUrl, 34.dp)
+        }
+        LazyRow(
+            state = rowState,
+            contentPadding = PaddingValues(start = 6.dp, end = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            items(pills, key = { it.key }) { pill ->
+                FilterPill(pill.label, pill.subLabel, pill.selected) {
+                    homeVm.selectChip(pill.target)
+                }
+            }
+        }
+    }
+}
+
+/** One pill in the chip row: what it says, whether it is chosen, and which feed a tap asks for (null: all). */
+private data class ChipPill(val key: String, val label: String, val subLabel: String?, val selected: Boolean, val target: String?)
+
+private fun chipPills(chips: List<kotify.api.home.HomeChip>, facet: String, allLabel: String): List<ChipPill> = buildList {
+    add(ChipPill("all", allLabel, null, facet.isEmpty(), null))
+    chips.forEach { chip ->
+        val chosenSub = chip.subChips.firstOrNull { it.id == facet }
+        when {
+            chosenSub != null -> add(ChipPill(chip.id, chip.label, chosenSub.label, true, null))
+            facet == chip.id -> {
+                add(ChipPill(chip.id, chip.label, null, true, null))
+                chip.subChips.forEach { sub -> add(ChipPill(sub.id, sub.label, null, false, sub.id)) }
+            }
+            else -> add(ChipPill(chip.id, chip.label, null, false, chip.id))
+        }
+    }
+}
+
+@Composable
+private fun FilterPill(label: String, subLabel: String?, selected: Boolean, onClick: () -> Unit) {
+    val theme by ThemeController.themeColors.collectAsState()
+    val textColor = if (selected) Color.Black else SnepilatchWhite
+    Row(
+        Modifier
+            .height(32.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (selected) theme.primary else SnepilatchGray)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, color = textColor, fontSize = 14.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+        if (subLabel != null) Text(subLabel, color = textColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(vm: PlaybackViewModel) {
     val homeVm: HomeViewModel = viewModel()
     val homeData by homeVm.homeData.collectAsState()
     val isHomeLoading by homeVm.isLoading.collectAsState()
+    val chips by homeVm.chips.collectAsState()
 
-    if (isHomeLoading && homeData == null) {
+    // Only the very first load shimmers; a chip's feed loads under the row with nothing below it,
+    // as the official app shows it.
+    if (isHomeLoading && homeData == null && chips.isEmpty()) {
         HomeShimmer()
         return
     }
 
     LazyColumn(
         Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(top = 8.dp, bottom = LocalBottomOverlayHeight.current.value + 16.dp)
+        contentPadding = PaddingValues(bottom = LocalBottomOverlayHeight.current.value + 16.dp)
     ) {
-        item {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    homeData?.greeting ?: stringResource(R.string.greeting_fallback),
-                    color = SnepilatchWhite,
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f),
-                )
-                // The web player's bell (#884), left of the friends button as there, with its dot for news.
-                val whatsNewVm: WhatsNewViewModel = viewModel()
-                val hasNew by whatsNewVm.hasNew.collectAsState()
-                IconButton(onClick = { vm.navigateTo(Screen.WHATS_NEW) }) {
-                    BadgedBox(badge = { if (hasNew) Badge(containerColor = ThemeController.themeColors.collectAsState().value.primary) }) {
-                        Icon(Icons.Rounded.NotificationsNone, stringResource(R.string.whats_new_title), tint = SnepilatchWhite)
-                    }
-                }
-                // What friends are listening to (#843), the web player's buddy feed.
-                IconButton(onClick = { vm.navigateTo(Screen.FRIEND_ACTIVITY) }) {
-                    Icon(Icons.Rounded.Groups, stringResource(R.string.friend_activity), tint = SnepilatchWhite)
-                }
-            }
-        }
+        stickyHeader { HomeHeader(vm, homeVm) }
 
         // Quick-pick grid (first section as compact grid)
         val firstSection = homeData?.sections?.firstOrNull()
@@ -146,14 +211,18 @@ fun HomeScreen(vm: PlaybackViewModel) {
 
         homeData?.sections?.drop(1)?.forEach { section ->
             if (section.items.isNotEmpty()) {
-                item {
-                    Text(
-                        section.title,
-                        color = SnepilatchWhite,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 10.dp)
-                    )
+                // A chip's feed can send sections without a title (Following's new releases); an empty
+                // title row would only leave a gap above them.
+                if (section.title.isNotBlank()) {
+                    item {
+                        Text(
+                            section.title,
+                            color = SnepilatchWhite,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 10.dp)
+                        )
+                    }
                 }
                 // A section holding one thing reads as a lone tile in a row that goes nowhere, so it
                 // gets a card wide enough to say what it is instead.

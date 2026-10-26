@@ -462,4 +462,7 @@
     <string name="whats_new_error_title">Что-то пошло не так.</string>
     <string name="whats_new_try_again">Повторить</string>
     <string name="quality_none">Нет аудио</string>
+    <string name="home_filter_all">Все</string>
+    <string name="profile_menu_view_account">Открыть аккаунт</string>
+    <string name="profile_menu_switch_account">Сменить аккаунт</string>
 </resources>

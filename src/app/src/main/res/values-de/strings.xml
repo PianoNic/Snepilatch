@@ -460,4 +460,7 @@
     <string name="whats_new_error_title">Etwas ist schiefgelaufen.</string>
     <string name="whats_new_try_again">Erneut versuchen</string>
     <string name="quality_none">Kein Audio</string>
+    <string name="home_filter_all">Alle</string>
+    <string name="profile_menu_view_account">Konto ansehen</string>
+    <string name="profile_menu_switch_account">Konto wechseln</string>
 </resources>

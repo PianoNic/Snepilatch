@@ -476,4 +476,7 @@
     <string name="whats_new_error_title">Öppis isch schiefgloffe.</string>
     <string name="whats_new_try_again">Nomal probiere</string>
     <string name="quality_none">Kei Audio</string>
+    <string name="home_filter_all">Alli</string>
+    <string name="profile_menu_view_account">Konto aaluege</string>
+    <string name="profile_menu_switch_account">Konto wächsle</string>
 </resources>

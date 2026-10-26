@@ -39,6 +39,9 @@ object SessionHolder {
     /** The player once it is registered, or null when that takes longer than [timeoutMs]. */
     suspend fun awaitPlayer(timeoutMs: Long): PlayerConnect? =
         withTimeoutOrNull(timeoutMs) { playerFlow.filterNotNull().first() }
+
+    /** The player once it is registered, however long that takes; the caller's scope bounds the wait. */
+    suspend fun nextPlayer(): PlayerConnect = playerFlow.filterNotNull().first()
     @Volatile var spfyPlayback: SpfyPlayback? = null
     @Volatile var cdnResolver: SpfyCdnResolver? = null
 

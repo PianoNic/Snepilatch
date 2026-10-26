@@ -80,6 +80,8 @@ import androidx.compose.ui.util.lerp
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import ch.snepilatch.app.ui.shared.PlaylistPickerDialog
+import ch.snepilatch.app.ui.shared.LocalOpenProfileMenu
+import ch.snepilatch.app.ui.shared.ProfileMenu
 import ch.snepilatch.app.logic.shared.spfyId
 import ch.snepilatch.app.logic.shared.JamHolder
 import ch.snepilatch.app.ui.shared.JamBanner
@@ -156,7 +158,19 @@ fun SpfyApp(vm: PlaybackViewModel) {
 
     BackHandler(screen != Screen.HOME) { vm.goBack() }
 
-    CompositionLocalProvider(LocalBottomOverlayHeight provides bottomOverlayHeight) {
+    // The profile menu covers the whole shell, player and bottom bar too, as the official app's does.
+    // Only an open menu takes the swipe, so the mini player's and the list's gestures stay theirs.
+    val menuState = rememberDrawerState(DrawerValue.Closed)
+    BackHandler(menuState.isOpen) { scope.launch { menuState.close() } }
+    ModalNavigationDrawer(
+        drawerState = menuState,
+        gesturesEnabled = menuState.isOpen,
+        drawerContent = { ProfileMenu(vm, onClose = { scope.launch { menuState.close() } }) },
+    ) {
+    CompositionLocalProvider(
+        LocalBottomOverlayHeight provides bottomOverlayHeight,
+        LocalOpenProfileMenu provides { scope.launch { menuState.open() } },
+    ) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val fullWidthPx = constraints.maxWidth
         val fullHeightPx = constraints.maxHeight
@@ -336,6 +350,7 @@ fun SpfyApp(vm: PlaybackViewModel) {
         }
     }
     } // CompositionLocalProvider
+    } // ModalNavigationDrawer
 }
 
 @Composable

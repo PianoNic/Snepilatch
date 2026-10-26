@@ -7,6 +7,7 @@ import androidx.media3.exoplayer.drm.ExoMediaDrm
 import androidx.media3.exoplayer.drm.FrameworkMediaDrm
 import androidx.media3.exoplayer.drm.HttpMediaDrmCallback
 import androidx.media3.exoplayer.drm.MediaDrmCallback
+import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.logic.shared.LokiLogger
 import kotify.cdn.SpfyPlayback
 import kotlinx.coroutines.runBlocking
@@ -30,13 +31,19 @@ class KotifyDrmCallback(private val playback: SpfyPlayback) : MediaDrmCallback {
 }
 
 /**
- * A Widevine CDM with the service certificate set, which the web player sets before every license.
- * Set the way Chrome's Android MediaDrmBridge sets it: privacy mode on, or the plugin ignores the
- * certificate and the challenge carries the client id in the clear.
+ * A Widevine CDM set up the way Chrome's Android MediaDrmBridge sets up its own: our origin first, so
+ * the CDM licenses with a certificate provisioned for that origin, then the service certificate the
+ * web player sets before every license, with privacy mode on, or the plugin ignores the certificate
+ * and the challenge carries the client id in the clear.
  */
 @OptIn(UnstableApi::class)
 fun widevineWithCertificate(uuid: UUID, certificate: ByteArray?): FrameworkMediaDrm =
     FrameworkMediaDrm.newInstance(uuid).also { drm ->
+        // Before any session opens, as Chrome sets it; the plugin refuses a change once one is open.
+        AppSettings.widevineOrigin()?.let { origin ->
+            runCatching { drm.setPropertyString("origin", origin) }
+                .onFailure { LokiLogger.w("KotifyDrm", "Origin not set: ${it.message}") }
+        }
         if (certificate == null) return@also
         // Not fatal, as for the web player, which licenses without it when setting it fails.
         runCatching {

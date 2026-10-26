@@ -81,6 +81,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.runtime.DisposableEffect
 import ch.snepilatch.app.ui.shared.Avatar
 import ch.snepilatch.app.ui.shared.LocalOpenProfileMenu
 import ch.snepilatch.app.ui.theme.SnepilatchLightGray
@@ -265,6 +266,18 @@ fun HomeScreen(vm: PlaybackViewModel) {
     val facet by homeVm.facet.collectAsState()
     val episodes by homeVm.episodes.collectAsState()
 
+    // Home shown again, or the app back in front: the feed is asked for again only once it is stale,
+    // as the web player's home query does on mount and window focus. Adding the observer delivers the
+    // current ON_START, which covers opening the tab.
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_START) homeVm.refreshIfStale()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     // Only the very first load shimmers; a chip's feed loads under the row with nothing below it,
     // as the official app shows it.
     if (isHomeLoading && homeData == null && chips.isEmpty()) {
@@ -277,6 +290,8 @@ fun HomeScreen(vm: PlaybackViewModel) {
         contentPadding = PaddingValues(bottom = LocalBottomOverlayHeight.current.value + 16.dp)
     ) {
         stickyHeader { HomeHeader(vm, homeVm) }
+        // A chip's feed not seen yet: the skeleton under the row until it is in, not a blank page.
+        if (homeData == null) item { HomeShimmer() }
 
         // The quick picks are the shortcuts section the whole feed opens with. A chip's feed opens with an
         // ordinary section instead (Following's first release card), which the grid used to swallow.
@@ -307,9 +322,10 @@ fun HomeScreen(vm: PlaybackViewModel) {
                 // A section holding one thing reads as a lone tile in a row that goes nowhere, so it
                 // gets a card wide enough to say what it is instead.
                 if (section.items.size == 1) {
-                    // Spaced like the official feed, where untitled cards follow one another with nothing
-                    // else between them.
-                    item { Box(Modifier.padding(top = 20.dp)) { HomeSingleCard(section.items.first(), vm) } }
+                    // Untitled cards that follow one another get room between them, as in the official
+                    // feed; one under a heading sits right below it, the heading's own gap is enough.
+                    val gap = if (section.title.isBlank()) 20.dp else 0.dp
+                    item { Box(Modifier.padding(top = gap)) { HomeSingleCard(section.items.first(), vm) } }
                     return@forEach
                 }
                 item {

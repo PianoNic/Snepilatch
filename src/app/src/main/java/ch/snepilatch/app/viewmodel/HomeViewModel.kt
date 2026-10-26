@@ -38,11 +38,16 @@ class HomeViewModel : SessionViewModel("HomeVM") {
     private val _chips = MutableStateFlow<List<HomeChip>>(emptyList())
     val chips: StateFlow<List<HomeChip>> = _chips
 
+    /** A feed as it was loaded, by facet, so a chip already seen shows at once. */
+    private class Cached(val data: HomeData, val episodes: List<WhatsNewItem>, val at: Long)
+    private val cache = java.util.concurrent.ConcurrentHashMap<String, Cached>()
+
     init {
         loadHome()
         // A switched account gets a fresh feed instead of the old account's (#847).
         viewModelScope.launch {
             SessionHolder.generation.drop(1).collect {
+                cache.clear()
                 _homeData.value = null
                 _facet.value = ""
                 _chips.value = emptyList()
@@ -52,12 +57,35 @@ class HomeViewModel : SessionViewModel("HomeVM") {
         }
     }
 
-    /** Shows [chipId]'s feed; the chip already shown, or null, goes back to the whole feed. */
+    /**
+     * Shows [chipId]'s feed; the chip already shown, or null, goes back to the whole feed. A feed seen in
+     * the last half hour shows straight from the cache and is only asked for again once it is five
+     * minutes old, the web player's gcTime and staleTime for the home query.
+     */
     fun selectChip(chipId: String?) {
-        _facet.value = if (chipId == null || chipId == _facet.value) "" else chipId
-        // The old feed goes at once: the official app shows nothing under the row until the new one is in.
+        val facet = if (chipId == null || chipId == _facet.value) "" else chipId
+        _facet.value = facet
+        val now = System.currentTimeMillis()
+        val hit = cache[facet]?.takeIf { now - it.at < CACHE_KEEP_MS }
+        if (hit != null) {
+            _homeData.value = hit.data
+            _episodes.value = hit.episodes
+            if (now - hit.at >= CACHE_FRESH_MS) loadHome()
+            return
+        }
+        // Nothing to show yet: the screen draws the skeleton under the row until the feed is in.
         _homeData.value = null
         loadHome()
+    }
+
+    /**
+     * Asks for the shown feed again once it is older than the staleTime, and only then: the web player's
+     * home query is refetched on mount and on window focus with React Query's defaults, which skip a
+     * feed still fresh. The old feed stays on screen while the new one loads.
+     */
+    fun refreshIfStale() {
+        val hit = cache[_facet.value] ?: return
+        if (System.currentTimeMillis() - hit.at >= CACHE_FRESH_MS) loadHome()
     }
 
     /**
@@ -89,6 +117,7 @@ class HomeViewModel : SessionViewModel("HomeVM") {
                     if (_facet.value == facet) _facet.value = ""
                     Home(sess).getHomeFeed()
                 }
+                if (feed != null) cache[shown] = Cached(feed, emptyList(), System.currentTimeMillis())
                 // A chip tapped while this loaded owns the screen now.
                 if (shown != _facet.value) return@launchWithSession
                 _homeData.value = feed
@@ -104,10 +133,12 @@ class HomeViewModel : SessionViewModel("HomeVM") {
         launchWithSession("loadFollowedEpisodes") { sess ->
             try {
                 val page = WhatsNewFeed(sess).getFeed(types = setOf(WhatsNewContentType.EPISODES))
+                // An empty feed stands in for the home data, so the screen stops waiting for one.
+                val stand = HomeData(greeting = "", sections = emptyList(), chips = _chips.value)
+                cache[PODCASTS_FOLLOWING_CHIP] = Cached(stand, page.items, System.currentTimeMillis())
                 if (_facet.value != PODCASTS_FOLLOWING_CHIP) return@launchWithSession
                 _episodes.value = page.items
-                // An empty feed stands in for the home data, so the screen stops waiting for one.
-                _homeData.value = HomeData(greeting = "", sections = emptyList(), chips = _chips.value)
+                _homeData.value = stand
                 LokiLogger.i(logTag, "Followed episodes loaded: ${page.items.size}")
             } finally {
                 isLoading.value = false
@@ -117,5 +148,11 @@ class HomeViewModel : SessionViewModel("HomeVM") {
 
     companion object {
         const val PODCASTS_FOLLOWING_CHIP = "podcasts-following-chip"
+
+        /** The web player's staleTime for the home query: younger than this a cached feed is not asked for again. */
+        private const val CACHE_FRESH_MS = 5 * 60 * 1000L
+
+        /** Its gcTime: older than this a cached feed is not shown at all. */
+        private const val CACHE_KEEP_MS = 30 * 60 * 1000L
     }
 }

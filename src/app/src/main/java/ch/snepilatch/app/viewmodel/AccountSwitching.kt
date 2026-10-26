@@ -6,6 +6,7 @@ import ch.snepilatch.app.data.Screen
 import ch.snepilatch.app.logic.shared.AccountStore
 import ch.snepilatch.app.logic.shared.SavedAccount
 import ch.snepilatch.app.logic.shared.SessionHolder
+import ch.snepilatch.app.logic.shared.SessionResume
 import ch.snepilatch.app.logic.shared.clearCookies
 import ch.snepilatch.app.logic.shared.saveCookies
 import kotlinx.coroutines.Job
@@ -46,6 +47,7 @@ fun PlaybackViewModel.logout(context: Context): Job? {
     if (next != null) return switchAccount(context, next)
     return viewModelScope.launch {
         clearCookies(context)
+        SessionResume.clear()
         shutDownSession()
         showLogin()
     }

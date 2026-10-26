@@ -29,6 +29,17 @@ object AccountStore {
     /** Adds or refreshes [account] by username, so a re-login or a new picture updates the row. */
     fun remember(account: SavedAccount) = persist(accounts.value.filter { it.username != account.username } + account)
 
+    /**
+     * Gives the saved account these [cookies] belong to (same sp_dc) the cookies the server last set,
+     * so switching back to it later starts from them rather than from the login's.
+     */
+    fun updateCookies(cookies: Map<String, String>) {
+        val spDc = cookies["sp_dc"] ?: return
+        val list = accounts.value
+        if (list.none { it.cookies["sp_dc"] == spDc && it.cookies != cookies }) return
+        persist(list.map { if (it.cookies["sp_dc"] == spDc) it.copy(cookies = cookies) else it })
+    }
+
     fun forget(username: String) = persist(accounts.value.filter { it.username != username })
 
     private fun persist(list: List<SavedAccount>) {

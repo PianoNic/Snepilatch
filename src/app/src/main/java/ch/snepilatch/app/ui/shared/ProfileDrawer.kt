@@ -28,7 +28,6 @@ import androidx.compose.material.icons.rounded.Campaign
 import androidx.compose.material.icons.rounded.DownloadForOffline
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
-import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Settings
@@ -207,9 +206,9 @@ private fun FriendsRow(onOpen: () -> Unit) {
                     )
                 }
                 Text(friend.userName, color = SnepilatchWhite, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                // Playing right now: the track in the accent with the equalizer glyph, as the official tile marks it.
+                // Playing right now: the track in the accent beside the spinning record, the app's now-playing glyph.
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    if (friend.isPlaying) Icon(Icons.Rounded.GraphicEq, null, tint = theme.primary, modifier = Modifier.size(12.dp))
+                    if (friend.isPlaying) SpinningDisc(theme.primary, Modifier.size(12.dp))
                     Text(
                         friend.trackName,
                         color = if (friend.isPlaying) theme.primary else SnepilatchLightGray,

@@ -44,6 +44,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
+import androidx.compose.foundation.clickable
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotify.api.playerstatus.DealerState
+import ch.snepilatch.app.logic.shared.SessionHolder
 import ch.snepilatch.app.data.Screen
 import ch.snepilatch.app.ui.shared.BottomNav
 import ch.snepilatch.app.ui.shared.DevicesDialog
@@ -148,6 +152,11 @@ fun SpfyApp(vm: PlaybackViewModel) {
     }
 
     val isOffline by vm.isOffline.collectAsState()
+    val currentPlayer by SessionHolder.players.collectAsState()
+    // CONNECTED until there is a player: before ready() nothing has given up yet.
+    val dealerState by remember(currentPlayer) {
+        currentPlayer?.connectionState ?: MutableStateFlow(DealerState.CONNECTED)
+    }.collectAsState()
 
     val toastContext = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(Unit) {
@@ -279,6 +288,17 @@ fun SpfyApp(vm: PlaybackViewModel) {
                             fontSize = 12.sp,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                        )
+                    } else if (dealerState == DealerState.DISCONNECTED) {
+                        // The reconnect gave up (Kotify #577); a tap starts it over, as the next command would.
+                        Text(
+                            stringResource(R.string.connection_lost_banner),
+                            color = SnepilatchLightGray,
+                            fontSize = 12.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                                .clickable { currentPlayer?.onNetworkChanged() }
+                                .padding(vertical = 4.dp)
                         )
                     }
                     BottomNav(screen, vm, hazeState)

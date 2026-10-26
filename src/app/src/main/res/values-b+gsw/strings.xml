@@ -424,6 +424,7 @@
     </plurals>
     <string name="auto_save_listened">Bhalte, was i lose</string>
     <string name="auto_save_listened_desc">Spicheret en Song, sobald du ne dureghört häsch</string>
+    <string name="connection_lost_banner">Spotify nöd erreichbar. Tipp zum nomal probiere</string>
     <string name="offline_banner">Du bisch offline</string>
     <string name="offline_while_youre_offline">Wärend du offline bisch</string>
     <string name="offline_no_downloads">Du bisch offline und es isch no nüt abeglade. Abegladeni Songs erschine da.</string>

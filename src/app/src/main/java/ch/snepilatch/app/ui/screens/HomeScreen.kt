@@ -82,6 +82,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.State
 import ch.snepilatch.app.ui.shared.Avatar
 import ch.snepilatch.app.ui.shared.LocalOpenProfileMenu
 import ch.snepilatch.app.ui.theme.SnepilatchLightGray
@@ -222,7 +223,8 @@ private fun LazyListScope.followingFeed(
     vm: PlaybackViewModel,
 ) {
     val podcasts = facet == HomeViewModel.PODCASTS_FOLLOWING_CHIP
-    if (facet != MUSIC_FOLLOWING_CHIP && !podcasts) return
+    // Still loading: the skeleton stands in for the heading as well.
+    if (facet != MUSIC_FOLLOWING_CHIP && !podcasts || !loaded) return
     item {
         Text(
             stringResource(if (podcasts) R.string.home_following_podcasts_header else R.string.home_following_music_header),
@@ -291,7 +293,7 @@ fun HomeScreen(vm: PlaybackViewModel) {
     ) {
         stickyHeader { HomeHeader(vm, homeVm) }
         // A chip's feed not seen yet: the skeleton under the row until it is in, not a blank page.
-        if (homeData == null) item { HomeShimmer() }
+        if (homeData == null) item { HomeShimmer(homeSkeletonFor(facet)) }
 
         // The quick picks are the shortcuts section the whole feed opens with. A chip's feed opens with an
         // ordinary section instead (Following's first release card), which the grid used to swallow.
@@ -396,8 +398,21 @@ fun QuickPickGrid(items: List<kotify.api.home.HomeSectionItem>, vm: PlaybackView
     }
 }
 
+/** Which shape the skeleton takes: the one the feed about to load will have. */
+enum class HomeSkeleton { SHORTCUTS, CARDS, EPISODES }
+
+/**
+ * The skeleton for [facet]'s feed. The whole feed and Music open with the shortcuts and rows of tiles;
+ * Following, Podcasts and Audiobooks are a heading over big cards; podcasts' Following is episode rows.
+ */
+fun homeSkeletonFor(facet: String): HomeSkeleton = when (facet) {
+    "", "music-chip" -> HomeSkeleton.SHORTCUTS
+    HomeViewModel.PODCASTS_FOLLOWING_CHIP -> HomeSkeleton.EPISODES
+    else -> HomeSkeleton.CARDS
+}
+
 @Composable
-fun HomeShimmer() {
+fun HomeShimmer(layout: HomeSkeleton = HomeSkeleton.SHORTCUTS) {
     // One shared transition drives every placeholder; ShimmerBox reads phase in the draw phase, so the
     // sweep animates without recomposing any box. Keep `phase` as State<Float> (no `by`, never read
     // .value here) so this composable is not invalidated each frame.
@@ -407,23 +422,20 @@ fun HomeShimmer() {
         animationSpec = infiniteRepeatable(tween(1200, easing = LinearEasing)),
         label = "shimmer"
     )
-    Column(
-        Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        ShimmerBox(phase, Modifier.width(180.dp).height(28.dp).clip(RoundedCornerShape(4.dp)))
-        Spacer(Modifier.height(16.dp))
-        repeat(3) {
+    when (layout) {
+        HomeSkeleton.SHORTCUTS -> ShortcutsSkeleton(phase)
+        HomeSkeleton.CARDS -> CardsSkeleton(phase)
+        HomeSkeleton.EPISODES -> EpisodesSkeleton(phase)
+    }
+}
+
+@Composable
+private fun ShortcutsSkeleton(phase: State<Float>) {
+    Column(Modifier.fillMaxWidth().padding(16.dp)) {
+        repeat(4) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 repeat(2) {
-                    ShimmerBox(
-                        phase,
-                        Modifier
-                            .weight(1f)
-                            .height(56.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                    )
+                    ShimmerBox(phase, Modifier.weight(1f).height(56.dp).clip(RoundedCornerShape(6.dp)))
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -437,6 +449,47 @@ fun HomeShimmer() {
                     ShimmerBox(phase, Modifier.size(140.dp).clip(RoundedCornerShape(8.dp)))
                     Spacer(Modifier.height(8.dp))
                     ShimmerBox(phase, Modifier.width(100.dp).height(14.dp).clip(RoundedCornerShape(4.dp)))
+                }
+            }
+        }
+    }
+}
+
+/** A heading over the big single-item cards, sized as [HomeSingleCard] draws them. */
+@Composable
+private fun CardsSkeleton(phase: State<Float>) {
+    // Each card under its own heading, as Podcasts and Audiobooks send them; the same paddings as the
+    // section title and the card, so the loaded feed lands where the skeleton stood.
+    Column(Modifier.fillMaxWidth()) {
+        repeat(2) {
+            ShimmerBox(
+                phase,
+                Modifier.padding(start = 16.dp, top = 20.dp, bottom = 10.dp).width(180.dp).height(24.dp).clip(RoundedCornerShape(4.dp)),
+            )
+            ShimmerBox(phase, Modifier.padding(horizontal = 16.dp).fillMaxWidth().height(170.dp).clip(RoundedCornerShape(12.dp)))
+        }
+    }
+}
+
+/** A heading over episode rows, sized as the What's New rows the feed shows. */
+@Composable
+private fun EpisodesSkeleton(phase: State<Float>) {
+    Column(Modifier.fillMaxWidth()) {
+        ShimmerBox(
+            phase,
+            Modifier.padding(start = 16.dp, top = 12.dp, bottom = 8.dp).width(200.dp).height(28.dp).clip(RoundedCornerShape(4.dp)),
+        )
+        repeat(6) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ShimmerBox(phase, Modifier.size(64.dp).clip(RoundedCornerShape(4.dp)))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    ShimmerBox(phase, Modifier.fillMaxWidth(0.75f).height(15.dp).clip(RoundedCornerShape(4.dp)))
+                    ShimmerBox(phase, Modifier.fillMaxWidth(0.5f).height(13.dp).clip(RoundedCornerShape(4.dp)))
+                    ShimmerBox(phase, Modifier.fillMaxWidth(0.3f).height(12.dp).clip(RoundedCornerShape(4.dp)))
                 }
             }
         }

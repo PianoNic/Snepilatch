@@ -81,6 +81,9 @@
     <string name="lyrics_horizontal">Слева направо</string>
     <string name="player_shortcut">Кнопка плеера</string>
     <string name="player_shortcut_desc">Выберите кнопку рядом с меню плеера</string>
+    <string name="nav_slot">Четвёртая кнопка на панели</string>
+    <string name="nav_slot_desc">То, что вы выберете, исчезнет из меню профиля</string>
+    <string name="nav_slot_none">Нет, три кнопки</string>
     <string name="swipe_left_action">Свайп влево</string>
     <string name="swipe_right_action">Свайп вправо</string>
     <string name="swipe_action_desc">Выберите действие для этого направления свайпа</string>
@@ -301,6 +304,10 @@
     <string name="appearance">Внешний вид</string>
     <string name="behavior">Поведение</string>
     <string name="interface_desc">Язык, текст песен, фон и кнопки уведомлений</string>
+    <string name="settings_playback_desc">Источник звука, регион и устройства</string>
+    <string name="settings_downloads_desc">Источник, папка и лимит памяти</string>
+    <string name="settings_sound_desc">Эквалайзер</string>
+    <string name="settings_about_desc">Версия, обновления и отладка</string>
     <string name="account_section_notifications">Уведомления</string>
 
     <!-- Equalizer -->

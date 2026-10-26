@@ -86,6 +86,9 @@
     <string name="lyrics_horizontal">Left to Right</string>
     <string name="player_shortcut">Player button</string>
     <string name="player_shortcut_desc">Choose the button beside the player menu</string>
+    <string name="nav_slot">Fourth button in the bar</string>
+    <string name="nav_slot_desc">What you put here leaves the profile menu</string>
+    <string name="nav_slot_none">None, three buttons</string>
     <string name="swipe_left_action">Swipe left</string>
     <string name="swipe_right_action">Swipe right</string>
     <string name="swipe_action_desc">Choose what swiping a track in this direction does</string>
@@ -305,6 +308,10 @@
     <string name="appearance">Appearance</string>
     <string name="behavior">Behavior</string>
     <string name="interface_desc">Language, lyrics, backgrounds and notification buttons</string>
+    <string name="settings_playback_desc">Audio source, region and devices</string>
+    <string name="settings_downloads_desc">Source, folder and storage limit</string>
+    <string name="settings_sound_desc">Equalizer</string>
+    <string name="settings_about_desc">Version, updates and debugging</string>
     <string name="account_section_notifications">Notifications</string>
 
     <!-- Equalizer -->

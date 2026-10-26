@@ -61,6 +61,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.R
 import ch.snepilatch.app.data.Screen
 import ch.snepilatch.app.logic.shared.AccountStore
+import ch.snepilatch.app.logic.shared.NavSettings
 import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.ui.theme.SnepilatchGray
 import ch.snepilatch.app.ui.theme.SnepilatchLightGray
@@ -85,6 +86,8 @@ fun ProfileMenu(vm: PlaybackViewModel, onClose: () -> Unit) {
     val whatsNewVm: WhatsNewViewModel = viewModel()
     val hasNew by whatsNewVm.hasNew.collectAsState()
     val theme by ThemeController.themeColors.collectAsState()
+    // What the bottom bar already holds stays out of here, so nothing shows in both places.
+    val pinned = NavSettings.navSlot.collectAsState().value.screen
     fun go(action: () -> Unit) {
         onClose()
         action()
@@ -94,17 +97,23 @@ fun ProfileMenu(vm: PlaybackViewModel, onClose: () -> Unit) {
         Column(Modifier.statusBarsPadding().verticalScroll(rememberScrollState()).padding(vertical = 16.dp)) {
             AccountCard(vm, ::go)
             Spacer(Modifier.height(8.dp))
-            MenuEntry(
-                Icons.Rounded.Campaign, stringResource(R.string.whats_new_title),
-                trailing = { if (hasNew) Box(Modifier.size(8.dp).clip(CircleShape).background(theme.primary)) },
-            ) { go { vm.navigateTo(Screen.WHATS_NEW) } }
-            MenuEntry(Icons.Rounded.DownloadForOffline, stringResource(R.string.downloads)) {
-                go { vm.navigateTo(Screen.DOWNLOADS) }
+            if (pinned != Screen.WHATS_NEW) {
+                MenuEntry(
+                    Icons.Rounded.Campaign, stringResource(R.string.whats_new_title),
+                    trailing = { if (hasNew) Box(Modifier.size(8.dp).clip(CircleShape).background(theme.primary)) },
+                ) { go { vm.navigateTo(Screen.WHATS_NEW) } }
             }
-            MenuEntry(Icons.Rounded.Settings, stringResource(R.string.settings)) {
-                go { vm.navigateToTab(Screen.ACCOUNT) }
+            if (pinned != Screen.DOWNLOADS) {
+                MenuEntry(Icons.Rounded.DownloadForOffline, stringResource(R.string.downloads)) {
+                    go { vm.navigateTo(Screen.DOWNLOADS) }
+                }
             }
-            FriendsRow { go { vm.navigateTo(Screen.FRIEND_ACTIVITY) } }
+            if (pinned != Screen.SETTINGS) {
+                MenuEntry(Icons.Rounded.Settings, stringResource(R.string.settings)) {
+                    go { vm.navigateTo(Screen.SETTINGS) }
+                }
+            }
+            if (pinned != Screen.FRIEND_ACTIVITY) FriendsRow { go { vm.navigateTo(Screen.FRIEND_ACTIVITY) } }
         }
     }
 }
@@ -124,7 +133,7 @@ private fun AccountCard(vm: PlaybackViewModel, go: (() -> Unit) -> Unit) {
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Row(
-                Modifier.weight(1f).clickable { go { vm.navigateToTab(Screen.ACCOUNT) } },
+                Modifier.weight(1f).clickable { go { vm.navigateTo(Screen.ACCOUNT) } },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {

@@ -675,8 +675,8 @@ class PlaybackViewModel : ViewModel() {
                     // phone's Widevine CDM belongs to, registered as the ordinary web player.
                     deviceProfile = kotify.config.DeviceProfile.CHROME_ANDROID_DESKTOP
                 ))
+                SessionResume.track(sess)
                 sess.load(SessionResume.forCookies(cookies))
-                SessionResume.save(sess)
 
                 // KotifyClient now fires this ONLY when the login is genuinely dead (Spfy handed
                 // back an anonymous token — an expired/revoked sp_dc). Transient dealer/network trouble

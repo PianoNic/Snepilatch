@@ -27,6 +27,7 @@ abstract class SessionViewModel(protected val logTag: String) : ViewModel() {
     protected fun launchWithSessionLoading(
         op: String,
         loading: MutableStateFlow<Boolean>,
+        onFailure: (Exception) -> Unit = {},
         block: suspend (Session) -> Unit
     ): Job =
         launchWith(
@@ -34,6 +35,7 @@ abstract class SessionViewModel(protected val logTag: String) : ViewModel() {
             op,
             { SessionHolder.session },
             before = { loading.value = true },
+            onFailure = onFailure,
             after = { loading.value = false },
             block = block,
         )

@@ -457,9 +457,13 @@
     <string name="whats_new_empty_music_message">Folge deinen Lieblingskünstlern, dann halten wir dich auf dem Laufenden.</string>
     <string name="whats_new_empty_podcasts_title">Nichts Neues bei Podcasts</string>
     <string name="whats_new_empty_podcasts_message">Folge deinen Lieblingspodcasts, dann halten wir dich auf dem Laufenden.</string>
-    <string name="whats_new_error">Prüfe deine Internetverbindung und versuche es erneut</string>
-    <string name="whats_new_error_title">Etwas ist schiefgelaufen.</string>
-    <string name="whats_new_try_again">Erneut versuchen</string>
+    <string name="load_error_body">Prüfe deine Internetverbindung und versuche es erneut</string>
+    <string name="load_error_title">Etwas ist schiefgelaufen.</string>
+    <string name="load_error_try_again">Erneut versuchen</string>
+    <string name="load_error_not_found_playlist">Playlist nicht gefunden</string>
+    <string name="load_error_not_found_album">Album nicht gefunden</string>
+    <string name="load_error_not_found_page">Seite nicht gefunden</string>
+    <string name="load_error_not_found_body">Nach etwas anderem suchen?</string>
     <string name="quality_none">Kein Audio</string>
     <string name="home_filter_all">Alle</string>
     <string name="profile_menu_view_account">Konto ansehen</string>

@@ -45,9 +45,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
+import ch.snepilatch.app.data.Screen
+import ch.snepilatch.app.logic.shared.Navigator
 import ch.snepilatch.app.data.canEditPlaylistItems
 import ch.snepilatch.app.logic.download.Downloads
 import ch.snepilatch.app.ui.shared.SpfyImage
+import ch.snepilatch.app.ui.shared.LoadErrorState
 import ch.snepilatch.app.ui.shared.TrackRow
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.logic.shared.stripHtml
@@ -76,6 +79,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
     val detailVm: DetailViewModel = viewModel()
     val detail by detailVm.detail.collectAsState()
     val isLoading by detailVm.isLoading.collectAsState()
+    val loadError by detailVm.loadError.collectAsState()
     val isLoadingMore by detailVm.isLoadingMore.collectAsState()
     val theme by ThemeController.themeColors.collectAsState()
     val accentColor by androidx.compose.animation.animateColorAsState(theme.primary, androidx.compose.animation.core.tween(800), label = "detailAccent")
@@ -85,6 +89,23 @@ fun DetailScreen(vm: PlaybackViewModel) {
     if (isLoading) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             LoadingIndicator(color = SnepilatchLightGray)
+        }
+        return
+    }
+    loadError?.let { error ->
+        val screen by Navigator.currentScreen.collectAsState()
+        // The header that carries the way back is not drawn, so the error keeps its own.
+        Box(Modifier.fillMaxSize()) {
+            LoadErrorState(
+                error,
+                onRetry = { detailVm.retry() },
+                notFoundTitle = when (screen) {
+                    Screen.PLAYLIST_DETAIL -> R.string.load_error_not_found_playlist
+                    Screen.ALBUM_DETAIL -> R.string.load_error_not_found_album
+                    else -> R.string.load_error_not_found_page
+                },
+            )
+            DetailBackButton(Modifier.align(Alignment.TopStart)) { vm.goBack() }
         }
         return
     }
@@ -108,18 +129,7 @@ fun DetailScreen(vm: PlaybackViewModel) {
                             startY = if (isArtist) 400f else 150f
                         ))
                 )
-                Box(
-                    Modifier
-                        .align(Alignment.TopStart)
-                        .padding(12.dp)
-                        .size(36.dp)
-                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-                        .clip(CircleShape)
-                        .clickable { vm.goBack() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back), tint = SnepilatchWhite, modifier = Modifier.size(20.dp))
-                }
+                DetailBackButton(Modifier.align(Alignment.TopStart)) { vm.goBack() }
                 Column(Modifier.align(Alignment.BottomStart).padding(16.dp)) {
                     Text(
                         detail.name,
@@ -826,4 +836,20 @@ private fun DetailHeaderMenu(
         actions = actions,
         onDismiss = onDismiss
     )
+}
+
+/** The round back button over the top left of a detail page. */
+@Composable
+private fun DetailBackButton(modifier: Modifier = Modifier, onBack: () -> Unit) {
+    Box(
+        modifier
+            .padding(12.dp)
+            .size(36.dp)
+            .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+            .clip(CircleShape)
+            .clickable(onClick = onBack),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back), tint = SnepilatchWhite, modifier = Modifier.size(20.dp))
+    }
 }

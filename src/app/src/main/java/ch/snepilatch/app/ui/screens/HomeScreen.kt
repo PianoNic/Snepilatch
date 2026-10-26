@@ -14,6 +14,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import ch.snepilatch.app.R
+import ch.snepilatch.app.ui.shared.LoadErrorState
 import ch.snepilatch.app.data.LIKED_SONGS_COVER_URL
 import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import androidx.compose.foundation.background
@@ -285,6 +286,13 @@ fun HomeScreen(vm: PlaybackViewModel) {
     if (isHomeLoading && homeData == null && chips.isEmpty()) {
         HomeShimmer()
         return
+    }
+    val loadError by homeVm.loadError.collectAsState()
+    if (homeData == null && chips.isEmpty()) {
+        loadError?.let {
+            LoadErrorState(it, onRetry = { homeVm.retry() })
+            return
+        }
     }
 
     LazyColumn(

@@ -400,10 +400,10 @@
     <string name="download_source_ytm">YouTube Music</string>
     <string name="download_source_lossless">Lossless (FLAC)</string>
     <string name="manage_downloads">Manage downloads</string>
-    <string name="downloads_summary">%1$d tracks · %2$d MB</string>
+    <string name="downloads_summary">%1$d tracks · %2$s</string>
     <string name="remove_all">Delete all songs</string>
     <string name="remove_all_title">Delete all downloaded songs?</string>
-    <string name="remove_all_confirm">This deletes all %1$d songs (%2$d MB) from your phone. They cannot be brought back; you would have to download them again.</string>
+    <string name="remove_all_confirm">This deletes all %1$d songs (%2$s) from your phone. They cannot be brought back; you would have to download them again.</string>
     <string name="downloads_count">%1$d downloaded</string>
     <string name="downloading_count">Downloading %1$d of %2$d</string>
     <string name="downloaded_count">%1$d of %2$d downloaded</string>

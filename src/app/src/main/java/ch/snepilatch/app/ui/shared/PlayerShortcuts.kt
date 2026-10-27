@@ -14,6 +14,7 @@ import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.OfflinePin
 import androidx.compose.material.icons.rounded.QrCode2
 import androidx.compose.material.icons.rounded.Radio
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.ui.graphics.vector.ImageVector
 import ch.snepilatch.app.R
@@ -33,6 +34,7 @@ fun playerShortcutTitle(shortcut: PlayerShortcut): Int = when (shortcut) {
     PlayerShortcut.INFINIPLAY -> R.string.infiniplay
     PlayerShortcut.JAM -> R.string.jam_menu
     PlayerShortcut.CODE -> R.string.show_code
+    PlayerShortcut.EQUALIZER -> R.string.equalizer
     PlayerShortcut.SHARE -> R.string.share
 }
 
@@ -49,5 +51,6 @@ fun playerShortcutIcon(shortcut: PlayerShortcut, isLiked: Boolean = false, isDow
     PlayerShortcut.INFINIPLAY -> Icons.Rounded.AllInclusive
     PlayerShortcut.JAM -> Icons.Rounded.Groups
     PlayerShortcut.CODE -> Icons.Rounded.QrCode2
+    PlayerShortcut.EQUALIZER -> Icons.Rounded.Tune
     PlayerShortcut.SHARE -> Icons.Rounded.Share
 }

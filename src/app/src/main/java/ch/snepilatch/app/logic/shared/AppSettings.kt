@@ -175,6 +175,7 @@ object AppSettings {
         playerGradientBg.value = prefs.getBoolean("player_gradient_bg", false)
         playerShortcut.value = PlayerShortcut.fromId(prefs.getString("player_shortcut", null))
         GestureSettings.load(prefs)
+        PlayerButtonSettings.load(prefs)
         contentRegion.value = prefs.getString("content_region", "nearest") ?: "nearest"
         updateChannel.value = prefs.getString("update_channel", CHANNEL_STABLE) ?: CHANNEL_STABLE
         lokiEndpoint.value = prefs.getString("loki_endpoint", "") ?: ""

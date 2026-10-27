@@ -14,7 +14,7 @@ class TrackSwipeActionsTest {
     fun rowsOnlyOfferWhatActsOnTheirOwnTrack() {
         val perTrack = PlayerShortcut.perTrack
         assertTrue(perTrack.containsAll(listOf(PlayerShortcut.ADD_TO_QUEUE, PlayerShortcut.ADD_TO_PLAYLIST, PlayerShortcut.SHARE)))
-        for (excluded in listOf(PlayerShortcut.LIKE, PlayerShortcut.LYRICS, PlayerShortcut.QUEUE, PlayerShortcut.JAM)) {
+        for (excluded in listOf(PlayerShortcut.LIKE, PlayerShortcut.LYRICS, PlayerShortcut.QUEUE, PlayerShortcut.JAM, PlayerShortcut.EQUALIZER)) {
             assertFalse(excluded in perTrack)
         }
     }

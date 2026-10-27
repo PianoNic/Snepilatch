@@ -85,6 +85,10 @@
     <string name="lyrics_vertical">Top to Bottom</string>
     <string name="lyrics_horizontal">Left to Right</string>
     <string name="player_shortcut">Player button</string>
+    <string name="player_top_right_button">Player top right button</string>
+    <string name="player_share_button">Player share button</string>
+    <string name="player_queue_button">Player queue button</string>
+    <string name="player_button_action_desc">Choose what this player button does</string>
     <string name="player_shortcut_desc">Choose the button beside the player menu</string>
     <string name="swipe_left_action">Swipe left</string>
     <string name="swipe_right_action">Swipe right</string>

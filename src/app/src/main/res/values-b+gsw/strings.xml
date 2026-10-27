@@ -93,6 +93,10 @@
     <string name="lyrics_vertical">Vo obe abe</string>
     <string name="lyrics_horizontal">Vo links uf rächts</string>
     <string name="player_shortcut">Player-Taste</string>
+    <string name="player_top_right_button">Player-Taste obe rächts</string>
+    <string name="player_share_button">Teile-Taste im Player</string>
+    <string name="player_queue_button">Wartelischte-Taste im Player</string>
+    <string name="player_button_action_desc">Wähl d Aktion für die Player-Taste</string>
     <string name="player_shortcut_desc">Wähl d Taste näbed em Player-Menü</string>
     <string name="swipe_left_action">Nach links wüsche</string>
     <string name="swipe_right_action">Nach rächts wüsche</string>

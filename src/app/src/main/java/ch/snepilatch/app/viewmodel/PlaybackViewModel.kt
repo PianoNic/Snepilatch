@@ -3026,7 +3026,11 @@ class PlaybackViewModel : ViewModel() {
             startPositionTicker()
             viewModelScope.launch(Dispatchers.IO) {
                 try {
-                    fallbackResume()
+                    // The local state report, as the play button's hot path sends it. The resume
+                    // command went to a jam's session instead of this device while the jam redirects
+                    // commands, so the server kept us paused under audio that was playing (#1008).
+                    val reported = try { player?.localResume(pos) == true } catch (_: Exception) { false }
+                    if (!reported) fallbackResume()
                 } finally {
                     isStreamLoading.value = false
                 }

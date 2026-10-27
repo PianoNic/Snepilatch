@@ -433,6 +433,8 @@
     <string name="connection_lost_banner">Нет связи со Spotify. Нажмите, чтобы повторить</string>
     <string name="offline_banner">Вы офлайн</string>
     <string name="offline_while_youre_offline">Пока вы офлайн</string>
+    <string name="offline_albums">Альбомы</string>
+    <string name="offline_all_tracks">Все треки</string>
     <string name="offline_no_downloads">Вы офлайн, и пока ничего не загружено. Загруженные треки появятся здесь.</string>
     <string name="jam">Джем</string>
     <string name="jam_join">Присоединиться</string>

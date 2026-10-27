@@ -37,10 +37,26 @@ data class DownloadedTrack(
     val idTagged: Boolean = false,
     /** The file was checked for a missing title, artist, album or cover, and given what it lacked (#946). */
     val tagsChecked: Boolean = false,
+    /** The album, as its files' tags have it, so the offline home can list albums (#1038). */
+    val album: String? = null,
+    val albumArtist: String? = null,
+    val trackNumber: Int = 0,
+    val discNumber: Int = 0,
 )
 
 /** The row as the screens and the offline player see it. */
-fun DownloadedTrack.toTrackInfo() = TrackInfo(uri = trackUri, name = title, artist = artist, albumArt = coverUrl, durationMs = durationMs)
+fun DownloadedTrack.toTrackInfo() =
+    TrackInfo(uri = trackUri, name = title, artist = artist, albumArt = coverUrl, durationMs = durationMs, albumName = album)
+
+/**
+ * The offline album this download belongs to, as a context: its album and album artist (the track's
+ * artist where the file names none). Null for a download whose files carry no album.
+ */
+fun DownloadedTrack.offlineAlbum(): String? =
+    album?.takeIf { it.isNotBlank() }?.let { "$OFFLINE_ALBUM$it\u0001${albumArtist?.ifBlank { null } ?: artist}" }
+
+/** What an offline album's context starts with; [ch.snepilatch.app.logic.playback.OfflinePlayer] plays it in disc and track order. */
+const val OFFLINE_ALBUM = "offline:album:"
 
 /**
  * Index of what has been downloaded. Process-scoped like [ch.snepilatch.app.logic.shared.AppSettings],
@@ -52,7 +68,7 @@ fun DownloadedTrack.toTrackInfo() = TrackInfo(uri = trackUri, name = title, arti
 object Downloads {
 
     private const val DB_NAME = "downloads.db"
-    private const val DB_VERSION = 8
+    private const val DB_VERSION = 9
     private const val TABLE = "downloads"
 
     private var helper: Helper? = null
@@ -113,7 +129,11 @@ object Downloads {
                     duration_ms INTEGER NOT NULL DEFAULT 0,
                     auto INTEGER NOT NULL DEFAULT 0,
                     id_tagged INTEGER NOT NULL DEFAULT 0,
-                    tags_checked INTEGER NOT NULL DEFAULT 0
+                    tags_checked INTEGER NOT NULL DEFAULT 0,
+                    album TEXT,
+                    album_artist TEXT,
+                    track_number INTEGER NOT NULL DEFAULT 0,
+                    disc_number INTEGER NOT NULL DEFAULT 0
                 )
                 """.trimIndent()
             )
@@ -145,6 +165,14 @@ object Downloads {
             // v8 knows which files were checked for missing tags. Older rows count as not: a download of the
             // app's own can lack them too, so each is checked once when the user migrates.
             if (oldVersion < 8) db.execSQL("ALTER TABLE $TABLE ADD COLUMN tags_checked INTEGER NOT NULL DEFAULT 0")
+            // The album fields came later (#1038): every file is looked at once more, so the next migration adds them.
+            if (oldVersion < 9) {
+                db.execSQL("UPDATE $TABLE SET tags_checked = 0")
+                db.execSQL("ALTER TABLE $TABLE ADD COLUMN album TEXT")
+                db.execSQL("ALTER TABLE $TABLE ADD COLUMN album_artist TEXT")
+                db.execSQL("ALTER TABLE $TABLE ADD COLUMN track_number INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE $TABLE ADD COLUMN disc_number INTEGER NOT NULL DEFAULT 0")
+            }
         }
 
         /** Sideloading an older build must not crash; the default implementation throws. */
@@ -333,6 +361,10 @@ object Downloads {
         put("auto", if (auto) 1 else 0)
         put("id_tagged", if (idTagged) 1 else 0)
         put("tags_checked", if (tagsChecked) 1 else 0)
+        put("album", album)
+        put("album_artist", albumArtist)
+        put("track_number", trackNumber)
+        put("disc_number", discNumber)
     }
 
     private fun android.database.Cursor.toTrack() = DownloadedTrack(
@@ -354,6 +386,10 @@ object Downloads {
         auto = getInt(getColumnIndexOrThrow("auto")) == 1,
         idTagged = getInt(getColumnIndexOrThrow("id_tagged")) == 1,
         tagsChecked = getInt(getColumnIndexOrThrow("tags_checked")) == 1,
+        album = getStringOrNull("album"),
+        albumArtist = getStringOrNull("album_artist"),
+        trackNumber = getInt(getColumnIndexOrThrow("track_number")),
+        discNumber = getInt(getColumnIndexOrThrow("disc_number")),
     )
 
     private fun android.database.Cursor.getStringOrNull(column: String): String? =

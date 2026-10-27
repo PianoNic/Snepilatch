@@ -52,14 +52,21 @@ internal object Id3Tags {
 
     fun missing(bytes: ByteArray): Set<TrackIdWriter.Field>? {
         val tag = read(bytes) ?: return null
-        return FRAME_OF.filterValues { it !in tag.ids }.keys
+        return FRAME_OF.filterValues { it !in tag.ids }.keys +
+            if (DATE_FRAMES.none { it in tag.ids }) setOf(TrackIdWriter.Field.DATE) else emptySet()
     }
+
+    /** v2.4 dates a release in TDRC, v2.3 by year in TYER; either counts as there. */
+    private val DATE_FRAMES = setOf("TDRC", "TYER")
 
     private val FRAME_OF = mapOf(
         TrackIdWriter.Field.TITLE to "TIT2",
         TrackIdWriter.Field.ARTIST to "TPE1",
         TrackIdWriter.Field.ALBUM to "TALB",
         TrackIdWriter.Field.COVER to "APIC",
+        TrackIdWriter.Field.ALBUM_ARTIST to "TPE2",
+        TrackIdWriter.Field.TRACK_NUMBER to "TRCK",
+        TrackIdWriter.Field.DISC_NUMBER to "TPOS",
     )
 
     fun withTags(bytes: ByteArray, tags: TrackTags): ByteArray? {
@@ -70,6 +77,18 @@ internal object Id3Tags {
             if ("TIT2" !in tag.ids && tags.title.isNotBlank()) add(frame(tag.version, "TIT2", text(tag.version, tags.title)))
             if ("TPE1" !in tag.ids && tags.artist.isNotBlank()) add(frame(tag.version, "TPE1", text(tag.version, tags.artist)))
             if ("TALB" !in tag.ids && !tags.album.isNullOrBlank()) add(frame(tag.version, "TALB", text(tag.version, tags.album)))
+            if ("TPE2" !in tag.ids) tags.albumArtist?.let { add(frame(tag.version, "TPE2", text(tag.version, it))) }
+            if ("TRCK" !in tag.ids) {
+                tags.trackNumber?.let { add(frame(tag.version, "TRCK", text(tag.version, ofTotal(it, tags.trackTotal)))) }
+            }
+            if ("TPOS" !in tag.ids) {
+                tags.discNumber?.let { add(frame(tag.version, "TPOS", text(tag.version, ofTotal(it, tags.discTotal)))) }
+            }
+            if (DATE_FRAMES.none { it in tag.ids }) {
+                tags.date?.let { date ->
+                    if (tag.version == 4) add(frame(4, "TDRC", text(4, date))) else add(frame(tag.version, "TYER", text(tag.version, date.take(4))))
+                }
+            }
             if ("APIC" !in tag.ids) tags.cover?.let { add(frame(tag.version, "APIC", picture(it))) }
         }
         val frames = added + tag.frames
@@ -84,6 +103,9 @@ internal object Id3Tags {
         out.write(bytes, tag.audioAt, bytes.size - tag.audioAt)
         return out.toByteArray()
     }
+
+    /** "4/12" as ID3 numbers a track or disc, or "4" when the total is unknown. */
+    private fun ofTotal(number: Int, total: Int?) = if (total != null && total > 0) "$number/$total" else "$number"
 
     private fun frame(version: Int, id: String, payload: ByteArray): ByteArray {
         val size = if (version == 4) synchsafeBytes(payload.size) else beBytes(payload.size)

@@ -3,10 +3,7 @@ package ch.snepilatch.app.logic.download
 import ch.snepilatch.app.logic.shared.LokiLogger
 import kotify.api.song.Song
 import kotify.session.Session
-import kotify.session.SessionConfig
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlin.math.abs
 
 /**
@@ -49,10 +46,26 @@ internal object TrackMatcher {
  * starting included, stops the rest of the run (#1034): the service once refused anonymous sessions
  * their token, and every file after it was reported as not found.
  */
-internal class CatalogueLookup(private val session: suspend () -> Session? = anonymous()) {
+internal class CatalogueLookup(private val session: suspend () -> Session? = { AnonymousCatalogue.session() }) {
+
+    private val albumTags = AlbumTagsLookup(session)
+
+    /** [info] with its album details (#1038), for a file that lacks any of them. */
+    suspend fun infoWithAlbum(id: String): TrackInfo? {
+        val info = info(id) ?: return null
+        if (refused != null) return info
+        return info.copy(albumTags = albumTags.of(id))
+    }
 
     /** What a file's tags are filled in from (#946). */
-    data class TrackInfo(val title: String, val artist: String, val album: String?, val coverUrl: String?)
+    data class TrackInfo(
+        val title: String,
+        val artist: String,
+        val album: String?,
+        val coverUrl: String?,
+        /** Asked only when the file lacks an album field (#1038). */
+        val albumTags: AlbumTags? = null,
+    )
 
     /** The details of each track a search matched, so filling in its tags asks nothing more. */
     private val matched = java.util.concurrent.ConcurrentHashMap<String, TrackInfo>()
@@ -97,24 +110,6 @@ internal class CatalogueLookup(private val session: suspend () -> Session? = ano
             throw e
         } catch (e: Exception) {
             refuse("details for $id failed: ${e.message}")
-        }
-    }
-
-    private companion object {
-        /** One anonymous session for the whole scan, however many lookups ask for it at once. */
-        fun anonymous(): suspend () -> Session {
-            var made: Session? = null
-            val starting = Mutex()
-            return {
-                starting.withLock {
-                    made ?: Session(
-                        SessionConfig(identifier = "folder-scan", anonymous = true, deviceProfile = kotify.config.DeviceProfile.CHROME_ANDROID_DESKTOP)
-                    ).also {
-                        it.load()
-                        made = it
-                    }
-                }
-            }
         }
     }
 

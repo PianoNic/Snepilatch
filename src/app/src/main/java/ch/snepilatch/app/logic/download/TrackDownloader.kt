@@ -394,7 +394,7 @@ object TrackDownloader {
                 if (it is CancellationException) throw it
                 return null
             }
-            return record(request, info, target.toString(), finalExtension, payload.length())
+            return record(request, info, target.toString(), finalExtension, payload.length(), tags)
         } finally {
             remuxTemp?.delete()
             taggedTemp?.delete()
@@ -426,6 +426,7 @@ object TrackDownloader {
         documentUri: String,
         finalExtension: String,
         written: Long,
+        tags: TrackTags,
     ): DownloadedTrack {
         val record = DownloadedTrack(
             trackUri = request.trackUri,
@@ -447,6 +448,10 @@ object TrackDownloader {
             // tagsFor writes the id for every catalogue track, with the title, artist, album and cover.
             idTagged = request.trackUri.startsWith("spotify:track:"),
             tagsChecked = request.trackUri.startsWith("spotify:track:"),
+            album = request.album,
+            albumArtist = tags.albumArtist,
+            trackNumber = tags.trackNumber ?: 0,
+            discNumber = tags.discNumber ?: 0,
         )
         Downloads.put(record)
         LokiLogger.i(TAG, "downloaded '${request.title}' as .$finalExtension from ${info.provider}")
@@ -538,13 +543,19 @@ object TrackDownloader {
     private fun contentRangeTotal(header: String?): Long? =
         header?.substringAfter('/', "")?.toLongOrNull()
 
-    private fun tagsFor(request: DownloadRequest) = TrackTags(
-        title = request.title,
-        artist = request.artist,
-        album = request.album,
-        cover = request.coverUrl?.let { fetchCover(it) },
-        trackId = request.trackUri.takeIf { it.startsWith("spotify:track:") }?.removePrefix("spotify:track:"),
-    )
+    private suspend fun tagsFor(request: DownloadRequest): TrackTags {
+        val id = request.trackUri.takeIf { it.startsWith("spotify:track:") }?.removePrefix("spotify:track:")
+        return TrackTags(
+            title = request.title,
+            artist = request.artist,
+            album = request.album,
+            cover = request.coverUrl?.let { fetchCover(it) },
+            trackId = id,
+        ).with(id?.let { albumTags.of(it) })
+    }
+
+    /** The album details downloads tag their files with (#1038); kept so an album's page is asked once. */
+    private val albumTags = AlbumTagsLookup()
 
     /**
      * Album art is the same image for every track on a release, so an album would otherwise fetch it

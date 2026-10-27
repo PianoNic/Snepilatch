@@ -149,7 +149,8 @@ object FolderScan {
                 return@forEachIndexed
             }
             val result = FileRetagger.tag(ctx, row, lookup) ?: return@forEachIndexed
-            Downloads.put(result.row)
+            // Read back from the file just tagged: the album the offline home lists it under (#1038).
+            Downloads.put(withAlbum(ctx, result.row))
             if (result.wrote) written++
         }
         LokiLogger.i(TAG, "wrote tags into $written of ${unchecked.size} file(s)")
@@ -359,10 +360,42 @@ object FolderScan {
             downloadedAt = file.modified,
             durationMs = meta.durationMs,
             idTagged = tagged != null,
+            album = meta.album.album,
+            albumArtist = meta.album.albumArtist,
+            trackNumber = meta.album.trackNumber,
+            discNumber = meta.album.discNumber,
         )
     }
 
-    private class Meta(val title: String, val artist: String, val durationMs: Long, val picture: ByteArray?)
+    private class Meta(val title: String, val artist: String, val durationMs: Long, val picture: ByteArray?, val album: AlbumMeta)
+
+    /** The album fields a file's tags carry, for the offline albums (#1038). */
+    class AlbumMeta(val album: String?, val albumArtist: String?, val trackNumber: Int, val discNumber: Int)
+
+    private fun albumMeta(retriever: MediaMetadataRetriever) = AlbumMeta(
+        album = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)?.ifBlank { null },
+        albumArtist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST)?.ifBlank { null },
+        // "4/12" or "4"
+        trackNumber = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER)
+            ?.substringBefore('/')?.trim()?.toIntOrNull() ?: 0,
+        discNumber = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DISC_NUMBER)
+            ?.substringBefore('/')?.trim()?.toIntOrNull() ?: 0,
+    )
+
+    /** [row] with the album its file's tags name; the row as it was when the file cannot be read. */
+    fun withAlbum(ctx: Context, row: DownloadedTrack): DownloadedTrack {
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(ctx, Uri.parse(row.documentUri))
+            val meta = albumMeta(retriever)
+            row.copy(album = meta.album, albumArtist = meta.albumArtist, trackNumber = meta.trackNumber, discNumber = meta.discNumber)
+        } catch (e: Exception) {
+            LokiLogger.d(TAG, "could not read the album of ${row.title}: ${e.message}")
+            row
+        } finally {
+            retriever.release()
+        }
+    }
 
     private fun readMeta(ctx: Context, file: FoundFile): Meta? {
         val retriever = MediaMetadataRetriever()
@@ -375,6 +408,7 @@ object FolderScan {
                 artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: stem.substringBefore(" - "),
                 durationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L,
                 picture = retriever.embeddedPicture,
+                album = albumMeta(retriever),
             )
         } catch (e: Exception) {
             LokiLogger.d(TAG, "could not read ${file.name}: ${e.message}")

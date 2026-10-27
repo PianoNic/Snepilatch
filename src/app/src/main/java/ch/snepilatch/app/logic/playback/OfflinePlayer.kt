@@ -2,6 +2,7 @@ package ch.snepilatch.app.logic.playback
 
 import ch.snepilatch.app.data.TrackInfo
 import ch.snepilatch.app.logic.download.Downloads
+import ch.snepilatch.app.logic.download.offlineAlbum
 import ch.snepilatch.app.logic.download.toTrackInfo
 import ch.snepilatch.app.logic.shared.LokiLogger
 import kotify.cdn.StreamResult
@@ -76,9 +77,15 @@ object OfflinePlayer {
      * A track the index does not hold plays on its own.
      */
     suspend fun playFromDownloads(track: TrackInfo, contextUri: String?): Boolean {
-        val list = Downloads.rows.value
-            .filter { contextUri == null || it.contextUri == contextUri }
-            .map { it.toTrackInfo() }
+        val rows = Downloads.rows.value
+        val list = (
+            if (contextUri?.startsWith(ch.snepilatch.app.logic.download.OFFLINE_ALBUM) == true) {
+                // An offline album (#1038): its tracks in disc and track order.
+                rows.filter { it.offlineAlbum() == contextUri }.sortedWith(compareBy({ it.discNumber }, { it.trackNumber }))
+            } else {
+                rows.filter { contextUri == null || it.contextUri == contextUri }
+            }
+            ).map { it.toTrackInfo() }
             .takeIf { rows -> rows.any { it.uri == track.uri } }
             ?: listOf(track)
         return play(list, list.indexOfFirst { it.uri == track.uri }.coerceAtLeast(0), contextUri)

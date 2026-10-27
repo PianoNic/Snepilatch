@@ -18,7 +18,11 @@ class TagFillTest {
 
     private val id = "5u7QargOKXO82nXcAU9s8L"
     private val cover = TrackTags.Cover(ByteArray(600) { (it * 3).toByte() }, "image/jpeg")
-    private val spfy = TrackTags("Spfy Title", "Spfy Artist", album = "Spfy Album", cover = cover, trackId = id)
+    private val spfy = TrackTags(
+        "Spfy Title", "Spfy Artist", album = "Spfy Album", cover = cover, trackId = id,
+        albumArtist = "Spfy Album Artist", trackNumber = 4, trackTotal = 12, discNumber = 1, discTotal = 2, date = "2022-08-29",
+    )
+    private val album = TrackIdWriter.ALBUM_FIELDS
 
     private fun latin1(b: ByteArray) = String(b, Charsets.ISO_8859_1)
 
@@ -34,7 +38,7 @@ class TagFillTest {
         writer.finish()
         val original = out.toByteArray()
 
-        assertEquals(setOf(Field.ALBUM, Field.COVER), TrackIdWriter.missing(original))
+        assertEquals(setOf(Field.ALBUM, Field.COVER) + album, TrackIdWriter.missing(original))
         val filled = TrackIdWriter.withTags(original, spfy)!!
 
         assertTrue(latin1(filled).contains("TITLE=Biertornado"))
@@ -52,7 +56,7 @@ class TagFillTest {
         FlacTagger.tag(ByteArrayInputStream(plain), out, TrackTags("Song", "Band"))
         val original = out.toByteArray()
 
-        assertEquals(setOf(Field.ALBUM, Field.COVER), TrackIdWriter.missing(original))
+        assertEquals(setOf(Field.ALBUM, Field.COVER) + album, TrackIdWriter.missing(original))
         val filled = TrackIdWriter.withTags(original, spfy)!!
 
         assertTrue(latin1(filled).contains("TITLE=Song"))
@@ -75,7 +79,7 @@ class TagFillTest {
         Mp4Tagger.tag(ByteArrayInputStream(plain), out, TrackTags("Song", "Band"))
         val original = out.toByteArray()
 
-        assertEquals(setOf(Field.ALBUM, Field.COVER), TrackIdWriter.missing(original))
+        assertEquals(setOf(Field.ALBUM, Field.COVER) + album, TrackIdWriter.missing(original))
         val filled = TrackIdWriter.withTags(original, spfy)!!
 
         assertEquals(1, occurrences(filled, "©nam"))
@@ -94,6 +98,39 @@ class TagFillTest {
         val full = out.toByteArray()
 
         assertArrayEquals(full, TrackIdWriter.withTags(full, TrackTags("Other", "Other", album = "Other", cover = cover)))
+    }
+
+    /** Issue #1038: the album fields players group and order an album by, in the names they read. */
+    @Test
+    fun flacGetsTheAlbumFields_andATrackPastItsTotalIsNumberedAgain() {
+        val frames = ByteArray(1024) { (it * 13).toByte() }
+        val plain = "fLaC".toByteArray() + byteArrayOf(0x80.toByte(), 0, 0, 34) + ByteArray(34) { it.toByte() } + frames
+        val out = ByteArrayOutputStream()
+        // What one source writes: track 4 of a total of 1, which players show as 4/1.
+        FlacTagger.tag(ByteArrayInputStream(plain), out, TrackTags("Song", "Band", trackNumber = 4, trackTotal = 1))
+        val original = out.toByteArray()
+        assertTrue(Field.TRACK_NUMBER in TrackIdWriter.missing(original)!!)
+
+        val filled = TrackIdWriter.withTags(original, spfy)!!
+        val text = latin1(filled)
+        assertTrue(text.contains("ALBUMARTIST=Spfy Album Artist"))
+        assertTrue(text.contains("TRACKNUMBER=4"))
+        assertTrue(text.contains("TRACKTOTAL=12"))
+        assertEquals("the wrong total is replaced, not kept beside the new one", 1, occurrences(filled, "TRACKTOTAL="))
+        assertTrue(text.contains("DISCNUMBER=1"))
+        assertTrue(text.contains("DATE=2022-08-29"))
+        assertEquals(emptySet<Field>(), TrackIdWriter.missing(filled))
+        assertArrayEquals(frames, filled.copyOfRange(filled.size - frames.size, filled.size))
+    }
+
+    @Test
+    fun mp4NumbersTheTrackAndDiscAsItunesDoes() {
+        val entries = Mp4Tagger.ilstEntries(TrackTags("", "", trackNumber = 4, trackTotal = 12, discNumber = 1, discTotal = 2))
+        val trkn = latin1(entries).indexOf("trkn")
+        // trkn, then a data box: type 0, locale, and the words 0, 4, 12, 0.
+        val words = entries.copyOfRange(trkn + 4 + 16, trkn + 4 + 24)
+        assertArrayEquals(byteArrayOf(0, 0, 0, 4, 0, 12, 0, 0), words)
+        assertTrue(latin1(entries).contains("disk"))
     }
 
     // --- MP3 -------------------------------------------------------------------------------------
@@ -130,7 +167,7 @@ class TagFillTest {
     fun anMp3KeepsItsTitleAndGetsTheRest() {
         val original = id3v23("Eigener Titel") + mpeg
 
-        assertEquals(setOf(Field.ARTIST, Field.ALBUM, Field.COVER), TrackIdWriter.missing(original))
+        assertEquals(setOf(Field.ARTIST, Field.ALBUM, Field.COVER) + album, TrackIdWriter.missing(original))
         val filled = TrackIdWriter.withTags(original, spfy)!!
 
         assertEquals(1, occurrences(filled, "TIT2"))

@@ -431,6 +431,8 @@
     <string name="connection_lost_banner">Spotify nicht erreichbar. Tippen zum Wiederholen</string>
     <string name="offline_banner">Du bist offline</string>
     <string name="offline_while_youre_offline">Während du offline bist</string>
+    <string name="offline_albums">Alben</string>
+    <string name="offline_all_tracks">Alle Titel</string>
     <string name="offline_no_downloads">Du bist offline und es ist noch nichts heruntergeladen. Heruntergeladene Songs erscheinen hier.</string>
     <string name="jam">Jam</string>
     <string name="jam_join">Beitreten</string>

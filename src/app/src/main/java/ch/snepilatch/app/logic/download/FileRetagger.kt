@@ -48,7 +48,11 @@ internal object FileRetagger {
         val hasId = FolderScan.trackIdIn(String(bytes, Charsets.ISO_8859_1)) == id
         // Asked only when something is missing. Without the details the id alone is still written, and the
         // row stays unchecked so a later migration fills in the rest.
-        val info = if (missing.isEmpty()) null else lookup.info(id)
+        val info = when {
+            missing.isEmpty() -> null
+            missing.any { it in TrackIdWriter.ALBUM_FIELDS } -> lookup.infoWithAlbum(id)
+            else -> lookup.info(id)
+        }
         val checked = missing.isEmpty() || info != null
         val edit = if (hasId && info == null) null else editFor(content, missing, info, id, hasId) ?: return leftAlone(row)
         if (edit == null || !edit.changes(bytes)) return Result(row.copy(idTagged = true, tagsChecked = checked), wrote = false)
@@ -90,7 +94,7 @@ internal object FileRetagger {
             album = info?.album,
             cover = info?.coverUrl?.takeIf { TrackIdWriter.Field.COVER in missing }?.let { TrackDownloader.fetchCover(it) },
             trackId = id.takeUnless { hasId },
-        )
+        ).with(info?.albumTags)
         return TrackIdWriter.edit(content.bytes, content.whole, tags)
             ?.takeIf { FolderScan.trackIdIn(String(it.prefix, Charsets.ISO_8859_1)) == id }
     }

@@ -97,6 +97,11 @@ internal object Mp4Tagger {
         text(out, "©nam", tags.title)
         text(out, "©ART", tags.artist)
         tags.album?.let { text(out, "©alb", it) }
+        tags.albumArtist?.let { text(out, "aART", it) }
+        // Number and total as iTunes stores them: big-endian 16-bit words in an implicit data atom.
+        tags.trackNumber?.let { out.write(box("trkn", data(TYPE_IMPLICIT, words(0, it, tags.trackTotal ?: 0, 0)))) }
+        tags.discNumber?.let { out.write(box("disk", data(TYPE_IMPLICIT, words(0, it, tags.discTotal ?: 0)))) }
+        tags.date?.let { text(out, "©day", it) }
         tags.trackId?.let { freeform(out, TrackTags.TRACK_ID_KEY, it) }
         tags.cover?.let { cover ->
             val type = if (cover.mimeType.contains("png")) TYPE_PNG else TYPE_JPEG
@@ -105,6 +110,7 @@ internal object Mp4Tagger {
         return out.toByteArray()
     }
 
+    private const val TYPE_IMPLICIT = 0
     private const val TYPE_UTF8 = 1
     private const val TYPE_JPEG = 13
     private const val TYPE_PNG = 14
@@ -129,6 +135,10 @@ internal object Mp4Tagger {
     private fun box(type: String, payload: ByteArray): ByteArray {
         val name = type.toByteArray(Charsets.ISO_8859_1)
         return beInt(HEADER + payload.size) + name + payload
+    }
+
+    private fun words(vararg values: Int) = ByteArray(values.size * 2) { i ->
+        ((values[i / 2] ushr (if (i % 2 == 0) 8 else 0)) and 0xFF).toByte()
     }
 
     private fun beInt(value: Int) = ByteArray(4) { ((value ushr (8 * (3 - it))) and 0xFF).toByte() }

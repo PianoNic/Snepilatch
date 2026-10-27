@@ -10,7 +10,23 @@ data class TrackTags(
     val cover: Cover? = null,
     /** The track's catalogue id, so a file can be matched back to its track from its own tags (#566). */
     val trackId: String? = null,
+    /** How players group and order an album (#1038); null leaves the field out. */
+    val albumArtist: String? = null,
+    val trackNumber: Int? = null,
+    val trackTotal: Int? = null,
+    val discNumber: Int? = null,
+    val discTotal: Int? = null,
+    /** "2022-08-29", "2022-08" or "2022". */
+    val date: String? = null,
 ) {
+    /** These tags with the album details filled in. */
+    internal fun with(album: AlbumTags?): TrackTags = album?.let {
+        copy(
+            albumArtist = it.albumArtist, trackNumber = it.trackNumber, trackTotal = it.trackTotal,
+            discNumber = it.discNumber, discTotal = it.discTotal, date = it.date,
+        )
+    } ?: this
+
     data class Cover(val bytes: ByteArray, val mimeType: String) {
         override fun equals(other: Any?) = other is Cover && mimeType == other.mimeType &&
             bytes.contentEquals(other.bytes)
@@ -66,6 +82,16 @@ internal object VorbisComments {
         return out.toByteArray()
     }
 
+    /** The album fields as Vorbis comments, the names Picard and foobar2000 write and players read. */
+    fun albumComments(tags: TrackTags): List<Pair<String, String>> = buildList {
+        tags.albumArtist?.let { add("ALBUMARTIST" to it) }
+        tags.trackNumber?.let { add("TRACKNUMBER" to it.toString()) }
+        tags.trackTotal?.let { add("TRACKTOTAL" to it.toString()) }
+        tags.discNumber?.let { add("DISCNUMBER" to it.toString()) }
+        tags.discTotal?.let { add("DISCTOTAL" to it.toString()) }
+        tags.date?.let { add("DATE" to it) }
+    }
+
     private fun writeCommentBlock(out: ByteArrayOutputStream, tags: TrackTags, includeCover: Boolean = true) {
         val vendor = VENDOR.toByteArray(Charsets.UTF_8)
         writeLe(out, vendor.size)
@@ -75,6 +101,7 @@ internal object VorbisComments {
             add("TITLE" to tags.title)
             add("ARTIST" to tags.artist)
             tags.album?.let { add("ALBUM" to it) }
+            addAll(VorbisComments.albumComments(tags))
             tags.trackId?.let { add(TrackTags.TRACK_ID_KEY to it) }
             if (includeCover) tags.cover?.let { add("METADATA_BLOCK_PICTURE" to encodePicture(it)) }
         }.filter { it.second.isNotBlank() }

@@ -47,5 +47,17 @@ class ViewModelRelayPlayer(private val vm: PlaybackViewModel) : RelayHostPlayer 
 
     override suspend fun enqueue(uri: String) = onMain { vm.addToQueue(uri) }
 
+    override val nextUri: String? get() = vm.queue.value.firstOrNull()?.uri
+
+    override var holdAtTrackEnd: Boolean
+        get() = ch.snepilatch.app.logic.shared.SessionHolder.player?.holdAtTrackEnd == true
+        set(value) {
+            ch.snepilatch.app.logic.shared.SessionHolder.player?.holdAtTrackEnd = value
+        }
+
+    override suspend fun playNext(uri: String, replacing: String?) {
+        ch.snepilatch.app.logic.shared.SessionHolder.player?.playNext(uri, replacing)
+    }
+
     private suspend fun onMain(block: () -> Unit) = withContext(Dispatchers.Main) { block() }
 }

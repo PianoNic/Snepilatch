@@ -941,18 +941,19 @@ class PlaybackViewModel : ViewModel() {
             }
         }
 
+        // A remote-only relay guest shows the host's playback (RelayRemoteView), not this account's own.
         pc.onState { state ->
-            if (isOffline.value) return@onState
+            if (isOffline.value || RelayJam.remoteOnly) return@onState
             val delta = if (lastCommandTs > 0) System.currentTimeMillis() - lastCommandTs else -1
             LokiLogger.i(TAG, "[Timing] WS onState arrived (${delta}ms after CMD '$lastCommandName')")
             viewModelScope.launch { updatePlaybackFromState(state) }
         }
 
-        pc.onTrackChange { event -> if (!isOffline.value) handleTrackChange(event) }
+        pc.onTrackChange { event -> if (!isOffline.value && !RelayJam.remoteOnly) handleTrackChange(event) }
 
-        pc.onPlay { state -> if (!isOffline.value) handleRemotePlay(state.position_as_of_timestamp) }
+        pc.onPlay { state -> if (!isOffline.value && !RelayJam.remoteOnly) handleRemotePlay(state.position_as_of_timestamp) }
 
-        pc.onPause { state -> if (!isOffline.value) handleRemotePause(state.position_as_of_timestamp) }
+        pc.onPause { state -> if (!isOffline.value && !RelayJam.remoteOnly) handleRemotePause(state.position_as_of_timestamp) }
 
         pc.onReconnected {
             offline.onDealerReconnected()
@@ -1227,7 +1228,10 @@ class PlaybackViewModel : ViewModel() {
             "album" -> DetailRoutes.openAlbum(id)
             "playlist" -> DetailRoutes.openPlaylist(id)
             "artist" -> DetailRoutes.openArtist(id)
-            "jam" -> launchWithSession("joinRelayJam") { RelayJam.joinFromLink(id) }
+            // Looked up only, as for a Spfy jam: the join sheet asks how to take part.
+            "jam" -> launchWithSession("previewRelayJam") {
+                RelayJam.preview(id)?.let { LokiLogger.w(TAG, "Relay jam $id not opened: $it") }
+            }
             "socialsession" -> launchWithSession("joinJam") { sess ->
                 // Looked up only; the join sheet asks how to take part before anything is joined.
                 JamHolder.preview(sess, uri.toString())?.let { LokiLogger.w(TAG, "Jam link $id not opened: $it") }
@@ -1616,6 +1620,12 @@ class PlaybackViewModel : ViewModel() {
     /** Pause, or nothing when already paused; see [resumePlayback]. */
     fun pausePlayback() {
         if (!isPausedNow()) setPlaying(false)
+    }
+
+    /** [pausePlayback], returning once the pause has gone out (before joining a jam only to control it). */
+    suspend fun pauseAndWait() {
+        pausePlayback()
+        commandJob?.join()
     }
 
     private fun isPausedNow(): Boolean = _playback.value.isPaused || !_playback.value.isPlaying
@@ -2879,8 +2889,10 @@ class PlaybackViewModel : ViewModel() {
 
     /** Play / pause / skip / seek — forwarded through KotifyClient's local-device transport (uncapped). */
     private fun wireTransportCallbacks(svc: MusicPlaybackService) {
-        svc.onPlay = { togglePlayPause() }
-        svc.onPause = { togglePlayPause() }
+        // Explicit, not a toggle: a media session event that lands late (an earbud or focus echo of our
+        // own change) would otherwise flip the state back, and in a relay jam that flip reaches the host.
+        svc.onPlay = { resumePlayback() }
+        svc.onPause = { pausePlayback() }
         svc.onAudioFocusPaused = { handleAudioFocusPaused() }
         svc.onAudioFocusResumed = { handleAudioFocusResumed() }
         // Same functions the on-screen buttons call, so a remote device gets its commands here too.
@@ -3005,6 +3017,8 @@ class PlaybackViewModel : ViewModel() {
             // The YouTube copy ending is no reason to advance anything on Spfy; the jam's next track
             // reaches the engine through the cluster.
             if (JamListenAlong.active.value) return@onEnded
+            // A relay guest: Kotify held at the end, and the host's next track is played instead.
+            if (RelayJam.trackEnded()) return@onEnded
             if (isOffline.value) {
                 viewModelScope.launch(Dispatchers.IO) { offline.trackEnded() }
                 return@onEnded

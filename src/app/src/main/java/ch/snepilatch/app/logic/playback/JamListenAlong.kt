@@ -215,14 +215,12 @@ object JamListenAlong {
         watch = scope.launch {
             var seen = false
             JamHolder.session.collect { jam ->
-                when {
-                    // Left or ended: nothing to come back to.
-                    jam == null -> if (seen) AppSettings.listenAlongSession = null
-                    active.value -> Unit
-                    jam.sessionId == AppSettings.listenAlongSession -> resumable.value = true
-                    else -> AppSettings.listenAlongSession = null
-                }
-                if (jam == null) resumable.value = false
+                val saved = AppSettings.listenAlongSession
+                // Only the Spfy jam listened along to; a relay jam plays through its own guest.
+                resumable.value = jam != null && !active.value && saved != null && jam.sessionId == saved &&
+                    !ch.snepilatch.app.logic.relay.RelayJamMapper.isRelay(jam)
+                // Left, ended, or another jam: nothing to come back to.
+                if (jam?.sessionId != saved && (jam != null || seen)) AppSettings.listenAlongSession = null
                 seen = seen || jam != null
             }
         }

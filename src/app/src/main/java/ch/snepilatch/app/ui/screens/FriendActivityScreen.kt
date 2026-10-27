@@ -37,6 +37,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.R
+import ch.snepilatch.app.logic.shared.spfyId
+import ch.snepilatch.app.viewmodel.DetailRoutes
 import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.ui.shared.SpfyImage
 import ch.snepilatch.app.ui.shared.SpinningDisc
@@ -86,7 +88,10 @@ fun FriendActivityScreen(vm: PlaybackViewModel, friendsVm: FriendActivityViewMod
             }
             else -> LazyColumn(contentPadding = PaddingValues(bottom = LocalBottomOverlayHeight.current.value + 16.dp)) {
                 items(feed, key = { it.userUri }) { friend ->
-                    FriendRow(friend) { vm.playTrack(friend.trackUri, friend.contextUri) }
+                    // Opens the song's album to look at, as a chat link does; it never starts playing (#1020).
+                    FriendRow(friend) {
+                        friend.albumUri?.let { DetailRoutes.openAlbum(spfyId(it)) } ?: DetailRoutes.openAlbumForTrack(friend.trackUri)
+                    }
                 }
             }
         }

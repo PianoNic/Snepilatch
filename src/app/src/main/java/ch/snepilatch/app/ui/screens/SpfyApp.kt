@@ -44,6 +44,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
+import androidx.compose.foundation.clickable
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotify.api.playerstatus.DealerState
+import ch.snepilatch.app.logic.shared.SessionHolder
 import ch.snepilatch.app.data.Screen
 import ch.snepilatch.app.ui.shared.BottomNav
 import ch.snepilatch.app.ui.shared.DevicesDialog
@@ -80,6 +84,8 @@ import androidx.compose.ui.util.lerp
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import ch.snepilatch.app.ui.shared.PlaylistPickerDialog
+import ch.snepilatch.app.ui.shared.LocalOpenProfileMenu
+import ch.snepilatch.app.ui.shared.ProfileMenu
 import ch.snepilatch.app.logic.shared.spfyId
 import ch.snepilatch.app.logic.shared.JamHolder
 import ch.snepilatch.app.ui.shared.JamBanner
@@ -146,6 +152,11 @@ fun SpfyApp(vm: PlaybackViewModel) {
     }
 
     val isOffline by vm.isOffline.collectAsState()
+    val currentPlayer by SessionHolder.players.collectAsState()
+    // CONNECTED until there is a player: before ready() nothing has given up yet.
+    val dealerState by remember(currentPlayer) {
+        currentPlayer?.connectionState ?: MutableStateFlow(DealerState.CONNECTED)
+    }.collectAsState()
 
     val toastContext = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(Unit) {
@@ -156,7 +167,19 @@ fun SpfyApp(vm: PlaybackViewModel) {
 
     BackHandler(screen != Screen.HOME) { vm.goBack() }
 
-    CompositionLocalProvider(LocalBottomOverlayHeight provides bottomOverlayHeight) {
+    // The profile menu covers the whole shell, player and bottom bar too, as the official app's does.
+    // Only an open menu takes the swipe, so the mini player's and the list's gestures stay theirs.
+    val menuState = rememberDrawerState(DrawerValue.Closed)
+    BackHandler(menuState.isOpen) { scope.launch { menuState.close() } }
+    ModalNavigationDrawer(
+        drawerState = menuState,
+        gesturesEnabled = menuState.isOpen,
+        drawerContent = { ProfileMenu(vm, onClose = { scope.launch { menuState.close() } }) },
+    ) {
+    CompositionLocalProvider(
+        LocalBottomOverlayHeight provides bottomOverlayHeight,
+        LocalOpenProfileMenu provides { scope.launch { menuState.open() } },
+    ) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val fullWidthPx = constraints.maxWidth
         val fullHeightPx = constraints.maxHeight
@@ -266,6 +289,17 @@ fun SpfyApp(vm: PlaybackViewModel) {
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                         )
+                    } else if (dealerState == DealerState.DISCONNECTED) {
+                        // The reconnect gave up (Kotify #577); a tap starts it over, as the next command would.
+                        Text(
+                            stringResource(R.string.connection_lost_banner),
+                            color = SnepilatchLightGray,
+                            fontSize = 12.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                                .clickable { currentPlayer?.onNetworkChanged() }
+                                .padding(vertical = 4.dp)
+                        )
                     }
                     BottomNav(screen, vm, hazeState)
                 }
@@ -336,6 +370,7 @@ fun SpfyApp(vm: PlaybackViewModel) {
         }
     }
     } // CompositionLocalProvider
+    } // ModalNavigationDrawer
 }
 
 @Composable
@@ -521,10 +556,6 @@ fun LoadingScreen(
                         color = SnepilatchWhite,
                         trackColor = SnepilatchLightGray.copy(alpha = 0.2f)
                     )
-                    Spacer(Modifier.height(24.dp))
-                    TextButton(onClick = onLogin) {
-                        Text(stringResource(R.string.login_different_account), color = SnepilatchLightGray, fontSize = 13.sp)
-                    }
                 }
                 error != null -> {
                     Icon(Icons.Rounded.CloudOff, null, tint = SnepilatchLightGray, modifier = Modifier.size(48.dp))

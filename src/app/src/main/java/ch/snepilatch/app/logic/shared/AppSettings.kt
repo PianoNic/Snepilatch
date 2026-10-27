@@ -137,6 +137,18 @@ object AppSettings {
         return newDeviceId().also { prefs.edit().putString("device_id", it).apply() }
     }
 
+    /**
+     * The Widevine origin for the life of the install, in the shape Chrome gives its own (32
+     * uppercase hex chars). The CDM provisions a certificate per origin, so a fresh one per process
+     * would provision every time. Null before [load], when there is nowhere to keep it.
+     */
+    fun widevineOrigin(): String? {
+        val prefs = prefs(appContext ?: return null)
+        prefs.getString("widevine_origin", null)?.let { return it }
+        val origin = ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }.joinToString("") { "%02X".format(it) }
+        return origin.also { prefs.edit().putString("widevine_origin", it).apply() }
+    }
+
     fun load(context: Context) {
         appContext = context.applicationContext
         val prefs = prefs(context)

@@ -23,8 +23,10 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import ch.snepilatch.app.logic.shared.LoadError
+import ch.snepilatch.app.ui.shared.CenteredMessage
+import ch.snepilatch.app.ui.shared.LoadErrorState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -33,7 +35,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -107,11 +108,7 @@ fun WhatsNewScreen(vm: PlaybackViewModel, whatsNewVm: WhatsNewViewModel = viewMo
             loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = SnepilatchWhite)
             }
-            failed -> Message(stringResource(R.string.whats_new_error_title), stringResource(R.string.whats_new_error)) {
-                TextButton(onClick = { whatsNewVm.load() }) {
-                    Text(stringResource(R.string.whats_new_try_again), color = SnepilatchWhite)
-                }
-            }
+            failed -> LoadErrorState(LoadError.GENERIC, onRetry = { whatsNewVm.load() })
             else -> EmptyFeed(filter)
         }
     }
@@ -164,7 +161,7 @@ private fun ReleaseRow(release: WhatsNewContent.Release, onClick: () -> Unit) {
 }
 
 @Composable
-private fun EpisodeRow(episode: WhatsNewContent.Episode, onClick: () -> Unit) {
+internal fun EpisodeRow(episode: WhatsNewContent.Episode, onClick: () -> Unit) {
     val minutes = (episode.durationMs / 60_000).takeIf { it > 0 }?.let { "$it min" }
     val details = listOfNotNull(episode.releaseDate?.let { relativeDate(it) }, minutes)
     FeedRow(episode.coverUrl, episode.name, episode.podcastName.orEmpty(), details.joinToString(" · "), onClick)
@@ -205,22 +202,7 @@ private fun EmptyFeed(filter: WhatsNewContentType?) {
         WhatsNewContentType.EPISODES -> R.string.whats_new_empty_podcasts_title to R.string.whats_new_empty_podcasts_message
         null -> R.string.whats_new_empty_all_title to R.string.whats_new_empty_all_message
     }
-    Message(stringResource(title), stringResource(message))
-}
-
-@Composable
-private fun Message(title: String, message: String?, action: (@Composable () -> Unit)? = null) {
-    Column(
-        Modifier.fillMaxSize().padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(title, color = SnepilatchWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-        if (message != null) {
-            Text(message, color = SnepilatchLightGray, fontSize = 13.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
-        }
-        action?.invoke()
-    }
+    CenteredMessage(stringResource(title), stringResource(message))
 }
 
 /** Same look as the search filter chips: the accent when on. */

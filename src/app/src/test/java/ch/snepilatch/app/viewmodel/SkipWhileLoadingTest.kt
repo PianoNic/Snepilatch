@@ -45,7 +45,7 @@ class SkipWhileLoadingTest {
         every { AudioSourceResolver.localOrNull(any(), any(), any()) } returns null
         AppSettings.preferredAudioSource.value = null
         coEvery { resolver.resolveForFileId(any(), any()) } answers {
-            SpfyStream(cdnUrl = "cdn/${firstArg<String>()}", licenseUrl = "lic", licenseHeaders = emptyMap(), mirrorCount = 1, pssh = null)
+            SpfyStream(cdnUrl = "cdn/${firstArg<String>()}", mirrorCount = 1, pssh = null)
         }
         SessionHolder.cdnResolver = resolver
         coEvery { rig.player.getState() } returns null
@@ -72,7 +72,7 @@ class SkipWhileLoadingTest {
         coVerify(timeout = 3_000, exactly = 1) { resolver.resolveForFileId(skippedToFile, any()) }
         coVerify(exactly = 0) { resolver.resolveForFileId(loadingFile, any()) }
         verify(timeout = 1_000) {
-            rig.service.playDrmUrl("cdn/$skippedToFile", any(), any(), any(), any(), any(), any(), any(), any())
+            rig.service.playDrmUrl("cdn/$skippedToFile", any(), any(), any(), any(), any(), any(), any())
         }
     }
 

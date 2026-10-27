@@ -414,6 +414,7 @@
     </plurals>
     <string name="auto_save_listened">Сохранять прослушанное</string>
     <string name="auto_save_listened_desc">Сохраняет трек после полного прослушивания</string>
+    <string name="connection_lost_banner">Нет связи со Spotify. Нажмите, чтобы повторить</string>
     <string name="offline_banner">Вы офлайн</string>
     <string name="offline_while_youre_offline">Пока вы офлайн</string>
     <string name="offline_no_downloads">Вы офлайн, и пока ничего не загружено. Загруженные треки появятся здесь.</string>
@@ -462,8 +463,20 @@
     <string name="whats_new_empty_music_message">Подпишитесь на любимых артистов, и мы будем держать вас в курсе.</string>
     <string name="whats_new_empty_podcasts_title">В подкастах ничего нового</string>
     <string name="whats_new_empty_podcasts_message">Подпишитесь на любимые подкасты, и мы будем держать вас в курсе.</string>
-    <string name="whats_new_error">Проверьте подключение к интернету и попробуйте снова</string>
-    <string name="whats_new_error_title">Что-то пошло не так.</string>
-    <string name="whats_new_try_again">Повторить</string>
+    <string name="load_error_body">Проверьте подключение к интернету и попробуйте снова</string>
+    <string name="load_error_title">Что-то пошло не так.</string>
+    <string name="load_error_try_again">Повторить</string>
+    <string name="load_error_not_found_playlist">Не удалось найти этот плейлист</string>
+    <string name="load_error_not_found_album">Не удалось найти этот альбом</string>
+    <string name="load_error_not_found_page">Не удалось найти эту страницу</string>
+    <string name="load_error_not_found_body">Поискать что-нибудь другое?</string>
     <string name="quality_none">Нет аудио</string>
+    <string name="home_filter_all">Все</string>
+    <string name="profile_menu_view_account">Открыть аккаунт</string>
+    <string name="profile_menu_switch_account">Сменить аккаунт</string>
+    <string name="home_following_music_header">Последние релизы</string>
+    <string name="home_following_podcasts_header">Последние выпуски</string>
+    <string name="home_following_caught_up_title">Вы в курсе всех новинок</string>
+    <string name="home_following_music_caught_up">Больше нет новых релизов от исполнителей, на которых вы подписаны.</string>
+    <string name="home_following_podcasts_caught_up">Больше нет новых выпусков от авторов, на которых вы подписаны.</string>
 </resources>

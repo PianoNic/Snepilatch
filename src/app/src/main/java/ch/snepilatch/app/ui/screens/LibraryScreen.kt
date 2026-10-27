@@ -70,6 +70,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
+import ch.snepilatch.app.ui.shared.LoadErrorState
 import ch.snepilatch.app.logic.download.Downloads
 import ch.snepilatch.app.data.LIKED_SONGS_COVER_URL
 import ch.snepilatch.app.data.LibraryItem
@@ -101,6 +102,7 @@ fun LibraryScreen() {
     val isLoadingMore by libraryVm.isLoadingMore.collectAsState()
     // Only while there is nothing to show: a background refresh must not blank the list.
     val showLoading = isLoading && library.isEmpty()
+    val loadError by libraryVm.loadError.collectAsState()
     val folderPath by libraryVm.folderPath.collectAsState()
     val openFolder = folderPath.lastOrNull()
     // Back leaves the folder before it leaves the Library tab.
@@ -110,6 +112,7 @@ fun LibraryScreen() {
     val prefs = remember { context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE) }
     var gridView by remember { mutableStateOf(prefs.getBoolean("library_grid_view", false)) }
     var selectedFilter by remember { mutableStateOf<String?>(null) }
+    val libraryError = loadError?.takeIf { library.isEmpty() && selectedFilter != "Downloaded" }
     var sortMode by remember { mutableStateOf(prefs.getString("library_sort", "recent") ?: "recent") }
     var showSortMenu by remember { mutableStateOf(false) }
     var searchActive by remember { mutableStateOf(false) }
@@ -337,6 +340,9 @@ fun LibraryScreen() {
             // the middle of the screen rather than the middle of the space left under the header.
             if (showLoading) {
                 Spacer(Modifier.weight(1f))
+            } else if (libraryError != null) {
+                // Under the header, so the Downloaded filter stays in reach when the listing fails.
+                LoadErrorState(libraryError, onRetry = { libraryVm.loadLibrary() }, modifier = Modifier.weight(1f))
             } else if (openFolder != null && sortedLibrary.isEmpty() && libraryTotal == 0) {
                 Text(
                     stringResource(R.string.library_folder_empty),

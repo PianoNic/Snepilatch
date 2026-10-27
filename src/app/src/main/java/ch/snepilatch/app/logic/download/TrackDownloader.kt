@@ -194,7 +194,15 @@ object TrackDownloader {
                         is StreamResult.Failure -> return@withContext DownloadOutcome.Failed(resolved.message)
                     }
                 }
+                // One more go after a dropped connection: in a bulk download about one in twenty of
+                // ArgonFetch's streams is reset mid-file (HTTP/2 INTERNAL_ERROR), and the url it gave
+                // is good for an hour. fetchTo rewrites the file from the start.
                 val fetched = runCatching { fetchTo(info, temp, report) }
+                    .recoverCatching {
+                        if (it !is java.io.IOException) throw it
+                        LokiLogger.w(TAG, "fetch for ${request.title} dropped (${it.message}), trying once more")
+                        fetchTo(info, temp, report)
+                    }
                     .getOrElse {
                         if (it is CancellationException) throw it
                         LokiLogger.e(TAG, "fetch failed for ${request.title}: ${it.message}")
@@ -244,7 +252,9 @@ object TrackDownloader {
             return null
         }
         LokiLogger.i(TAG, "'${request.title}' encoded from the decoded capture (${temp.length()} bytes)")
-        return StreamInfo(url = "pcm-capture", provider = "Decoded audio", mimeType = "audio/mpeg")
+        // PcmAacEncoder writes AAC into an MP4 container, so it is an m4a and gets the MP4 tags. Labelled
+        // audio/mpeg it was saved as an untagged .mp3 that only played because players sniff the bytes.
+        return StreamInfo(url = "pcm-capture", provider = "Decoded audio", mimeType = "audio/mp4")
     }
 
     /**

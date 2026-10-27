@@ -27,8 +27,10 @@ import ch.snepilatch.app.logic.playback.MusicPlaybackService
 import ch.snepilatch.app.logic.playback.PlaybackCache
 import ch.snepilatch.app.logic.playback.PositionInterpolator
 import ch.snepilatch.app.logic.shared.AccountStore
+import ch.snepilatch.app.logic.shared.SessionResume
 import ch.snepilatch.app.logic.shared.SavedAccount
 import ch.snepilatch.app.logic.shared.SessionHolder
+import ch.snepilatch.app.logic.shared.spfyId
 import ch.snepilatch.app.logic.shared.AppMessages
 
 import ch.snepilatch.app.logic.download.DownloadActions
@@ -670,9 +672,12 @@ class PlaybackViewModel : ViewModel() {
                     identifier = "kotify-android",
                     language = AppSettings.effectiveLanguage(),
                     initialCookies = cookies,
-                    deviceProfile = kotify.config.DeviceProfile.CHROME_WINDOWS
+                    // What Chrome on an Android phone presents with "Desktop site" on: the browser this
+                    // phone's Widevine CDM belongs to, registered as the ordinary web player.
+                    deviceProfile = kotify.config.DeviceProfile.CHROME_ANDROID_DESKTOP
                 ))
-                sess.load()
+                SessionResume.track(sess)
+                sess.load(SessionResume.forCookies(cookies))
 
                 // KotifyClient now fires this ONLY when the login is genuinely dead (Spfy handed
                 // back an anonymous token — an expired/revoked sp_dc). Transient dealer/network trouble
@@ -687,7 +692,7 @@ class PlaybackViewModel : ViewModel() {
                 session = sess
                 val sp = SpfyPlayback(sess)
                 spfyPlayback = sp
-                cdnResolver = spfyResolver(sess, sp)
+                cdnResolver = spfyResolver(sp)
                 LokiLogger.i(TAG, "Session loaded")
 
                 // Home and library load themselves from HomeViewModel.init / LibraryViewModel.init.
@@ -1179,8 +1184,9 @@ class PlaybackViewModel : ViewModel() {
 
     /**
      * Handle a deep link URI from open.spotify.com.
-     * Supported paths: /track/{id}, /album/{id}, /playlist/{id}, /artist/{id}, /socialsession/{token},
-     * and a relay invite's /jam/{token}.
+     * Supported paths: /track/{id}, /album/{id}, /playlist/{id}, /artist/{id}, /show/{id}, /episode/{id},
+     * /socialsession/{token}, and a relay invite's /jam/{token}. A link opens its page and never plays:
+     * a track opens its album, an episode its show, as there is no page for either alone.
      * A spotify.link short link is expanded first and then handled like the long one.
      */
     fun handleDeepLink(uri: android.net.Uri) {
@@ -1204,7 +1210,16 @@ class PlaybackViewModel : ViewModel() {
         LokiLogger.i(TAG, "Deep link: type=$type id=$id")
 
         when (type) {
-            "track" -> playTrack("spotify:track:$id")
+            "track" -> DetailRoutes.openAlbumForTrack("spotify:track:$id")
+            "show" -> DetailRoutes.openShow(id)
+            "episode" -> launchWithSession("openEpisodeLink") { sess ->
+                val show = kotify.api.podcast.Podcast(sess).getEpisode(id)?.show?.uri
+                if (show == null) {
+                    LokiLogger.w(TAG, "Episode $id has no show to open")
+                } else {
+                    withContext(Dispatchers.Main) { DetailRoutes.openShow(spfyId(show)) }
+                }
+            }
             "album" -> DetailRoutes.openAlbum(id)
             "playlist" -> DetailRoutes.openPlaylist(id)
             "artist" -> DetailRoutes.openArtist(id)
@@ -1575,6 +1590,13 @@ class PlaybackViewModel : ViewModel() {
         infiniPlay.enable(uri)
     }
 
+    /**
+     * In a jam as a controller, not a listener: the audio belongs on the host's device, so play never
+     * claims this phone. Taking it over anyway dropped the account from the jam, and with nothing
+     * active the server kept the phone paused under audio that played.
+     */
+    private fun jamControllerOnly(): Boolean = JamHolder.session.value?.let { it.active && !it.isListening } == true
+
     fun togglePlayPause() {
         val paused = _playback.value.isPaused || !_playback.value.isPlaying
         if (RelayJam.redirect(RelayCommand(if (paused) RelayCommand.RESUME else RelayCommand.PAUSE))) return
@@ -1591,8 +1613,9 @@ class PlaybackViewModel : ViewModel() {
             try {
                 val p = player ?: return@launch
                 val t0 = System.currentTimeMillis()
-                if (foreignDeviceActive) {
-                    // Another device holds playback: act as a remote control for it. The local* state
+                if (foreignDeviceActive || jamControllerOnly()) {
+                    // Another device holds playback, or this account is in a jam only to control the
+                    // host's playback (CONTROL, all a Free account may take): act as a remote control. The local* state
                     // reports below describe THIS device, so they'd be ignored, and the cold-start path
                     // would claim the device and pull the audio over here. Moving playback to the phone
                     // stays an explicit action via the devices dialog (transferPlayback).
@@ -1675,7 +1698,7 @@ class PlaybackViewModel : ViewModel() {
      * still gets audio, just slower.
      */
     /** The resolver reports every stream it resolves to the player, for the playback telemetry. */
-    private fun spfyResolver(sess: Session, sp: SpfyPlayback) = SpfyCdnResolver(sess, sp).also { r ->
+    private fun spfyResolver(sp: SpfyPlayback) = SpfyCdnResolver(sp).also { r ->
         r.onResolved = { info -> player?.reportStreamResolved(info) }
     }
 
@@ -1939,7 +1962,7 @@ class PlaybackViewModel : ViewModel() {
         playUrlAt = System.currentTimeMillis()
         withContext(Dispatchers.Main) {
             MusicPlaybackService.instance?.playDrmUrl(
-                stream.cdnUrl, stream.licenseUrl, stream.licenseHeaders, title, artist, art,
+                stream.cdnUrl, stream.certificate, title, artist, art,
                 startPlaying = true, startPositionMs = positionMs, pssh = stream.pssh,
             )
         }
@@ -2312,6 +2335,9 @@ class PlaybackViewModel : ViewModel() {
                     } else throw e
                 }
                 delay(500); refreshState()
+            } catch (e: CancellationException) {
+                // A second tap cancels the first one's job, and that is not a failure.
+                throw e
             } catch (e: Exception) { isStreamLoading.value = false; LokiLogger.e(TAG, "playTrack", e) }
         }
     }
@@ -2705,6 +2731,8 @@ class PlaybackViewModel : ViewModel() {
         try {
             val state = player?.getState() ?: return
             updatePlaybackFromState(state)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) { LokiLogger.e(TAG, "refreshState", e) }
     }
 
@@ -3320,7 +3348,7 @@ class PlaybackViewModel : ViewModel() {
                 val coldStart = coldStartPending
                 withContext(Dispatchers.Main) {
                     MusicPlaybackService.instance?.playDrmUrl(
-                        stream.cdnUrl, stream.licenseUrl, stream.licenseHeaders, title, artist, art,
+                        stream.cdnUrl, stream.certificate, title, artist, art,
                         startPlaying = !coldStart,
                         pssh = stream.pssh,
                     )
@@ -3528,7 +3556,7 @@ class PlaybackViewModel : ViewModel() {
                     playUrlAt = System.currentTimeMillis()
                     withContext(Dispatchers.Main) {
                         MusicPlaybackService.instance?.playDrmUrl(
-                            stream.cdnUrl, stream.licenseUrl, stream.licenseHeaders, title, artist, art,
+                            stream.cdnUrl, stream.certificate, title, artist, art,
                             startPlaying = !coldStart, pssh = stream.pssh,
                         )
                     }
@@ -3606,7 +3634,7 @@ class PlaybackViewModel : ViewModel() {
                 playUrlAt = System.currentTimeMillis()
                 withContext(Dispatchers.Main) {
                     MusicPlaybackService.instance?.playDrmUrl(
-                        stream.cdnUrl, stream.licenseUrl, stream.licenseHeaders, title, artist, art,
+                        stream.cdnUrl, stream.certificate, title, artist, art,
                         startPlaying = !coldStart, pssh = stream.pssh,
                     )
                 }

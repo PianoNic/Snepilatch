@@ -412,6 +412,7 @@
     </plurals>
     <string name="auto_save_listened">Gehörtes behalten</string>
     <string name="auto_save_listened_desc">Speichert einen Titel, sobald du ihn durchgehört hast</string>
+    <string name="connection_lost_banner">Spotify nicht erreichbar. Tippen zum Wiederholen</string>
     <string name="offline_banner">Du bist offline</string>
     <string name="offline_while_youre_offline">Während du offline bist</string>
     <string name="offline_no_downloads">Du bist offline und es ist noch nichts heruntergeladen. Heruntergeladene Songs erscheinen hier.</string>
@@ -460,8 +461,20 @@
     <string name="whats_new_empty_music_message">Folge deinen Lieblingskünstlern, dann halten wir dich auf dem Laufenden.</string>
     <string name="whats_new_empty_podcasts_title">Nichts Neues bei Podcasts</string>
     <string name="whats_new_empty_podcasts_message">Folge deinen Lieblingspodcasts, dann halten wir dich auf dem Laufenden.</string>
-    <string name="whats_new_error">Prüfe deine Internetverbindung und versuche es erneut</string>
-    <string name="whats_new_error_title">Etwas ist schiefgelaufen.</string>
-    <string name="whats_new_try_again">Erneut versuchen</string>
+    <string name="load_error_body">Prüfe deine Internetverbindung und versuche es erneut</string>
+    <string name="load_error_title">Etwas ist schiefgelaufen.</string>
+    <string name="load_error_try_again">Erneut versuchen</string>
+    <string name="load_error_not_found_playlist">Playlist nicht gefunden</string>
+    <string name="load_error_not_found_album">Album nicht gefunden</string>
+    <string name="load_error_not_found_page">Seite nicht gefunden</string>
+    <string name="load_error_not_found_body">Nach etwas anderem suchen?</string>
     <string name="quality_none">Kein Audio</string>
+    <string name="home_filter_all">Alle</string>
+    <string name="profile_menu_view_account">Konto ansehen</string>
+    <string name="profile_menu_switch_account">Konto wechseln</string>
+    <string name="home_following_music_header">Zuletzt erschienen</string>
+    <string name="home_following_podcasts_header">Neueste Folgen</string>
+    <string name="home_following_caught_up_title">Du bist auf dem neuesten Stand</string>
+    <string name="home_following_music_caught_up">Es gibt keine weiteren Neuerscheinungen von Künstler*innen, denen du folgst.</string>
+    <string name="home_following_podcasts_caught_up">Es gibt keine weiteren neuen Folgen von Creator*innen, denen du folgst.</string>
 </resources>

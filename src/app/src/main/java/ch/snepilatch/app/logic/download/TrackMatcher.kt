@@ -63,7 +63,9 @@ internal class CatalogueLookup {
 
     /** One session for the whole scan, however many lookups ask for it at once. */
     private suspend fun session(): Session = starting.withLock {
-        session ?: Session(SessionConfig(identifier = "folder-scan", anonymous = true)).also {
+        session ?: Session(
+            SessionConfig(identifier = "folder-scan", anonymous = true, deviceProfile = kotify.config.DeviceProfile.CHROME_ANDROID_DESKTOP)
+        ).also {
             it.load()
             session = it
         }
@@ -101,6 +103,10 @@ internal class CatalogueLookup {
         return try {
             Song(session()).getSong(id)?.let { track ->
                 TrackInfo(track.name, track.artists.joinToString(", ") { it.name }, track.album.name, track.album.coverArtUrl)
+            } ?: null.also {
+                // An empty answer, not an error: while the anonymous session is rate limited the query
+                // comes back blank. The row stays unchecked, so the next migration asks again.
+                LokiLogger.w("CatalogueLookup", "no details for $id in the answer")
             }
         } catch (e: CancellationException) {
             throw e

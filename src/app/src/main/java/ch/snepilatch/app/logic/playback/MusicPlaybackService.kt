@@ -9,6 +9,7 @@ import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import android.net.NetworkCapabilities
 import ch.snepilatch.app.logic.shared.NetworkState
+import kotify.api.playerstatus.DealerState
 import coil.request.ImageRequest
 import android.media.audiofx.AudioEffect
 import android.net.ConnectivityManager
@@ -48,6 +49,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import ch.snepilatch.app.logic.shared.SessionHolder
+import ch.snepilatch.app.logic.playback.engine.KotifyDrmCallback
+import ch.snepilatch.app.logic.playback.engine.PsshInjectingDrmSessionManager
+import ch.snepilatch.app.logic.playback.engine.widevineWithCertificate
 import ch.snepilatch.app.logic.shared.normalizeSpfyImageUrl
 
 class MusicPlaybackService : MediaBrowserServiceCompat() {
@@ -412,38 +416,35 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 if (playbackSuppressionReason == Player.PLAYBACK_SUPPRESSION_REASON_TRANSIENT_AUDIO_FOCUS_LOSS) {
                     LokiLogger.i(TAG, "Transient focus loss — reporting pause to Spfy")
                     onAudioFocusPaused?.invoke()
-                } else {
+                } else if (player.playWhenReady) {
                     LokiLogger.i(TAG, "Playback no longer suppressed — reporting play to Spfy")
                     onAudioFocusResumed?.invoke()
+                } else {
+                    // The suppression ended because the player was paused, most often by Spfy echoing
+                    // the pause reported above. Reporting play here started the music again over the
+                    // app that had taken focus (#1006).
+                    LokiLogger.i(TAG, "Suppression ended by a pause — nothing to report")
                 }
             }
 
             /**
-             * A seek invalidates the decoded capture, so stand it down.
+             * A seek re-anchors the decoded capture where playback lands, so the recording survives it.
              *
-             * The tap only ever appends what the decoder hands it, and nothing re-anchors it on a
-             * seek: jumping forward leaves a hole, jumping back records a stretch twice. The
-             * completeness check counts frames rather than mapping coverage, so a backward seek can
-             * even reach its threshold with audio audibly repeated — the one way this could write a
-             * wrong file rather than simply refuse. Hooked here rather than at each seekTo so no
-             * caller can miss it: the media session, both Connect sync paths and the infiniPlay jumps
-             * all land on this. The playback cache is byte-exact and unaffected, so a non-DRM track
-             * still saves from there; only Widevine, which has no cache, loses the ability to save
-             * this track — correctly, since what was recorded is not the track.
+             * It used to be dropped on any seek, and the small ones are constant: the sync seek after
+             * a notification ducks the audio cost about two of every three auto-saves that failed.
+             * Writing by position makes a jump back record over itself and a jump forward leave a
+             * hole the completeness check refuses, so neither can write a wrong file. Hooked here
+             * rather than at each seekTo so no caller can miss it: the media session, both Connect
+             * sync paths and the infiniPlay jumps all land on this.
              */
             override fun onPositionDiscontinuity(
                 oldPosition: Player.PositionInfo,
                 newPosition: Player.PositionInfo,
                 reason: Int,
             ) {
-                // capturedFrames guard: loading a track with a start position is not a seek, but if a
-                // device ever reported one it would arrive before anything was recorded.
-                if (reason == Player.DISCONTINUITY_REASON_SEEK &&
-                    captureUri != null &&
-                    infiniPlayTap.capturedFrames() > 0
-                ) {
-                    LokiLogger.i(TAG, "seek during capture, dropping it for $captureUri")
-                    stopCapture()
+                if (reason == Player.DISCONTINUITY_REASON_SEEK && captureUri != null) {
+                    LokiLogger.i(TAG, "seek during capture to ${newPosition.positionMs}ms, recording on from there for $captureUri")
+                    infiniPlayTap.markPosition(newPosition.positionMs)
                 }
             }
 
@@ -719,6 +720,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             // (the anandserver Qobuz mirror) need those headers on the HTTP data
             // source, so they go through a dedicated header-injecting MediaSource.
             // Both accept a start position so resume-from-idle seeks on load.
+            infiniPlayTap.markPosition(startPositionMs)
             if (headers.isEmpty() && cacheKey == null) {
                 player.setMediaItem(buildMediaItem(url), startPositionMs)
             } else {
@@ -953,8 +955,17 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         val rate = infiniPlayTap.sampleRate()
         val channels = infiniPlayTap.channelCount()
         if (rate <= 0 || channels <= 0) return null
-        val expected = durationMs.toDouble() * rate / 1000
-        if (infiniPlayTap.capturedFrames() < expected * CAPTURE_COMPLETE_FRACTION) return null
+        val needed = (durationMs.toDouble() * rate / 1000 * CAPTURE_COMPLETE_FRACTION).toInt()
+        // Every stretch, not a count: a track resumed a second in, or skipped through, has a hole
+        // that a frame count would have let through as long as the rest added up.
+        if (!infiniPlayTap.isCovered(needed)) {
+            LokiLogger.i(
+                TAG,
+                "capture of $trackUri has a hole: it reaches ${infiniPlayTap.capturedFrames() / rate}s " +
+                    "of the ${needed / rate}s needed, but not all of it was played"
+            )
+            return null
+        }
         return rate to channels
     }
 
@@ -1205,42 +1216,30 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         return ProgressiveMediaSource.Factory(factory).createMediaSource(item)
     }
 
-    fun buildDrmMediaItem(url: String, licenseUrl: String, licenseHeaders: Map<String, String>): MediaItem {
-        return MediaItem.Builder()
-            .setMediaId(url)
-            .setUri(url)
-            .setDrmConfiguration(
-                MediaItem.DrmConfiguration.Builder(C.WIDEVINE_UUID)
-                    .setLicenseUri(licenseUrl)
-                    .setLicenseRequestHeaders(licenseHeaders)
-                    .build()
-            )
-            .build()
-    }
-
     /**
-     * Progressive media source that injects a Widevine PSSH (base64 from Spfy's seektable) into
-     * the DRM session. Needed because many Spfy files are cenc-encrypted but embed no Widevine
-     * pssh box, so ExoPlayer's default in-file DRM throws MissingSchemeDataException and plays silent.
+     * Progressive Widevine source whose license goes through Kotify, on a CDM with the service
+     * certificate set. With [psshBase64] (from Spfy's seektable) the PSSH is injected into the DRM
+     * session: many Spfy files are cenc-encrypted but embed no Widevine pssh box, so ExoPlayer's
+     * default in-file DRM throws MissingSchemeDataException and plays silent.
      */
     @OptIn(UnstableApi::class)
-    private fun buildPsshDrmSource(url: String, licenseUrl: String, licenseHeaders: Map<String, String>, psshBase64: String): MediaSource {
-        val callback = androidx.media3.exoplayer.drm.HttpMediaDrmCallback(licenseUrl, DefaultHttpDataSource.Factory())
-        licenseHeaders.forEach { (k, v) -> callback.setKeyRequestProperty(k, v) }
+    private fun buildDrmSource(url: String, certificate: ByteArray?, psshBase64: String?): MediaSource {
+        val playback = SessionHolder.spfyPlayback ?: error("No SpfyPlayback to license with")
         val base = androidx.media3.exoplayer.drm.DefaultDrmSessionManager.Builder()
-            .setUuidAndExoMediaDrmProvider(C.WIDEVINE_UUID, androidx.media3.exoplayer.drm.FrameworkMediaDrm.DEFAULT_PROVIDER)
+            .setUuidAndExoMediaDrmProvider(C.WIDEVINE_UUID) { uuid -> widevineWithCertificate(uuid, certificate) }
             .setMultiSession(true)
-            .build(callback)
-        val psshBytes = android.util.Base64.decode(psshBase64, android.util.Base64.DEFAULT)
-        val injecting = ch.snepilatch.app.logic.playback.engine.PsshInjectingDrmSessionManager(base, psshBytes)
+            .build(KotifyDrmCallback(playback))
+        val manager = psshBase64?.let {
+            PsshInjectingDrmSessionManager(base, android.util.Base64.decode(it, android.util.Base64.DEFAULT))
+        } ?: base
         return ProgressiveMediaSource.Factory(DefaultDataSource.Factory(this))
-            .setDrmSessionManagerProvider { injecting }
-            .createMediaSource(MediaItem.fromUri(url))
+            .setDrmSessionManagerProvider { manager }
+            .createMediaSource(MediaItem.Builder().setMediaId(url).setUri(url).build())
     }
 
     @OptIn(UnstableApi::class)
     @Suppress("LongParameterList")
-    fun playDrmUrl(url: String, licenseUrl: String, licenseHeaders: Map<String, String>,
+    fun playDrmUrl(url: String, certificate: ByteArray?,
                    title: String, artist: String, albumArtUrl: String?,
                    startPlaying: Boolean = true,
                    startPositionMs: Long = 0L,
@@ -1254,11 +1253,8 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             // seek, and reach STATE_READY at that exact position. No post-prepare seek
             // dance — eliminates the race where the post-ready seek fails to actually
             // produce audio (the bug in the cold-start sync).
-            if (pssh != null) {
-                player.setMediaSource(buildPsshDrmSource(url, licenseUrl, licenseHeaders, pssh), startPositionMs)
-            } else {
-                player.setMediaItem(buildDrmMediaItem(url, licenseUrl, licenseHeaders), startPositionMs)
-            }
+            infiniPlayTap.markPosition(startPositionMs)
+            player.setMediaSource(buildDrmSource(url, certificate, pssh), startPositionMs)
             player.playWhenReady = startPlaying
             // Register listener BEFORE prepare() so we catch STATE_READY
             player.addListener(object : Player.Listener {
@@ -1548,10 +1544,17 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
         // The offline engine's cue: a validated route is online, losing the default network is not.
         override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
-            NetworkState.set(
-                caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                    caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-            )
+            val online = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            val cameBack = online && !NetworkState.online.value
+            NetworkState.set(online)
+            // The web player's online event: a dealer that gave up, or is waiting out a backoff, while
+            // the network was gone tries again now. A live socket is left alone (#793).
+            val player = SessionHolder.player
+            if (cameBack && player != null && player.connectionState.value != DealerState.CONNECTED) {
+                LokiLogger.i(TAG, "Network back, reconnecting dealer")
+                player.onNetworkChanged()
+            }
         }
 
         override fun onLost(network: Network) {

@@ -7,6 +7,7 @@ import kotify.api.playlist.PlaylistStore
 import kotify.cdn.SpfyPlayback
 import kotify.session.Session
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
@@ -36,9 +37,15 @@ object SessionHolder {
         get() = playerFlow.value
         set(value) { playerFlow.value = value }
 
+    /** The player as it changes, for UI that follows the current one across account switches. */
+    val players: StateFlow<PlayerConnect?> = playerFlow
+
     /** The player once it is registered, or null when that takes longer than [timeoutMs]. */
     suspend fun awaitPlayer(timeoutMs: Long): PlayerConnect? =
         withTimeoutOrNull(timeoutMs) { playerFlow.filterNotNull().first() }
+
+    /** The player once it is registered, however long that takes; the caller's scope bounds the wait. */
+    suspend fun nextPlayer(): PlayerConnect = playerFlow.filterNotNull().first()
     @Volatile var spfyPlayback: SpfyPlayback? = null
     @Volatile var cdnResolver: SpfyCdnResolver? = null
 

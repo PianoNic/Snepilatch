@@ -1,11 +1,6 @@
 package ch.snepilatch.app.ui.screens
 
 import android.text.format.DateUtils
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,9 +30,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -47,6 +39,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.R
 import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.ui.shared.SpfyImage
+import ch.snepilatch.app.ui.shared.SpinningDisc
 import ch.snepilatch.app.ui.theme.SnepilatchLightGray
 import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import ch.snepilatch.app.viewmodel.FriendActivityViewModel
@@ -146,18 +139,6 @@ private fun FriendRow(friend: FriendActivity, onClick: () -> Unit) {
         SpfyImage(friend.imageUrl, Modifier.size(44.dp))
     }
 }
-
-/** A vinyl record turning at a steady pace, the now-playing glyph. */
-@Composable
-private fun SpinningDisc(color: Color, modifier: Modifier = Modifier) {
-    val angle by rememberInfiniteTransition(label = "disc").animateFloat(
-        initialValue = 0f, targetValue = 360f, label = "angle",
-        animationSpec = infiniteRepeatable(tween(DISC_TURN_MS, easing = LinearEasing)),
-    )
-    Icon(painterResource(R.drawable.ic_vinyl_record), null, tint = color, modifier = modifier.rotate(angle))
-}
-
-private const val DISC_TURN_MS = 1800
 
 /** "now" inside the first minute, then the platform's abbreviated relative time ("56 min ago"). */
 @Composable

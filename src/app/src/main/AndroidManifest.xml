@@ -66,6 +66,14 @@
                     android:scheme="https"
                     android:host="open.spotify.com"
                     android:pathPrefix="/socialsession" />
+                <data
+                    android:scheme="https"
+                    android:host="open.spotify.com"
+                    android:pathPrefix="/show" />
+                <data
+                    android:scheme="https"
+                    android:host="open.spotify.com"
+                    android:pathPrefix="/episode" />
             </intent-filter>
 
             <!-- Relay jam invites from the default Snepirelay; a self-hosted relay's links are pasted instead. -->

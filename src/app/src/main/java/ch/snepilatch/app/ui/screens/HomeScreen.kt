@@ -14,6 +14,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import ch.snepilatch.app.R
+import ch.snepilatch.app.viewmodel.DetailRoutes
 import ch.snepilatch.app.ui.shared.LoadErrorState
 import ch.snepilatch.app.data.LIKED_SONGS_COVER_URL
 import ch.snepilatch.app.ui.theme.SnepilatchWhite
@@ -254,7 +255,11 @@ private fun LazyListScope.followingFeed(
     if (podcasts) {
         items(episodes, key = { it.id }) { item ->
             val episode = item.content as? kotify.api.whatsnew.WhatsNewContent.Episode ?: return@items
-            EpisodeRow(episode) { vm.playTrack(episode.uri) }
+            EpisodeRow(episode) {
+                // The show's page, as an episode card opens it; the row has no play of its own to steal.
+                val show = episode.podcastUri
+                if (show != null) DetailRoutes.openShow(spfyId(show), episode.podcastName) else vm.playTrack(episode.uri)
+            }
         }
     }
 }
@@ -377,7 +382,7 @@ fun QuickPickGrid(items: List<kotify.api.home.HomeSectionItem>, vm: PlaybackView
                             .weight(1f)
                             .height(48.dp)
                             .clickable {
-                                if (!detailVm.openEntity(item.type, item.uri, item.owner, item.imageUrl)) vm.playTrack(item.uri)
+                                if (!detailVm.openEntity(item.type, item.uri, item.owner, item.imageUrl, item.showUri)) vm.playTrack(item.uri)
                             },
                         shape = RoundedCornerShape(6.dp),
                         colors = CardDefaults.cardColors(containerColor = SnepilatchGray)
@@ -537,7 +542,7 @@ fun HomeSingleCard(item: kotify.api.home.HomeSectionItem, vm: PlaybackViewModel)
     val detailVm: DetailViewModel = viewModel()
     val (base, glow, counterGlow) = homeCardColors(item)
     val open = {
-        if (!detailVm.openEntity(item.type, item.uri, item.owner, item.imageUrl)) detailVm.openPlaylist(spfyId(item.uri))
+        if (!detailVm.openEntity(item.type, item.uri, item.owner, item.imageUrl, item.showUri)) detailVm.openPlaylist(spfyId(item.uri))
     }
     Card(
         modifier = Modifier
@@ -770,7 +775,7 @@ fun HomeSectionCard(item: kotify.api.home.HomeSectionItem, vm: PlaybackViewModel
         modifier
             .width(140.dp)
             .clickable {
-                if (!detailVm.openEntity(item.type, item.uri, item.owner, item.imageUrl)) vm.playTrack(item.uri)
+                if (!detailVm.openEntity(item.type, item.uri, item.owner, item.imageUrl, item.showUri)) vm.playTrack(item.uri)
             },
         horizontalAlignment = if (isArtist) Alignment.CenterHorizontally else Alignment.Start
     ) {

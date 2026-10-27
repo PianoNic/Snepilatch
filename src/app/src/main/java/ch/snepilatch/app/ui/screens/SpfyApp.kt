@@ -209,14 +209,15 @@ fun SpfyApp(vm: PlaybackViewModel) {
                 ch.snepilatch.app.logic.playback.JamListenAlong.bind(vm)
             }
             val resumable by ch.snepilatch.app.logic.playback.JamListenAlong.resumable.collectAsState()
+            val relayResumable by ch.snepilatch.app.logic.relay.RelayJam.resumable.collectAsState()
             jam?.let {
                 JamBanner(
                     it,
                     onClick = { vm.openQueue() },
-                    onResume = if (resumable) {
-                        { ch.snepilatch.app.logic.playback.JamListenAlong.start() }
-                    } else {
-                        null
+                    onResume = when {
+                        relayResumable -> ch.snepilatch.app.logic.relay.RelayJam::resumeListening
+                        resumable -> ch.snepilatch.app.logic.playback.JamListenAlong::start
+                        else -> null
                     },
                 )
             }

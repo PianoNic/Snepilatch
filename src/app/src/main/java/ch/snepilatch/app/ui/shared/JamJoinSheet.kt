@@ -73,6 +73,8 @@ fun JamJoinSheet(pending: JamHolder.PendingJam, isPremium: Boolean, myImageUrl: 
     var choice by remember { mutableStateOf<JamViewModel.JoinChoice?>(null) }
     val host = pending.jam.host
     val hostName = host?.displayName.orEmpty()
+    // A Snepilatch relay jam: listening is ours to allow, not Spfy's, so no Premium gate and no YouTube copy.
+    val relay = ch.snepilatch.app.logic.relay.RelayJamMapper.isRelay(pending.jam)
     val sheetState = rememberBottomSheetState(
         initialValue = SheetValue.Hidden,
         enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
@@ -106,14 +108,14 @@ fun JamJoinSheet(pending: JamHolder.PendingJam, isPremium: Boolean, myImageUrl: 
             ChoiceRow(
                 icon = Icons.Rounded.Smartphone,
                 title = stringResource(R.string.jam_play_here, android.os.Build.MODEL),
-                sub = stringResource(R.string.premium),
+                sub = if (relay) null else stringResource(R.string.premium),
                 subColor = theme.primary,
                 selected = choice == JamViewModel.JoinChoice.LISTEN,
-                enabled = isPremium,
+                enabled = relay || isPremium,
             ) { choice = JamViewModel.JoinChoice.LISTEN }
             // What a Free account gets instead of listening on Spfy: the same jam on this phone from
             // YouTube Music, while it only controls the host's playback on Spfy (#1026).
-            if (!isPremium) {
+            if (!isPremium && !relay) {
                 ChoiceRow(
                     icon = Icons.Rounded.Smartphone,
                     title = stringResource(R.string.jam_listen_along_ytm),

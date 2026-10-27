@@ -53,8 +53,15 @@ object JamHolder {
         (token ?: session?.joinSessionToken?.takeIf { it.isNotBlank() })?.let(::jamShareLink)
 
     fun apply(update: JamUpdate, tokenFromClient: String?) {
-        // A jam held through the relay is not the account's jam as the player client sees it.
-        if (RelayJam.active) return
+        if (RelayJam.active) {
+            // A jam held through the relay is not the account's jam as the player client sees it.
+            val spfyJam = update.session ?: return
+            // In a Spfy jam as well, joined somewhere else: one jam at a time, since the account's
+            // playback goes to that jam's host and the relay's commands would change their music.
+            // The newer one wins, so the relay jam is left.
+            LokiLogger.i(TAG, "In Spfy jam ${spfyJam.sessionId} while in a relay jam, leaving the relay jam")
+            RelayJam.leaveInBackground()
+        }
         session.value = update.session
         if (update.session == null) {
             shareToken.value = null

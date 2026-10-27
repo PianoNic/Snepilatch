@@ -31,4 +31,17 @@ interface RelayHostPlayer {
     suspend fun seek(positionMs: Long)
     suspend fun play(uri: String, contextUri: String?)
     suspend fun enqueue(uri: String)
+
+    // A guest's side: making Spfy's own advance land on the host's next track.
+
+    /** This account's own next track, the one Spfy's natural advance will play. */
+    val nextUri: String? get() = null
+
+    /** Whether Kotify holds at a track end instead of advancing to [nextUri]. */
+    var holdAtTrackEnd: Boolean
+        get() = false
+        set(_) = Unit
+
+    /** Put [uri] at the front of this account's queue, taking out [replacing] put there before. */
+    suspend fun playNext(uri: String, replacing: String?) = Unit
 }

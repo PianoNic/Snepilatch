@@ -40,6 +40,36 @@ object RelayJamMapper {
         )
     }
 
+    /** What the join sheet shows of a relay jam before joining it: its host, from the relay's preview. */
+    fun preview(joinToken: String, hostName: String, hostImageUrl: String?): JamSession = JamSession(
+        sessionId = joinToken,
+        joinSessionToken = joinToken,
+        joinSessionUri = "",
+        sessionOwnerId = PREVIEW_HOST,
+        members = listOf(
+            JamMember(
+                id = PREVIEW_HOST,
+                username = hostName,
+                displayName = hostName,
+                imageUrl = hostImageUrl,
+                isListening = true,
+                isControlling = true,
+                largeImageUrl = hostImageUrl,
+            ),
+        ),
+        isSessionOwner = false,
+        isListening = true,
+        isControlling = true,
+        active = true,
+        queueOnlyMode = false,
+        isPaused = false,
+        hostActiveDeviceId = null,
+        initialSessionType = SESSION_TYPE,
+        hostDevice = null,
+    )
+
+    private const val PREVIEW_HOST = "host"
+
     /** The link an invite shares: the relay's own address with the join token. */
     fun inviteLink(serverUrl: String, joinToken: String): String = "${serverUrl.trimEnd('/')}/jam/$joinToken"
 

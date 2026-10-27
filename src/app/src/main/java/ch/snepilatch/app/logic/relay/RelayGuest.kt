@@ -8,6 +8,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import ch.snepilatch.app.logic.shared.LokiLogger
 import kotlin.math.abs
 
 /**
@@ -31,6 +32,9 @@ class RelayGuest(
     private var trackCommand: Pair<String, Long>? = null
     private var lastSeekAt = Long.MIN_VALUE / 2
     private var lastPauseAt = Long.MIN_VALUE / 2
+
+    // The host's next track this guest put at the front of its own queue, so it is not put there twice.
+    private var placedNext: String? = null
 
     fun start() {
         if (jobs.isNotEmpty()) return
@@ -79,19 +83,54 @@ class RelayGuest(
         }
     }
 
+    /**
+     * This device's track ran out and Kotify held instead of picking a next one: play the host's next
+     * now. The host is either still on the track that ended here (its next is the head of its queue) or
+     * has already moved on (its current one). Nothing when neither is known; the next update brings it.
+     */
+    suspend fun trackEnded() = lock.withLock {
+        val target = host ?: return@withLock
+        val ended = player.current().trackUri
+        val next = if (target.trackUri == ended) target.queue.firstOrNull()?.uri else target.trackUri
+        LokiLogger.i(TAG, "Track $ended ended here; host on ${target.trackUri}, queue ${target.queue.size}, playing $next")
+        if (next != null) playTrack(target, next, serverNow())
+    }
+
     suspend fun reconcile() = lock.withLock {
         val target = host ?: return@withLock
         val trackUri = target.trackUri ?: return@withLock
         val now = serverNow()
         val local = player.current()
         if (local.trackUri != trackUri) {
-            playTrack(target, trackUri, now)
+            // Spfy advanced this account onto the host's next a moment before the host's own update:
+            // the host is at its track's end and about to say the same, so this is not a mismatch.
+            val aheadByOne = local.trackUri == target.queue.firstOrNull()?.uri &&
+                target.durationMs - target.positionAt(now) <= ADVANCE_GRACE_MS
+            if (!aheadByOne) playTrack(target, trackUri, now)
             return@withLock
         }
         val sinceTrackCommand = trackCommand?.takeIf { it.first == trackUri }?.let { now - it.second } ?: Long.MAX_VALUE
         if (sinceTrackCommand < LOAD_GRACE_MS) return@withLock
         matchPosition(target, now)
         matchPause(target, local, now)
+        prepareNext(target, now)
+    }
+
+    /**
+     * What makes a track change seamless, as everyone in a Spfy jam advancing through one shared list:
+     * near the end, the host's next is put at the front of this account's own queue, so Spfy's natural
+     * advance plays it with its audio fetched ahead and no command at the boundary. Kotify holds at the
+     * end only while this account's next is something else; [trackEnded] then plays the host's next.
+     */
+    private suspend fun prepareNext(target: RelayPlayback, now: Long) {
+        val hostNext = target.queue.firstOrNull()?.uri
+        val mine = player.nextUri
+        player.holdAtTrackEnd = hostNext == null || mine != hostNext
+        if (hostNext == null || mine == hostNext || hostNext == placedNext) return
+        if (target.durationMs - target.positionAt(now) > PREPARE_MS) return
+        val previous = placedNext
+        placedNext = hostNext
+        applied { player.playNext(hostNext, replacing = previous) }
     }
 
     private suspend fun playTrack(target: RelayPlayback, trackUri: String, now: Long) {
@@ -125,6 +164,7 @@ class RelayGuest(
     }
 
     companion object {
+        private const val TAG = "RelayGuest"
         const val DRIFT_MS = 2_000L
         const val CHECK_MS = 5_000L
         const val LOAD_GRACE_MS = 1_500L
@@ -132,5 +172,7 @@ class RelayGuest(
         const val SEEK_COOLDOWN_MS = 3_000L
         const val PAUSE_COOLDOWN_MS = 2_000L
         const val SEEK_LEAD_MS = 300L
+        const val PREPARE_MS = 20_000L
+        const val ADVANCE_GRACE_MS = 3_000L
     }
 }

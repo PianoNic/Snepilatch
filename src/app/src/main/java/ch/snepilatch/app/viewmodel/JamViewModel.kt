@@ -53,7 +53,8 @@ class JamViewModel : SessionViewModel("JamVM") {
         if (starting.value || RelayJam.active) return
         starting.value = true
         error.value = null
-        launchWithSessionLoading("startJam", starting) {
+        launchWithSessionLoading("startJam", starting) { sess ->
+            leaveSpfyJam(sess)
             RelayJam.create()?.let { error.value = START_FAILED }
         }.invokeOnCompletion { starting.value = false }
     }
@@ -67,8 +68,8 @@ class JamViewModel : SessionViewModel("JamVM") {
         if (linkOrToken.isBlank()) return
         error.value = null
         RelayJamMapper.joinToken(linkOrToken)?.let { token ->
-            launchWithSessionLoading("joinRelayJam", joining) {
-                RelayJam.join(token)?.let { error.value = JamHolder.FAILED }
+            launchWithSessionLoading("previewRelayJam", joining) {
+                RelayJam.preview(token)?.let { error.value = JamHolder.FAILED }
             }
             return
         }
@@ -91,7 +92,17 @@ class JamViewModel : SessionViewModel("JamVM") {
 
     fun confirmJoin(choice: JoinChoice) {
         error.value = null
+        val pending = JamHolder.pending.value
+        if (pending != null && RelayJamMapper.isRelay(pending.jam)) {
+            launchWithSessionLoading("joinRelayJam", joining) { sess ->
+                leaveSpfyJam(sess)
+                error.value = RelayJam.join(pending.link, listen = choice == JoinChoice.LISTEN)?.let { JamHolder.FAILED }
+                if (error.value == null) JamHolder.pending.value = null
+            }
+            return
+        }
         launchWithSessionLoading("joinJam", joining) { sess ->
+            if (RelayJam.active) RelayJam.leave()
             error.value = JamHolder.join(sess, listen = choice == JoinChoice.LISTEN)
             if (error.value == null && choice == JoinChoice.LISTEN_VIA_YOUTUBE) JamListenAlong.start()
         }
@@ -117,6 +128,17 @@ class JamViewModel : SessionViewModel("JamVM") {
             // the socket is slow.
             if (Jam(sess).leave(current.sessionId)) JamHolder.clear()
         }
+    }
+
+    /**
+     * One jam at a time: an account still in a Spfy jam has its playback routed to that jam's host, so a
+     * relay jam's play commands would change someone else's music. Leaves it (ends it when hosting) first.
+     */
+    private suspend fun leaveSpfyJam(sess: kotify.session.Session) {
+        val current = JamHolder.session.value?.takeUnless { RelayJamMapper.isRelay(it) } ?: return
+        val jam = Jam(sess)
+        if (if (current.isSessionOwner) jam.end(current.sessionId) else jam.leave(current.sessionId)) JamHolder.clear()
+        JamListenAlong.stop()
     }
 
     /** Ends the jam for everyone. The server only lets the host do this. */

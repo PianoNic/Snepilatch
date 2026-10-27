@@ -36,6 +36,15 @@ class RelayGuestTest {
             positionMs.value = 0
         }
         override suspend fun enqueue(uri: String) = record("enqueue:$uri") {}
+        var next: String? = null
+        var held: Boolean? = null
+        override val nextUri get() = next
+        override var holdAtTrackEnd: Boolean
+            get() = held == true
+            set(value) {
+                held = value
+            }
+        override suspend fun playNext(uri: String, replacing: String?) = record("playNext:$uri:$replacing") {}
 
         private fun record(call: String, effect: () -> Unit) {
             calls += call
@@ -65,6 +74,70 @@ class RelayGuestTest {
         val target = seek.removePrefix("seek:").toLong()
         assertTrue("seek target $target", target in 31_500L..32_500L)
         assertTrue(player.applyingDuringCalls.all { it })
+    }
+
+    @Test
+    fun trackEnd_playsTheHostsNext_notThisAccountsOwn() = runTest {
+        val player = FakePlayer()
+        player.flow.value = player.flow.value.copy(trackUri = "track:a", contextUri = "playlist:host")
+        val guest = guest(player)
+        // The host is still on the track that just ended here: its next is the head of its queue.
+        guest.follow(
+            hostPlayback("track:a", position = 199_000, paused = false, at = currentTime)
+                .copy(queue = listOf(RelayQueueEntry("track:b"))),
+        )
+        runCurrent()
+        player.calls.clear()
+        guest.trackEnded()
+        assertEquals(listOf("play:track:b:playlist:host"), player.calls)
+    }
+
+    @Test
+    fun trackEnd_afterTheHostMovedOn_playsTheHostsCurrent() = runTest {
+        val player = FakePlayer()
+        player.flow.value = player.flow.value.copy(trackUri = "track:a", contextUri = "playlist:host")
+        val guest = guest(player)
+        guest.follow(hostPlayback("track:b", position = 500, paused = false, at = currentTime))
+        runCurrent()
+        player.calls.clear()
+        player.flow.value = player.flow.value.copy(trackUri = "track:a")
+        advanceTimeBy(RelayGuest.TRACK_RETRY_MS + 100)
+        guest.trackEnded()
+        assertEquals("play:track:b:playlist:host", player.calls.first())
+    }
+
+    @Test
+    fun nearTheEnd_theHostsNextGoesFirst_andTheHoldEndsOnceItIsThisAccountsNext() = runTest {
+        val player = FakePlayer()
+        player.flow.value = player.flow.value.copy(trackUri = "track:a", contextUri = "playlist:host")
+        player.next = "track:mine"
+        val guest = guest(player)
+        val nearEnd = hostPlayback("track:a", position = 190_000, paused = false, at = currentTime)
+            .copy(queue = listOf(RelayQueueEntry("track:b")))
+        player.positionMs.value = 190_000
+        guest.follow(nearEnd)
+        runCurrent()
+        assertEquals(listOf("playNext:track:b:null"), player.calls)
+        assertEquals(true, player.held)
+
+        // Spfy's state now names the host's next as this account's own: no hold, no second write.
+        player.next = "track:b"
+        guest.reconcile()
+        assertEquals(false, player.held)
+        assertEquals(1, player.calls.count { it.startsWith("playNext") })
+    }
+
+    @Test
+    fun aheadByOneAtTheHostsEnd_isNotPulledBack() = runTest {
+        val player = FakePlayer()
+        player.flow.value = player.flow.value.copy(trackUri = "track:b", contextUri = "playlist:host")
+        val guest = guest(player)
+        guest.follow(
+            hostPlayback("track:a", position = 199_500, paused = false, at = currentTime)
+                .copy(queue = listOf(RelayQueueEntry("track:b"))),
+        )
+        runCurrent()
+        assertEquals(emptyList<String>(), player.calls.filter { it.startsWith("play:") })
     }
 
     @Test

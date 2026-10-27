@@ -30,10 +30,10 @@ class AppSettingsDefaultsTest {
     }
 
     @Test
-    fun freshInstallStartsWithTheInAppEqualizer() {
-        assertEquals(AppSettings.EQ_IN_APP, AppSettings.eqMode.value)
+    fun freshInstallStartsWithTheExternalEqualizer() {
+        assertEquals(AppSettings.EQ_EXTERNAL, AppSettings.eqMode.value)
         AppSettings.load(contextWith(emptyPrefs()))
-        assertEquals(AppSettings.EQ_IN_APP, AppSettings.eqMode.value)
+        assertEquals(AppSettings.EQ_EXTERNAL, AppSettings.eqMode.value)
     }
 
     @Test

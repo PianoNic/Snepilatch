@@ -102,8 +102,8 @@ object AppSettings {
     //   [EQ_OFF]      no EQ, no attenuation
     //   [EQ_IN_APP]   our 10-band EQ, which makes its own headroom
     //   [EQ_EXTERNAL] no in-app EQ, just [eqHeadroomDb] of attenuation for the external one
-    // Defaults to [EQ_IN_APP]; [eqBands] starts flat, so it's transparent until a slider moves.
-    val eqMode = MutableStateFlow(EQ_IN_APP)
+    // Defaults to [EQ_EXTERNAL] until someone picks a mode, so a system or third-party EQ works out of the box.
+    val eqMode = MutableStateFlow(EQ_EXTERNAL)
     val eqHeadroomDb = MutableStateFlow(-6f)
 
     // Per-band gains in dB for the in-app EQ (see EqualizerHeadroom.FREQUENCIES).
@@ -347,13 +347,12 @@ object AppSettings {
      * state across once: the in-app EQ wins if it was on, otherwise headroom means an external one.
      *
      * Neither flag set means "never opened the screen" — the old booleans only ever recorded an
-     * *enable* — so it lands on the [EQ_IN_APP] default. A deliberate off is stored as `eq_mode` and
+     * *enable* — so it lands on the [EQ_EXTERNAL] default. A deliberate off is stored as `eq_mode` and
      * never reaches here.
      */
     internal fun migratedEqMode(prefs: android.content.SharedPreferences): String = when {
         prefs.getBoolean("eq_enabled", false) -> EQ_IN_APP
-        prefs.getBoolean("eq_headroom_enabled", false) -> EQ_EXTERNAL
-        else -> EQ_IN_APP
+        else -> EQ_EXTERNAL
     }
 
     /** Switch equalizer mode: re-attach or drop our EQ, and re-stage the gain for the new mode. */

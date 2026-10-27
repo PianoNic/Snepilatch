@@ -190,9 +190,11 @@ class DetailViewModel : SessionViewModel("DetailVM") {
      * Opens the page of an item of [type] (collection, playlist, album, artist, show) identified by
      * [uri]. False when the type has no page, so the caller decides what to do with it instead.
      */
-    fun openEntity(type: String, uri: String, owner: String? = null, imageUrl: String? = null): Boolean {
+    fun openEntity(type: String, uri: String, owner: String? = null, imageUrl: String? = null, showUri: String? = null): Boolean {
         val id = spfyId(uri)
         when (type) {
+            // No episode page: an episode opens its show, never plays from a tap on its card.
+            "episode" -> openShow(spfyId(showUri ?: return false), owner)
             "collection" -> openLikedSongs()
             "playlist" -> openPlaylist(id)
             "album" -> openAlbum(id)

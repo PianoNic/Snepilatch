@@ -71,9 +71,21 @@ class JamViewModel : SessionViewModel("JamVM") {
             }
             return
         }
-        launchWithSessionLoading("joinJam", joining) { sess ->
-            error.value = JamHolder.join(sess, linkOrToken)
+        launchWithSessionLoading("previewJam", joining) { sess ->
+            error.value = JamHolder.preview(sess, linkOrToken)
         }
+    }
+
+    /** The join sheet's answer: [listen] plays the jam on this phone (Premium), else controls the host's. */
+    fun confirmJoin(listen: Boolean) {
+        error.value = null
+        launchWithSessionLoading("joinJam", joining) { sess ->
+            error.value = JamHolder.join(sess, listen)
+        }
+    }
+
+    fun cancelJoin() {
+        JamHolder.pending.value = null
     }
 
     /** Ask the server again; the pushes normally keep the holder current on their own. */

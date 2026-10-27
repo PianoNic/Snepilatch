@@ -439,6 +439,11 @@
     <string name="jam_paste_hint">Paste a jam link someone shared with you.</string>
     <string name="jam_link_placeholder">Jam link</string>
     <string name="jam_join_failed">Couldn\'t join that jam. The link may have expired.</string>
+    <string name="jam_join_title">Join %1$s\'s Jam?</string>
+    <string name="jam_join_subtitle">Listen together in real time, from anywhere.</string>
+    <string name="jam_play_here">Play on %1$s</string>
+    <string name="jam_play_on_host">Play on %1$s\'s speaker</string>
+    <string name="jam_join_privacy">People in the Jam will see your username, profile picture, and suggested songs based on your taste profile.</string>
     <string name="jam_not_ready">Still connecting. Try again in a moment.</string>
     <string name="jam_start_title">Start a jam</string>
     <string name="jam_start_hint">Listen together with friends. Anyone with the link can join, and everyone hears what you play.</string>

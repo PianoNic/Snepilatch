@@ -56,7 +56,9 @@ fun JamSheet(onDismiss: () -> Unit, jamVm: JamViewModel = viewModel()) {
         initialValue = SheetValue.Hidden,
         enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
     )
-    LaunchedEffect(jam?.sessionId) { if (jam != null) onDismiss() }
+    val pending by JamHolder.pending.collectAsState()
+    // The join sheet takes over once the link resolved; a join that lands closes this one too.
+    LaunchedEffect(jam?.sessionId, pending) { if (jam != null || pending != null) onDismiss() }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,

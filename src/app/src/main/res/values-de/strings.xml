@@ -424,6 +424,11 @@
     <string name="jam_paste_hint">Füge einen Jam-Link ein, den dir jemand geschickt hat.</string>
     <string name="jam_link_placeholder">Jam-Link</string>
     <string name="jam_join_failed">Beitritt fehlgeschlagen. Der Link ist vielleicht abgelaufen.</string>
+    <string name="jam_join_title">Möchtest du einen Jam mit %1$s starten?</string>
+    <string name="jam_join_subtitle">Hört zusammen in Echtzeit Musik, egal wo ihr seid.</string>
+    <string name="jam_play_here">Wiedergabe über %1$s</string>
+    <string name="jam_play_on_host">Wiedergabe über den Lautsprecher von %1$s</string>
+    <string name="jam_join_privacy">In einem Jam sehen die Teilnehmer*innen deinen Benutzernamen, dein Profil und Songs, die basierend auf deinem Hörverhalten vorgeschlagen werden.</string>
     <string name="jam_not_ready">Verbindung wird noch aufgebaut. Gleich nochmal versuchen.</string>
     <string name="jam_start_title">Jam starten</string>
     <string name="jam_start_hint">Hört gemeinsam Musik. Wer den Link hat, kann beitreten und hört, was du abspielst.</string>

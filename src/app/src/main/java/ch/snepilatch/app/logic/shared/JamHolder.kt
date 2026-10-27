@@ -70,29 +70,51 @@ object JamHolder {
         inviteLinks.value = null
     }
 
+    /** A jam link opened but not joined yet: the join sheet asks how to take part, as the official app does. */
+    data class PendingJam(val link: String, val jam: JamSession)
+
+    val pending = MutableStateFlow<PendingJam?>(null)
+
     /**
-     * Join by link (long or `spotify.link` short) or bare token. Null when it worked, otherwise the
-     * error key the join sheet shows: [NOT_READY] or [FAILED].
+     * Look up the jam behind a link (long or `spotify.link` short) or bare token and hold it in
+     * [pending] for the join sheet. Null when it worked, otherwise the error key the sheets show:
+     * [NOT_READY] or [FAILED].
      *
      * Joining without a registered Connect device returns 200 but does not stick: the membership is
      * silently dropped and every later command fails. [ch.snepilatch.app.viewmodel.PlaybackViewModel.initialize]
      * is what calls `ready()`, and a link opened on a cold start arrives before that, so wait for it.
      */
-    suspend fun join(sess: Session, linkOrToken: String): String? {
+    suspend fun preview(sess: Session, linkOrToken: String): String? {
         val input = linkOrToken.trim().takeIf { it.isNotBlank() } ?: return FAILED
         SessionHolder.awaitPlayer(PLAYER_WAIT_MS) ?: return NOT_READY
-        val api = Jam(sess)
         // A pasted or scanned short link stands for the long one; the share token has to come from
         // the long one.
         val link = ShortLink.expand(sess, input)
-        val joined = link?.let { api.joinFromLink(it) }
-        if (joined == null) {
-            LokiLogger.w(TAG, "Jam join failed for $input")
+        val jam = link?.let { Jam(sess).getSession(it) }
+        if (link == null || jam == null) {
+            LokiLogger.w(TAG, "Jam lookup failed for $input")
             return FAILED
         }
-        shareToken.value = api.shareTokenOf(link)
+        pending.value = PendingJam(link, jam)
+        return null
+    }
+
+    /**
+     * Join the [pending] jam. [listen] plays it on this phone ("listen along"), which the server allows
+     * Premium accounts only; without it this account controls the host's playback. Null when it
+     * worked, otherwise [FAILED].
+     */
+    suspend fun join(sess: Session, listen: Boolean): String? {
+        val wanted = pending.value ?: return FAILED
+        val joined = Jam(sess).joinFromLink(wanted.link, listen, SessionHolder.player?.ourDeviceId())
+        if (joined == null) {
+            LokiLogger.w(TAG, "Jam join failed for ${wanted.link} (listen=$listen)")
+            return FAILED
+        }
+        pending.value = null
+        shareToken.value = Jam(sess).shareTokenOf(wanted.link)
         session.value = joined
-        LokiLogger.i(TAG, "Joined jam ${joined.sessionId} (${joined.members.size} members)")
+        LokiLogger.i(TAG, "Joined jam ${joined.sessionId} (${joined.members.size} members, listen=$listen)")
         return null
     }
 

@@ -422,6 +422,11 @@
     <string name="jam_paste_hint">Вставьте ссылку на джем, которой с вами поделились.</string>
     <string name="jam_link_placeholder">Ссылка на джем</string>
     <string name="jam_join_failed">Не удалось присоединиться. Ссылка могла устареть.</string>
+    <string name="jam_join_title">Присоединиться к джему %1$s?</string>
+    <string name="jam_join_subtitle">Слушайте музыку вместе в реальном времени, где бы вы ни были.</string>
+    <string name="jam_play_here">Воспроизводить на %1$s</string>
+    <string name="jam_play_on_host">Воспроизводить на динамике %1$s</string>
+    <string name="jam_join_privacy">Участники джема увидят ваше имя пользователя, фото профиля и треки, предложенные на основе ваших вкусов.</string>
     <string name="jam_not_ready">Ещё подключаемся. Попробуйте через момент.</string>
     <string name="jam_start_title">Начать джем</string>
     <string name="jam_start_hint">Слушайте музыку вместе с друзьями. Любой, у кого есть ссылка, может присоединиться и слышит то, что играет у вас.</string>

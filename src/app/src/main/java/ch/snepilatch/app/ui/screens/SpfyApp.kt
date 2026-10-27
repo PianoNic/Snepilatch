@@ -352,6 +352,13 @@ fun SpfyApp(vm: PlaybackViewModel) {
         val showQueue by vm.queueSheetVisible.collectAsState()
         if (showQueue) QueueSheet(vm)
 
+        // A jam link, tapped or pasted, waits here for how to take part before anything is joined.
+        val pendingJam by ch.snepilatch.app.logic.shared.JamHolder.pending.collectAsState()
+        pendingJam?.let { jam ->
+            val account by vm.account.collectAsState()
+            ch.snepilatch.app.ui.shared.JamJoinSheet(jam, isPremium = account.isPremium, myImageUrl = account.profileImageUrl)
+        }
+
         // Global playlist picker (triggered from TrackRow menu)
         val showPicker by vm.showPlaylistPicker.collectAsState()
         if (showPicker) {

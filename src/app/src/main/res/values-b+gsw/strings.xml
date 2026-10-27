@@ -436,6 +436,11 @@
     <string name="jam_paste_hint">Füeg en Jam-Link ii, wo dir öpper gschickt het.</string>
     <string name="jam_link_placeholder">Jam-Link</string>
     <string name="jam_join_failed">Biitrete het nöd klappet. De Link isch villicht abglaufe.</string>
+    <string name="jam_join_title">Wotsch en Jam mit %1$s starte?</string>
+    <string name="jam_join_subtitle">Losed zäme in Echtziit Musig, egal wo ihr sind.</string>
+    <string name="jam_play_here">Abspile über %1$s</string>
+    <string name="jam_play_on_host">Abspile über de Lutsprecher vo %1$s</string>
+    <string name="jam_join_privacy">Im ne Jam gsehnd d Teilnehmer*inne din Benutzername, dis Profil und Songs, wo uf dim Hörverhalte basiered.</string>
     <string name="jam_not_ready">Verbindig wird no ufboue. Grad nomal probiere.</string>
     <string name="jam_start_title">Jam starte</string>
     <string name="jam_start_hint">Losed zäme Musig. Wer de Link het, cha biträte und ghört, was du abspielsch.</string>

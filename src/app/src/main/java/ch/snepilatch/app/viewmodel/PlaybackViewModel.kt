@@ -1214,7 +1214,8 @@ class PlaybackViewModel : ViewModel() {
             "artist" -> DetailRoutes.openArtist(id)
             "jam" -> launchWithSession("joinRelayJam") { RelayJam.joinFromLink(id) }
             "socialsession" -> launchWithSession("joinJam") { sess ->
-                JamHolder.join(sess, id)?.let { LokiLogger.w(TAG, "Jam link $id not joined: $it") }
+                // Looked up only; the join sheet asks how to take part before anything is joined.
+                JamHolder.preview(sess, uri.toString())?.let { LokiLogger.w(TAG, "Jam link $id not opened: $it") }
             }
             else -> LokiLogger.i(TAG, "Unsupported deep link type: $type")
         }

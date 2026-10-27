@@ -1579,6 +1579,13 @@ class PlaybackViewModel : ViewModel() {
         infiniPlay.enable(uri)
     }
 
+    /**
+     * In a jam as a controller, not a listener: the audio belongs on the host's device, so play never
+     * claims this phone. Taking it over anyway dropped the account from the jam, and with nothing
+     * active the server kept the phone paused under audio that played.
+     */
+    private fun jamControllerOnly(): Boolean = JamHolder.session.value?.let { it.active && !it.isListening } == true
+
     fun togglePlayPause() {
         val paused = _playback.value.isPaused || !_playback.value.isPlaying
         if (RelayJam.redirect(RelayCommand(if (paused) RelayCommand.RESUME else RelayCommand.PAUSE))) return
@@ -1595,8 +1602,9 @@ class PlaybackViewModel : ViewModel() {
             try {
                 val p = player ?: return@launch
                 val t0 = System.currentTimeMillis()
-                if (foreignDeviceActive) {
-                    // Another device holds playback: act as a remote control for it. The local* state
+                if (foreignDeviceActive || jamControllerOnly()) {
+                    // Another device holds playback, or this account is in a jam only to control the
+                    // host's playback (CONTROL, all a Free account may take): act as a remote control. The local* state
                     // reports below describe THIS device, so they'd be ignored, and the cold-start path
                     // would claim the device and pull the audio over here. Moving playback to the phone
                     // stays an explicit action via the devices dialog (transferPlayback).

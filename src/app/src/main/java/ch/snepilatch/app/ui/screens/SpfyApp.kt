@@ -204,8 +204,22 @@ fun SpfyApp(vm: PlaybackViewModel) {
         ) {
             val jam by JamHolder.session.collectAsState()
             val appContext = LocalContext.current.applicationContext
-            LaunchedEffect(vm) { ch.snepilatch.app.logic.relay.RelayJam.bind(vm, appContext) }
-            jam?.let { JamBanner(it, onClick = { vm.openQueue() }) }
+            LaunchedEffect(vm) {
+                ch.snepilatch.app.logic.relay.RelayJam.bind(vm, appContext)
+                ch.snepilatch.app.logic.playback.JamListenAlong.bind(vm)
+            }
+            val resumable by ch.snepilatch.app.logic.playback.JamListenAlong.resumable.collectAsState()
+            jam?.let {
+                JamBanner(
+                    it,
+                    onClick = { vm.openQueue() },
+                    onResume = if (resumable) {
+                        { ch.snepilatch.app.logic.playback.JamListenAlong.start() }
+                    } else {
+                        null
+                    },
+                )
+            }
             if (hasTrack) {
                 MiniPlayer(
                     vm,

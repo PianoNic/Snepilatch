@@ -23,6 +23,7 @@ import ch.snepilatch.app.logic.shared.hasInternet
 import ch.snepilatch.app.logic.shared.normalizeSpfyImageUrl
 import ch.snepilatch.app.logic.playback.InfiniPlayController
 import ch.snepilatch.app.logic.playback.InfiniPlayViz
+import ch.snepilatch.app.logic.playback.JamListenAlong
 import ch.snepilatch.app.logic.playback.MusicPlaybackService
 import ch.snepilatch.app.logic.playback.PlaybackCache
 import ch.snepilatch.app.logic.playback.PositionInterpolator
@@ -1042,6 +1043,8 @@ class PlaybackViewModel : ViewModel() {
      * needing a real PlayerConnect.
      */
     internal fun handleRemotePlay(positionMs: Long) {
+        // Listening along to a jam: the engine follows the jam's play itself, from its own audio.
+        if (JamListenAlong.active.value) return
         if (!isStreaming.value) {
             LokiLogger.i(TAG, "Spfy: play at ${positionMs}ms")
             MusicPlaybackService.instance?.syncPlay(positionMs)
@@ -1061,6 +1064,7 @@ class PlaybackViewModel : ViewModel() {
             LokiLogger.d(TAG, "Spfy: pause suppressed (reconnecting)")
             return
         }
+        if (JamListenAlong.active.value) return
         if (!isStreaming.value) {
             LokiLogger.i(TAG, "Spfy: pause at ${positionMs}ms")
             MusicPlaybackService.instance?.syncPause()
@@ -2813,6 +2817,9 @@ class PlaybackViewModel : ViewModel() {
      * tap on play was swallowed without a trace and the cold start waited forever for a player that
      * did not exist. Its callbacks are wired again too, or onReady would never reach this model.
      */
+    /** The playback service, started again if it was gone; for engines that play without a Connect stream. */
+    suspend fun ensurePlaybackService(): MusicPlaybackService? = ensureService()
+
     private suspend fun ensureService(): MusicPlaybackService? {
         MusicPlaybackService.instance?.let { return it }
         val ctx = serviceContext ?: return null
@@ -2960,7 +2967,9 @@ class PlaybackViewModel : ViewModel() {
      * and the crucial onReady that completes the cold-start handoff.
      */
     private fun wirePlaybackLifecycleCallbacks(svc: MusicPlaybackService) {
-        svc.onTrackTransition = {
+        svc.onTrackTransition = transition@{
+            // Listening along to a jam plays no Spfy stream, so there is nothing of Spfy's to pre-resolve.
+            if (JamListenAlong.active.value) return@transition
             // ExoPlayer auto-advanced to the pre-buffered next track. The
             // WebSocket will push the new state; just pre-resolve the next one.
             viewModelScope.launch(Dispatchers.IO) {
@@ -2970,6 +2979,13 @@ class PlaybackViewModel : ViewModel() {
             }
         }
         svc.onPlaybackError = onError@{ errorCode ->
+            if (JamListenAlong.active.value) {
+                // The YouTube stream failed: the engine's next check loads the jam's track again. A
+                // recovery here would resolve it from Spfy, which drops the account from the jam.
+                LokiLogger.w(TAG, "ExoPlayer error $errorCode while listening along, left to the engine")
+                JamListenAlong.playbackFailed()
+                return@onError
+            }
             if (isOffline.value) {
                 LokiLogger.w(TAG, "ExoPlayer error $errorCode while offline, treating the track as ended")
                 clearStream()
@@ -2986,6 +3002,9 @@ class PlaybackViewModel : ViewModel() {
             viewModelScope.launch(Dispatchers.IO) { recoverFromPlaybackError(failedUri, failedPos) }
         }
         svc.onPlaybackEnded = onEnded@{
+            // The YouTube copy ending is no reason to advance anything on Spfy; the jam's next track
+            // reaches the engine through the cluster.
+            if (JamListenAlong.active.value) return@onEnded
             if (isOffline.value) {
                 viewModelScope.launch(Dispatchers.IO) { offline.trackEnded() }
                 return@onEnded
@@ -3033,7 +3052,10 @@ class PlaybackViewModel : ViewModel() {
                 catch (e: Exception) { handleAdvanceFailure(e) }
             }
         }
-        svc.onReady = { onStreamReady() }
+        svc.onReady = {
+            // Listening along: the engine's stream is ready, so its spinner stops; nothing else is ours to do.
+            if (JamListenAlong.active.value) isStreamLoading.value = false else onStreamReady()
+        }
     }
 
     /** ExoPlayer reached STATE_READY for the current stream. */

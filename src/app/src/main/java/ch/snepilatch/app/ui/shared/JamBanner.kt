@@ -41,7 +41,7 @@ import kotify.api.jam.JamSession
 
 /** The strip above the mini player while the account is in a jam: whose jam, and who is in it. */
 @Composable
-fun JamBanner(jam: JamSession, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun JamBanner(jam: JamSession, onClick: () -> Unit, modifier: Modifier = Modifier, onResume: (() -> Unit)? = null) {
     val theme by ThemeController.themeColors.collectAsState()
     val accent by animateColorAsState(theme.primary, tween(800), label = "jamBanner")
     Row(
@@ -66,6 +66,21 @@ fun JamBanner(jam: JamSession, onClick: () -> Unit, modifier: Modifier = Modifie
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
+        if (onResume != null) {
+            // Resumes listening along after a cold boot (JamListenAlong.resumable).
+            Text(
+                stringResource(R.string.jam_listen_along_resume),
+                color = SnepilatchWhite,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .padding(end = 10.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(Color.Black.copy(alpha = 0.2f))
+                    .clickable(onClick = onResume)
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+            )
+        }
         JamAvatars(jam.members, size = 26.dp, ring = accent)
     }
 }

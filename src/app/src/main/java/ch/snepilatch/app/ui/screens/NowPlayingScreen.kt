@@ -1138,8 +1138,13 @@ private fun SourcePill(provider: String?) {
     val jamVm: ch.snepilatch.app.viewmodel.JamViewModel = viewModel()
     val jam by jamVm.jam.collectAsState()
     val inJam = jam != null
+    val listeningAlong by ch.snepilatch.app.logic.playback.JamListenAlong.active.collectAsState()
+    // Joined as CONTROL with no YouTube Music audio: this phone plays nothing, it only steers the host.
+    val remoteOnly = jam?.let { !it.isListening && !it.isSessionOwner } == true && !listeningAlong
     val active = provider != null || inJam
     val label = when {
+        remoteOnly -> stringResource(R.string.jam_remote_only)
+        jam?.isSessionOwner == true -> stringResource(R.string.jam_hosting)
         inJam -> stringResource(R.string.jam_connected)
         provider == null -> "No CDN"
         provider == "qobuz" -> "Qobuz"
@@ -1147,6 +1152,7 @@ private fun SourcePill(provider: String?) {
         else -> provider.replaceFirstChar { it.uppercase() }
     }
     val icon = when {
+        remoteOnly -> Icons.Rounded.SettingsRemote
         inJam -> Icons.Rounded.Groups
         active -> Icons.Rounded.MusicNote
         else -> Icons.Rounded.CloudOff

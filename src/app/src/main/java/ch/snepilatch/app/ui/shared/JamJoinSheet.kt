@@ -70,7 +70,7 @@ fun JamJoinSheet(pending: JamHolder.PendingJam, isPremium: Boolean, myImageUrl: 
     val joining by jamVm.joining.collectAsState()
     val error by jamVm.error.collectAsState()
     val theme by ThemeController.themeColors.collectAsState()
-    var listen by remember { mutableStateOf<Boolean?>(null) }
+    var choice by remember { mutableStateOf<JamViewModel.JoinChoice?>(null) }
     val host = pending.jam.host
     val hostName = host?.displayName.orEmpty()
     val sheetState = rememberBottomSheetState(
@@ -88,7 +88,8 @@ fun JamJoinSheet(pending: JamHolder.PendingJam, isPremium: Boolean, myImageUrl: 
             Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Row(horizontalArrangement = Arrangement.Center) {
+            // Centred: the host's ring makes its avatar taller than this account's.
+            Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                 Avatar(myImageUrl)
                 // The host's picture sits over this account's, cut out by a ring in the sheet's colour,
                 // the way the jam banner stacks its members.
@@ -105,25 +106,37 @@ fun JamJoinSheet(pending: JamHolder.PendingJam, isPremium: Boolean, myImageUrl: 
             ChoiceRow(
                 icon = Icons.Rounded.Smartphone,
                 title = stringResource(R.string.jam_play_here, android.os.Build.MODEL),
-                premiumBadge = true,
-                selected = listen == true,
+                sub = stringResource(R.string.premium),
+                subColor = theme.primary,
+                selected = choice == JamViewModel.JoinChoice.LISTEN,
                 enabled = isPremium,
-                accent = theme.primary,
-            ) { listen = true }
+            ) { choice = JamViewModel.JoinChoice.LISTEN }
+            // What a Free account gets instead of listening on Spfy: the same jam on this phone from
+            // YouTube Music, while it only controls the host's playback on Spfy (#1026).
+            if (!isPremium) {
+                ChoiceRow(
+                    icon = Icons.Rounded.Smartphone,
+                    title = stringResource(R.string.jam_listen_along_ytm),
+                    sub = stringResource(R.string.jam_listen_along_ytm_desc),
+                    subColor = SnepilatchLightGray,
+                    selected = choice == JamViewModel.JoinChoice.LISTEN_VIA_YOUTUBE,
+                    enabled = true,
+                ) { choice = JamViewModel.JoinChoice.LISTEN_VIA_YOUTUBE }
+            }
             ChoiceRow(
                 icon = Icons.Rounded.Speaker,
                 title = stringResource(R.string.jam_play_on_host, hostName),
-                premiumBadge = false,
-                selected = listen == false,
+                sub = null,
+                subColor = SnepilatchLightGray,
+                selected = choice == JamViewModel.JoinChoice.CONTROL,
                 enabled = true,
-                accent = theme.primary,
-            ) { listen = false }
+            ) { choice = JamViewModel.JoinChoice.CONTROL }
             if (error == JamHolder.FAILED) {
                 Spacer(Modifier.height(6.dp))
                 Text(stringResource(R.string.jam_join_failed), color = SnepilatchLightGray, fontSize = 12.sp)
             }
             Spacer(Modifier.height(16.dp))
-            Button(onClick = { listen?.let(jamVm::confirmJoin) }, enabled = listen != null && !joining) {
+            Button(onClick = { choice?.let(jamVm::confirmJoin) }, enabled = choice != null && !joining) {
                 Text(stringResource(if (joining) R.string.jam_joining else R.string.jam_join))
             }
             Spacer(Modifier.height(16.dp))
@@ -144,15 +157,15 @@ private fun Avatar(url: String?, modifier: Modifier = Modifier) {
     }
 }
 
-/** One way to take part: an icon, its name, the Premium badge where it needs one, and the radio. */
+/** One way to take part: an icon, its name, a line under it (the Premium badge, or what it uses), and the radio. */
 @Composable
 private fun ChoiceRow(
     icon: ImageVector,
     title: String,
-    premiumBadge: Boolean,
+    sub: String?,
+    subColor: androidx.compose.ui.graphics.Color,
     selected: Boolean,
     enabled: Boolean,
-    accent: androidx.compose.ui.graphics.Color,
     onSelect: () -> Unit,
 ) {
     Row(
@@ -167,8 +180,8 @@ private fun ChoiceRow(
         Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {
             Text(title, color = SnepilatchWhite, fontSize = 16.sp)
-            if (premiumBadge) {
-                Text(stringResource(R.string.premium), color = accent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            if (sub != null) {
+                Text(sub, color = subColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             }
         }
         RadioButton(selected = selected, onClick = null, enabled = enabled)

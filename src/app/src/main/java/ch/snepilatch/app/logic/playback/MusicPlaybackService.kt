@@ -416,9 +416,14 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 if (playbackSuppressionReason == Player.PLAYBACK_SUPPRESSION_REASON_TRANSIENT_AUDIO_FOCUS_LOSS) {
                     LokiLogger.i(TAG, "Transient focus loss — reporting pause to Spfy")
                     onAudioFocusPaused?.invoke()
-                } else {
+                } else if (player.playWhenReady) {
                     LokiLogger.i(TAG, "Playback no longer suppressed — reporting play to Spfy")
                     onAudioFocusResumed?.invoke()
+                } else {
+                    // The suppression ended because the player was paused, most often by Spfy echoing
+                    // the pause reported above. Reporting play here started the music again over the
+                    // app that had taken focus (#1006).
+                    LokiLogger.i(TAG, "Suppression ended by a pause — nothing to report")
                 }
             }
 

@@ -118,7 +118,10 @@ object FolderScan {
                     .getOrDefault(0)
                 val total = _migrating.value?.total ?: 0
                 LokiLogger.i(TAG, "matched $matched of $total file(s) to the catalogue")
-                if (unindexed > 0) AppMessages.show(R.string.downloads_matched, matched, total)
+                when {
+                    lookup.refused != null -> AppMessages.show(R.string.downloads_lookup_stopped, matched, total)
+                    unindexed > 0 -> AppMessages.show(R.string.downloads_matched, matched, total)
+                }
             }
             val written = runCatching { writeTags(ctx, lookup) }
                 .onFailure { LokiLogger.e(TAG, "writing ids failed", it) }
@@ -262,6 +265,8 @@ object FolderScan {
                     index.withLock {
                         // add() is false for a track already indexed, or a second copy of one just taken.
                         when {
+                            // Not looked up at all: the lookups stopped. It is tried again next time.
+                            row == null && lookup?.refused != null -> Unit
                             row == null -> {
                                 LokiLogger.i(TAG, "no track found for ${file.name}")
                                 unmatched += file.uri.toString()

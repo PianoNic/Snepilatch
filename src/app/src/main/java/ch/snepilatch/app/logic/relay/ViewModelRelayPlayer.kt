@@ -33,9 +33,9 @@ class ViewModelRelayPlayer(private val vm: PlaybackViewModel) : RelayHostPlayer 
         )
     }
 
-    override suspend fun pause() = onMain { vm.togglePlayPause() }
+    override suspend fun pause() = onMain { vm.pausePlayback() }
 
-    override suspend fun resume() = onMain { vm.togglePlayPause() }
+    override suspend fun resume() = onMain { vm.resumePlayback() }
 
     override suspend fun next() = onMain { vm.skipNext() }
 

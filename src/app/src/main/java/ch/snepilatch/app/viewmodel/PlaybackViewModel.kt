@@ -1598,15 +1598,32 @@ class PlaybackViewModel : ViewModel() {
      */
     private fun jamControllerOnly(): Boolean = JamHolder.session.value?.let { it.active && !it.isListening } == true
 
-    fun togglePlayPause() {
-        val paused = _playback.value.isPaused || !_playback.value.isPlaying
-        if (RelayJam.redirect(RelayCommand(if (paused) RelayCommand.RESUME else RelayCommand.PAUSE))) return
+    fun togglePlayPause() = setPlaying(isPausedNow())
+
+    /**
+     * Play, or nothing when already playing; never the opposite (#1024). A toggle decides from the state
+     * at the moment it runs, so one that changed in between (an echo, an optimistic flip, a tap)
+     * turned a relay jam's pause into a play.
+     */
+    fun resumePlayback() {
+        if (isPausedNow()) setPlaying(true)
+    }
+
+    /** Pause, or nothing when already paused; see [resumePlayback]. */
+    fun pausePlayback() {
+        if (!isPausedNow()) setPlaying(false)
+    }
+
+    private fun isPausedNow(): Boolean = _playback.value.isPaused || !_playback.value.isPlaying
+
+    private fun setPlaying(play: Boolean) {
+        if (RelayJam.redirect(RelayCommand(if (play) RelayCommand.RESUME else RelayCommand.PAUSE))) return
         commandJob?.cancel()
         if (isOffline.value) {
             commandJob = viewModelScope.launch(Dispatchers.IO) { OfflinePlayer.togglePlayPause() }
             return
         }
-        val action = if (_playback.value.isPaused || !_playback.value.isPlaying) "resume" else "pause"
+        val action = if (play) "resume" else "pause"
         lastCommandTs = System.currentTimeMillis()
         lastCommandName = action
         LokiLogger.i(TAG, "[Timing] CMD $action sent")

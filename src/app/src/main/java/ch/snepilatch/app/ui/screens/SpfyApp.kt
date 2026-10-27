@@ -373,6 +373,11 @@ fun SpfyApp(vm: PlaybackViewModel) {
     } // ModalNavigationDrawer
 }
 
+/** The pages under Settings, which slide in from it. */
+private val SETTINGS_PAGES = setOf(
+    Screen.INTERFACE, Screen.SETTINGS_PLAYBACK, Screen.SETTINGS_DOWNLOADS, Screen.SETTINGS_SOUND, Screen.SETTINGS_ABOUT,
+)
+
 @Composable
 private fun MainContent(screen: Screen, vm: PlaybackViewModel, hazeState: HazeState) {
     // Constructed here, not read here: building it starts the one library load and subscribes it to
@@ -386,13 +391,13 @@ private fun MainContent(screen: Screen, vm: PlaybackViewModel, hazeState: HazeSt
             .statusBarsPadding()
             .hazeSource(hazeState)
     ) {
-        // The interface page slides in over the account tab and back out; every other switch is a cut.
+        // A settings page slides in over Settings and back out; every other switch is a cut.
         AnimatedContent(
             targetState = screen,
             transitionSpec = {
                 when {
-                    targetState == Screen.INTERFACE -> slideInHorizontally { it } togetherWith slideOutHorizontally { -it }
-                    initialState == Screen.INTERFACE -> slideInHorizontally { -it } togetherWith slideOutHorizontally { it }
+                    targetState in SETTINGS_PAGES -> slideInHorizontally { it } togetherWith slideOutHorizontally { -it }
+                    initialState in SETTINGS_PAGES -> slideInHorizontally { -it } togetherWith slideOutHorizontally { it }
                     else -> EnterTransition.None togetherWith ExitTransition.None
                 }
             },
@@ -405,6 +410,11 @@ private fun MainContent(screen: Screen, vm: PlaybackViewModel, hazeState: HazeSt
                 Screen.LIBRARY -> LibraryScreen()
                 Screen.ACCOUNT -> AccountScreen(vm)
                 Screen.INTERFACE -> InterfaceScreen(vm)
+                Screen.SETTINGS -> SettingsScreen(vm)
+                Screen.SETTINGS_PLAYBACK -> SettingsPage(vm, stringResource(R.string.account_section_playback)) { PlaybackSettings(vm) }
+                Screen.SETTINGS_DOWNLOADS -> SettingsPage(vm, stringResource(R.string.downloads)) { DownloadSettings(vm) }
+                Screen.SETTINGS_SOUND -> SettingsPage(vm, stringResource(R.string.account_section_sound)) { SoundSettings(vm) }
+                Screen.SETTINGS_ABOUT -> SettingsPage(vm, stringResource(R.string.about)) { AboutSettings() }
                 Screen.EQUALIZER -> EqualizerScreen(vm)
                 Screen.FRIEND_ACTIVITY -> FriendActivityScreen(vm)
                 Screen.WHATS_NEW -> WhatsNewScreen(vm)

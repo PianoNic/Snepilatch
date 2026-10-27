@@ -94,6 +94,9 @@
     <string name="lyrics_horizontal">Vo links uf rächts</string>
     <string name="player_shortcut">Player-Taste</string>
     <string name="player_shortcut_desc">Wähl d Taste näbed em Player-Menü</string>
+    <string name="nav_slot">Vierti Taste i de Leiste</string>
+    <string name="nav_slot_desc">Was du da wählsch, verschwindet usem Profilmenü</string>
+    <string name="nav_slot_none">Kei, drü Taste</string>
     <string name="swipe_left_action">Nach links wüsche</string>
     <string name="swipe_right_action">Nach rächts wüsche</string>
     <string name="swipe_action_desc">Wähl d Aktion für die Wüsch-Richtig</string>
@@ -313,6 +316,10 @@
     <string name="appearance">Usgsee</string>
     <string name="behavior">Verhalte</string>
     <string name="interface_desc">Sproch, Lyrics, Hindergründ und Benachrichtigungs-Taste</string>
+    <string name="settings_playback_desc">Audioquälle, Region und Grät</string>
+    <string name="settings_downloads_desc">Quälle, Ordner und Spiicherlimit</string>
+    <string name="settings_sound_desc">Equalizer</string>
+    <string name="settings_about_desc">Version, Updates und Fählersuechi</string>
     <string name="account_section_notifications">Benachrichtigunge</string>
     <string name="account_section_sound">Ton</string>
 

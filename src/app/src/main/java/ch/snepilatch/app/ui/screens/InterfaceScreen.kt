@@ -24,8 +24,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
 import androidx.compose.ui.graphics.vector.ImageVector
+import ch.snepilatch.app.data.NavSlot
 import ch.snepilatch.app.data.PlayerShortcut
 import ch.snepilatch.app.logic.shared.AppSettings
+import ch.snepilatch.app.logic.shared.NavSettings
 import ch.snepilatch.app.logic.shared.GestureSettings
 import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.ui.shared.RadioOption
@@ -34,6 +36,7 @@ import ch.snepilatch.app.ui.shared.SettingRow
 import ch.snepilatch.app.ui.shared.SettingsSectionHeader
 import ch.snepilatch.app.ui.shared.SettingToggleRow
 import ch.snepilatch.app.ui.shared.playerShortcutIcon
+import ch.snepilatch.app.ui.shared.slotLook
 import ch.snepilatch.app.ui.shared.playerShortcutTitle
 import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
@@ -151,6 +154,8 @@ private fun BehaviorSection(context: Context, accent: Color) {
         icon = Icons.AutoMirrored.Rounded.QueueMusic,
     )
 
+    NavSlotPickerRow(context)
+
     val playerShortcut by AppSettings.playerShortcut.collectAsState()
     ShortcutPickerRow(
         title = stringResource(R.string.player_shortcut),
@@ -178,6 +183,32 @@ private fun BehaviorSection(context: Context, accent: Color) {
         options = PlayerShortcut.perTrack,
     ) { GestureSettings.setSwipeActions(context, right = it) }
 }
+
+/** Picks the bottom bar's fourth button; whatever is picked leaves the profile menu. */
+@Composable
+private fun NavSlotPickerRow(context: Context) {
+    val slot by NavSettings.navSlot.collectAsState()
+    var showPicker by remember { mutableStateOf(false) }
+    val title = stringResource(R.string.nav_slot)
+    SettingRow(title = title, subtitle = navSlotLabel(slot), icon = Icons.Rounded.TouchApp, onClick = { showPicker = true })
+    if (showPicker) {
+        RadioPickerDialog(
+            title = title,
+            description = stringResource(R.string.nav_slot_desc),
+            options = NavSlot.entries.map { RadioOption(it.id, navSlotLabel(it), icon = slotLook(it)?.first) },
+            selected = slot.id,
+            onSelect = { id ->
+                NavSettings.setNavSlot(NavSlot.fromId(id), context)
+                showPicker = false
+            },
+            onDismiss = { showPicker = false },
+        )
+    }
+}
+
+@Composable
+private fun navSlotLabel(slot: NavSlot): String =
+    slotLook(slot)?.let { stringResource(it.second) } ?: stringResource(R.string.nav_slot_none)
 
 /** A setting row that picks one [PlayerShortcut] out of [options], shown with its title and glyph. */
 @Composable

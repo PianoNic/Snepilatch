@@ -422,6 +422,15 @@
     <string name="downloaded_indicator">Abeglade</string>
     <string name="downloads_active">Aktiv</string>
     <string name="downloads_idle">Grad lauft kei Download</string>
+    <string name="downloads_finished">Fertig</string>
+    <string name="downloads_failed">Fählgschlage</string>
+    <string name="downloads_cancelled">Abbroche</string>
+    <string name="downloads_clear_finished">Fertigi entferne</string>
+    <string name="liked_songs">Lieblingssongs</string>
+    <string name="home_card_songs">%1$d Songs</string>
+    <string name="downloads_paused">Pausiert bi %1$d vo %2$d</string>
+    <string name="pause">Pause</string>
+    <string name="resume">Wiiterspile</string>
     <plurals name="remove_download_message">
         <item quantity="one">Abegladeni Datei vo %1$s lösche? (%2$d Song)</item>
         <item quantity="other">Abegladeni Dateie vo %1$s lösche? (%2$d Songs)</item>

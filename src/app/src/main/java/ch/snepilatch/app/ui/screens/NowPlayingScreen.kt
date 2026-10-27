@@ -62,6 +62,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.viewmodel.LibraryViewModel
 import ch.snepilatch.app.logic.shared.AppSettings
+import ch.snepilatch.app.logic.shared.PlayerButtonSettings
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import ch.snepilatch.app.viewmodel.canRemovePlayingFromPlaylist
 import ch.snepilatch.app.viewmodel.removePlayingFromPlaylist
@@ -444,7 +445,7 @@ fun NowPlayingScreen(
         }
     }
     val shortcut by AppSettings.playerShortcut.collectAsState()
-    val topRightShortcut by AppSettings.playerTopRightShortcut.collectAsState()
+    val topRightShortcut by PlayerButtonSettings.topRight.collectAsState()
     val canvasVideoUrl by vm.canvasUrl.collectAsState()
     val canvasOn by AppSettings.canvasEnabled.collectAsState()
     val hasCanvas = canvasOn && canvasVideoUrl != null
@@ -1066,8 +1067,8 @@ private fun PlayerBottomBar(
     val audioOutput by vm.audioOutputName.collectAsState()
     val audioType by vm.audioOutputType.collectAsState()
     val activeDevice by vm.activeDeviceName.collectAsState()
-    val shareShortcut by AppSettings.playerShareShortcut.collectAsState()
-    val queueShortcut by AppSettings.playerQueueShortcut.collectAsState()
+    val shareShortcut by PlayerButtonSettings.share.collectAsState()
+    val queueShortcut by PlayerButtonSettings.queue.collectAsState()
     val audioIcon = when (audioType) {
         "bluetooth" -> Icons.Rounded.Bluetooth
         "wired" -> Icons.Rounded.Headphones

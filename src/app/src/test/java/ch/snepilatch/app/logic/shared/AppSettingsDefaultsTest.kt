@@ -64,9 +64,9 @@ class AppSettingsDefaultsTest {
     @Test
     fun playerButtonsKeepTheirOriginalDefaults() {
         AppSettings.load(contextWith(emptyPrefs()))
-        assertEquals(PlayerShortcut.EQUALIZER, AppSettings.playerTopRightShortcut.value)
-        assertEquals(PlayerShortcut.SHARE, AppSettings.playerShareShortcut.value)
-        assertEquals(PlayerShortcut.QUEUE, AppSettings.playerQueueShortcut.value)
+        assertEquals(PlayerShortcut.EQUALIZER, PlayerButtonSettings.topRight.value)
+        assertEquals(PlayerShortcut.SHARE, PlayerButtonSettings.share.value)
+        assertEquals(PlayerShortcut.QUEUE, PlayerButtonSettings.queue.value)
     }
 
     @Test
@@ -76,9 +76,9 @@ class AppSettingsDefaultsTest {
         every { prefs.getString("player_share_shortcut", null) } returns "unknown"
         every { prefs.getString("player_queue_shortcut", null) } returns "unknown"
         AppSettings.load(contextWith(prefs))
-        assertEquals(PlayerShortcut.EQUALIZER, AppSettings.playerTopRightShortcut.value)
-        assertEquals(PlayerShortcut.SHARE, AppSettings.playerShareShortcut.value)
-        assertEquals(PlayerShortcut.QUEUE, AppSettings.playerQueueShortcut.value)
+        assertEquals(PlayerShortcut.EQUALIZER, PlayerButtonSettings.topRight.value)
+        assertEquals(PlayerShortcut.SHARE, PlayerButtonSettings.share.value)
+        assertEquals(PlayerShortcut.QUEUE, PlayerButtonSettings.queue.value)
     }
 
     @Test
@@ -95,20 +95,20 @@ class AppSettingsDefaultsTest {
         val context = contextWith(prefs)
         try {
             AppSettings.load(context)
-            AppSettings.setPlayerButtonActions(context, topRight = PlayerShortcut.QUEUE)
-            assertEquals(PlayerShortcut.SHARE, AppSettings.playerShareShortcut.value)
-            assertEquals(PlayerShortcut.QUEUE, AppSettings.playerQueueShortcut.value)
-            AppSettings.setPlayerButtonActions(context, share = PlayerShortcut.LIKE)
-            AppSettings.setPlayerButtonActions(context, queue = PlayerShortcut.EQUALIZER)
-            assertEquals(PlayerShortcut.QUEUE, AppSettings.playerTopRightShortcut.value)
-            assertEquals(PlayerShortcut.LIKE, AppSettings.playerShareShortcut.value)
-            assertEquals(PlayerShortcut.EQUALIZER, AppSettings.playerQueueShortcut.value)
+            PlayerButtonSettings.set(context, topRight = PlayerShortcut.QUEUE)
+            assertEquals(PlayerShortcut.SHARE, PlayerButtonSettings.share.value)
+            assertEquals(PlayerShortcut.QUEUE, PlayerButtonSettings.queue.value)
+            PlayerButtonSettings.set(context, share = PlayerShortcut.LIKE)
+            PlayerButtonSettings.set(context, queue = PlayerShortcut.EQUALIZER)
+            assertEquals(PlayerShortcut.QUEUE, PlayerButtonSettings.topRight.value)
+            assertEquals(PlayerShortcut.LIKE, PlayerButtonSettings.share.value)
+            assertEquals(PlayerShortcut.EQUALIZER, PlayerButtonSettings.queue.value)
 
             AppSettings.load(contextWith(emptyPrefs()))
             AppSettings.load(context)
-            assertEquals(PlayerShortcut.QUEUE, AppSettings.playerTopRightShortcut.value)
-            assertEquals(PlayerShortcut.LIKE, AppSettings.playerShareShortcut.value)
-            assertEquals(PlayerShortcut.EQUALIZER, AppSettings.playerQueueShortcut.value)
+            assertEquals(PlayerShortcut.QUEUE, PlayerButtonSettings.topRight.value)
+            assertEquals(PlayerShortcut.LIKE, PlayerButtonSettings.share.value)
+            assertEquals(PlayerShortcut.EQUALIZER, PlayerButtonSettings.queue.value)
             assertEquals(PlayerShortcut.LIKE, AppSettings.playerShortcut.value)
         } finally {
             AppSettings.load(contextWith(emptyPrefs()))

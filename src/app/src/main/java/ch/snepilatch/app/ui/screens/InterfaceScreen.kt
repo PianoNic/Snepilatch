@@ -26,6 +26,7 @@ import ch.snepilatch.app.R
 import androidx.compose.ui.graphics.vector.ImageVector
 import ch.snepilatch.app.data.PlayerShortcut
 import ch.snepilatch.app.logic.shared.AppSettings
+import ch.snepilatch.app.logic.shared.PlayerButtonSettings
 import ch.snepilatch.app.logic.shared.GestureSettings
 import ch.snepilatch.app.logic.shared.ThemeController
 import ch.snepilatch.app.ui.shared.RadioOption
@@ -183,30 +184,30 @@ private fun PlayerButtonSettings(context: Context) {
         options = PlayerShortcut.entries,
     ) { AppSettings.setPlayerShortcut(it, context) }
 
-    val topRightShortcut by AppSettings.playerTopRightShortcut.collectAsState()
+    val topRightShortcut by PlayerButtonSettings.topRight.collectAsState()
     ShortcutPickerRow(
         title = stringResource(R.string.player_top_right_button),
         description = stringResource(R.string.player_button_action_desc),
         icon = playerShortcutIcon(topRightShortcut),
         current = topRightShortcut,
         options = PlayerShortcut.entries,
-    ) { AppSettings.setPlayerButtonActions(context, topRight = it) }
-    val shareShortcut by AppSettings.playerShareShortcut.collectAsState()
+    ) { PlayerButtonSettings.set(context, topRight = it) }
+    val shareShortcut by PlayerButtonSettings.share.collectAsState()
     ShortcutPickerRow(
         title = stringResource(R.string.player_share_button),
         description = stringResource(R.string.player_button_action_desc),
         icon = playerShortcutIcon(shareShortcut),
         current = shareShortcut,
         options = PlayerShortcut.entries,
-    ) { AppSettings.setPlayerButtonActions(context, share = it) }
-    val queueShortcut by AppSettings.playerQueueShortcut.collectAsState()
+    ) { PlayerButtonSettings.set(context, share = it) }
+    val queueShortcut by PlayerButtonSettings.queue.collectAsState()
     ShortcutPickerRow(
         title = stringResource(R.string.player_queue_button),
         description = stringResource(R.string.player_button_action_desc),
         icon = playerShortcutIcon(queueShortcut),
         current = queueShortcut,
         options = PlayerShortcut.entries,
-    ) { AppSettings.setPlayerButtonActions(context, queue = it) }
+    ) { PlayerButtonSettings.set(context, queue = it) }
 }
 
 /** A setting row that picks one [PlayerShortcut] out of [options], shown with its title and glyph. */

@@ -42,13 +42,16 @@ fun DownloadsScreen(vm: PlaybackViewModel) {
     // Downloads.rows, not a query: a remember{} body runs on the composition thread, and every
     // finished track re-emits, so reading the table here put a full SELECT on the UI thread per track.
     val stored by Downloads.rows.collectAsState()
-    val totalMb = remember(stored) { (stored.sumOf { it.sizeBytes } / 1024 / 1024).toInt() }
+    // In the platform's own units, as the phone's storage settings show them: GB from a gigabyte on.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val totalBytes = remember(stored) { stored.sumOf { it.sizeBytes } }
+    val totalSize = android.text.format.Formatter.formatShortFileSize(context, totalBytes)
     var confirmClearAll by remember { mutableStateOf(false) }
 
     if (confirmClearAll) {
         ClearAllDialog(
             count = stored.size,
-            totalMb = totalMb,
+            totalSize = totalSize,
             onConfirm = {
                 stored.forEach { vm.removeDownload(it.trackUri) }
                 confirmClearAll = false
@@ -79,7 +82,7 @@ fun DownloadsScreen(vm: PlaybackViewModel) {
             }
         }
 
-        StorageSummary(folder = folder, count = stored.size, totalMb = totalMb)
+        StorageSummary(folder = folder, count = stored.size, totalSize = totalSize)
         UnindexedFiles()
 
         HorizontalDivider(color = SnepilatchLightGray.copy(alpha = 0.15f))
@@ -151,7 +154,7 @@ private fun UnindexedFiles() {
 
 /** Where the files go and how much room they take. */
 @Composable
-private fun StorageSummary(folder: android.net.Uri?, count: Int, totalMb: Int) {
+private fun StorageSummary(folder: android.net.Uri?, count: Int, totalSize: String) {
     // It says "tap to choose" when unset, so it has to open the picker, as the row in settings does.
     val context = androidx.compose.ui.platform.LocalContext.current
     val folderPicker = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -162,7 +165,7 @@ private fun StorageSummary(folder: android.net.Uri?, count: Int, totalMb: Int) {
         subtitle = folder?.let { readableFolder(it) } ?: stringResource(R.string.download_folder_none),
         onClick = { folderPicker.launch(null) },
     )
-    SettingRow(title = stringResource(R.string.downloads_summary, count, totalMb), icon = Icons.Rounded.CloudDone)
+    SettingRow(title = stringResource(R.string.downloads_summary, count, totalSize), icon = Icons.Rounded.CloudDone)
 }
 
 @Composable
@@ -235,12 +238,12 @@ private fun QueuedDownload(job: DownloadQueue.QueueEntry, onCancel: () -> Unit) 
 
 @Composable
 /** Says exactly what goes, with the confirm in red, since the files cannot be brought back. */
-private fun ClearAllDialog(count: Int, totalMb: Int, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+private fun ClearAllDialog(count: Int, totalSize: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = SnepilatchGray,
         title = { Text(stringResource(R.string.remove_all_title), color = SnepilatchWhite) },
-        text = { Text(stringResource(R.string.remove_all_confirm, count, totalMb), color = SnepilatchLightGray) },
+        text = { Text(stringResource(R.string.remove_all_confirm, count, totalSize), color = SnepilatchLightGray) },
         confirmButton = {
             TextButton(onClick = onConfirm) {
                 Text(stringResource(R.string.remove_all), color = Color.Red)

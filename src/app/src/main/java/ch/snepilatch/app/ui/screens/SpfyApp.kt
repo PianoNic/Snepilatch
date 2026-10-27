@@ -174,7 +174,9 @@ fun SpfyApp(vm: PlaybackViewModel) {
     ModalNavigationDrawer(
         drawerState = menuState,
         gesturesEnabled = menuState.isOpen,
-        drawerContent = { ProfileMenu(vm, onClose = { scope.launch { menuState.close() } }) },
+        drawerContent = {
+            ProfileMenu(vm, open = menuState.targetValue == DrawerValue.Open, onClose = { scope.launch { menuState.close() } })
+        },
     ) {
     CompositionLocalProvider(
         LocalBottomOverlayHeight provides bottomOverlayHeight,

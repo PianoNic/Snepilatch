@@ -387,6 +387,7 @@
     <string name="downloads_unindexed_action">Tippe, zum si zuezordne und ihri Tags z ergänze</string>
     <string name="downloads_matching">Ordne %1$d vo %2$d zue</string>
     <string name="downloads_matched">Ihrne Songs zuegordnet: %1$d vo %2$d</string>
+    <string name="downloads_lookup_stopped">%1$d vo %2$d zuegordnet, denn sind d Abfroge abglehnt worde. Probiers spöter nomol.</string>
     <plurals name="downloads_untagged_title"><item quantity="one">%d Download uf fehlendi Tags prüefe</item><item quantity="other">%d Downloads uf fehlendi Tags prüefe</item></plurals>
     <plurals name="downloads_unmatched_title"><item quantity="one">%d Song isch uf Spotify nöd gfunde worde</item><item quantity="other">%d Songs sind uf Spotify nöd gfunde worde</item></plurals>
     <string name="downloads_unmatched_action">Tippe, zum s nomal probiere</string>

@@ -45,36 +45,27 @@ internal object TrackMatcher {
 
 /**
  * Catalogue search for [FolderScan], on an anonymous session so a folder's worth of lookups runs on
- * no account (#930). Made on first use and kept for the scan; if it cannot start, the rest of the scan
- * stops asking.
+ * no account (#930). Made on first use and kept for the scan. The first refusal, the session not
+ * starting included, stops the rest of the run (#1034): the service once refused anonymous sessions
+ * their token, and every file after it was reported as not found.
  */
-internal class CatalogueLookup {
+internal class CatalogueLookup(private val session: suspend () -> Session? = anonymous()) {
 
     /** What a file's tags are filled in from (#946). */
     data class TrackInfo(val title: String, val artist: String, val album: String?, val coverUrl: String?)
 
-    private var session: Session? = null
-
     /** The details of each track a search matched, so filling in its tags asks nothing more. */
     private val matched = java.util.concurrent.ConcurrentHashMap<String, TrackInfo>()
 
-    @Volatile private var unavailable = false
-    private val starting = Mutex()
-
-    /** One session for the whole scan, however many lookups ask for it at once. */
-    private suspend fun session(): Session = starting.withLock {
-        session ?: Session(
-            SessionConfig(identifier = "folder-scan", anonymous = true, deviceProfile = kotify.config.DeviceProfile.CHROME_ANDROID_DESKTOP)
-        ).also {
-            it.load()
-            session = it
-        }
-    }
+    /** Set by the first refused request: the rest of the run asks nothing more, and says so. */
+    @Volatile var refused: String? = null
+        private set
 
     suspend fun find(title: String, artist: String, durationMs: Long): String? {
-        if (unavailable || title.isBlank()) return null
+        if (refused != null || title.isBlank()) return null
         return try {
-            val found = Song(session()).search("$artist $title", limit = 10).tracks.items
+            val sess = session() ?: return refuse("no session")
+            val found = Song(sess).search("$artist $title", limit = 10).tracks.items
             val hits = found.map { hit ->
                 TrackMatcher.Candidate(hit.id, hit.name, hit.artists.map { it.name }, hit.durationMs)
             }
@@ -86,34 +77,50 @@ internal class CatalogueLookup {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            LokiLogger.w("CatalogueLookup", "lookup failed for '$title': ${e.message}")
-            if (session == null) unavailable = true
-            null
+            refuse("search for '$title' failed: ${e.message}")
         }
     }
 
-    /**
-     * The title, artists, album and cover of track [id]: from the search that matched it, or else the
-     * track page query the web player answers logged out, on this lookup's anonymous session, so the
-     * account never makes these requests.
-     */
+    /** The title, artists, album and cover of track [id]: from the search that matched it, or else its track page. */
     suspend fun info(id: String): TrackInfo? {
         matched[id]?.let { return it }
-        if (unavailable) return null
+        if (refused != null) return null
         return try {
-            Song(session()).getSong(id)?.let { track ->
+            val sess = session() ?: return refuse("no session")
+            Song(sess).getSong(id)?.let { track ->
                 TrackInfo(track.name, track.artists.joinToString(", ") { it.name }, track.album.name, track.album.coverArtUrl)
             } ?: null.also {
-                // An empty answer, not an error: while the anonymous session is rate limited the query
-                // comes back blank. The row stays unchecked, so the next migration asks again.
+                // An empty answer, not an error; the row stays unchecked, so the next migration asks again.
                 LokiLogger.w("CatalogueLookup", "no details for $id in the answer")
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            LokiLogger.w("CatalogueLookup", "no details for $id: ${e.message}")
-            if (session == null) unavailable = true
-            null
+            refuse("details for $id failed: ${e.message}")
         }
+    }
+
+    private companion object {
+        /** One anonymous session for the whole scan, however many lookups ask for it at once. */
+        fun anonymous(): suspend () -> Session {
+            var made: Session? = null
+            val starting = Mutex()
+            return {
+                starting.withLock {
+                    made ?: Session(
+                        SessionConfig(identifier = "folder-scan", anonymous = true, deviceProfile = kotify.config.DeviceProfile.CHROME_ANDROID_DESKTOP)
+                    ).also {
+                        it.load()
+                        made = it
+                    }
+                }
+            }
+        }
+    }
+
+    private fun <T> refuse(why: String): T? {
+        if (refused == null) LokiLogger.w("CatalogueLookup", "stopping the lookups: $why")
+        refused = why
+        return null
     }
 }

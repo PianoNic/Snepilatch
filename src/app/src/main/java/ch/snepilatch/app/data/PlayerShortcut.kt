@@ -1,6 +1,6 @@
 package ch.snepilatch.app.data
 
-/** What the button beside the full-screen player's track details does; [requiresTrack] greys it out while nothing plays. */
+/** An action assignable to a full-screen player button; [requiresTrack] greys it out while nothing plays. */
 enum class PlayerShortcut(val id: String, val requiresTrack: Boolean = true) {
     LIKE("like"),
     LYRICS("lyrics"),
@@ -14,6 +14,7 @@ enum class PlayerShortcut(val id: String, val requiresTrack: Boolean = true) {
     JAM("jam", false),
     CODE("code"),
     SHARE("share"),
+    EQUALIZER("equalizer", false),
     ;
 
     companion object {

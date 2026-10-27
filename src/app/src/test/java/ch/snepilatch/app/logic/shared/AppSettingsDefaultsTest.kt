@@ -62,6 +62,60 @@ class AppSettingsDefaultsTest {
     }
 
     @Test
+    fun playerButtonsKeepTheirOriginalDefaults() {
+        AppSettings.load(contextWith(emptyPrefs()))
+        assertEquals(PlayerShortcut.EQUALIZER, PlayerButtonSettings.topRight.value)
+        assertEquals(PlayerShortcut.SHARE, PlayerButtonSettings.share.value)
+        assertEquals(PlayerShortcut.QUEUE, PlayerButtonSettings.queue.value)
+    }
+
+    @Test
+    fun unknownPlayerButtonActionsUseEachButtonsDefault() {
+        val prefs = emptyPrefs()
+        every { prefs.getString("player_top_right_shortcut", null) } returns "unknown"
+        every { prefs.getString("player_share_shortcut", null) } returns "unknown"
+        every { prefs.getString("player_queue_shortcut", null) } returns "unknown"
+        AppSettings.load(contextWith(prefs))
+        assertEquals(PlayerShortcut.EQUALIZER, PlayerButtonSettings.topRight.value)
+        assertEquals(PlayerShortcut.SHARE, PlayerButtonSettings.share.value)
+        assertEquals(PlayerShortcut.QUEUE, PlayerButtonSettings.queue.value)
+    }
+
+    @Test
+    fun playerButtonChoicesPersistIndependently() {
+        val stored = mutableMapOf<String, String?>()
+        val editor = mockk<SharedPreferences.Editor>(relaxed = true)
+        every { editor.putString(any(), any()) } answers {
+            stored[firstArg()] = secondArg()
+            editor
+        }
+        val prefs = emptyPrefs()
+        every { prefs.edit() } returns editor
+        every { prefs.getString(any(), any()) } answers { stored[firstArg()] ?: secondArg() }
+        val context = contextWith(prefs)
+        try {
+            AppSettings.load(context)
+            PlayerButtonSettings.set(context, topRight = PlayerShortcut.QUEUE)
+            assertEquals(PlayerShortcut.SHARE, PlayerButtonSettings.share.value)
+            assertEquals(PlayerShortcut.QUEUE, PlayerButtonSettings.queue.value)
+            PlayerButtonSettings.set(context, share = PlayerShortcut.LIKE)
+            PlayerButtonSettings.set(context, queue = PlayerShortcut.EQUALIZER)
+            assertEquals(PlayerShortcut.QUEUE, PlayerButtonSettings.topRight.value)
+            assertEquals(PlayerShortcut.LIKE, PlayerButtonSettings.share.value)
+            assertEquals(PlayerShortcut.EQUALIZER, PlayerButtonSettings.queue.value)
+
+            AppSettings.load(contextWith(emptyPrefs()))
+            AppSettings.load(context)
+            assertEquals(PlayerShortcut.QUEUE, PlayerButtonSettings.topRight.value)
+            assertEquals(PlayerShortcut.LIKE, PlayerButtonSettings.share.value)
+            assertEquals(PlayerShortcut.EQUALIZER, PlayerButtonSettings.queue.value)
+            assertEquals(PlayerShortcut.LIKE, AppSettings.playerShortcut.value)
+        } finally {
+            AppSettings.load(contextWith(emptyPrefs()))
+        }
+    }
+
+    @Test
     fun swipeActionsUseTheirOwnDefaults() {
         AppSettings.load(contextWith(emptyPrefs()))
 

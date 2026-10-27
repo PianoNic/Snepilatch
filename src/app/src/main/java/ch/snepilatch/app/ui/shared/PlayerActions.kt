@@ -55,6 +55,7 @@ class PlayerActionScope(
             PlayerShortcut.ADD_TO_QUEUE -> uri?.let { vm.addToQueue(it) }
             PlayerShortcut.ADD_TO_PLAYLIST -> onOpen(PlayerOverlay.PlaylistPicker)
             PlayerShortcut.QUEUE -> vm.openQueue()
+            PlayerShortcut.EQUALIZER -> vm.openEqualizer(context)
             // Via the router: the actions are built outside a composable that owns a DetailViewModel.
             PlayerShortcut.ALBUM -> uri?.let { DetailRoutes.openAlbumForTrack(it) }
             PlayerShortcut.RADIO -> uri?.let { DetailRoutes.openRadio(it) }

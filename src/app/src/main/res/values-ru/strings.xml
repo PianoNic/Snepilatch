@@ -80,6 +80,10 @@
     <string name="lyrics_vertical">Сверху вниз</string>
     <string name="lyrics_horizontal">Слева направо</string>
     <string name="player_shortcut">Кнопка плеера</string>
+    <string name="player_top_right_button">Кнопка плеера вверху справа</string>
+    <string name="player_share_button">Кнопка «Поделиться» в плеере</string>
+    <string name="player_queue_button">Кнопка очереди в плеере</string>
+    <string name="player_button_action_desc">Выберите действие для этой кнопки плеера</string>
     <string name="player_shortcut_desc">Выберите кнопку рядом с меню плеера</string>
     <string name="swipe_left_action">Свайп влево</string>
     <string name="swipe_right_action">Свайп вправо</string>

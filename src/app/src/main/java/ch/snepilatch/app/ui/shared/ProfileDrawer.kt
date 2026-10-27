@@ -36,7 +36,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
@@ -81,7 +81,7 @@ val LocalOpenProfileMenu = compositionLocalOf<() -> Unit> { {} }
  * friends are playing as a row. Every destination closes the menu first.
  */
 @Composable
-fun ProfileMenu(vm: PlaybackViewModel, onClose: () -> Unit) {
+fun ProfileMenu(vm: PlaybackViewModel, open: Boolean, onClose: () -> Unit) {
     val whatsNewVm: WhatsNewViewModel = viewModel()
     val hasNew by whatsNewVm.hasNew.collectAsState()
     val theme by ThemeController.themeColors.collectAsState()
@@ -104,7 +104,7 @@ fun ProfileMenu(vm: PlaybackViewModel, onClose: () -> Unit) {
             MenuEntry(Icons.Rounded.Settings, stringResource(R.string.settings)) {
                 go { vm.navigateToTab(Screen.ACCOUNT) }
             }
-            FriendsRow { go { vm.navigateTo(Screen.FRIEND_ACTIVITY) } }
+            FriendsRow(open) { go { vm.navigateTo(Screen.FRIEND_ACTIVITY) } }
         }
     }
 }
@@ -176,11 +176,14 @@ private fun AccountTile(label: String, picture: @Composable () -> Unit, onClick:
 
 /** What friends are playing, newest first, as the official sheet shows it under its menu. */
 @Composable
-private fun FriendsRow(onOpen: () -> Unit) {
+private fun FriendsRow(open: Boolean, onOpen: () -> Unit) {
     val friendsVm: FriendActivityViewModel = viewModel()
     val feed by friendsVm.feed.collectAsState()
-    // The same live feed the friend screen starts; a second call keeps the one already running.
-    LaunchedEffect(Unit) { friendsVm.load() }
+    // The menu is composed while closed, so it follows friends only while it is open, not from app start.
+    DisposableEffect(open) {
+        if (open) friendsVm.watch()
+        onDispose { if (open) friendsVm.unwatch() }
+    }
     val theme by ThemeController.themeColors.collectAsState()
     // With nobody to show the row would be gone, and with it the way to the friend screen from here.
     if (feed.isEmpty()) {

@@ -25,7 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -57,7 +57,10 @@ import kotify.api.user.FriendActivity
 fun FriendActivityScreen(vm: PlaybackViewModel, friendsVm: FriendActivityViewModel = viewModel()) {
     val feed by friendsVm.feed.collectAsState()
     val loading by friendsVm.loading.collectAsState()
-    LaunchedEffect(Unit) { friendsVm.load() }
+    DisposableEffect(Unit) {
+        friendsVm.watch()
+        onDispose { friendsVm.unwatch() }
+    }
 
     Column(Modifier.fillMaxSize().padding(top = 12.dp)) {
         Row(

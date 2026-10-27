@@ -72,7 +72,8 @@ internal class ListenAlongFollower(
             return@withLock
         }
         if (uri != loadedUri) {
-            if (uri == missedUri) return@withLock
+            // A skip's first state can carry the uri before the name; the lookup and the notification need it.
+            if (uri == missedUri || jam.title.isBlank()) return@withLock
             val ahead = prefetched?.takeIf { it.first == uri }?.second
             loading(true)
             val stream = ahead ?: resolve(jam)
@@ -99,7 +100,11 @@ internal class ListenAlongFollower(
             return@withLock
         }
         if (!player.isPlaying() || abs(player.positionMs() - jam.positionMs) > DRIFT_MS) {
+            LokiLogger.i(TAG, "Resync: here ${player.positionMs()} ms (playing=${player.isPlaying()}), jam ${jam.positionMs} ms")
             player.play(jam.positionMs + SEEK_LEAD_MS)
+            // A seek rebuffers, which stalls the position; without a fresh grace the next check sees that
+            // as drift and seeks again, and the audio stops and starts every check.
+            loadedAt = now()
         }
     }
 
@@ -136,7 +141,9 @@ internal class ListenAlongFollower(
         private const val TAG = "JamListenAlong"
         const val DRIFT_MS = 1_500L
         const val LOAD_GRACE_MS = 3_000L
-        const val LOAD_LEAD_MS = 400L
+
+        // What an ArgonFetch stream takes from load to ready (1.2 to 1.8 s measured), so it starts in step.
+        const val LOAD_LEAD_MS = 1_500L
         const val SEEK_LEAD_MS = 150L
         const val MAX_FAILURES = 2
     }
@@ -160,7 +167,8 @@ private object ServiceListenAlongPlayer : ListenAlongPlayer {
 
     override fun positionMs(): Long = service?.getCurrentPosition() ?: 0L
 
-    override fun isPlaying(): Boolean = service?.isPlaying() == true
+    // Told to play, buffering included: a rebuffer is not a pause to correct.
+    override fun isPlaying(): Boolean = service?.playWhenReady() == true
 
     override fun stop() { service?.stop() }
 }
@@ -174,6 +182,13 @@ private object ServiceListenAlongPlayer : ListenAlongPlayer {
  */
 object JamListenAlong {
     val active = MutableStateFlow(false)
+
+    /**
+     * Still in the jam listened along to before a cold boot. Nothing plays by itself, as the web player
+     * does nothing on finding a session of its own; the jam banner offers to resume instead.
+     */
+    val resumable = MutableStateFlow(false)
+    private var watch: Job? = null
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var jobs: List<Job> = emptyList()
@@ -196,17 +211,34 @@ object JamListenAlong {
 
     fun bind(viewModel: PlaybackViewModel) {
         vm = viewModel
+        if (watch != null) return
+        watch = scope.launch {
+            var seen = false
+            JamHolder.session.collect { jam ->
+                when {
+                    // Left or ended: nothing to come back to.
+                    jam == null -> if (seen) AppSettings.listenAlongSession = null
+                    active.value -> Unit
+                    jam.sessionId == AppSettings.listenAlongSession -> resumable.value = true
+                    else -> AppSettings.listenAlongSession = null
+                }
+                if (jam == null) resumable.value = false
+                seen = seen || jam != null
+            }
+        }
     }
 
     fun start() {
         val model = vm ?: return
         if (active.value) return
         active.value = true
+        resumable.value = false
+        AppSettings.listenAlongSession = JamHolder.session.value?.sessionId
         follower.reset()
         LokiLogger.i(TAG, "Listening along to the jam via YouTube Music")
         jobs = listOf(
             scope.launch {
-                combine(model.currentTrack, model.isPausedFlow) { track, paused -> track?.uri to paused }
+                combine(model.currentTrack, model.isPausedFlow) { track, paused -> Triple(track?.uri, track?.name, paused) }
                     .distinctUntilChanged()
                     .collect { follow(model) }
             },

@@ -117,6 +117,13 @@ object AppSettings {
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
+    /** The jam last listened along to via YouTube Music, so a cold boot still in it can offer to resume. */
+    var listenAlongSession: String?
+        get() = appContext?.let { prefs(it).getString("listen_along_session", null) }
+        set(value) {
+            appContext?.let { prefs(it).edit().putString("listen_along_session", value).apply() }
+        }
+
     /**
      * One Connect device id for the life of the install. The web player mints a fresh id per page
      * load but DELETEs its registration on unload, so it never holds more than one; Android gives

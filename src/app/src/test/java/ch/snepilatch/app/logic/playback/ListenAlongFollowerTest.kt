@@ -65,6 +65,28 @@ class ListenAlongFollowerTest {
     }
 
     @Test
+    fun resync_isNotRepeatedWhileItRebuffers() = runBlocking {
+        val f = follower()
+        f.reconcile { jam(position = 10_000) }
+        clock += ListenAlongFollower.LOAD_GRACE_MS
+        player.calls.clear()
+        f.reconcile { jam(position = 20_000) }
+        player.position = 20_000 + ListenAlongFollower.SEEK_LEAD_MS - 2_000 // stalled while it buffers
+        clock += 2_000
+        f.reconcile { jam(position = 22_000) }
+        assertEquals(listOf("play @${20_000 + ListenAlongFollower.SEEK_LEAD_MS}"), player.calls)
+    }
+
+    @Test
+    fun trackWithoutItsNameYet_waitsForIt() = runBlocking {
+        val f = follower()
+        f.reconcile { jam().copy(title = "") }
+        assertEquals(emptyList<String>(), player.calls)
+        f.reconcile { jam() }
+        assertEquals(1, player.calls.size)
+    }
+
+    @Test
     fun pausedJam_pausesThisPhone() = runBlocking {
         val f = follower()
         f.reconcile { jam() }

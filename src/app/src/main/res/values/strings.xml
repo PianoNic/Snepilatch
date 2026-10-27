@@ -456,7 +456,10 @@
     <string name="jam_host_only">Only the host can do this. You can still add songs to the queue.</string>
     <string name="jam_ended_by_host">The host ended the jam</string>
     <string name="join_jam">Join a jam</string>
-    <string name="jam_connected">Connected to jam</string>
+    <string name="jam_connected">Jam · Listening</string>
+    <string name="jam_hosting">Jam · Host</string>
+    <string name="jam_remote_only">Jam · Remote</string>
+    <string name="jam_listen_along_resume">Listen along</string>
     <string name="jam_of">%1$s\'s Jam</string>
     <string name="jam_invite">Invite friends to the jam</string>
     <string name="jam_share_link">Share link</string>

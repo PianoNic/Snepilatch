@@ -466,7 +466,10 @@
     <string name="jam_host_only">Das cha nur de Host. Du chasch trotzdem Songs zur Warteschlange hinzuefüege.</string>
     <string name="jam_ended_by_host">De Host het de Jam beendet</string>
     <string name="join_jam">Emene Jam biitrete</string>
-    <string name="jam_connected">Mit em Jam verbunde</string>
+    <string name="jam_connected">Jam · Mitlose</string>
+    <string name="jam_hosting">Jam · Gastgeber</string>
+    <string name="jam_remote_only">Jam · Fernbedienig</string>
+    <string name="jam_listen_along_resume">Mitlose</string>
     <string name="jam_of">Jam vo %1$s</string>
     <string name="jam_invite">Fründ zum Jam iilade</string>
     <string name="jam_share_link">Link teile</string>

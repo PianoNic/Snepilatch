@@ -443,6 +443,8 @@
     <string name="jam_join_subtitle">Hört zusammen in Echtzeit Musik, egal wo ihr seid.</string>
     <string name="jam_play_here">Wiedergabe über %1$s</string>
     <string name="jam_play_on_host">Wiedergabe über den Lautsprecher von %1$s</string>
+    <string name="jam_listen_along_ytm">Auf diesem Smartphone mithören</string>
+    <string name="jam_listen_along_ytm_desc">Über YouTube Music, experimentell</string>
     <string name="jam_join_privacy">In einem Jam sehen die Teilnehmer*innen deinen Benutzernamen, dein Profil und Songs, die basierend auf deinem Hörverhalten vorgeschlagen werden.</string>
     <string name="jam_not_ready">Verbindung wird noch aufgebaut. Gleich nochmal versuchen.</string>
     <string name="jam_start_title">Jam starten</string>

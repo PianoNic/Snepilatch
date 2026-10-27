@@ -445,6 +445,8 @@
     <string name="jam_join_subtitle">Слушайте музыку вместе в реальном времени, где бы вы ни были.</string>
     <string name="jam_play_here">Воспроизводить на %1$s</string>
     <string name="jam_play_on_host">Воспроизводить на динамике %1$s</string>
+    <string name="jam_listen_along_ytm">Слушать на этом телефоне</string>
+    <string name="jam_listen_along_ytm_desc">Через YouTube Music, экспериментально</string>
     <string name="jam_join_privacy">Участники джема увидят ваше имя пользователя, фото профиля и треки, предложенные на основе ваших вкусов.</string>
     <string name="jam_not_ready">Ещё подключаемся. Попробуйте через момент.</string>
     <string name="jam_start_title">Начать джем</string>

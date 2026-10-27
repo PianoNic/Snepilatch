@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import ch.snepilatch.app.logic.relay.RelayJam
 import ch.snepilatch.app.logic.relay.RelayJamMapper
 import ch.snepilatch.app.logic.relay.RelaySettings
+import ch.snepilatch.app.logic.playback.JamListenAlong
 import ch.snepilatch.app.logic.shared.JamHolder
 import ch.snepilatch.app.logic.shared.SessionHolder
 import ch.snepilatch.app.logic.shared.SessionViewModel
@@ -76,11 +77,23 @@ class JamViewModel : SessionViewModel("JamVM") {
         }
     }
 
-    /** The join sheet's answer: [listen] plays the jam on this phone (Premium), else controls the host's. */
-    fun confirmJoin(listen: Boolean) {
+    /** How the join sheet takes part in a jam. */
+    enum class JoinChoice {
+        /** Play the jam on this phone through Spfy; Premium only, the server refuses it otherwise. */
+        LISTEN,
+
+        /** Control the host's playback; the audio stays on the host's device. */
+        CONTROL,
+
+        /** Control on Spfy and play the jam on this phone from YouTube Music (#1026). */
+        LISTEN_VIA_YOUTUBE,
+    }
+
+    fun confirmJoin(choice: JoinChoice) {
         error.value = null
         launchWithSessionLoading("joinJam", joining) { sess ->
-            error.value = JamHolder.join(sess, listen)
+            error.value = JamHolder.join(sess, listen = choice == JoinChoice.LISTEN)
+            if (error.value == null && choice == JoinChoice.LISTEN_VIA_YOUTUBE) JamListenAlong.start()
         }
     }
 

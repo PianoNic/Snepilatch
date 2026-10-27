@@ -453,6 +453,8 @@
     <string name="jam_join_subtitle">Losed zäme in Echtziit Musig, egal wo ihr sind.</string>
     <string name="jam_play_here">Abspile über %1$s</string>
     <string name="jam_play_on_host">Abspile über de Lutsprecher vo %1$s</string>
+    <string name="jam_listen_along_ytm">Uf dem Handy mitlose</string>
+    <string name="jam_listen_along_ytm_desc">Über YouTube Music, experimentell</string>
     <string name="jam_join_privacy">Im ne Jam gsehnd d Teilnehmer*inne din Benutzername, dis Profil und Songs, wo uf dim Hörverhalte basiered.</string>
     <string name="jam_not_ready">Verbindig wird no ufboue. Grad nomal probiere.</string>
     <string name="jam_start_title">Jam starte</string>

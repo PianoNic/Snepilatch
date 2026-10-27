@@ -95,7 +95,7 @@ object YouTubeMusicSource {
         visitorData = null
     }
 
-    data class Stream(val url: String, val mimeType: String?, val headers: Map<String, String>)
+    data class Stream(val url: String, val mimeType: String?, val headers: Map<String, String>, val kbps: Int? = null)
 
     internal data class Candidate(
         val videoId: String,

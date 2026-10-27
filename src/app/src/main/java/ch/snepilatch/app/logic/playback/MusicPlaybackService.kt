@@ -349,6 +349,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 val audio = tracks.groups.firstOrNull { it.type == C.TRACK_TYPE_AUDIO && it.isSelected }
                 playingFormat.value = audio?.let { group ->
                     (0 until group.length).firstOrNull { group.isTrackSelected(it) }?.let { group.getTrackFormat(it) }
+                }?.let { f ->
+                    val kbps = knownKbps
+                    if (kbps != null && f.averageBitrate <= 0 && f.bitrate <= 0) f.buildUpon().setAverageBitrate(kbps * 1000).build() else f
                 }
             }
 
@@ -699,6 +702,9 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         }
     }
 
+    /** The source's own bitrate, set after [playUrl] for a container whose header has none (YouTube's WebM). */
+    var knownKbps: Int? = null
+
     fun playUrl(
         url: String,
         title: String,
@@ -709,6 +715,7 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         startPositionMs: Long = 0L,
         cacheKey: String? = null
     ) {
+        knownKbps = null
         LokiLogger.i(TAG, "Loading: $title by $artist -> ${url.take(80)} (play=$startPlaying, headers=${headers.keys}, pos=${startPositionMs}ms)")
         val meta = beginLoad(title, artist, albumArtUrl)
 

@@ -32,7 +32,7 @@ object ArgonFetchSource {
     private val json = Json { ignoreUnknownKeys = true }
 
     /** Where the audio is and what it is. The mime decides whether the store remuxes or writes as-is. */
-    data class Audio(val url: String, val mimeType: String?)
+    data class Audio(val url: String, val mimeType: String?, val kbps: Int? = null)
 
     /**
      * One string field off a rendition, or null when it is absent or explicitly null. JsonNull is a
@@ -92,6 +92,8 @@ object ArgonFetchSource {
             audio?.get("bestQualityMimeType")?.jsonPrimitive?.content
         }.getOrNull()
         LokiLogger.i(TAG, "resolved $trackUri as ${mimeType ?: "unknown"} (${field(best, "label") ?: "?"})")
-        Audio("$BASE_URL/api/Stream/Media/$key", mimeType)
+        // The label is "148 kbps"; a WebM header carries no bitrate, so this is all the quality pill gets.
+        val kbps = field(best, "label")?.substringBefore(' ')?.toIntOrNull()
+        Audio("$BASE_URL/api/Stream/Media/$key", mimeType, kbps)
     }
 }

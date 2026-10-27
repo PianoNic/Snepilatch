@@ -2983,6 +2983,7 @@ class PlaybackViewModel : ViewModel() {
                 // The YouTube stream failed: the engine's next check loads the jam's track again. A
                 // recovery here would resolve it from Spfy, which drops the account from the jam.
                 LokiLogger.w(TAG, "ExoPlayer error $errorCode while listening along, left to the engine")
+                JamListenAlong.playbackFailed()
                 return@onError
             }
             if (isOffline.value) {
@@ -3051,7 +3052,10 @@ class PlaybackViewModel : ViewModel() {
                 catch (e: Exception) { handleAdvanceFailure(e) }
             }
         }
-        svc.onReady = { if (!JamListenAlong.active.value) onStreamReady() }
+        svc.onReady = {
+            // Listening along: the engine's stream is ready, so its spinner stops; nothing else is ours to do.
+            if (JamListenAlong.active.value) isStreamLoading.value = false else onStreamReady()
+        }
     }
 
     /** ExoPlayer reached STATE_READY for the current stream. */

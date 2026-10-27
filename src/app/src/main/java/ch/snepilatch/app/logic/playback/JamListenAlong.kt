@@ -1,5 +1,6 @@
 package ch.snepilatch.app.logic.playback
 
+import ch.snepilatch.app.logic.download.ArgonFetchSource
 import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.logic.shared.JamHolder
 import ch.snepilatch.app.logic.shared.LokiLogger
@@ -49,11 +50,18 @@ internal class ListenAlongFollower(
     private val player: ListenAlongPlayer,
     private val resolve: suspend (JamPosition) -> YouTubeMusicSource.Stream?,
     private val now: () -> Long = System::currentTimeMillis,
+    /** True while a track is being looked up and loaded, for the play button's spinner. */
+    private val loading: (Boolean) -> Unit = {},
 ) {
+    /** The jam's next track, looked up ahead so a change plays at once; one entry, replaced as the queue moves. */
+    private var prefetched: Pair<String, YouTubeMusicSource.Stream>? = null
+
     private val lock = Mutex()
     private var loadedUri: String? = null
     private var loadedAt = Long.MIN_VALUE / 2
     private var missedUri: String? = null
+    private var failures = 0
+    private var loadedUriBeforeFailure: String? = null
 
     /** [target] is asked again after a lookup, since the jam may have moved on while it ran. */
     suspend fun reconcile(target: () -> JamPosition) = lock.withLock {
@@ -65,17 +73,23 @@ internal class ListenAlongFollower(
         }
         if (uri != loadedUri) {
             if (uri == missedUri) return@withLock
-            val stream = resolve(jam)
+            val ahead = prefetched?.takeIf { it.first == uri }?.second
+            loading(true)
+            val stream = ahead ?: resolve(jam)
             val latest = target()
             if (latest.trackUri != uri) return@withLock
             if (stream == null) {
                 missedUri = uri
+                loading(false)
                 LokiLogger.w(TAG, "No YouTube Music match for ${jam.artist} - ${jam.title}, silent until the next track")
                 if (player.isPlaying()) player.pause()
                 return@withLock
             }
+            if (ahead != null) LokiLogger.i(TAG, "Playing the prefetched ${jam.title}")
             player.load(stream, latest, latest.positionMs + LOAD_LEAD_MS, play = !latest.paused)
+            if (uri != loadedUriBeforeFailure) failures = 0
             loadedUri = uri
+            loadedUriBeforeFailure = uri
             loadedAt = now()
             return@withLock
         }
@@ -89,9 +103,33 @@ internal class ListenAlongFollower(
         }
     }
 
+    /** The track whose stream is loaded on this phone, or null. */
+    val loadedTrack: String? get() = loadedUri
+
+    /** Looks the jam's [next] track up ahead, once, so the change to it needs no lookup. */
+    suspend fun prefetch(next: JamPosition?) {
+        val uri = next?.trackUri ?: return
+        if (uri == loadedUri || uri == missedUri || prefetched?.first == uri) return
+        val stream = resolve(next) ?: return
+        prefetched = uri to stream
+    }
+
+    /** The loaded stream failed: load the track again at the next check, and give up on it after [MAX_FAILURES]. */
+    fun failed() {
+        val uri = loadedUri ?: return
+        failures++
+        loadedUri = null
+        if (failures >= MAX_FAILURES) {
+            LokiLogger.w(TAG, "Stream for $uri failed $failures times, silent until the next track")
+            missedUri = uri
+        }
+    }
+
     fun reset() {
         loadedUri = null
         missedUri = null
+        failures = 0
+        prefetched = null
     }
 
     companion object {
@@ -100,6 +138,7 @@ internal class ListenAlongFollower(
         const val LOAD_GRACE_MS = 3_000L
         const val LOAD_LEAD_MS = 400L
         const val SEEK_LEAD_MS = 150L
+        const val MAX_FAILURES = 2
     }
 }
 
@@ -112,6 +151,7 @@ private object ServiceListenAlongPlayer : ListenAlongPlayer {
             stream.url, at.title, at.artist, at.imageUrl,
             startPlaying = play, headers = stream.headers, startPositionMs = positionMs,
         )
+        service?.knownKbps = stream.kbps
     }
 
     override fun play(positionMs: Long) { service?.syncPlay(positionMs) }
@@ -138,9 +178,21 @@ object JamListenAlong {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var jobs: List<Job> = emptyList()
     private var vm: PlaybackViewModel? = null
-    private val follower = ListenAlongFollower(ServiceListenAlongPlayer, resolve = { jam ->
-        YouTubeMusicSource.resolve(jam.title, jam.artist, AppSettings.effectiveRegion(), jam.durationMs)
-    })
+
+    // ArgonFetch first, as downloads do: googlevideo refuses the urls the InnerTube player hands out, so
+    // the direct route mostly ends in a 403. It stays as the fallback for when ArgonFetch has no answer.
+    private val follower = ListenAlongFollower(
+        ServiceListenAlongPlayer,
+        resolve = { jam ->
+            jam.trackUri?.let { ArgonFetchSource.audio(it) }
+                ?.let { YouTubeMusicSource.Stream(it.url, it.mimeType, emptyMap(), it.kbps) }
+                ?: YouTubeMusicSource.resolve(jam.title, jam.artist, AppSettings.effectiveRegion(), jam.durationMs)
+        },
+        loading = { vm?.isStreamLoading?.value = it },
+    )
+
+    /** The service's player failed on the stream; called from the playback view model's error hook. */
+    fun playbackFailed() = follower.failed()
 
     fun bind(viewModel: PlaybackViewModel) {
         vm = viewModel
@@ -165,7 +217,8 @@ object JamListenAlong {
                 }
             },
             scope.launch {
-                JamHolder.session.collect { if (it == null || !it.active) stop() }
+                // A left or ended jam clears the holder; the join response's session carries no `active`.
+                JamHolder.session.collect { if (it == null) stop() }
             },
         )
     }
@@ -177,6 +230,7 @@ object JamListenAlong {
         jobs = emptyList()
         follower.reset()
         scope.launch(Dispatchers.Main) { ServiceListenAlongPlayer.stop() }
+        vm?.streamProvider?.let { if (it.value == PROVIDER) it.value = null }
         LokiLogger.i(TAG, "Stopped listening along")
     }
 
@@ -184,6 +238,11 @@ object JamListenAlong {
     private suspend fun follow(model: PlaybackViewModel) {
         model.ensurePlaybackService()
         withContext(Dispatchers.Main) { follower.reconcile { snapshot(model) } }
+        // What the source and quality pills show. Set on every check: the view model clears it whenever
+        // the jam's track changes, as it would for a Connect stream of its own.
+        if (follower.loadedTrack != null) model.streamProvider.value = PROVIDER
+        val next = model.queue.value.firstOrNull()
+        follower.prefetch(next?.let { JamPosition(it.uri, it.name, it.artist, it.albumArt, it.durationMs, 0, paused = false) })
     }
 
     private fun snapshot(model: PlaybackViewModel): JamPosition {
@@ -201,4 +260,5 @@ object JamListenAlong {
 
     private const val TAG = "JamListenAlong"
     private const val CHECK_MS = 2_000L
+    private const val PROVIDER = "YouTube Music"
 }

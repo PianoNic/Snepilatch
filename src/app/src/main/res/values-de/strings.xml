@@ -377,6 +377,7 @@
     <string name="downloads_unindexed_action">Tippen, um sie zuzuordnen und ihre Tags zu ergänzen</string>
     <string name="downloads_matching">Ordne %1$d von %2$d zu</string>
     <string name="downloads_matched">Ihren Titeln zugeordnet: %1$d von %2$d</string>
+    <string name="downloads_redownloading">%1$d leere Datei(en) werden neu heruntergeladen</string>
     <string name="downloads_lookup_stopped">%1$d von %2$d zugeordnet, dann wurden die Abfragen abgelehnt. Versuch es später nochmals.</string>
     <plurals name="downloads_untagged_title"><item quantity="one">%d Download auf fehlende Tags prüfen</item><item quantity="other">%d Downloads auf fehlende Tags prüfen</item></plurals>
     <plurals name="downloads_unmatched_title"><item quantity="one">%d Song wurde auf Spotify nicht gefunden</item><item quantity="other">%d Songs wurden auf Spotify nicht gefunden</item></plurals>

@@ -17,6 +17,9 @@ internal object TrackMatcher {
     /** YouTube uploads run a few seconds long or short (silence, an intro); a different cut is far more. */
     private const val DURATION_SLACK_MS = 5_000L
 
+    /** How close a differently titled result must be in length to count as the same recording. */
+    private const val SAME_RECORDING_MS = 2_000L
+
     private val BRACKETS = Regex("""\s*[(\[][^)\]]*[)\]]""")
     private val ARTIST_SEPARATORS = Regex(""",|&| feat\.? | ft\.? | x """, RegexOption.IGNORE_CASE)
 
@@ -26,13 +29,46 @@ internal object TrackMatcher {
      */
     fun match(title: String, artist: String, durationMs: Long, candidates: List<Candidate>): String? {
         val wantTitle = normalize(title).ifEmpty { return null }
-        val wantArtists = artist.split(ARTIST_SEPARATORS).map(::normalize).filter { it.isNotEmpty() }.toSet()
-        val same = candidates.filter { c -> normalize(c.title) == wantTitle && c.artists.any { normalize(it) in wantArtists } }
+        val wantArtists = artistKeys(listOf(artist))
+        val byArtist = candidates.filter { c -> artistKeys(c.artists).any { it in wantArtists } }
+        val same = byArtist.filter { normalize(it.title) == wantTitle }
         if (durationMs <= 0) return same.firstOrNull()?.id
         return same.filter { it.durationMs > 0 }
             .minByOrNull { abs(it.durationMs - durationMs) }
             ?.takeIf { abs(it.durationMs - durationMs) <= DURATION_SLACK_MS }
             ?.id
+            // The catalogue may name a song in another language than the file ("항복" as "Surrender"): the
+            // same artist and the same length to the second is that song.
+            ?: byArtist.filter { it.durationMs > 0 && abs(it.durationMs - durationMs) <= SAME_RECORDING_MS }
+                .minByOrNull { abs(it.durationMs - durationMs) }?.id
+    }
+
+    /**
+     * Each artist and each of its parts, compared without case, punctuation or word order: "Earth, Wind &
+     * Fire" is one artist to the catalogue and three parts to a split, and "Mori Calliope" is "Calliope Mori".
+     */
+    internal fun artistKeys(artists: List<String>): Set<String> = artists
+        .flatMap { listOf(it) + it.split(ARTIST_SEPARATORS) }
+        .map(::wordsInAnyOrder)
+        .filter { it.isNotEmpty() }
+        .toSet()
+
+    private val WHITESPACE = Regex("\\s+")
+
+    private fun wordsInAnyOrder(name: String): String =
+        name.lowercase().split(WHITESPACE).map(::normalize).filter(String::isNotEmpty).sorted().joinToString("")
+
+    /** For the log, when [match] found nothing: what the closest result got wrong. */
+    fun why(title: String, artist: String, durationMs: Long, candidates: List<Candidate>): String {
+        if (candidates.isEmpty()) return "the search found nothing"
+        val wantTitle = normalize(title)
+        val wantArtists = artistKeys(listOf(artist))
+        val sameTitle = candidates.filter { normalize(it.title) == wantTitle }
+        if (sameTitle.isEmpty()) return "no result of that title; first was '${candidates.first().title}' by ${candidates.first().artists}"
+        val sameArtist = sameTitle.filter { c -> artistKeys(c.artists).any { it in wantArtists } }
+        if (sameArtist.isEmpty()) return "that title only by ${sameTitle.first().artists}"
+        val closest = sameArtist.minBy { abs(it.durationMs - durationMs) }
+        return "closest length ${closest.durationMs}ms, ${abs(closest.durationMs - durationMs) / 1000}s off"
     }
 
     /** Case, "(feat. …)", "[Remastered]", " - Live" and punctuation do not tell two titles apart. */
@@ -78,13 +114,18 @@ internal class CatalogueLookup(private val session: suspend () -> Session? = { A
         if (refused != null || title.isBlank()) return null
         return try {
             val sess = session() ?: return refuse("no session")
-            val found = Song(sess).search("$artist $title", limit = 10).tracks.items
+            val found = Song(sess).search("$artist $title", limit = searchResults).tracks.items
             val hits = found.map { hit ->
                 TrackMatcher.Candidate(hit.id, hit.name, hit.artists.map { it.name }, hit.durationMs)
             }
-            TrackMatcher.match(title, artist, durationMs, hits)?.also { id ->
-                found.firstOrNull { it.id == id }?.let { hit ->
-                    matched[id] = TrackInfo(hit.name, hit.artists.joinToString(", ") { it.name }, hit.album?.name, hit.album?.coverArtUrl)
+            val id = TrackMatcher.match(title, artist, durationMs, hits)
+            if (id == null) {
+                val why = TrackMatcher.why(title, artist, durationMs, hits)
+                LokiLogger.i("CatalogueLookup", "no match for '$artist - $title' (${durationMs}ms): $why")
+            }
+            id?.also {
+                found.firstOrNull { hit -> hit.id == it }?.let { hit ->
+                    matched[it] = TrackInfo(hit.name, hit.artists.joinToString(", ") { a -> a.name }, hit.album?.name, hit.album?.coverArtUrl)
                 }
             }
         } catch (e: CancellationException) {
@@ -112,6 +153,9 @@ internal class CatalogueLookup(private val session: suspend () -> Session? = { A
             refuse("details for $id failed: ${e.message}")
         }
     }
+
+    /** Deep enough that a game soundtrack's many tracks of one name still include the right one. */
+    private val searchResults = 20
 
     private fun <T> refuse(why: String): T? {
         if (refused == null) LokiLogger.w("CatalogueLookup", "stopping the lookups: $why")

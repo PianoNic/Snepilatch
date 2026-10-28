@@ -123,6 +123,10 @@ object FolderScan {
                     unindexed > 0 -> AppMessages.show(R.string.downloads_matched, matched, total)
                 }
             }
+            val redownloading = runCatching { redownloadEmpty(ctx, lookup) }
+                .onFailure { LokiLogger.e(TAG, "re-downloading empty files failed", it) }
+                .getOrDefault(0)
+            if (redownloading > 0) AppMessages.show(R.string.downloads_redownloading, redownloading)
             val written = runCatching { writeTags(ctx, lookup) }
                 .onFailure { LokiLogger.e(TAG, "writing ids failed", it) }
                 .getOrDefault(0)
@@ -130,6 +134,46 @@ object FolderScan {
             _migrating.value = null
             count(ctx)
         }
+    }
+
+    /**
+     * The fixer's last step (#1038): a file of no bytes is a download that never finished, with nothing in
+     * it to repair. Its name still says which track it was, either way round, so the track is downloaded
+     * again the usual way and the empty file goes. One the name does not identify is left as it is.
+     */
+    private suspend fun redownloadEmpty(ctx: Context, lookup: CatalogueLookup): Int {
+        var queued = 0
+        for (file in listFiles(ctx).filter { it.size == 0L }) {
+            if (lookup.refused != null) break
+            if (redownload(ctx, file, lookup)) queued++
+        }
+        return queued
+    }
+
+    /** True when the empty [file] was deleted and its track queued again. */
+    private suspend fun redownload(ctx: Context, file: FoundFile, lookup: CatalogueLookup): Boolean {
+        val stem = file.name.substringBeforeLast('.')
+        // Split at the first and at the last " - ", and try each side as the title.
+        val splits = listOf(stem.indexOf(" - "), stem.lastIndexOf(" - ")).filter { it > 0 }.distinct()
+            .map { stem.substring(0, it) to stem.substring(it + 3) }
+        val id = splits.firstNotNullOfOrNull { (a, b) -> lookup.find(b, a, 0) ?: lookup.find(a, b, 0) }
+        if (id == null) {
+            LokiLogger.i(TAG, "${file.name} is empty and its name matches no track, left as it is")
+            return false
+        }
+        val info = lookup.info(id)
+        val deleted = runCatching { DocumentsContract.deleteDocument(ctx.contentResolver, file.uri) }.getOrDefault(false)
+        if (!deleted) return false
+        val track = ch.snepilatch.app.data.TrackInfo(
+            uri = "spotify:track:$id",
+            name = info?.title ?: stem.substringBefore(" - "),
+            artist = info?.artist ?: stem.substringAfterLast(" - "),
+            albumArt = info?.coverUrl,
+            albumName = info?.album,
+        )
+        LokiLogger.i(TAG, "${file.name} was empty, downloading ${track.artist} - ${track.name} again")
+        DownloadActions.downloadTrack(scope, track, ctx)
+        return true
     }
 
     /**
@@ -183,36 +227,75 @@ object FolderScan {
      * untagged so the migration gives it its tags. A real MP3 starts with a frame or an ID3 header, never
      * `ftyp`, so only these are touched, and the rename changes no bytes.
      */
+    /**
+     * The file fixer (#1038): a file whose name says another format than its bytes is renamed to what it
+     * is, an MP4 called .mp3 or .flac included. Players and the tag reader go by the name and could not
+     * open them. A file whose bytes are no audio format at all is broken; it is left and logged as such.
+     */
     private fun renameMislabelled(ctx: Context) {
         val resolver = ctx.contentResolver
-        val renamed = listFiles(ctx)
-            .filter { it.name.endsWith(".mp3", ignoreCase = true) && isMp4(ctx, it.uri) }
-            .mapNotNull { file ->
-                // A file of that name already there makes the provider refuse; that one stays as it is.
-                runCatching { DocumentsContract.renameDocument(resolver, file.uri, file.name.dropLast(4) + ".m4a") }
-                    .getOrNull()?.let { file.uri.toString() to it.toString() }
+        val renamed = HashMap<String, Pair<String, String>>()
+        listFiles(ctx).forEach { file ->
+            val named = file.name.substringAfterLast('.', "").lowercase()
+            val actual = formatOf(ctx, file.uri)
+            when {
+                actual == null -> LokiLogger.w(TAG, "${file.name} is broken: its bytes are no audio format, left as it is")
+                sameFormat(named, actual) -> Unit
+                else -> {
+                    val target = file.name.substringBeforeLast('.') + ".$actual"
+                    // A file of that name already there makes the provider refuse; that one stays as it is.
+                    runCatching { DocumentsContract.renameDocument(resolver, file.uri, target) }.getOrNull()?.let {
+                        LokiLogger.i(TAG, "${file.name} is $actual, renamed to $target")
+                        renamed[file.uri.toString()] = it.toString() to actual
+                    }
+                }
             }
-            .toMap()
+        }
         Downloads.rows.value.forEach { row ->
-            val moved = renamed[row.documentUri] ?: return@forEach
-            Downloads.put(row.copy(documentUri = moved, mimeType = "audio/mp4", idTagged = false, tagsChecked = false))
+            val (moved, format) = renamed[row.documentUri] ?: return@forEach
+            Downloads.put(row.copy(documentUri = moved, mimeType = MIME_OF[format], idTagged = false, tagsChecked = false))
         }
         if (renamed.isEmpty()) return
         // A remembered copy or miss is remembered by its uri, which the rename changed.
         val prefs = ctx.getSharedPreferences(AppSettings.PREFS, Context.MODE_PRIVATE)
         prefs.edit()
-            .putStringSet(PREF_DUPLICATES, duplicates(ctx).mapTo(HashSet()) { renamed[it] ?: it })
-            .putStringSet(PREF_UNMATCHED, unmatchedFiles(ctx).mapTo(HashSet()) { renamed[it] ?: it })
+            .putStringSet(PREF_DUPLICATES, duplicates(ctx).mapTo(HashSet()) { renamed[it]?.first ?: it })
+            .putStringSet(PREF_UNMATCHED, unmatchedFiles(ctx).mapTo(HashSet()) { renamed[it]?.first ?: it })
             .apply()
-        LokiLogger.i(TAG, "renamed ${renamed.size} mislabelled .mp3 file(s) to .m4a")
+        LokiLogger.i(TAG, "renamed ${renamed.size} mislabelled file(s) to their format")
     }
 
-    /** Whether [uri] holds an MP4 whatever it is called: its first box is `ftyp`. */
-    private fun isMp4(ctx: Context, uri: Uri): Boolean {
-        val head = ByteArray(8)
-        val read = ctx.contentResolver.openInputStream(uri)?.use { it.read(head) } ?: return false
-        return read == head.size && String(head, 4, 4, Charsets.ISO_8859_1) == "ftyp"
+    private val MIME_OF =
+        mapOf("flac" to "audio/flac", "m4a" to "audio/mp4", "opus" to "audio/ogg", "ogg" to "audio/ogg", "mp3" to "audio/mpeg")
+
+    /** An .mp4 is an .m4a, an .ogg an .opus, as far as the name goes. */
+    private fun sameFormat(named: String, actual: String) =
+        named == actual || setOf(named, actual) == setOf("m4a", "mp4") || setOf(named, actual) == setOf("opus", "ogg") ||
+            named == "webm"
+
+    /** The format [uri]'s first bytes say it is, as the extension it should have; null for none of them. */
+    internal fun formatOf(ctx: Context, uri: Uri): String? {
+        val head = ByteArray(HEAD_PROBE)
+        val read = ctx.contentResolver.openInputStream(uri)?.use { it.read(head) } ?: return null
+        return formatOf(head.copyOf(maxOf(read, 0)))
     }
+
+    internal fun formatOf(head: ByteArray): String? {
+        fun at(offset: Int, magic: String) =
+            head.size >= offset + magic.length && String(head, offset, magic.length, Charsets.ISO_8859_1) == magic
+        return when {
+            at(0, "fLaC") -> "flac"
+            at(4, "ftyp") -> "m4a"
+            at(0, "OggS") -> if (at(28, "OpusHead")) "opus" else "ogg"
+            at(0, "ID3") -> "mp3"
+            head.size > 1 && head[0] == 0xFF.toByte() && (head[1].toInt() and 0xE0) == 0xE0 -> "mp3"
+            // A WebM download keeps its own name; it is audio, just not one this renames.
+            head.size >= 4 && head[0] == 0x1A.toByte() && head[1] == 0x45.toByte() && head[2] == 0xDF.toByte() && head[3] == 0xA3.toByte() -> "webm"
+            else -> null
+        }
+    }
+
+    private const val HEAD_PROBE = 64
 
     private fun duplicates(ctx: Context): Set<String> =
         ctx.getSharedPreferences(AppSettings.PREFS, Context.MODE_PRIVATE).getStringSet(PREF_DUPLICATES, emptySet()).orEmpty()
@@ -341,9 +424,14 @@ object FolderScan {
      * artist and length (#930). Null when neither says which track it is.
      */
     private suspend fun rowFor(ctx: Context, file: FoundFile, lookup: CatalogueLookup?): DownloadedTrack? {
-        val meta = readMeta(ctx, file) ?: return null
+        // The id first: a file carrying it needs nothing else, even when its tags cannot be read.
         val tagged = readTrackId(ctx, file)
-        val id = tagged ?: lookup?.find(meta.title, meta.artist, meta.durationMs) ?: return null
+        val meta = readMeta(ctx, file) ?: if (tagged != null) nameOnly(file) else null
+        if (meta == null) {
+            LokiLogger.i(TAG, "${file.name}: no id, and its tags cannot be read")
+            return null
+        }
+        val id = tagged ?: lookup?.let { findFor(file, meta, it) } ?: return null
         return DownloadedTrack(
             trackUri = "spotify:track:$id",
             documentUri = file.uri.toString(),
@@ -367,7 +455,15 @@ object FolderScan {
         )
     }
 
-    private class Meta(val title: String, val artist: String, val durationMs: Long, val picture: ByteArray?, val album: AlbumMeta)
+    private class Meta(
+        val title: String,
+        val artist: String,
+        val durationMs: Long,
+        val picture: ByteArray?,
+        val album: AlbumMeta,
+        /** False when the title or artist came from the file name, the tags having none. */
+        val fromTags: Boolean = true,
+    )
 
     /** The album fields a file's tags carry, for the offline albums (#1038). */
     class AlbumMeta(val album: String?, val albumArtist: String?, val trackNumber: Int, val discNumber: Int)
@@ -397,18 +493,42 @@ object FolderScan {
         }
     }
 
+    /**
+     * The catalogue match for a file without its id. Its tags first; a file whose tags name no title, or the
+     * artist as its title, is matched by its name, which has been both "Artist - Title" and "Title - Artist"
+     * over time, split at its first and at its last " - ".
+     */
+    private suspend fun findFor(file: FoundFile, meta: Meta, lookup: CatalogueLookup): String? {
+        if (meta.fromTags && meta.title.isNotBlank() && !meta.title.equals(meta.artist, ignoreCase = true)) {
+            lookup.find(meta.title, meta.artist, meta.durationMs)?.let { return it }
+        }
+        val stem = file.name.substringBeforeLast('.')
+        return listOf(stem.indexOf(" - "), stem.lastIndexOf(" - ")).filter { it > 0 }.distinct()
+            .map { stem.substring(0, it) to stem.substring(it + 3) }
+            .firstNotNullOfOrNull { (a, b) -> lookup.find(b, a, meta.durationMs) ?: lookup.find(a, b, meta.durationMs) }
+    }
+
+    /** What the name alone says, "Artist - Title", for a file whose tags cannot be read. */
+    private fun nameOnly(file: FoundFile): Meta {
+        val stem = file.name.substringBeforeLast('.')
+        return Meta(stem.substringAfter(" - "), stem.substringBefore(" - "), 0L, null, AlbumMeta(null, null, 0, 0), fromTags = false)
+    }
+
     private fun readMeta(ctx: Context, file: FoundFile): Meta? {
         val retriever = MediaMetadataRetriever()
         return try {
             retriever.setDataSource(ctx, file.uri)
             // "Artist - Title" is how downloads are named, for a file whose tags the reader cannot see.
             val stem = file.name.substringBeforeLast('.')
+            val title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+            val artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
             Meta(
-                title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE) ?: stem.substringAfter(" - "),
-                artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: stem.substringBefore(" - "),
+                title = title ?: stem.substringAfter(" - "),
+                artist = artist ?: stem.substringBefore(" - "),
                 durationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L,
                 picture = retriever.embeddedPicture,
                 album = albumMeta(retriever),
+                fromTags = title != null && artist != null,
             )
         } catch (e: Exception) {
             LokiLogger.d(TAG, "could not read ${file.name}: ${e.message}")

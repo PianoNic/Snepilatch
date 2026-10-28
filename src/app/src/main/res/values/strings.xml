@@ -522,4 +522,6 @@
     <string name="episode_new">New episode</string>
     <string name="save_to_your_episodes">Save to Your Episodes</string>
     <string name="remove_from_your_episodes">Remove from Your Episodes</string>
+    <string name="skip_back_15">Back 15 seconds</string>
+    <string name="skip_forward_15">Forward 15 seconds</string>
 </resources>

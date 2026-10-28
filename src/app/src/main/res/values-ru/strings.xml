@@ -524,4 +524,6 @@
     <string name="episode_new">Новый выпуск</string>
     <string name="save_to_your_episodes">Добавить в «Ваши выпуски»</string>
     <string name="remove_from_your_episodes">Удалить из «Ваших выпусков»</string>
+    <string name="skip_back_15">Назад на 15 секунд</string>
+    <string name="skip_forward_15">Вперёд на 15 секунд</string>
 </resources>

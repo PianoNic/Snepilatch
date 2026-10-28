@@ -532,4 +532,6 @@
     <string name="episode_new">Nöii Folg</string>
     <string name="save_to_your_episodes">I „Dini Folge“ speichere</string>
     <string name="remove_from_your_episodes">Us „Dini Folge“ entferne</string>
+    <string name="skip_back_15">15 Sekunde zrugg</string>
+    <string name="skip_forward_15">15 Sekunde vor</string>
 </resources>

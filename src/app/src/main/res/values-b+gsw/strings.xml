@@ -387,6 +387,7 @@
     <string name="downloads_unindexed_action">Tippe, zum si zuezordne und ihri Tags z ergänze</string>
     <string name="downloads_matching">Ordne %1$d vo %2$d zue</string>
     <string name="downloads_matched">Ihrne Songs zuegordnet: %1$d vo %2$d</string>
+    <string name="downloads_redownloading">%1$d lääri Datei(e) wärded neu abeglade</string>
     <string name="downloads_lookup_stopped">%1$d vo %2$d zuegordnet, denn sind d Abfroge abglehnt worde. Probiers spöter nomol.</string>
     <plurals name="downloads_untagged_title"><item quantity="one">%d Download uf fehlendi Tags prüefe</item><item quantity="other">%d Downloads uf fehlendi Tags prüefe</item></plurals>
     <plurals name="downloads_unmatched_title"><item quantity="one">%d Song isch uf Spotify nöd gfunde worde</item><item quantity="other">%d Songs sind uf Spotify nöd gfunde worde</item></plurals>
@@ -441,6 +442,8 @@
     <string name="connection_lost_banner">Spotify nöd erreichbar. Tipp zum nomal probiere</string>
     <string name="offline_banner">Du bisch offline</string>
     <string name="offline_while_youre_offline">Wärend du offline bisch</string>
+    <string name="offline_albums">Albe</string>
+    <string name="offline_all_tracks">Alli Songs</string>
     <string name="offline_no_downloads">Du bisch offline und es isch no nüt abeglade. Abegladeni Songs erschine da.</string>
     <string name="jam">Jam</string>
     <string name="jam_join">Biitrete</string>

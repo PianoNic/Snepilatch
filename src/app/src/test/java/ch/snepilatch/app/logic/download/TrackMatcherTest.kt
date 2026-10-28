@@ -50,4 +50,26 @@ class TrackMatcherTest {
     fun anUnknownLengthStillMatchesOnTitleAndArtist() {
         assertEquals(crush.id, TrackMatcher.match("Instant Crush", "Daft Punk", 0, listOf(crush)))
     }
+
+    // Issue #1038: cases from a real folder the matcher missed.
+
+    @Test
+    fun anArtistWhoseNameHasACommaIsStillTheSameArtist() {
+        val september = Candidate("2grjqo0Frpf2okIBiifQKs", "September", listOf("Earth, Wind & Fire"), 215_093)
+        assertEquals(september.id, TrackMatcher.match("September", "Earth, Wind & Fire", 215_006, listOf(september)))
+    }
+
+    @Test
+    fun anArtistsWordsInAnotherOrderAreTheSameArtist() {
+        val stars = Candidate("1", "Seeing Stars", listOf("Mori Calliope", "Lotus Juice"), 207_600)
+        assertEquals(stars.id, TrackMatcher.match("Seeing Stars", "Calliope Mori", 207_567, listOf(stars)))
+    }
+
+    @Test
+    fun aTitleInAnotherLanguageMatchesOnArtistAndLengthToTheSecond() {
+        val surrender = Candidate("2", "Surrender", listOf("MRCH"), 207_500)
+        assertEquals(surrender.id, TrackMatcher.match("항복", "MRCH", 207_411, listOf(surrender)))
+        // Three seconds apart is another recording, not the same one under another name.
+        assertNull(TrackMatcher.match("항복", "MRCH", 210_600, listOf(surrender)))
+    }
 }

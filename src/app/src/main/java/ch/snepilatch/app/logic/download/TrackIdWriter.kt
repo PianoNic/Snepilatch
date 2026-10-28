@@ -17,7 +17,10 @@ internal object TrackIdWriter {
     private val TAGGABLE = setOf("opus", "ogg", "flac", "m4a", "mp4", "mp3")
 
     /** What the downloads write besides the id, and so what a file can be missing. */
-    enum class Field { TITLE, ARTIST, ALBUM, COVER }
+    enum class Field { TITLE, ARTIST, ALBUM, COVER, ALBUM_ARTIST, TRACK_NUMBER, DISC_NUMBER, DATE }
+
+    /** The album fields (#1038): what a file lacking any of them needs the album details for. */
+    val ALBUM_FIELDS = setOf(Field.ALBUM_ARTIST, Field.TRACK_NUMBER, Field.DISC_NUMBER, Field.DATE)
 
     /** Whether a file of this name is a format [withTags] can write to. */
     fun canTag(fileName: String): Boolean = fileName.substringAfterLast('.', "").lowercase() in TAGGABLE
@@ -80,10 +83,13 @@ internal object TrackIdWriter {
 
     /** A parsed Vorbis comment block: what precedes the comments, the comments, and what follows them. */
     private class Comments(val head: ByteArray, val comments: List<ByteArray>, val tail: ByteArray) {
-        /** Upper-case keys that carry a value. */
-        val keys: Set<String> = comments.map { String(it, Charsets.UTF_8) }
+        /** The first value of each upper-case key that carries one. */
+        val values: Map<String, String> = comments.map { String(it, Charsets.UTF_8) }
             .filter { it.substringAfter('=', "").isNotBlank() }
-            .mapTo(HashSet()) { it.substringBefore('=').uppercase() }
+            .groupBy({ it.substringBefore('=').uppercase() }, { it.substringAfter('=') })
+            .mapValues { it.value.first() }
+
+        val keys: Set<String> get() = values.keys
     }
 
     /** [prefix] is what comes before the vendor string: "OpusTags" in Opus, nothing in FLAC. */
@@ -104,11 +110,31 @@ internal object TrackIdWriter {
         return Comments(head, comments, block.copyOfRange(at, block.size))
     }
 
-    private fun missingFrom(keys: Set<String>, hasCover: Boolean) = buildSet {
+    private val ALBUM_ARTIST_KEYS = setOf("ALBUMARTIST", "ALBUM ARTIST", "ALBUM_ARTIST")
+    private val TRACK_TOTAL_KEYS = listOf("TRACKTOTAL", "TOTALTRACKS")
+
+    private fun missingFrom(values: Map<String, String>, hasCover: Boolean) = buildSet {
+        val keys = values.keys
         if ("TITLE" !in keys) add(Field.TITLE)
         if ("ARTIST" !in keys) add(Field.ARTIST)
         if ("ALBUM" !in keys) add(Field.ALBUM)
         if (!hasCover) add(Field.COVER)
+        if (ALBUM_ARTIST_KEYS.none { it in keys }) add(Field.ALBUM_ARTIST)
+        if (!trackNumberHolds(values)) add(Field.TRACK_NUMBER)
+        if ("DISCNUMBER" !in keys) add(Field.DISC_NUMBER)
+        if ("DATE" !in keys && "YEAR" !in keys) add(Field.DATE)
+    }
+
+    /**
+     * A track number that is there and not past its total. One source writes "4" of a total of "1",
+     * which players show as 4/1 and sort by; such a number is written again, total and all.
+     */
+    internal fun trackNumberHolds(values: Map<String, String>): Boolean {
+        val raw = values["TRACKNUMBER"] ?: return false
+        val number = raw.substringBefore('/').trim().toIntOrNull() ?: return false
+        val total = raw.substringAfter('/', "").trim().toIntOrNull()
+            ?: TRACK_TOTAL_KEYS.firstNotNullOfOrNull { values[it]?.trim()?.toIntOrNull() }
+        return total == null || number <= total
     }
 
     /**
@@ -117,15 +143,27 @@ internal object TrackIdWriter {
      */
     private fun commentsWith(block: ByteArray, prefix: Int, tags: TrackTags, coverAsComment: Boolean): ByteArray {
         val parsed = parseComments(block, prefix)
+        val lacking = missingFrom(parsed.values, hasCover = true)
         val added = buildList {
             if ("TITLE" !in parsed.keys && tags.title.isNotBlank()) add("TITLE=${tags.title}")
             if ("ARTIST" !in parsed.keys && tags.artist.isNotBlank()) add("ARTIST=${tags.artist}")
             if ("ALBUM" !in parsed.keys && !tags.album.isNullOrBlank()) add("ALBUM=${tags.album}")
+            // Each album field only where it is missing, a track number with the total it is checked against.
+            VorbisComments.albumComments(tags).filter { (key, _) ->
+                when (key) {
+                    "ALBUMARTIST" -> Field.ALBUM_ARTIST in lacking
+                    "TRACKNUMBER", "TRACKTOTAL" -> Field.TRACK_NUMBER in lacking
+                    "DISCNUMBER", "DISCTOTAL" -> Field.DISC_NUMBER in lacking
+                    else -> Field.DATE in lacking
+                }
+            }.forEach { (key, value) -> add("$key=$value") }
             tags.trackId?.let { add("$KEY=$it") }
             val cover = tags.cover.takeIf { coverAsComment && PICTURE_KEY !in parsed.keys }
             cover?.let { add("$PICTURE_KEY=${VorbisComments.encodePicture(it)}") }
         }
-        val replaced = added.map { it.substringBefore('=').uppercase() + "=" }.toSet()
+        // A total under another name goes with the number it belonged to.
+        val replaced = added.map { it.substringBefore('=').uppercase() + "=" }.toSet() +
+            (if (added.any { it.startsWith("TRACKTOTAL=") }) setOf("TOTALTRACKS=") else emptySet())
         val kept = parsed.comments.filter { comment ->
             replaced.none { String(comment, Charsets.UTF_8).startsWith(it, ignoreCase = true) }
         }
@@ -159,8 +197,8 @@ internal object TrackIdWriter {
 
         fun missing(bytes: ByteArray): Set<Field>? {
             val tags = tags(bytes) ?: return null
-            val keys = parseComments(tags.packet, 8).keys
-            return missingFrom(keys, hasCover = PICTURE_KEY in keys)
+            val values = parseComments(tags.packet, 8).values
+            return missingFrom(values, hasCover = PICTURE_KEY in values)
         }
 
         fun withTags(bytes: ByteArray, add: TrackTags): ByteArray? {
@@ -278,7 +316,7 @@ internal object TrackIdWriter {
         fun missing(bytes: ByteArray): Set<Field>? {
             val metadata = metadata(bytes) ?: return null
             val comments = metadata.blocks.firstOrNull { it.type == TYPE_VORBIS_COMMENT }?.data ?: EMPTY_COMMENTS
-            return missingFrom(parseComments(comments, 0).keys, hasCover = metadata.blocks.any { it.type == TYPE_PICTURE })
+            return missingFrom(parseComments(comments, 0).values, hasCover = metadata.blocks.any { it.type == TYPE_PICTURE })
         }
 
         fun withTags(bytes: ByteArray, tags: TrackTags): ByteArray? {
@@ -345,6 +383,10 @@ internal object TrackIdWriter {
             Field.ARTIST to "\u00A9ART",
             Field.ALBUM to "\u00A9alb",
             Field.COVER to "covr",
+            Field.ALBUM_ARTIST to "aART",
+            Field.TRACK_NUMBER to "trkn",
+            Field.DISC_NUMBER to "disk",
+            Field.DATE to "\u00A9day",
         )
 
         private fun layout(bytes: ByteArray): Layout? {
@@ -382,6 +424,12 @@ internal object TrackIdWriter {
                 album = tags.album.takeIf { Field.ALBUM in lacking },
                 cover = tags.cover.takeIf { Field.COVER in lacking },
                 trackId = tags.trackId,
+                albumArtist = tags.albumArtist.takeIf { Field.ALBUM_ARTIST in lacking },
+                trackNumber = tags.trackNumber.takeIf { Field.TRACK_NUMBER in lacking },
+                trackTotal = tags.trackTotal.takeIf { Field.TRACK_NUMBER in lacking },
+                discNumber = tags.discNumber.takeIf { Field.DISC_NUMBER in lacking },
+                discTotal = tags.discTotal.takeIf { Field.DISC_NUMBER in lacking },
+                date = tags.date.takeIf { Field.DATE in lacking },
             )
             val moov = layout.moov
             // Where the new bytes go, what they are, and which boxes enclose that point. A second udta is

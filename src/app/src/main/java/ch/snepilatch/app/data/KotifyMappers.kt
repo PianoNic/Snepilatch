@@ -11,6 +11,7 @@ import kotify.api.playlist.PlaylistInfo
 import kotify.api.playlist.PlaylistTrack
 import kotify.api.podcast.PodcastEpisode
 import kotify.api.podcast.PodcastInfo
+import kotify.api.podcast.ShowMetadata
 import kotify.api.song.SearchTrack
 import kotify.api.song.TrackDetail
 import kotify.api.playlist.Library as KLibrary
@@ -235,14 +236,32 @@ fun PodcastEpisode.toTrackInfo(showName: String): TrackInfo = TrackInfo(
     albumName = showName,
 )
 
+fun PodcastEpisode.toShowEpisode(): ShowEpisode = ShowEpisode(
+    uri = uri,
+    description = description,
+    releaseDate = releaseDate,
+    resumePositionMs = resumePositionMs,
+    isPlayed = playedState == "COMPLETED",
+    isExplicit = isExplicit,
+)
+
+fun ShowMetadata.toShowHeader(): ShowHeader = ShowHeader(
+    about = description,
+    averageRating = averageRating,
+    totalRatings = totalRatings,
+    isFollowed = isFollowed,
+    consumptionOrder = consumptionOrder,
+    shareUrl = shareUrl,
+)
+
 /**
- * Show detail. `PodcastInfo` carries only the show identity + first page of episodes; the cover art and
- * publisher aren't in that payload, so the caller passes them in from the search/library item it opened
- * (falling back to the first episode's cover art when unknown).
+ * Show detail. `PodcastInfo` carries the show identity and the first page of episodes, [metadata] the
+ * header: cover, publisher, About and follow state. Without it the cover and publisher come from the
+ * search/library item that was opened, falling back to the first episode's cover art.
  */
-fun PodcastInfo.toDetailData(showId: String, publisher: String?, imageUrl: String?): DetailData {
+fun PodcastInfo.toDetailData(showId: String, publisher: String?, imageUrl: String?, metadata: ShowMetadata? = null): DetailData {
     val mappedEpisodes = episodes.map { it.toTrackInfo(name) }
-    val art = imageUrl ?: episodes.firstOrNull()?.coverArtUrl
+    val art = metadata?.coverArtUrl ?: imageUrl ?: episodes.firstOrNull()?.coverArtUrl
     return DetailData(
         name = name,
         imageUrl = art,
@@ -250,9 +269,11 @@ fun PodcastInfo.toDetailData(showId: String, publisher: String?, imageUrl: Strin
         tracks = mappedEpisodes,
         uri = "spotify:show:$showId",
         type = "show",
-        publisher = publisher,
+        publisher = metadata?.publisher ?: publisher,
         totalCount = totalEpisodes,
         loadedOffset = mappedEpisodes.size,
+        show = metadata?.toShowHeader(),
+        episodes = episodes.map { it.toShowEpisode() },
     )
 }
 

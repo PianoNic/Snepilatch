@@ -110,6 +110,12 @@ fun DetailScreen(vm: PlaybackViewModel) {
         return
     }
 
+    // A show has its own page, laid out after the web player's (#1044).
+    if (detail.type == "show") {
+        ShowScreen(vm, detailVm, detail)
+        return
+    }
+
     val hasMore = detail.totalCount < 0 || detail.tracks.size < detail.totalCount
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = LocalBottomOverlayHeight.current.value + 16.dp)) {
@@ -192,20 +198,6 @@ fun DetailScreen(vm: PlaybackViewModel) {
                     val meta = listOfNotNull(detail.albumType, detail.releaseDate, summary).joinToString(" · ")
                     if (meta.isNotBlank()) {
                         Text(meta, color = SnepilatchLightGray, fontSize = 13.sp)
-                    }
-                }
-            }
-        }
-
-        // Show metadata (podcast): publisher + episode count
-        if (detail.type == "show") {
-            item {
-                Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-                    if (detail.publisher != null) {
-                        Text(detail.publisher!!, color = SnepilatchWhite, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                    if (detail.description != null) {
-                        Text(detail.description!!, color = SnepilatchLightGray, fontSize = 13.sp)
                     }
                 }
             }
@@ -840,7 +832,7 @@ private fun DetailHeaderMenu(
 
 /** The round back button over the top left of a detail page. */
 @Composable
-private fun DetailBackButton(modifier: Modifier = Modifier, onBack: () -> Unit) {
+internal fun DetailBackButton(modifier: Modifier = Modifier, onBack: () -> Unit) {
     Box(
         modifier
             .padding(12.dp)

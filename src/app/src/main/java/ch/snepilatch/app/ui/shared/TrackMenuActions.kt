@@ -3,13 +3,16 @@ package ch.snepilatch.app.ui.shared
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.AddCircleOutline
 import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlaylistRemove
 import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import ch.snepilatch.app.logic.download.Downloads
 import androidx.compose.material.icons.rounded.DownloadForOffline
@@ -19,6 +22,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.res.stringResource
 import ch.snepilatch.app.R
 import ch.snepilatch.app.data.TrackInfo
+import ch.snepilatch.app.logic.podcast.YourEpisodes
 import ch.snepilatch.app.logic.shared.shareSpfyUri
 import ch.snepilatch.app.viewmodel.DetailViewModel
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
@@ -36,6 +40,7 @@ fun trackMenuActions(
     close: () -> Unit,
     options: TrackMenuOptions = TrackMenuOptions(),
 ): List<MenuAction> {
+    if (track.uri.startsWith("spotify:episode:")) return episodeMenuActions(track, vm, detailVm, close, options)
     val context = LocalContext.current
     val shareLabel = stringResource(R.string.share)
     val downloadedIndex by Downloads.index.collectAsState()
@@ -93,6 +98,53 @@ fun trackMenuActions(
             close()
             detailVm.openArtistForTrack(track.uri)
         }.takeIf { options.visitArtist },
+        MenuAction(Icons.Rounded.Share, shareLabel) {
+            close()
+            shareSpfyUri(context, track.uri, shareLabel)
+        },
+    )
+}
+
+/**
+ * An episode's menu, in the web player's order: add to playlist, Your Episodes, add to queue, share.
+ * Like, song radio, album and artist are track things it leaves out, and downloads hold tracks only.
+ */
+@Composable
+private fun episodeMenuActions(
+    track: TrackInfo,
+    vm: PlaybackViewModel,
+    detailVm: DetailViewModel,
+    close: () -> Unit,
+    options: TrackMenuOptions,
+): List<MenuAction> {
+    val context = LocalContext.current
+    val shareLabel = stringResource(R.string.share)
+    val savedEpisodes by YourEpisodes.saved.collectAsState()
+    val saved = track.uri in savedEpisodes
+    // Opened from the queue or the player, nothing has looked this episode up yet.
+    LaunchedEffect(track.uri) { detailVm.refreshSavedEpisodes(listOf(track.uri)) }
+    return listOfNotNull(
+        MenuAction(Icons.AutoMirrored.Rounded.PlaylistAdd, stringResource(R.string.add_to_playlist)) {
+            close()
+            vm.showPlaylistPickerForTrack(track.uri)
+        },
+        options.removeFromPlaylist?.let { remove ->
+            MenuAction(Icons.Rounded.PlaylistRemove, stringResource(R.string.remove_from_playlist)) {
+                close()
+                remove()
+            }
+        },
+        MenuAction(
+            if (saved) Icons.Rounded.CheckCircle else Icons.Rounded.AddCircleOutline,
+            stringResource(if (saved) R.string.remove_from_your_episodes else R.string.save_to_your_episodes),
+        ) {
+            detailVm.toggleEpisodeSaved(track.uri)
+            close()
+        },
+        MenuAction(Icons.AutoMirrored.Rounded.QueueMusic, stringResource(R.string.add_to_queue)) {
+            vm.addToQueue(track.uri)
+            close()
+        },
         MenuAction(Icons.Rounded.Share, shareLabel) {
             close()
             shareSpfyUri(context, track.uri, shareLabel)

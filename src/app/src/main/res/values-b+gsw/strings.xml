@@ -513,4 +513,23 @@
     <string name="home_following_caught_up_title">Du bisch uf em neuschte Stand</string>
     <string name="home_following_music_caught_up">Es git kei wiiteri Neuerschiinige vo Künstler, dene du folgsch.</string>
     <string name="home_following_podcasts_caught_up">Es git kei wiiteri nöii Folge vo Creator, dene du folgsch.</string>
+    <string name="show_type">Podcast</string>
+    <string name="show_about">Info</string>
+    <string name="show_rating">%1$s (%2$s)</string>
+    <string name="episodes_all">Alli Folge</string>
+    <string name="episodes_unplayed">Nöd ghört</string>
+    <string name="episodes_in_progress">Aagfange</string>
+    <string name="episodes_newest">Nöischti</string>
+    <string name="episodes_oldest">Ältischti</string>
+    <string name="episodes_filter_by">Filtere nach</string>
+    <string name="episodes_sort_by">Sortiere nach</string>
+    <string name="episode_today">Hüt</string>
+    <string name="episode_time_left">No %s</string>
+    <string name="episode_played">Ghört</string>
+    <string name="episode_hours_short">%d Std.</string>
+    <string name="episode_minutes_short">%d Min.</string>
+    <string name="episode_seconds_short">%d Sek.</string>
+    <string name="episode_new">Nöii Folg</string>
+    <string name="save_to_your_episodes">I „Dini Folge“ speichere</string>
+    <string name="remove_from_your_episodes">Us „Dini Folge“ entferne</string>
 </resources>

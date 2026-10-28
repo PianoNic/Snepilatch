@@ -505,4 +505,23 @@
     <string name="home_following_caught_up_title">Вы в курсе всех новинок</string>
     <string name="home_following_music_caught_up">Больше нет новых релизов от исполнителей, на которых вы подписаны.</string>
     <string name="home_following_podcasts_caught_up">Больше нет новых выпусков от авторов, на которых вы подписаны.</string>
+    <string name="show_type">Подкаст</string>
+    <string name="show_about">Описание</string>
+    <string name="show_rating">%1$s (%2$s)</string>
+    <string name="episodes_all">Все выпуски</string>
+    <string name="episodes_unplayed">Непрослушанные</string>
+    <string name="episodes_in_progress">Начатые</string>
+    <string name="episodes_newest">Сначала новые</string>
+    <string name="episodes_oldest">Сначала старые</string>
+    <string name="episodes_filter_by">Фильтр</string>
+    <string name="episodes_sort_by">Сортировка</string>
+    <string name="episode_today">Сегодня</string>
+    <string name="episode_time_left">Осталось %s</string>
+    <string name="episode_played">Прослушано</string>
+    <string name="episode_hours_short">%d ч</string>
+    <string name="episode_minutes_short">%d мин</string>
+    <string name="episode_seconds_short">%d сек</string>
+    <string name="episode_new">Новый выпуск</string>
+    <string name="save_to_your_episodes">Добавить в «Ваши выпуски»</string>
+    <string name="remove_from_your_episodes">Удалить из «Ваших выпусков»</string>
 </resources>

@@ -24,6 +24,9 @@ import kotlinx.coroutines.launch
 import ch.snepilatch.app.logic.shared.Navigator
 import ch.snepilatch.app.logic.shared.SessionViewModel
 import ch.snepilatch.app.logic.shared.spfyId
+import ch.snepilatch.app.logic.podcast.YourEpisodes
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 
 /**
  * ViewModel for the shared detail screen (playlist / album / artist / show).
@@ -157,16 +160,44 @@ class DetailViewModel : SessionViewModel("DetailVM") {
     }
 
     /**
-     * Open a podcast show. [publisher]/[imageUrl] come from the search/library item that was tapped
-     * (the `queryPodcastEpisodes` payload doesn't carry them); they fall back to the first episode's
-     * cover art. Episodes render as episode-URI [ch.snepilatch.app.data.TrackInfo]s.
+     * Open a podcast show: the header (cover, publisher, About, follow state) and the first page of
+     * episodes, asked for side by side as the web player's show page does. [publisher]/[imageUrl] come
+     * from the search/library item that was tapped and stand in when the header is missing. Episodes
+     * play as episode-URI [ch.snepilatch.app.data.TrackInfo]s.
      */
     fun openShow(showId: String, publisher: String? = null, imageUrl: String? = null) =
         openDetail(Screen.SHOW_DETAIL, "openShow") { sess ->
-            Podcast(sess, showId).getPodcastInfo(limit = 50, offset = 0)
-                ?.toDetailData(showId, publisher, imageUrl)
-                .also { if (it == null) LokiLogger.e(logTag, "openShow: no podcast info for $showId") }
+            coroutineScope {
+                val podcast = Podcast(sess, showId)
+                val header = async { podcast.getShowMetadata() }
+                podcast.getPodcastInfo(limit = 50, offset = 0)
+                    ?.toDetailData(showId, publisher, imageUrl, header.await())
+                    .also { if (it == null) LokiLogger.e(logTag, "openShow: no podcast info for $showId") }
+            }
         }
+
+    /** Follow or unfollow the open show. The button flips before the request lands and back if it fails. */
+    fun toggleShowFollow() {
+        val before = _detail.value
+        val header = before.show ?: return
+        val follow = !header.isFollowed
+        _detail.value = before.copy(show = header.copy(isFollowed = follow))
+        launchWithSession("toggleShowFollow", onFailure = {
+            _detail.value.show?.let { _detail.value = _detail.value.copy(show = it.copy(isFollowed = !follow)) }
+        }) { sess ->
+            val podcast = Podcast(sess, spfyId(before.uri))
+            if (follow) podcast.follow() else podcast.unfollow()
+        }
+    }
+
+    /** Learn which of the listed episodes are in Your Episodes, for their + buttons. */
+    fun refreshSavedEpisodes(uris: List<String>) {
+        launchWithSession("refreshSavedEpisodes") { sess -> YourEpisodes.refresh(sess, uris) }
+    }
+
+    fun toggleEpisodeSaved(uri: String) {
+        launchWithSession("toggleEpisodeSaved") { sess -> YourEpisodes.toggle(sess, uri) }
+    }
 
     /**
      * Open the station for [seedUri] (track = song radio, artist = artist radio) as a normal playlist
@@ -275,6 +306,7 @@ class DetailViewModel : SessionViewModel("DetailVM") {
                 val newTotalCount = if (more.size < DETAIL_PAGE_SIZE) newSize else (info?.totalEpisodes ?: newSize)
                 _detail.value = current.copy(
                     tracks = current.tracks + more,
+                    episodes = current.episodes + info?.episodes?.map { it.toShowEpisode() }.orEmpty(),
                     totalCount = newTotalCount,
                     loadedOffset = newSize
                 )

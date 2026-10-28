@@ -1780,6 +1780,23 @@ class PlaybackViewModel : ViewModel() {
             return
         }
 
+        // An episode resolves on its own uri, and an external one never pushes a file id to wait for.
+        val episode = _playback.value.track?.takeIf { it.uri.startsWith("spotify:episode:") }
+        if (episode != null) {
+            coldStartFileId = null
+            LokiLogger.i(TAG, "[ColdStart] episode ${episode.uri}, resolving it directly")
+            try {
+                resumeLoader.loadEpisodeAt(episode, savedPositionAtEntry, "ColdStart")
+            } catch (e: Exception) {
+                LokiLogger.e(TAG, "[ColdStart] episode load failed, falling back to resume", e)
+                resetColdStart()
+                currentStreamUri = null
+                isStreaming.value = false
+                fallbackResume()
+            }
+            return
+        }
+
         // Wait for Spfy's state machine to push the file id via onPlaybackId.
         // Capped at 5s — typically arrives in <1s on a fast connection. If we
         // already have a cached latestFileId from an earlier session it'll arrive
@@ -1825,7 +1842,9 @@ class PlaybackViewModel : ViewModel() {
     private suspend fun takeOverHandedPlayback(event: TrackChangeEvent) {
         val current = event.current ?: return
         val fileId = event.currentFileId ?: latestFileId?.takeIf { latestFileUri == current.uri }
-        if (fileId == null) {
+        // An episode resolves on its own uri; an external one has no file id at all.
+        val isEpisode = current.uri.startsWith("spotify:episode:")
+        if (fileId == null && !isEpisode) {
             LokiLogger.w(TAG, "[HandBack] no file id for ${current.uri}, leaving it to the play button")
             return
         }
@@ -1847,7 +1866,11 @@ class PlaybackViewModel : ViewModel() {
         checkLikedState(current.uri)
         fetchCanvasForTrack(current.uri)
         try {
-            resumeLoader.loadAt(fileId, track, position, "HandBack", startPlaying = !paused)
+            if (isEpisode) {
+                resumeLoader.loadEpisodeAt(track, position, "HandBack", startPlaying = !paused)
+            } else {
+                resumeLoader.loadAt(checkNotNull(fileId), track, position, "HandBack", startPlaying = !paused)
+            }
             if (paused) isStreamLoading.value = false
         } catch (e: CancellationException) {
             throw e

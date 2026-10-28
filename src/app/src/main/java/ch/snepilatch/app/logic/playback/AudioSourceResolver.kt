@@ -57,12 +57,18 @@ object AudioSourceResolver {
         source: String? = AppSettings.preferredAudioSource.value,
     ): StreamResult = localOrNull(trackUri, title, artist)
         ?: youTubeMusic(title, artist, durationMs, source)
-        ?: cdn.resolveStreamUrl(
-            spfyId(trackUri),
-            region = AppSettings.effectiveRegion(),
-            searchQuery = searchQuery,
-            preferredSource = source,
-        )
+        // With the title, artist and length the lossless hit is checked against the track (#1053); a first
+        // hit taken as it came was often another song of the name, and was downloaded as this one.
+        ?: if (!title.isNullOrBlank()) {
+            cdn.resolveTrack(title, artist.orEmpty(), durationMs, region = AppSettings.effectiveRegion(), preferredSource = source)
+        } else {
+            cdn.resolveStreamUrl(
+                spfyId(trackUri),
+                region = AppSettings.effectiveRegion(),
+                searchQuery = searchQuery,
+                preferredSource = source,
+            )
+        }
 
     /**
      * A downloaded copy wins over every source, including Spfy: the user asked for this track on

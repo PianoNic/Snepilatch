@@ -2697,6 +2697,7 @@ class PlaybackViewModel : ViewModel() {
         launchWithPlayer("openAlbumFromCurrentTrack") { pc ->
             val state = pc.getState() ?: return@launchWithPlayer
             val track = state.track ?: return@launchWithPlayer
+            if (openShowOf(track)) return@launchWithPlayer
             val albumUri = track.albumUri?.takeIf { it.isNotBlank() }
                 ?: state.context_uri?.takeIf { it.contains(":album:") }
             if (albumUri != null) {
@@ -2708,6 +2709,17 @@ class PlaybackViewModel : ViewModel() {
         }
     }
 
+    /**
+     * An episode has a show where a track has its artist and album, carried as `album_uri`, so both
+     * lines under the title open it. False for anything that is not an episode with a show.
+     */
+    private fun openShowOf(track: kotify.api.playerstatus.PlayerTrack): Boolean {
+        if (!track.uri.startsWith("spotify:episode:")) return false
+        val showUri = track.albumUri?.takeIf { it.startsWith("spotify:show:") } ?: return false
+        DetailRoutes.openShow(spfyId(showUri))
+        return true
+    }
+
     fun navigateToContext() {
         val ctx = playingContext.value ?: return
         val uri = ctx.uri ?: return
@@ -2716,6 +2728,7 @@ class PlaybackViewModel : ViewModel() {
             uri.contains(":album:") -> DetailRoutes.openAlbum(uri.substringAfter(":album:"))
             uri.contains(":artist:") -> DetailRoutes.openArtist(uri.substringAfter(":artist:"))
             uri.contains(":collection:tracks") -> DetailRoutes.openLikedSongs()
+            uri.contains(":show:") -> DetailRoutes.openShow(uri.substringAfter(":show:"))
         }
     }
 
@@ -2723,6 +2736,7 @@ class PlaybackViewModel : ViewModel() {
         launchWithPlayer("openArtistFromCurrentTrack") { pc ->
             val state = pc.getState() ?: return@launchWithPlayer
             val track = state.track ?: return@launchWithPlayer
+            if (openShowOf(track)) return@launchWithPlayer
             val artistUri = track.artistUri?.takeIf { it.isNotBlank() }
             if (artistUri != null) {
                 val artistId = artistUri.removePrefix("spotify:artist:")

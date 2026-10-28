@@ -414,6 +414,8 @@ fun NowPlayingScreen(
     // track", not an interruption. `track` is unchanged during an ad, so no blanking is needed.
     val displayTitle = track?.name ?: stringResource(R.string.now_playing_not_playing)
     val displayArtist = track?.artist ?: ""
+    // An episode's artist and album line are both its show: the web player prints it once.
+    val isEpisode = track?.uri?.startsWith("spotify:episode:") == true
     val displayArtUrl: String? = track?.albumArt
     // The cover turned over to its lyrics side (#817); kept across rotations, not across app restarts.
     var coverFlipped by rememberSaveable { mutableStateOf(false) }
@@ -595,7 +597,7 @@ fun NowPlayingScreen(
                                 )
                                 Spacer(Modifier.height(2.dp))
                                 Text(
-                                    track?.albumName.orEmpty(),
+                                    track?.albumName?.takeIf { !isEpisode }.orEmpty(),
                                     color = SnepilatchLightGray.copy(alpha = 0.7f),
                                     fontSize = 11.sp,
                                     minLines = 1,
@@ -763,7 +765,7 @@ fun NowPlayingScreen(
                                 modifier = Modifier.clickable { vm.openArtistFromCurrentTrack() }
                             )
                             Spacer(Modifier.height(2.dp))
-                            val albumName = track?.albumName?.takeIf { !isAd }
+                            val albumName = track?.albumName?.takeIf { !isAd && !isEpisode }
                             MarqueeText(
                                 text = albumName.orEmpty(),
                                 color = tertiaryText,
@@ -975,13 +977,11 @@ private fun PlayerControls(
 ) {
     val isPlaying by vm.isPlayingFlow.collectAsState()
     val isPaused by vm.isPausedFlow.collectAsState()
-    val isShuffling by vm.isShufflingFlow.collectAsState()
-    val shuffleMode by vm.shuffleModeFlow.collectAsState()
-    val repeatMode by vm.repeatModeFlow.collectAsState()
-    val canToggleShuffle by vm.canToggleShuffleFlow.collectAsState()
-    val canToggleRepeat by vm.canToggleRepeatFlow.collectAsState()
     val nextReady by vm.isNextReady.collectAsState()
     val isCurrentlyStreaming by vm.isStreaming.collectAsState()
+    // An episode trades shuffle and repeat for 15 seconds back and forward, as the web player's podcast controls.
+    val currentUri by vm.currentTrackUri.collectAsState()
+    val isEpisode = currentUri?.startsWith("spotify:episode:") == true
     // Offline the next track is a file on the phone, ready the moment it is asked for; the flag only
     // tracks the online pre-resolve, which never runs there, so it would spin forever.
     val offline by vm.isOffline.collectAsState()
@@ -1001,14 +1001,10 @@ private fun PlayerControls(
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        TonalIconToggle(
-            isShuffling, { vm.toggleShuffle() }, sideBtn, buttonBg, animatedPrimary, enabled = canToggleShuffle
-        ) {
-            Icon(
-                if (shuffleMode == "smart") ImageVector.vectorResource(R.drawable.ic_shuffle_smart) else Icons.Rounded.Shuffle,
-                stringResource(R.string.shuffle),
-                modifier = Modifier.size(sideIcon)
-            )
+        if (isEpisode) {
+            SkipSecondsButton(vm, -SKIP_SECONDS_MS, sideBtn, buttonBg, sideIcon, enabled = jamControls)
+        } else {
+            ShuffleButton(vm, sideBtn, buttonBg, animatedPrimary, sideIcon)
         }
         TonalIconBtn({ onSkip(1) }, skipBtn, buttonBg, enabled = jamControls) {
             Icon(Icons.Rounded.SkipPrevious, stringResource(R.string.previous), modifier = Modifier.size(skipIcon))
@@ -1038,14 +1034,62 @@ private fun PlayerControls(
                 Icon(Icons.Rounded.SkipNext, stringResource(R.string.next), modifier = Modifier.size(skipIcon))
             }
         }
-        TonalIconToggle(
-            repeatMode != "off", { vm.cycleRepeat() }, sideBtn, buttonBg, animatedPrimary, enabled = canToggleRepeat
-        ) {
+        if (isEpisode) {
+            SkipSecondsButton(vm, SKIP_SECONDS_MS, sideBtn, buttonBg, sideIcon, enabled = jamControls)
+        } else {
+            RepeatButton(vm, sideBtn, buttonBg, animatedPrimary, sideIcon)
+        }
+    }
+}
+
+@Composable
+private fun ShuffleButton(vm: PlaybackViewModel, size: Dp, buttonBg: Color, accent: Color, iconSize: Dp) {
+    val isShuffling by vm.isShufflingFlow.collectAsState()
+    val shuffleMode by vm.shuffleModeFlow.collectAsState()
+    val canToggleShuffle by vm.canToggleShuffleFlow.collectAsState()
+    TonalIconToggle(isShuffling, { vm.toggleShuffle() }, size, buttonBg, accent, enabled = canToggleShuffle) {
+        Icon(
+            if (shuffleMode == "smart") ImageVector.vectorResource(R.drawable.ic_shuffle_smart) else Icons.Rounded.Shuffle,
+            stringResource(R.string.shuffle),
+            modifier = Modifier.size(iconSize)
+        )
+    }
+}
+
+@Composable
+private fun RepeatButton(vm: PlaybackViewModel, size: Dp, buttonBg: Color, accent: Color, iconSize: Dp) {
+    val repeatMode by vm.repeatModeFlow.collectAsState()
+    val canToggleRepeat by vm.canToggleRepeatFlow.collectAsState()
+    TonalIconToggle(repeatMode != "off", { vm.cycleRepeat() }, size, buttonBg, accent, enabled = canToggleRepeat) {
+        Icon(
+            when (repeatMode) { "track" -> Icons.Rounded.RepeatOne; else -> Icons.Rounded.Repeat },
+            stringResource(R.string.repeat),
+            modifier = Modifier.size(iconSize)
+        )
+    }
+}
+
+private const val SKIP_SECONDS_MS = 15_000L
+
+/** 15 seconds back or forward within the episode: the replay arrow with its seconds, mirrored for forward. */
+@Composable
+private fun SkipSecondsButton(vm: PlaybackViewModel, byMs: Long, size: Dp, buttonBg: Color, iconSize: Dp, enabled: Boolean) {
+    val forward = byMs > 0
+    TonalIconBtn(
+        {
+            val duration = vm.currentTrack.value?.durationMs ?: 0L
+            val target = (vm.positionFlow.value + byMs).coerceAtLeast(0L)
+            vm.seekTo(if (duration > 0) target.coerceAtMost(duration) else target)
+        },
+        size, buttonBg, enabled = enabled,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
             Icon(
-                when (repeatMode) { "track" -> Icons.Rounded.RepeatOne; else -> Icons.Rounded.Repeat },
-                stringResource(R.string.repeat),
-                modifier = Modifier.size(sideIcon)
+                Icons.Rounded.Replay,
+                stringResource(if (forward) R.string.skip_forward_15 else R.string.skip_back_15),
+                modifier = Modifier.size(iconSize + 6.dp).graphicsLayer { scaleX = if (forward) -1f else 1f },
             )
+            Text("15", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = SnepilatchWhite, modifier = Modifier.padding(top = 2.dp))
         }
     }
 }

@@ -522,4 +522,6 @@
     <string name="episode_new">Neue Folge</string>
     <string name="save_to_your_episodes">In „Deine Folgen“ speichern</string>
     <string name="remove_from_your_episodes">Aus „Deine Folgen“ entfernen</string>
+    <string name="skip_back_15">15 Sekunden zurück</string>
+    <string name="skip_forward_15">15 Sekunden vor</string>
 </resources>

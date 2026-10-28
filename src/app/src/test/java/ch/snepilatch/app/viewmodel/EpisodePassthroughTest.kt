@@ -6,10 +6,12 @@ import ch.snepilatch.app.logic.playback.engine.SpfyStream
 import io.mockk.coEvery
 import io.mockk.mockk
 import io.mockk.verify
+import kotify.api.playerstatus.TrackChangeEvent
 import kotify.cdn.EpisodeResolveInfo
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -73,5 +75,27 @@ class EpisodePassthroughTest {
         verify {
             rig.service.playDrmUrl("https://cdn/enc", null, any(), any(), any(), any(), any(), pssh = "PSSHBYTES")
         }
+    }
+
+    /** #1042: the next button spun for as long as an episode played, as nothing marked the next ready. */
+    @Test
+    fun playingAnEpisode_marksTheNextReady() = runBlocking {
+        val resolver = mockk<SpfyCdnResolver>(relaxed = true)
+        coEvery { resolver.resolveEpisode("EP3") } returns EpisodeResolveInfo(
+            fileId = null,
+            format = "DO_NOT_USE",
+            cdnUrls = emptyList(),
+            passthrough = "MANDATORY",
+            passthroughUrl = "https://proxycast.radiofrance.fr/show/ep3.mp3",
+        )
+        SessionHolder.cdnResolver = resolver
+        rig.vm.isNextReady.value = false
+
+        rig.vm.resolveAndPlayEpisode(
+            "spotify:episode:EP3", TrackChangeEvent(previous = null, current = null, currentFileId = null),
+            "Ep Three", "Show", null, 0L,
+        )
+
+        assertTrue(rig.vm.isNextReady.value)
     }
 }

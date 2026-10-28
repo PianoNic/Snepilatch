@@ -3639,7 +3639,7 @@ class PlaybackViewModel : ViewModel() {
      * onPlaybackId / onExternalUrl race onTrackChange, so we wait briefly for either to arrive. On
      * failure we stop cleanly — we do NOT fall back to the third-party music CDN (wrong for podcasts).
      */
-    private suspend fun resolveAndPlayEpisode(
+    internal suspend fun resolveAndPlayEpisode(
         trackUri: String,
         event: kotify.api.playerstatus.TrackChangeEvent,
         title: String,
@@ -3707,6 +3707,8 @@ class PlaybackViewModel : ViewModel() {
             isStreaming.value = false
         } finally {
             isStreamLoading.value = false
+            // Every path above returns from inside the try, so this is the one place they all pass.
+            preResolveNextTrack()
         }
     }
 
@@ -3791,6 +3793,12 @@ class PlaybackViewModel : ViewModel() {
             if (nextUri.startsWith("spotify:ad:")) {
                 // Don't pre-resolve ads — KotifyClient handles them.
                 LokiLogger.i(TAG, "[Ad] not pre-resolving ad URI in preResolveNextTrack: $nextUri")
+                return
+            }
+            // An episode only ever resolves through spfy, on the boundary, so there is nothing to
+            // look up ahead on a third-party source.
+            if (nextUri.startsWith("spotify:episode:")) {
+                isNextReady.value = true
                 return
             }
 

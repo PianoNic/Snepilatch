@@ -406,7 +406,8 @@ class PlaybackViewModel : ViewModel() {
             }
             override fun setTickerRunning(running: Boolean) = if (running) startPositionTicker() else stopPositionTicker()
             override fun startSession() = restartSessionFromSavedCookies()
-            override suspend fun awaitPlayer(timeoutMs: Long) = SessionHolder.awaitPlayer(timeoutMs) != null
+            override suspend fun awaitDevice(timeoutMs: Long, dealer: Boolean) =
+                SessionHolder.awaitPlayer(timeoutMs)?.let { player -> !dealer || player.awaitDealer() } == true
             override suspend fun currentPositionMs() = withContext(Dispatchers.Main) {
                 MusicPlaybackService.instance?.getCurrentPosition() ?: _playback.value.positionMs
             }

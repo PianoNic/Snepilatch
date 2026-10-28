@@ -382,6 +382,13 @@
     <plurals name="downloads_untagged_title"><item quantity="one">%d download to check for missing tags</item><item quantity="other">%d downloads to check for missing tags</item></plurals>
     <plurals name="downloads_unmatched_title"><item quantity="one">%d song couldn\'t be found on Spotify</item><item quantity="other">%d songs couldn\'t be found on Spotify</item></plurals>
     <string name="downloads_unmatched_action">Tap to try again</string>
+    <string name="downloads_replacing">Downloading %1$d of %2$d again</string>
+    <string name="downloads_unmatched_why">Why they were not found</string>
+    <string name="downloads_unmatched_why_hint">Each file and what is wrong with it</string>
+    <string name="downloads_why_length">Another recording: %1$s long, the song is %2$s. Downloaded again if a source has it</string>
+    <string name="downloads_why_artist">The catalogue has this title only by %1$s</string>
+    <string name="downloads_why_none">Not in the catalogue</string>
+    <string name="downloads_why_unreadable">Its tags cannot be read</string>
     <string name="downloads_writing_ids">Writing tags: %1$d of %2$d</string>
     <string name="downloads_ids_written">Tags written into files: %1$d</string>
     <string name="download_folder_none">Not set, tap to choose</string>

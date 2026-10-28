@@ -145,12 +145,57 @@ private fun UnindexedFiles() {
             progress == null && onlyUnmatched -> stringResource(R.string.downloads_unmatched_action)
             progress == null -> stringResource(R.string.downloads_unindexed_action)
             progress.writingIds -> stringResource(R.string.downloads_writing_ids, progress.done, progress.total)
+            progress.replacing -> stringResource(R.string.downloads_replacing, progress.done, progress.total)
             else -> stringResource(R.string.downloads_matching, progress.done, progress.total)
         },
         icon = Icons.Rounded.Downloading,
         onClick = if (progress == null) ({ FolderScan.migrate(context) }) else null,
     )
+    UnmatchedWhy()
 }
+
+/** Which files nothing was found for, and why, so a number is not all the user gets (#1053). */
+@Composable
+private fun UnmatchedWhy() {
+    val files by FolderScan.unmatchedList.collectAsState()
+    var open by remember { mutableStateOf(false) }
+    if (files.isEmpty()) return
+    SettingRow(
+        title = stringResource(R.string.downloads_unmatched_why),
+        subtitle = stringResource(R.string.downloads_unmatched_why_hint),
+        onClick = { open = true },
+    )
+    if (!open) return
+    AlertDialog(
+        onDismissRequest = { open = false },
+        containerColor = SnepilatchGray,
+        title = { Text(stringResource(R.string.downloads_unmatched_why), color = SnepilatchWhite) },
+        text = {
+            LazyColumn(Modifier.heightIn(max = 480.dp)) {
+                items(files) { f ->
+                    Column(Modifier.padding(vertical = 6.dp)) {
+                        Text(f.name, color = SnepilatchWhite, fontSize = 14.sp)
+                        Text(whyText(f.miss), color = SnepilatchLightGray, fontSize = 12.sp)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { open = false }) { Text(stringResource(R.string.close), color = SnepilatchLightGray) }
+        },
+    )
+}
+
+@Composable
+private fun whyText(miss: ch.snepilatch.app.logic.download.Miss): String = when (miss) {
+    is ch.snepilatch.app.logic.download.Miss.WrongLength ->
+        stringResource(R.string.downloads_why_length, minutes(miss.fileMs), minutes(miss.catalogueMs))
+    is ch.snepilatch.app.logic.download.Miss.OtherArtist -> stringResource(R.string.downloads_why_artist, miss.artists)
+    ch.snepilatch.app.logic.download.Miss.NotFound -> stringResource(R.string.downloads_why_none)
+    ch.snepilatch.app.logic.download.Miss.Unreadable -> stringResource(R.string.downloads_why_unreadable)
+}
+
+private fun minutes(ms: Long): String = "%d:%02d".format(ms / 60_000, ms / 1000 % 60)
 
 /** Where the files go and how much room they take. */
 @Composable

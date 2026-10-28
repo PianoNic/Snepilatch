@@ -45,6 +45,9 @@ object FolderScan {
     /** Files the last migration looked up and found no track for; a new migration replaces the set. */
     private const val PREF_UNMATCHED = "folder_unmatched"
 
+    /** Why, for each of those: "uri<TAB>reason" (#1053). */
+    private const val PREF_UNMATCHED_WHY = "folder_unmatched_why"
+
     /** Opus and FLAC keep their tags near the start; the cover may sit before them, so this is generous. */
     private const val HEAD_BYTES = 2 * 1024 * 1024
 
@@ -66,6 +69,9 @@ object FolderScan {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    /** Files the last matching found to hold another song than their track, for [migrate] to replace (#1053). */
+    private val broken = java.util.Collections.synchronizedList(mutableListOf<BrokenFiles.Broken>())
+
     /** Audio files in the folder that are not in the index, from the last count. */
     private val _unindexed = MutableStateFlow(0)
     val unindexed: StateFlow<Int> = _unindexed.asStateFlow()
@@ -74,8 +80,20 @@ object FolderScan {
     private val _unmatched = MutableStateFlow(0)
     val unmatched: StateFlow<Int> = _unmatched.asStateFlow()
 
+    /** One file nothing was found for, and why, for the list the downloads screen shows (#1053). */
+    internal data class Unmatched(val name: String, val miss: Miss)
+
+    private val _unmatchedList = MutableStateFlow<List<Unmatched>>(emptyList())
+    internal val unmatchedList: StateFlow<List<Unmatched>> = _unmatchedList.asStateFlow()
+
     /** How far a running [migrate] is: matching unknown files, then writing ids into the indexed ones. */
-    data class Progress(val writingIds: Boolean, val done: Int, val total: Int)
+    data class Progress(
+        val writingIds: Boolean,
+        val done: Int,
+        val total: Int,
+        /** Downloading broken files again (#1053). */
+        val replacing: Boolean = false,
+    )
 
     private val _migrating = MutableStateFlow<Progress?>(null)
     val migrating: StateFlow<Progress?> = _migrating.asStateFlow()
@@ -110,6 +128,7 @@ object FolderScan {
         scope.launch {
             // One lookup for both steps: the details of each track the matching found fill in its tags.
             val lookup = CatalogueLookup()
+            broken.clear()
             // Remembered copies are looked at again too: one may be the only file left of its track (#948).
             if (_unindexed.value > 0 || duplicates(ctx).isNotEmpty()) {
                 val unindexed = _unindexed.value
@@ -122,11 +141,22 @@ object FolderScan {
                     lookup.refused != null -> AppMessages.show(R.string.downloads_lookup_stopped, matched, total)
                     unindexed > 0 -> AppMessages.show(R.string.downloads_matched, matched, total)
                 }
+                // The screen's count follows each step rather than waiting for the end of the run (#1053).
+                count(ctx, fixNames = false)
             }
-            val redownloading = runCatching { redownloadEmpty(ctx, lookup) }
-                .onFailure { LokiLogger.e(TAG, "re-downloading empty files failed", it) }
+            val empty = runCatching { redownloadEmpty(ctx, lookup) }
+                .onFailure { LokiLogger.e(TAG, "looking up empty files failed", it) }
+                .getOrDefault(emptyList())
+            val replaced = runCatching {
+                BrokenFiles.replace(ctx, scope, broken + empty, lookup) { done, total ->
+                    _migrating.value = Progress(writingIds = false, done = done, total = total, replacing = true)
+                    count(ctx, fixNames = false)
+                }
+            }
+                .onFailure { LokiLogger.e(TAG, "re-downloading broken files failed", it) }
                 .getOrDefault(0)
-            if (redownloading > 0) AppMessages.show(R.string.downloads_redownloading, redownloading)
+            LokiLogger.i(TAG, "replaced $replaced of ${broken.size + empty.size} broken file(s)")
+            broken.clear()
             val written = runCatching { writeTags(ctx, lookup) }
                 .onFailure { LokiLogger.e(TAG, "writing ids failed", it) }
                 .getOrDefault(0)
@@ -139,42 +169,15 @@ object FolderScan {
     /**
      * The fixer's last step (#1038): a file of no bytes is a download that never finished, with nothing in
      * it to repair. Its name still says which track it was, either way round, so the track is downloaded
-     * again the usual way and the empty file goes. One the name does not identify is left as it is.
+     * again. One the name does not identify is left as it is.
      */
-    private suspend fun redownloadEmpty(ctx: Context, lookup: CatalogueLookup): Int {
-        var queued = 0
-        for (file in listFiles(ctx).filter { it.size == 0L }) {
-            if (lookup.refused != null) break
-            if (redownload(ctx, file, lookup)) queued++
+    private suspend fun redownloadEmpty(ctx: Context, lookup: CatalogueLookup): List<BrokenFiles.Broken> =
+        listFiles(ctx).filter { it.size == 0L }.mapNotNull { file ->
+            if (lookup.refused != null) return@mapNotNull null
+            val id = BrokenFiles.byName(file, lookup)
+            if (id == null) LokiLogger.i(TAG, "${file.name} is empty and its name matches no track, left as it is")
+            id?.let { BrokenFiles.Broken(file, it, "is empty") }
         }
-        return queued
-    }
-
-    /** True when the empty [file] was deleted and its track queued again. */
-    private suspend fun redownload(ctx: Context, file: FoundFile, lookup: CatalogueLookup): Boolean {
-        val stem = file.name.substringBeforeLast('.')
-        // Split at the first and at the last " - ", and try each side as the title.
-        val splits = listOf(stem.indexOf(" - "), stem.lastIndexOf(" - ")).filter { it > 0 }.distinct()
-            .map { stem.substring(0, it) to stem.substring(it + 3) }
-        val id = splits.firstNotNullOfOrNull { (a, b) -> lookup.find(b, a, 0) ?: lookup.find(a, b, 0) }
-        if (id == null) {
-            LokiLogger.i(TAG, "${file.name} is empty and its name matches no track, left as it is")
-            return false
-        }
-        val info = lookup.info(id)
-        val deleted = runCatching { DocumentsContract.deleteDocument(ctx.contentResolver, file.uri) }.getOrDefault(false)
-        if (!deleted) return false
-        val track = ch.snepilatch.app.data.TrackInfo(
-            uri = "spotify:track:$id",
-            name = info?.title ?: stem.substringBefore(" - "),
-            artist = info?.artist ?: stem.substringAfterLast(" - "),
-            albumArt = info?.coverUrl,
-            albumName = info?.album,
-        )
-        LokiLogger.i(TAG, "${file.name} was empty, downloading ${track.artist} - ${track.name} again")
-        DownloadActions.downloadTrack(scope, track, ctx)
-        return true
-    }
 
     /**
      * The id and the missing tags into every file not checked yet (#946). One file at a time: each is read,
@@ -206,13 +209,19 @@ object FolderScan {
         !(row.idTagged && row.tagsChecked) && TrackIdWriter.canTag(Uri.decode(row.documentUri))
 
     /** Also tells the user, but only when the number went up since they were last told, not on every start. */
-    private fun count(ctx: Context) {
-        runCatching { renameMislabelled(ctx) }
-            .onFailure { LokiLogger.w(TAG, "could not rename mislabelled files: ${it.message}") }
+    private fun count(ctx: Context, fixNames: Boolean = true) {
+        // Reading every file's first bytes takes ~20 s on a few thousand files; a count while a migration
+        // runs needs the listing only, or the screen lags far behind it (#1053).
+        if (fixNames) {
+            runCatching { renameMislabelled(ctx) }
+                .onFailure { LokiLogger.w(TAG, "could not rename mislabelled files: ${it.message}") }
+        }
         val known = Downloads.rows.value.mapTo(HashSet()) { it.documentUri } + duplicates(ctx)
-        val unknownUris = runCatching { listFiles(ctx).map { it.uri.toString() }.filter { it !in known } }
+        val unknownFiles = runCatching { listFiles(ctx).filter { it.uri.toString() !in known } }
             .onFailure { LokiLogger.w(TAG, "could not list the folder: ${it.message}") }
             .getOrNull() ?: return
+        loadUnmatched(ctx, unknownFiles)
+        val unknownUris = unknownFiles.map { it.uri.toString() }
         val unknown = unknownUris.size
         _unindexed.value = unknown
         _unmatched.value = unmatchedFiles(ctx).let { tried -> unknownUris.count { it in tried } }
@@ -261,6 +270,13 @@ object FolderScan {
         prefs.edit()
             .putStringSet(PREF_DUPLICATES, duplicates(ctx).mapTo(HashSet()) { renamed[it]?.first ?: it })
             .putStringSet(PREF_UNMATCHED, unmatchedFiles(ctx).mapTo(HashSet()) { renamed[it]?.first ?: it })
+            .putStringSet(
+                PREF_UNMATCHED_WHY,
+                prefs.getStringSet(PREF_UNMATCHED_WHY, emptySet()).orEmpty().mapTo(HashSet()) { entry ->
+                    val uri = entry.substringBefore('\t')
+                    renamed[uri]?.let { it.first + entry.removePrefix(uri) } ?: entry
+                },
+            )
             .apply()
         LokiLogger.i(TAG, "renamed ${renamed.size} mislabelled file(s) to their format")
     }
@@ -337,7 +353,9 @@ object FolderScan {
         var done = 0
         val copies = mutableListOf<String>()
         val copyRows = mutableListOf<DownloadedTrack>()
+        val copyFiles = HashMap<String, FoundFile>()
         val unmatched = mutableListOf<String>()
+        val misses = java.util.concurrent.ConcurrentHashMap<String, Miss>()
         // A lookup is a network round trip of about a second; one at a time a folder of a few hundred
         // files took minutes. A few in flight, like the web player's own requests.
         val gate = Semaphore(PARALLEL_LOOKUPS)
@@ -345,15 +363,17 @@ object FolderScan {
         coroutineScope {
             for (file in files) {
                 launch {
-                    val row = gate.withPermit { rowFor(ctx, file, lookup) }
+                    val row = gate.withPermit { rowFor(ctx, file, lookup, misses) }
                     index.withLock {
                         // add() is false for a track already indexed, or a second copy of one just taken.
                         when {
                             // Not looked up at all: the lookups stopped. It is tried again next time.
                             row == null && lookup?.refused != null -> Unit
                             row == null -> {
-                                LokiLogger.i(TAG, "no track found for ${file.name}")
+                                val miss = misses[file.uri.toString()] ?: Miss.NotFound
+                                LokiLogger.i(TAG, "no track found for ${file.name}: $miss")
                                 unmatched += file.uri.toString()
+                                if (miss is Miss.WrongLength) broken += BrokenFiles.Broken(file, miss.id, "is another recording")
                             }
                             !knownTracks.add(row.trackUri) -> {
                                 val lost = rowOf[row.trackUri]?.takeIf { isLost(it) }
@@ -370,6 +390,7 @@ object FolderScan {
                                     LokiLogger.i(TAG, "${file.name} is another copy of ${row.trackUri}")
                                     copyRows += row
                                 }
+                                copyFiles[row.documentUri] = file
                             }
                             else -> {
                                 Downloads.put(row)
@@ -382,6 +403,12 @@ object FolderScan {
                 }
             }
         }
+        // A "copy" whose name names another song holds the wrong one: a wrong source hit saved it, its tags
+        // and so its id are that other song's (#1053). It is downloaded again as the song its name says.
+        if (lookup != null) {
+            val listed = listFiles(ctx).associateBy { it.uri.toString() }
+            broken += BrokenFiles.wrongSongs(copyRows, copyFiles, rowOf, listed, lookup)
+        }
         // A copy is the user's music as much as the file the downloads know, so it gets the same tags (#950).
         // Tagging writes a new file, so the copy is remembered under the name it has afterwards.
         for (copy in copyRows) {
@@ -392,9 +419,20 @@ object FolderScan {
         // Only a migration looks files up, so only it says which ones nothing was found for.
         if (lookup != null) {
             ctx.getSharedPreferences(AppSettings.PREFS, Context.MODE_PRIVATE).edit()
-                .putStringSet(PREF_UNMATCHED, unmatched.toSet()).apply()
+                .putStringSet(PREF_UNMATCHED, unmatched.toSet())
+                .putStringSet(PREF_UNMATCHED_WHY, unmatched.mapTo(HashSet()) { "$it\t${(misses[it] ?: Miss.NotFound).encode()}" })
+                .apply()
         }
         return added
+    }
+
+    /** The unmatched files still in the folder, by name, with why (#1053). */
+    private fun loadUnmatched(ctx: Context, files: List<FoundFile>) {
+        val why = ctx.getSharedPreferences(AppSettings.PREFS, Context.MODE_PRIVATE)
+            .getStringSet(PREF_UNMATCHED_WHY, emptySet()).orEmpty()
+            .associate { it.substringBefore('\t') to Miss.decode(it.substringAfter('\t', "")) }
+        _unmatchedList.value = files.mapNotNull { f -> why[f.uri.toString()]?.let { Unmatched(f.name, it) } }
+            .sortedWith(compareBy({ it.miss.rank }, { it.name.lowercase() }))
     }
 
     /**
@@ -417,21 +455,29 @@ object FolderScan {
         return FoundFile(doc, name, c.getString(2), c.getLong(3), c.getLong(4))
     }
 
-    private class FoundFile(val uri: Uri, val name: String, val mimeType: String?, val size: Long, val modified: Long)
+    internal class FoundFile(val uri: Uri, val name: String, val mimeType: String?, val size: Long, val modified: Long)
 
     /**
      * The row for [file]: its own track id when it carries one, else the catalogue match for its title,
      * artist and length (#930). Null when neither says which track it is.
      */
-    private suspend fun rowFor(ctx: Context, file: FoundFile, lookup: CatalogueLookup?): DownloadedTrack? {
+    private suspend fun rowFor(
+        ctx: Context,
+        file: FoundFile,
+        lookup: CatalogueLookup?,
+        misses: MutableMap<String, Miss> = HashMap(),
+    ): DownloadedTrack? {
         // The id first: a file carrying it needs nothing else, even when its tags cannot be read.
         val tagged = readTrackId(ctx, file)
         val meta = readMeta(ctx, file) ?: if (tagged != null) nameOnly(file) else null
         if (meta == null) {
             LokiLogger.i(TAG, "${file.name}: no id, and its tags cannot be read")
+            misses[file.uri.toString()] = Miss.Unreadable
             return null
         }
-        val id = tagged ?: lookup?.let { findFor(file, meta, it) } ?: return null
+        val found = if (tagged == null && lookup != null) findFor(file, meta, lookup) else null
+        if (found is CatalogueLookup.Missed) misses[file.uri.toString()] = found.miss
+        val id = tagged ?: (found as? CatalogueLookup.Match)?.id ?: return null
         return DownloadedTrack(
             trackUri = "spotify:track:$id",
             documentUri = file.uri.toString(),
@@ -498,14 +544,28 @@ object FolderScan {
      * artist as its title, is matched by its name, which has been both "Artist - Title" and "Title - Artist"
      * over time, split at its first and at its last " - ".
      */
-    private suspend fun findFor(file: FoundFile, meta: Meta, lookup: CatalogueLookup): String? {
-        if (meta.fromTags && meta.title.isNotBlank() && !meta.title.equals(meta.artist, ignoreCase = true)) {
-            lookup.find(meta.title, meta.artist, meta.durationMs)?.let { return it }
+    private suspend fun findFor(file: FoundFile, meta: Meta, lookup: CatalogueLookup): CatalogueLookup.Outcome? {
+        val tries = buildList {
+            if (meta.fromTags && meta.title.isNotBlank() && !meta.title.equals(meta.artist, ignoreCase = true)) {
+                add(meta.title to meta.artist)
+            }
+            val stem = file.name.substringBeforeLast('.')
+            listOf(stem.indexOf(" - "), stem.lastIndexOf(" - ")).filter { it > 0 }.distinct().forEach {
+                val (a, b) = stem.substring(0, it) to stem.substring(it + 3)
+                add(b to a)
+                add(a to b)
+            }
         }
-        val stem = file.name.substringBeforeLast('.')
-        return listOf(stem.indexOf(" - "), stem.lastIndexOf(" - ")).filter { it > 0 }.distinct()
-            .map { stem.substring(0, it) to stem.substring(it + 3) }
-            .firstNotNullOfOrNull { (a, b) -> lookup.find(b, a, meta.durationMs) ?: lookup.find(a, b, meta.durationMs) }
+        // The first match wins; with none, the most telling miss says why (#1053).
+        var best: CatalogueLookup.Missed? = null
+        for ((title, artist) in tries) {
+            when (val outcome = lookup.search(title, artist, meta.durationMs)) {
+                is CatalogueLookup.Match -> return outcome
+                is CatalogueLookup.Missed -> if (best == null || outcome.miss.rank < best.miss.rank) best = outcome
+                null -> Unit
+            }
+        }
+        return best
     }
 
     /** What the name alone says, "Artist - Title", for a file whose tags cannot be read. */

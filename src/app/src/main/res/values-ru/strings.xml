@@ -382,6 +382,13 @@
     <plurals name="downloads_untagged_title"><item quantity="one">%d загрузку нужно проверить на недостающие теги</item><item quantity="few">%d загрузки нужно проверить на недостающие теги</item><item quantity="many">%d загрузок нужно проверить на недостающие теги</item><item quantity="other">%d загрузки нужно проверить на недостающие теги</item></plurals>
     <plurals name="downloads_unmatched_title"><item quantity="one">%d трек не найден в Spotify</item><item quantity="few">%d трека не найдены в Spotify</item><item quantity="many">%d треков не найдены в Spotify</item><item quantity="other">%d трека не найдены в Spotify</item></plurals>
     <string name="downloads_unmatched_action">Нажмите, чтобы попробовать снова</string>
+    <string name="downloads_replacing">Повторная загрузка: %1$d из %2$d</string>
+    <string name="downloads_unmatched_why">Почему они не найдены</string>
+    <string name="downloads_unmatched_why_hint">Каждый файл и что с ним не так</string>
+    <string name="downloads_why_length">Другая запись: %1$s, а песня длится %2$s. Будет загружена заново, если источник её найдёт</string>
+    <string name="downloads_why_artist">В каталоге этот трек есть только у %1$s</string>
+    <string name="downloads_why_none">Нет в каталоге</string>
+    <string name="downloads_why_unreadable">Теги не читаются</string>
     <string name="downloads_writing_ids">Запись тегов: %1$d из %2$d</string>
     <string name="downloads_ids_written">Теги записаны в файлы: %1$d</string>
     <string name="download_folder_none">Не задана, нажмите чтобы выбрать</string>

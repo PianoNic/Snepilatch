@@ -32,7 +32,8 @@ class TrackMatcherTest {
 
     @Test
     fun aDifferentArtistIsNotAMatch() {
-        assertNull(TrackMatcher.match("Instant Crush", "Someone Else", 337_560, listOf(crush)))
+        // Only the same length to the second makes another artist name the same song (#1053); a cover is longer or shorter.
+        assertNull(TrackMatcher.match("Instant Crush", "Someone Else", 341_000, listOf(crush)))
     }
 
     @Test
@@ -71,5 +72,29 @@ class TrackMatcherTest {
         assertEquals(surrender.id, TrackMatcher.match("항복", "MRCH", 207_411, listOf(surrender)))
         // Three seconds apart is another recording, not the same one under another name.
         assertNull(TrackMatcher.match("항복", "MRCH", 210_600, listOf(surrender)))
+    }
+
+    @Test
+    fun anArtistUnderAnotherNameMatchesOnTitleAndLengthToTheSecond() {
+        val song = Candidate("3", "1999", listOf("Mark Lee"), 205_400)
+        assertEquals(song.id, TrackMatcher.match("1999", "MARK", 205_027, listOf(song)))
+        assertNull(TrackMatcher.match("1999", "MARK", 209_000, listOf(song)))
+    }
+
+    @Test
+    fun aMissSaysWhatIsWrong() {
+        val meeting = Candidate("4", "Meeting", listOf("ATLUS Sound Team", "ATLUS GAME MUSIC"), 45_386)
+        // The file is a 207 s loop of a 45 s track: the song is there, the file is another recording of it.
+        assertEquals(
+            Miss.WrongLength("4", fileMs = 207_720, catalogueMs = 45_386),
+            TrackMatcher.miss("Meeting", "アトラスサウンドチーム, ATLUS GAME MUSIC", 207_720, listOf(meeting)),
+        )
+        assertEquals(Miss.OtherArtist("Luciid"), TrackMatcher.miss("pray", "Such", 203_453, listOf(Candidate("5", "pray", listOf("Luciid"), 180_000))))
+        assertEquals(Miss.NotFound, TrackMatcher.miss("pa!", "SEE", 197_093, emptyList()))
+        // Of a song's cuts, the one of exactly that title is what the file was meant to be, not the remix closest in length.
+        val plain = Candidate("6", "Children", listOf("Robert Miles"), 453_000)
+        val remix = Candidate("7", "Children - Undercatt Remix", listOf("Robert Miles"), 405_000)
+        assertEquals("6", (TrackMatcher.miss("Children", "Robert Miles", 411_307, listOf(remix, plain)) as Miss.WrongLength).id)
+        assertEquals("6", TrackMatcher.match("Children", "Robert Miles", 0, listOf(remix, plain)))
     }
 }

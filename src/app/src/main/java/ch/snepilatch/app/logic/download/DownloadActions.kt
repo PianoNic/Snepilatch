@@ -7,7 +7,9 @@ import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.logic.shared.LokiLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -141,7 +143,7 @@ object DownloadActions {
         context: android.content.Context,
         capture: MusicPlaybackService.Capture? = null,
         localOnly: Boolean = false,
-    ) {
+    ): Deferred<DownloadOutcome?> {
         // applicationContext, or a batch outlives the Activity that started it and pins it — and its
         // whole Compose tree — for the minutes the download runs. Nothing here needs an Activity.
         val ctx = context.applicationContext
@@ -154,7 +156,8 @@ object DownloadActions {
             imageUrl = track.albumArt,
             total = 1,
         )
-        val job = scope.launch(Dispatchers.IO) {
+        // Deferred, for a caller that waits for the outcome: the folder migration replacing a broken file (#1053).
+        val job = scope.async(Dispatchers.IO) {
             val progress: ((Int) -> Unit)? = if (localOnly) {
                 null
             } else {
@@ -170,6 +173,7 @@ object DownloadActions {
                 )
                 if (outcome is DownloadOutcome.Done) state = DownloadQueue.QueueEntry.State.Done
                 warnNoFolder(ctx, outcome, track.name)
+                outcome
             } catch (e: CancellationException) {
                 state = DownloadQueue.QueueEntry.State.Cancelled
                 throw e
@@ -181,6 +185,7 @@ object DownloadActions {
             }
         }
         keep(id, job)
+        return job
     }
 
     /**

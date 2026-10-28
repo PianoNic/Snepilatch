@@ -146,37 +146,51 @@ object Downloads {
          */
         override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
             // v2 added the cover art url. Additive, so existing downloads keep working untagged.
-            if (oldVersion < 2) db.execSQL("ALTER TABLE $TABLE ADD COLUMN cover_url TEXT")
+            if (oldVersion < 2) addColumn(db, "cover_url TEXT")
             if (oldVersion < 3) {
                 // v3 records where a download came from so the library can group them.
                 listOf("context_uri", "context_name", "context_type")
-                    .forEach { db.execSQL("ALTER TABLE $TABLE ADD COLUMN $it TEXT") }
+                    .forEach { addColumn(db, "$it TEXT") }
             }
             // v4 stores the duration so the offline player and its rows know the length up front.
-            if (oldVersion < 4) db.execSQL("ALTER TABLE $TABLE ADD COLUMN duration_ms INTEGER NOT NULL DEFAULT 0")
+            if (oldVersion < 4) addColumn(db, "duration_ms INTEGER NOT NULL DEFAULT 0")
             // v5 keeps the album or playlist cover; older rows fall back to their own track art.
-            if (oldVersion < 5) db.execSQL("ALTER TABLE $TABLE ADD COLUMN context_image TEXT")
+            if (oldVersion < 5) addColumn(db, "context_image TEXT")
             // v6 tells auto-saves from asked-for downloads. Older rows count as asked for, so the cap
             // never deletes something the user may have wanted.
-            if (oldVersion < 6) db.execSQL("ALTER TABLE $TABLE ADD COLUMN auto INTEGER NOT NULL DEFAULT 0")
+            if (oldVersion < 6) addColumn(db, "auto INTEGER NOT NULL DEFAULT 0")
             // v7 knows which files carry their track id. Older rows count as not, and are checked when
             // the user has the ids written; one that already has it is only marked.
-            if (oldVersion < 7) db.execSQL("ALTER TABLE $TABLE ADD COLUMN id_tagged INTEGER NOT NULL DEFAULT 0")
+            if (oldVersion < 7) addColumn(db, "id_tagged INTEGER NOT NULL DEFAULT 0")
             // v8 knows which files were checked for missing tags. Older rows count as not: a download of the
             // app's own can lack them too, so each is checked once when the user migrates.
-            if (oldVersion < 8) db.execSQL("ALTER TABLE $TABLE ADD COLUMN tags_checked INTEGER NOT NULL DEFAULT 0")
+            if (oldVersion < 8) addColumn(db, "tags_checked INTEGER NOT NULL DEFAULT 0")
             // The album fields came later (#1038): every file is looked at once more, so the next migration adds them.
             if (oldVersion < 9) {
                 db.execSQL("UPDATE $TABLE SET tags_checked = 0")
-                db.execSQL("ALTER TABLE $TABLE ADD COLUMN album TEXT")
-                db.execSQL("ALTER TABLE $TABLE ADD COLUMN album_artist TEXT")
-                db.execSQL("ALTER TABLE $TABLE ADD COLUMN track_number INTEGER NOT NULL DEFAULT 0")
-                db.execSQL("ALTER TABLE $TABLE ADD COLUMN disc_number INTEGER NOT NULL DEFAULT 0")
+                addColumn(db, "album TEXT")
+                addColumn(db, "album_artist TEXT")
+                addColumn(db, "track_number INTEGER NOT NULL DEFAULT 0")
+                addColumn(db, "disc_number INTEGER NOT NULL DEFAULT 0")
             }
         }
 
         /** Sideloading an older build must not crash; the default implementation throws. */
         override fun onDowngrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+
+        /**
+         * Adds a column unless the table has it already. A build that sideloaded an older one downgrades the
+         * version number but keeps the columns, and the next upgrade must not fail on them ("duplicate column
+         * name", a crash on every start).
+         */
+        private fun addColumn(db: SQLiteDatabase, definition: String) {
+            val name = definition.substringBefore(' ')
+            val has = db.rawQuery("PRAGMA table_info($TABLE)", null).use { c ->
+                val column = c.getColumnIndexOrThrow("name")
+                generateSequence { if (c.moveToNext()) c.getString(column) else null }.any { it == name }
+            }
+            if (!has) db.execSQL("ALTER TABLE $TABLE ADD COLUMN $definition")
+        }
     }
 
     fun init(context: Context) {

@@ -66,6 +66,42 @@ class ResumeLoader(private val hooks: Hooks) {
         LokiLogger.i(TAG, "[$tag] ExoPlayer loading at ${positionMs}ms${if (startPlaying) ", will start on STATE_READY" else ", paused"}")
     }
 
+    /**
+     * Load an episode at [positionMs] the way the episode play path resolves it: soundfinder's direct
+     * url when the episode is passthrough, its Widevine file otherwise. An external episode never
+     * brings a state machine file id, so this is how it resumes. Throws when neither resolves.
+     */
+    suspend fun loadEpisodeAt(track: TrackInfo, positionMs: Long, tag: String, startPlaying: Boolean = true) {
+        val title = track.name.ifBlank { "Unknown" }
+        val artist = track.artist.ifBlank { "Unknown" }
+        val resolver = checkNotNull(hooks.cdnResolver) { "CdnResolver not initialized" }
+        checkNotNull(MusicPlaybackService.instance) { "the player service is not running" }
+        val episode = checkNotNull(resolver.resolveEpisode(track.uri.removePrefix("spotify:episode:"))) {
+            "no resolve for ${track.uri}"
+        }
+        val passthroughUrl = episode.passthroughUrl?.takeIf { episode.isPassthrough }
+        hooks.markPlayUrl()
+        if (passthroughUrl != null) {
+            withContext(Dispatchers.Main) {
+                MusicPlaybackService.instance?.playUrl(
+                    passthroughUrl, title, artist, track.albumArt,
+                    startPlaying = startPlaying, startPositionMs = positionMs, headers = emptyMap(),
+                )
+            }
+            hooks.commitStream(track.uri, "Podcast")
+        } else {
+            val stream = resolver.resolveForFileId(checkNotNull(episode.fileId) { "no audio for ${track.uri}" })
+            withContext(Dispatchers.Main) {
+                MusicPlaybackService.instance?.playDrmUrl(
+                    stream.cdnUrl, stream.certificate, title, artist, track.albumArt,
+                    startPlaying = startPlaying, startPositionMs = positionMs, pssh = stream.pssh,
+                )
+            }
+            hooks.commitStream(track.uri, "Spotify CDN")
+        }
+        LokiLogger.i(TAG, "[$tag] episode loading at ${positionMs}ms${if (startPlaying) "" else ", paused"}")
+    }
+
     /** The downloaded copy, resuming where the user left off. */
     private suspend fun loadLocal(
         track: TrackInfo,

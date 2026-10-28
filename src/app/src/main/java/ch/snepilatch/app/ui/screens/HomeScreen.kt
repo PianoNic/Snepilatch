@@ -12,6 +12,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.lerp
 import ch.snepilatch.app.R
 import ch.snepilatch.app.viewmodel.DetailRoutes
@@ -190,6 +191,11 @@ private fun ChipGroupView(group: ChipGroup, onSelect: (String?) -> Unit) {
     ) {
         group.segments.forEach { segment ->
             val dark = group.filled || segment.raised
+            val behind = when {
+                segment.raised -> raisedColor
+                group.filled -> accent
+                else -> SnepilatchGray
+            }
             Box(
                 Modifier
                     .fillMaxHeight()
@@ -201,7 +207,8 @@ private fun ChipGroupView(group: ChipGroup, onSelect: (String?) -> Unit) {
             ) {
                 Text(
                     segment.label,
-                    color = if (dark) Color.Black else SnepilatchWhite,
+                    // A dark accent takes white text, a light one black (#1055).
+                    color = if (behind.luminance() > HALF_LUMINANCE) Color.Black else SnepilatchWhite,
                     fontSize = 14.sp,
                     fontWeight = if (dark) FontWeight.SemiBold else FontWeight.Normal,
                 )
@@ -211,6 +218,7 @@ private fun ChipGroupView(group: ChipGroup, onSelect: (String?) -> Unit) {
 }
 
 private const val RAISED_LIGHTEN = 0.3f
+private const val HALF_LUMINANCE = 0.5f
 
 /**
  * What the two Following feeds add around their cards (#976): the heading the web player gives them,

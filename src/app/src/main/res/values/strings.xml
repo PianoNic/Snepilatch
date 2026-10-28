@@ -503,4 +503,23 @@
     <string name="home_following_caught_up_title">You\'re all caught up</string>
     <string name="home_following_music_caught_up">There are no more new releases from artists you follow.</string>
     <string name="home_following_podcasts_caught_up">There are no more new releases from creators you follow.</string>
+    <string name="show_type">Podcast</string>
+    <string name="show_about">About</string>
+    <string name="show_rating">%1$s (%2$s)</string>
+    <string name="episodes_all">All episodes</string>
+    <string name="episodes_unplayed">Unplayed</string>
+    <string name="episodes_in_progress">In progress</string>
+    <string name="episodes_newest">Newest</string>
+    <string name="episodes_oldest">Oldest</string>
+    <string name="episodes_filter_by">Filter by</string>
+    <string name="episodes_sort_by">Sort by</string>
+    <string name="episode_today">Today</string>
+    <string name="episode_time_left">%s left</string>
+    <string name="episode_played">Played</string>
+    <string name="episode_hours_short">%d hr</string>
+    <string name="episode_minutes_short">%d min</string>
+    <string name="episode_seconds_short">%d sec</string>
+    <string name="episode_new">New episode</string>
+    <string name="save_to_your_episodes">Save to Your Episodes</string>
+    <string name="remove_from_your_episodes">Remove from Your Episodes</string>
 </resources>

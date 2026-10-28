@@ -95,8 +95,34 @@ data class DetailData(
     val popularReleases: List<RelatedAlbum> = emptyList(),
     val relatedArtists: List<RelatedArtist> = emptyList(),
     val topTrackPlaycounts: List<String> = emptyList(),
-    // Show-specific (podcast). Episodes are carried in [tracks] as episode-URI TrackInfos.
-    val publisher: String? = null
+    // Show-specific (podcast). Episodes are carried in [tracks] as episode-URI TrackInfos, and their
+    // row details in [episodes], index for index.
+    val publisher: String? = null,
+    val show: ShowHeader? = null,
+    val episodes: List<ShowEpisode> = emptyList(),
+)
+
+/** What the web player's show page shows above the episodes. */
+data class ShowHeader(
+    val about: String,
+    /** Average stars, null when the show hides it. */
+    val averageRating: Double?,
+    val totalRatings: Int,
+    val isFollowed: Boolean,
+    /** "SEQUENTIAL" shows list oldest first by default, every other one newest first. */
+    val consumptionOrder: String?,
+    val shareUrl: String?,
+)
+
+/** An episode row of the show page, beside the [TrackInfo] that plays it. */
+data class ShowEpisode(
+    val uri: String,
+    val description: String,
+    /** ISO-8601, as the service sends it. */
+    val releaseDate: String?,
+    val resumePositionMs: Long,
+    val isPlayed: Boolean,
+    val isExplicit: Boolean,
 )
 
 /**

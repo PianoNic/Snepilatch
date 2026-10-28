@@ -503,4 +503,23 @@
     <string name="home_following_caught_up_title">Du bist auf dem neuesten Stand</string>
     <string name="home_following_music_caught_up">Es gibt keine weiteren Neuerscheinungen von Künstler*innen, denen du folgst.</string>
     <string name="home_following_podcasts_caught_up">Es gibt keine weiteren neuen Folgen von Creator*innen, denen du folgst.</string>
+    <string name="show_type">Podcast</string>
+    <string name="show_about">Info</string>
+    <string name="show_rating">%1$s (%2$s)</string>
+    <string name="episodes_all">Alle Folgen</string>
+    <string name="episodes_unplayed">Nicht gehört</string>
+    <string name="episodes_in_progress">Begonnen</string>
+    <string name="episodes_newest">Neueste</string>
+    <string name="episodes_oldest">Älteste</string>
+    <string name="episodes_filter_by">Filtern nach</string>
+    <string name="episodes_sort_by">Sortieren nach</string>
+    <string name="episode_today">Heute</string>
+    <string name="episode_time_left">Noch %s</string>
+    <string name="episode_played">Gehört</string>
+    <string name="episode_hours_short">%d Std.</string>
+    <string name="episode_minutes_short">%d Min.</string>
+    <string name="episode_seconds_short">%d Sek.</string>
+    <string name="episode_new">Neue Folge</string>
+    <string name="save_to_your_episodes">In „Deine Folgen“ speichern</string>
+    <string name="remove_from_your_episodes">Aus „Deine Folgen“ entfernen</string>
 </resources>

@@ -46,7 +46,15 @@ class OfflineShortOutageTest {
         override fun trackChanged(track: TrackInfo) = Unit
         override fun setTickerRunning(running: Boolean) = Unit
         override fun startSession() = Unit
-        override suspend fun awaitPlayer(timeoutMs: Long) = true
+
+        @Volatile var dealerBack = true
+
+        val dealerAsked = java.util.concurrent.atomic.AtomicInteger()
+        override suspend fun awaitDevice(timeoutMs: Long, dealer: Boolean): Boolean {
+            if (!dealer) return true
+            dealerAsked.incrementAndGet()
+            return dealerBack
+        }
         override suspend fun currentPositionMs() = 42_000L
         override suspend fun handBackToConnect(track: TrackInfo, contextUri: String?, positionMs: Long, paused: Boolean) {
             playCommands += track.uri
@@ -58,7 +66,8 @@ class OfflineShortOutageTest {
     }
 
     private val hooks = FakeHooks()
-    private val controller = OfflineController(CoroutineScope(Dispatchers.Unconfined), hooks)
+    private val controllerJob = kotlinx.coroutines.SupervisorJob()
+    private val controller = OfflineController(CoroutineScope(Dispatchers.Unconfined + controllerJob), hooks)
     private val playing =
         TrackInfo(uri = "spotify:track:playing", name = "P", artist = "A", albumArt = null, durationMs = 100_000L)
     private val next =
@@ -84,6 +93,8 @@ class OfflineShortOutageTest {
 
     @After
     fun tearDown() {
+        controllerJob.cancel()
+        ch.snepilatch.app.logic.shared.NetworkState.set(true)
         OfflinePlayer.clear()
         OfflinePlayer.localFile = localFile
         OfflinePlayer.service = service
@@ -109,6 +120,27 @@ class OfflineShortOutageTest {
         assertNull(OfflinePlayer.state.value)
         assertEquals(emptyList<String>(), hooks.playCommands)
         assertEquals(listOf(42_000L to false), awaitReports())
+    }
+
+    /**
+     * Issue #1050: the network back but the dealer not (DNS still failing), the engine keeps playing
+     * rather than handing back to a Connect that has no device for this phone.
+     */
+    @Test
+    fun networkBackButNotTheDealer_keepsTheEnginePlaying() {
+        val network = ch.snepilatch.app.logic.shared.NetworkState
+        hooks.dealerBack = false
+        controller.start()
+        controller.takeOver()
+        network.set(false)
+
+        network.set(true)
+        val deadline = System.currentTimeMillis() + 2_000
+        while (hooks.dealerAsked.get() == 0 && System.currentTimeMillis() < deadline) Thread.sleep(10)
+
+        assertTrue("the dealer was asked for", hooks.dealerAsked.get() > 0)
+        assertTrue("still offline", hooks.isOffline.value)
+        assertEquals(emptyList<String>(), hooks.playCommands)
     }
 
     @Test

@@ -8,14 +8,12 @@ import ch.snepilatch.app.logic.download.Downloads
 import ch.snepilatch.app.logic.download.toTrackInfo
 import ch.snepilatch.app.logic.shared.LokiLogger
 import ch.snepilatch.app.logic.shared.NetworkState
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * The offline engine's side of the playback view model: mirrors [OfflinePlayer]'s state into the
@@ -46,7 +44,11 @@ class OfflineController(private val scope: CoroutineScope, private val hooks: Ho
         fun startSession()
 
         /** The Connect player once the device is registered, or null after [timeoutMs]. */
-        suspend fun awaitPlayer(timeoutMs: Long): Boolean
+        /**
+         * The player within [timeoutMs]; with [dealer], also its dealer brought back if it is down, waiting
+         * for the outcome. True once the device is there.
+         */
+        suspend fun awaitDevice(timeoutMs: Long, dealer: Boolean): Boolean
 
         /** ExoPlayer's position; it is confined to the main thread, so this hops there. */
         suspend fun currentPositionMs(): Long
@@ -68,7 +70,6 @@ class OfflineController(private val scope: CoroutineScope, private val hooks: Ho
     private var handBack: Job? = null
 
     /** Completed when the dealer socket is back after a network return; a new wait replaces it. */
-    private var dealerBack = CompletableDeferred<Unit>()
 
     /** The context playback came from when the engine took over, for the way back. */
     private var takeoverContextUri: String? = null
@@ -117,7 +118,6 @@ class OfflineController(private val scope: CoroutineScope, private val hooks: Ho
             takeoverContextUri = null
             scope.launch(Dispatchers.IO) { hooks.reportToConnect(hooks.currentPositionMs(), paused) }
         }
-        dealerBack.complete(Unit)
     }
 
     /**
@@ -198,13 +198,17 @@ class OfflineController(private val scope: CoroutineScope, private val hooks: Ho
 
     private suspend fun tryHandBack(): Boolean {
         val hadSession = hooks.hasSession()
-        if (hadSession) dealerBack = CompletableDeferred() else hooks.startSession()
-        if (!hooks.awaitPlayer(PLAYER_WAIT_MS)) {
+        if (!hadSession) hooks.startSession()
+        if (!hooks.awaitDevice(PLAYER_WAIT_MS, dealer = false)) {
             LokiLogger.w(TAG, "Network back but no player within ${PLAYER_WAIT_MS}ms")
             return false
         }
-        if (hadSession && withTimeoutOrNull(DEALER_WAIT_MS) { dealerBack.await() } == null) {
-            LokiLogger.w(TAG, "Dealer not back within ${DEALER_WAIT_MS}ms, handing back anyway")
+        // Only once the device is really back. Handing back after a fixed wait, the dealer still down
+        // (DNS failing after the network returned), failed: Connect lost the device and the phone played
+        // on detached until the track ended. Not back, the engine keeps playing and this tries again.
+        if (hadSession && !hooks.awaitDevice(PLAYER_WAIT_MS, dealer = true)) {
+            LokiLogger.w(TAG, "Dealer not back yet, the offline engine keeps playing")
+            return false
         }
         // The dealer's return may have settled it already, see onDealerReconnected.
         if (!hooks.isOffline.value) return true
@@ -242,7 +246,6 @@ class OfflineController(private val scope: CoroutineScope, private val hooks: Ho
         /** How long the network has to stay gone before the engine takes over. */
         const val GRACE_MS = 5_000L
         const val PLAYER_WAIT_MS = 60_000L
-        const val DEALER_WAIT_MS = 15_000L
         const val RETRY_MS = 60_000L
     }
 }

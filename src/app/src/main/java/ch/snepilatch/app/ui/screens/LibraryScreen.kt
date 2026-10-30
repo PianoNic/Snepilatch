@@ -122,11 +122,10 @@ fun LibraryScreen() {
     // recomposition (e.g. a position tick or unrelated state update).
     // Downloaded content is grouped by the album or playlist it came from, so it browses like the
     // rest of the library rather than as a flat list of tracks.
-    // Keyed on the published rows rather than querying: groups() reads them out of memory, so this
-    // stays a grouping of a list the store already loaded off the main thread.
-    val downloadedRows by Downloads.rows.collectAsState()
-    val downloadedItems = remember(downloadedRows) {
-        Downloads.groups().map { LibraryItem(it.uri, it.name, it.imageUrl, it.type) }
+    // Grouped by the store whenever the downloads change, off the main thread (#1059).
+    val downloadGroups by Downloads.groupsFlow.collectAsState()
+    val downloadedItems = remember(downloadGroups) {
+        downloadGroups.map { LibraryItem(it.uri, it.name, it.imageUrl, it.type) }
     }
     val sortedLibrary = remember(library, downloadedItems, selectedFilter, searchQuery, sortMode) {
         val source = if (selectedFilter == "Downloaded") downloadedItems else library

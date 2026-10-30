@@ -46,7 +46,15 @@ fun SpfyImage(
         if (!url.isNullOrEmpty()) {
             val ctx = androidx.compose.ui.platform.LocalContext.current
             AsyncImage(
-                model = remember(url) { coil.request.ImageRequest.Builder(ctx).data(url).crossfade(300).build() },
+                model = remember(url) {
+                    coil.request.ImageRequest.Builder(ctx).data(url).crossfade(300)
+                        // A cover already in memory stands in at once: the request itself only starts once
+                        // the size is known after layout, so a cached cover still showed the grey box for a
+                        // frame on every tab switch (#1061). One key per url, whatever size it was shown at.
+                        .memoryCacheKey(url)
+                        .placeholderMemoryCacheKey(url)
+                        .build()
+                },
                 contentDescription = contentDescription,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop

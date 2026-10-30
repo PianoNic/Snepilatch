@@ -11,6 +11,8 @@ import kotify.api.whatsnew.WhatsNewFeed
 import kotify.api.whatsnew.WhatsNewItem
 import androidx.lifecycle.viewModelScope
 import ch.snepilatch.app.logic.shared.SessionHolder
+import ch.snepilatch.app.logic.shared.Debouncer
+import kotify.api.playerconnect.PlayerConnect
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
@@ -49,9 +51,11 @@ class HomeViewModel : SessionViewModel("HomeVM") {
 
     init {
         loadHome()
+        subscribeToPushes()
         // A switched account gets a fresh feed instead of the old account's (#847).
         viewModelScope.launch {
             SessionHolder.generation.drop(1).collect {
+                subscribeToPushes()
                 cache.clear()
                 _homeData.value = null
                 _facet.value = ""
@@ -100,6 +104,35 @@ class HomeViewModel : SessionViewModel("HomeVM") {
      */
     private val _episodes = MutableStateFlow<List<WhatsNewItem>>(emptyList())
     val episodes: StateFlow<List<WhatsNewItem>> = _episodes
+
+    private var subscribedTo: PlayerConnect? = null
+
+    /** Bursts of pushes, a playlist edited in several steps, collapse into one load. */
+    private val refresh = Debouncer(
+        scope = viewModelScope,
+        waitMs = REFRESH_WAIT_MS,
+        maxWaitMs = REFRESH_MAX_WAIT_MS,
+    ) { loadHome() }
+
+    /**
+     * A playlist the feed shows changed: the daylist renames itself and changes its cover through the day.
+     * The web player reloads a shown playlist on its `hm://playlist/v2/playlist` push, so the feed is asked
+     * for again rather than showing the old name until it goes stale (#1057).
+     */
+    private fun subscribeToPushes() {
+        viewModelScope.launch {
+            val player = SessionHolder.awaitPlayer(PLAYER_WAIT_MS) ?: return@launch
+            if (player === subscribedTo) return@launch
+            subscribedTo = player
+            player.onPlaylistChange { change ->
+                val shown = _homeData.value?.sections.orEmpty().any { s -> s.items.any { it.uri == change.uri } }
+                if (shown) {
+                    LokiLogger.i(logTag, "${change.uri} changed, loading the feed again")
+                    viewModelScope.launch { refresh.request() }
+                }
+            }
+        }
+    }
 
     /** "Try again" on the error state. */
     fun retry() {
@@ -160,6 +193,12 @@ class HomeViewModel : SessionViewModel("HomeVM") {
 
     companion object {
         const val PODCASTS_FOLLOWING_CHIP = "podcasts-following-chip"
+
+        private const val REFRESH_WAIT_MS = 200L
+        private const val REFRESH_MAX_WAIT_MS = 1000L
+
+        /** As long as the library waits for the player to subscribe to its pushes. */
+        private const val PLAYER_WAIT_MS = 30_000L
 
         /** The web player's staleTime for the home query: younger than this a cached feed is not asked for again. */
         private const val CACHE_FRESH_MS = 5 * 60 * 1000L

@@ -106,7 +106,11 @@ class DetailViewModel : SessionViewModel("DetailVM") {
     }
 
     fun openPlaylist(playlistId: String) = openDetail(Screen.PLAYLIST_DETAIL, "openPlaylist", "spotify:playlist:$playlistId") { sess ->
-        playlistPage(sess, playlistId, limit = 50, offset = 0).toDetailData(playlistId)
+        playlistPage(sess, playlistId, limit = 50, offset = 0).toDetailData(playlistId).also {
+            // A kept page shows at once and is asked for again behind it: the web player loads a playlist on
+            // every open, and the daylist renames itself without a push. A change reloads it (#1057).
+            launchWithSession("revalidatePlaylist") { SessionHolder.playlistStore?.revalidate(playlistId, limit = 50, offset = 0) }
+        }
     }
 
     /**

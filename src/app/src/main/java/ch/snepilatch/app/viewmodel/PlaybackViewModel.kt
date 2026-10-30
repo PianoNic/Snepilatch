@@ -61,6 +61,8 @@ import kotify.session.SessionConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -84,7 +86,9 @@ import ch.snepilatch.app.logic.shared.launchWith
 import ch.snepilatch.app.logic.shared.JamHolder
 
 @Suppress("TooManyFunctions") // central view-model; split-by-feature is tracked separately
-class PlaybackViewModel : ViewModel() {
+class PlaybackViewModel(
+    internal val queueIoDispatcher: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.IO,
+) : ViewModel() {
 
     private val TAG = "PlaybackVM"
 
@@ -930,7 +934,7 @@ class PlaybackViewModel : ViewModel() {
         // about a new queue rather than re-deriving one from every position update.
         pc.onQueue { view ->
             val sess = session ?: return@onQueue
-            viewModelScope.launch(Dispatchers.IO) {
+            viewModelScope.launch {
                 try {
                     // Metadata only while someone is looking. A queue nobody has open costs nothing.
                     applyQueue(view, if (queueSheetVisible.value) Song(sess) else null)
@@ -2084,31 +2088,52 @@ class PlaybackViewModel : ViewModel() {
             commandJob = viewModelScope.launch(Dispatchers.IO) { OfflinePlayer.next() }
             return
         }
-        applyOptimisticSkip(nextTrackPreview.value)
+        // The state machine walks the server's queue. Jump to the visible row only when a local
+        // edit (a removal, a move, an earlier unconfirmed skip) has put a different row first.
+        val machineNextQid = latestQueueView.entries.firstOrNull()?.track?.qid
+        val next = popQueueEntryForSkip()
+        if (next == null && (pendingQueueRemovals.isNotEmpty() || pendingQueueSkips.isNotEmpty())) {
+            AppMessages.show(R.string.queue_update_pending)
+            return
+        }
+        val jumpQid = next?.qid?.takeIf { it != machineNextQid }
+        val skipRequest = ++queueSkipRequest
+        applyOptimisticSkip(next ?: nextTrackPreview.value)
         skippedBack.value = false
-        commandJob?.cancel()
+        val previousCommand = commandJob
+        previousCommand?.cancel()
         lastCommandTs = System.currentTimeMillis()
         lastCommandName = "skipNext"
         LokiLogger.i(TAG, "[Timing] CMD skipNext sent")
         commandJob = viewModelScope.launch(Dispatchers.IO) {
+            var accepted = false
             try {
+                // Kotify restores the old queue during cancellation. Finish that cleanup before
+                // publishing the next command's queue, even when another Next supersedes this one.
+                withContext(NonCancellable) { previousCommand?.join() }
+                ensureActive()
                 val p = player ?: return@launch
                 val t0 = System.currentTimeMillis()
-                if (foreignDeviceActive) {
+                accepted = when {
+                    jumpQid != null -> p.skipToTrack(jumpQid)
                     // Another device holds playback: a local state report would describe this idle
                     // phone, so tell the active device to skip instead.
-                    p.skipNext()
-                } else {
-                    // Local advance (state report, never skip-capped) — the new track loads via onPlaybackId.
-                    // A pressed button walks the machine's skip_next edge, as the web player's forward button
-                    // does; the default reason walks advance, which is the natural end and lands elsewhere on
-                    // graphs where the two differ (radio, autoplay, smart shuffle).
-                    p.localNext(kotify.api.playerstatus.AdvanceReason.USER_SKIP)
+                    foreignDeviceActive -> p.skipNext()
+                    // Local advance (state report, never skip-capped); the new track loads via
+                    // onPlaybackId. USER_SKIP walks the skip_next edge, as the web player's forward
+                    // button does, which differs from a natural end on radio, autoplay and smart shuffle.
+                    else -> p.localNext(kotify.api.playerstatus.AdvanceReason.USER_SKIP)
                 }
+                if (next != null && !accepted) AppMessages.show(R.string.error_skip_queue)
                 LokiLogger.i(TAG, "[Timing] CMD skipNext API done in ${System.currentTimeMillis() - t0}ms")
             }
             catch (e: CancellationException) { throw e }
-            catch (e: Exception) { LokiLogger.e(TAG, "skipNext", e) }
+            catch (e: Exception) {
+                LokiLogger.e(TAG, "skipNext", e)
+                if (next != null) AppMessages.show(R.string.error_skip_queue)
+            } finally {
+                withContext(NonCancellable + Dispatchers.Main) { settleQueueSkip(skipRequest, accepted) }
+            }
         }
     }
 
@@ -2574,41 +2599,33 @@ class PlaybackViewModel : ViewModel() {
         navigateTo(Screen.LYRICS)
     }
 
-    /**
-     * Drop one entry from the queue.
-     *
-     * Addressed by qid, not uri: a queue legitimately holds the same track twice, and with repeat on
-     * the same uid comes back on the next pass. The row goes immediately so the swipe feels like it
-     * did something, and a refresh follows to reconcile with whatever the server actually did.
-     */
+    // Confined to Main. Hide entries until a fresh snapshot confirms the drained batch.
+    internal val pendingQueueRemovals = linkedSetOf<String>()
+    internal val pendingQueueSkips = linkedSetOf<String>()
+    internal var queueSkipConfirmed = false
+    internal var queueSkipRequest = 0L
+    private var queueRemovalJob: Job? = null
+    internal var queueReadGeneration = 0L
+    internal val queueEditMutex = kotlinx.coroutines.sync.Mutex()
+    internal var latestQueueView = kotify.api.playerstatus.QueueView.EMPTY
+
+    /** Hide immediately and drain rapid swipes without overlapping queue read/write pairs. */
     fun removeFromQueue(track: TrackInfo) {
-        AppMessages.show(R.string.removed_from_queue)
         if (isOffline.value) {
             OfflinePlayer.remove(track)
+            AppMessages.show(R.string.removed_from_queue)
             return
         }
-        val qid = track.qid ?: run {
-            LokiLogger.w(TAG, "No qid on ${track.name}, cannot address it for removal")
-            return
-        }
+        val qid = track.qid ?: return
+        val pc = player ?: return
+        if (!pendingQueueRemovals.add(qid)) return
+        queueReadGeneration++
         val before = _queue.value
         _queue.value = before.filterNot { it.qid == qid }
-        if (_queuedCount.value > 0 && before.take(_queuedCount.value).any { it.qid == qid }) {
-            _queuedCount.value -= 1
-        }
-        launchWithPlayer("removeFromQueue") { pc ->
-            val removed = try {
-                pc.removeFromQueue(qid)
-            } catch (e: Exception) {
-                LokiLogger.e(TAG, "removeFromQueue ${track.name}", e)
-                false
-            }
-            LokiLogger.i(TAG, "Queue remove ${track.name}: ${if (removed) "accepted" else "not found"}")
-            // Only refetch when the local edit and the server disagree. Refreshing after every swipe
-            // cost a getState plus a decorate round trip per row and rebuilt the list mid-gesture,
-            // which is what made it feel like the sheet was fighting the finger.
-            if (!removed) refreshQueue()
-        }
+        if (before.take(_queuedCount.value).any { it.qid == qid }) _queuedCount.value -= 1
+        AppMessages.show(R.string.removed_from_queue)
+        if (queueRemovalJob?.isActive == true) return
+        queueRemovalJob = viewModelScope.launch { drainQueueRemovals(pc) }
     }
 
     /** Move a queue entry to [toDisplayedIndex], the position the drag ended on; see [planQueueMove]. */
@@ -2617,6 +2634,7 @@ class PlaybackViewModel : ViewModel() {
             OfflinePlayer.move(track, toDisplayedIndex)
             return
         }
+        val pc = player ?: return
         val list = _queue.value
         val queued = _queuedCount.value
         val plan = when (val planned = planQueueMove(list, queued, track, toDisplayedIndex)) {
@@ -2627,11 +2645,16 @@ class PlaybackViewModel : ViewModel() {
             is QueueMovePlan.Move -> planned
         }
         LokiLogger.i(TAG, "Queue move: ${track.name} ${plan.from} -> ${plan.target} (server ${plan.rawTarget}), queued=$queued")
+        val anchorQid = list[plan.target].qid ?: return
+        val placeAfterAnchor = plan.target > plan.from
         _queue.value = list.toMutableList().apply { add(plan.target, removeAt(plan.from)) }
+        queueReadGeneration++
 
-        launchWithPlayer("moveQueueEntry") { pc ->
+        viewModelScope.launch {
             val moved = try {
-                pc.moveInQueue(plan.qid, plan.rawTarget)
+                sendQueueMove(pc, plan.qid, anchorQid, placeAfterAnchor)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 LokiLogger.e(TAG, "moveQueueEntry ${track.name}", e)
                 false
@@ -2643,75 +2666,19 @@ class PlaybackViewModel : ViewModel() {
     }
 
     /** Decorated metadata by uri, so a queue that has been seen once costs no request to show again. */
-    private val decoratedByUri = mutableMapOf<String, kotify.api.song.DecoratedTrack>()
+    internal val decoratedByUri = mutableMapOf<String, kotify.api.song.DecoratedTrack>()
 
     /** Seed the queue, or resync it after a write the server disagreed with. */
     fun refreshQueue() {
         launchWithSession("refreshQueue") { sess ->
+            val generation = withContext(Dispatchers.Main) { queueReadGeneration }
             val state = player?.getState() ?: return@launchWithSession
-            applyQueue(kotify.api.playerstatus.queueViewOf(state), Song(sess))
-        }
-    }
-
-    /**
-     * Build the displayed queue from [view], filling blanks from the cache and, if [songApi] is
-     * given, decorating whatever is still missing in one request.
-     */
-    private suspend fun applyQueue(view: kotify.api.playerstatus.QueueView, songApi: Song?) {
-        data class ParsedTrack(val uri: String, val info: TrackInfo, val needsFetch: Boolean)
-
-        _queuedCount.value = view.queued.size
-        val parsed = view.entries.map { (qt, rawIndex) ->
-            val cached = decoratedByUri[qt.uri]
-            val name = qt.name?.takeIf { it.isNotEmpty() } ?: cached?.name
-            val artist = qt.artistName?.takeIf { it.isNotEmpty() } ?: cached?.artistName
-            val art = normalizeSpfyImageUrl(qt.imageUrl) ?: normalizeSpfyImageUrl(cached?.imageUrl)
-            val info = TrackInfo(
-                uri = qt.uri,
-                name = name ?: "Unknown",
-                artist = artist ?: "Unknown",
-                albumArt = art,
-                durationMs = if (qt.durationMs > 0) qt.durationMs else cached?.durationMs ?: 0L,
-                uid = qt.uid,
-                qid = qt.qid,
-                queueIndex = rawIndex,
-                isRecommended = qt.metadata["provider"] == "enhanced_recommendation",
-            )
-            ParsedTrack(qt.uri, info, name.isNullOrEmpty() || artist.isNullOrEmpty() || art == null)
-        }
-        _queue.value = parsed.map { it.info }
-
-        val missing = parsed.filter { it.needsFetch }.map { it.uri }.distinct()
-        if (missing.isEmpty() || songApi == null) {
-            LokiLogger.i(TAG, "Queue: ${parsed.size} rows, ${missing.size} missing, none fetched")
-            return
-        }
-
-        // One request for the rest, the way the web player fills a queue. Spfy populates metadata
-        // for only the first entry or two, so this was once a getSong per row awaited together.
-        val started = System.currentTimeMillis()
-        val decorated = try {
-            songApi.decorateTracks(missing)
-        } catch (e: Exception) {
-            LokiLogger.e(TAG, "refreshQueue decorate", e)
-            emptyList()
-        }
-        decorated.forEach { decoratedByUri[it.uri] = it }
-        LokiLogger.i(
-            TAG,
-            "Queue: ${parsed.size} rows, ${missing.size} needed metadata, " +
-                "${decorated.size} decorated in ${System.currentTimeMillis() - started}ms"
-        )
-        if (decorated.isEmpty()) return
-        val byUri = decorated.associateBy { it.uri }
-        _queue.value = parsed.map { pt ->
-            val d = byUri[pt.uri] ?: return@map pt.info
-            pt.info.copy(
-                name = d.name ?: pt.info.name,
-                artist = d.artistName ?: pt.info.artist,
-                albumArt = normalizeSpfyImageUrl(d.imageUrl) ?: pt.info.albumArt,
-                durationMs = if (d.durationMs > 0) d.durationMs else pt.info.durationMs,
-            )
+            withContext(Dispatchers.Main) {
+                // A read started before a swipe or its confirmation must not undo that edit.
+                if (generation == queueReadGeneration) {
+                    applyQueue(kotify.api.playerstatus.queueViewOf(state), Song(sess))
+                }
+            }
         }
     }
 

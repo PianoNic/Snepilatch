@@ -364,6 +364,9 @@
     <string name="removed_from_liked_songs">Удалено из «Любимых треков»</string>
     <string name="added_to_library">Добавлено в вашу библиотеку</string>
     <string name="removed_from_library">Удалено из вашей библиотеки</string>
+    <string name="queue_update_pending">Очередь обновляется. Попробуйте через минуту.</string>
+    <string name="error_skip_queue">Не удалось перейти к следующему треку в очереди. Попробуйте ещё раз.</string>
+    <string name="error_remove_queue">Не удалось подтвердить удаление из очереди. Попробуйте ещё раз.</string>
     <string name="removed_from_queue">Удалено из очереди</string>
     <string name="downloads">Загрузки</string>
     <string name="downloading">Загрузка</string>

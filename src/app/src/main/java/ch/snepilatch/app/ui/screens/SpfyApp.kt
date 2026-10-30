@@ -422,6 +422,10 @@ private fun MainContent(screen: Screen, vm: PlaybackViewModel, hazeState: HazeSt
             },
             label = "mainContent",
         ) { targetScreen ->
+            // A cut still keeps the old screen composed until the transition settles, and it drew under the
+            // new one for a few frames, the last tab showing through (#1061). Only the slide needs both.
+            val sliding = screen == Screen.INTERFACE || targetScreen == Screen.INTERFACE
+            if (targetScreen != screen && !sliding) return@AnimatedContent
             when (targetScreen) {
                 Screen.HOME -> if (isOffline) OfflineHomeScreen(vm) else HomeScreen(vm)
                 Screen.SEARCH -> SearchScreen(vm)

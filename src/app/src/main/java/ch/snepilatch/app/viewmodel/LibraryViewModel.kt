@@ -100,6 +100,11 @@ class LibraryViewModel : SessionViewModel("LibraryVM") {
             if (player === subscribedTo) return@launch
             subscribedTo = player
             player.onRootlistChange { viewModelScope.launch { refresh.request() } }
+            // A listed playlist changed in itself: the daylist renames itself and changes its cover through
+            // the day, which moves no rootlist. The web player reloads a shown playlist on its push (#1057).
+            player.onPlaylistChange { change ->
+                if (_library.value.any { it.uri == change.uri }) viewModelScope.launch { refresh.request() }
+            }
             // Whatever moved while the socket was down was never delivered, so treat coming back as
             // a change in itself.
             player.onReconnected { viewModelScope.launch { refresh.request() } }

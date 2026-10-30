@@ -92,6 +92,14 @@ object Downloads {
     /** Uri and title/artist keys of every row, so a list row costs a hash lookup, not a scan. */
     val index: StateFlow<Set<String>> = _index.asStateFlow()
 
+    private val _groups = MutableStateFlow<List<Group>>(emptyList())
+
+    /**
+     * The rows grouped for the library, worked out once per change where the rows are read, off the main
+     * thread. The Library tab used to group a few thousand rows on every open and dropped frames (#1059).
+     */
+    val groupsFlow: StateFlow<List<Group>> = _groups.asStateFlow()
+
     private val _inProgress = MutableStateFlow<Set<String>>(emptySet())
 
     /** Track URIs being fetched right now, so a row can show a spinner instead of a download icon. */
@@ -329,7 +337,7 @@ object Downloads {
      */
     private fun groupUriOf(row: DownloadedTrack): String = row.contextUri ?: row.trackUri
 
-    fun groups(): List<Group> = groupsOf(_rows.value)
+    fun groups(): List<Group> = _groups.value
 
     /** Bytes on disk across every downloaded track, for enforcing AppSettings.downloadCapGb. */
     fun totalSizeBytes(): Long = _rows.value.sumOf { it.sizeBytes }
@@ -354,6 +362,7 @@ object Downloads {
         _rows.value = loaded
         _downloaded.value = loaded.mapTo(mutableSetOf()) { it.trackUri }
         _index.value = indexOf(loaded)
+        _groups.value = groupsOf(loaded)
     }
 
     private fun DownloadedTrack.toValues() = ContentValues().apply {

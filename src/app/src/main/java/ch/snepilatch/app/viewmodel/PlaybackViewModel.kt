@@ -756,9 +756,7 @@ class PlaybackViewModel(
                     // Idle preload is intentionally NOT done — pressing play sends resume to
                     // Spfy, which pushes the file_id via the WS state machine, and
                     // resolveAndPlay then loads ExoPlayer with the right CDN URL.
-                    if (state.is_active_device && state.isActuallyPlaying) {
-                        resolveCurrentTrack(state)
-                    }
+                    if (state.is_active_device && state.isActuallyPlaying) settleStartPlaying(state)
                 }
             } catch (e: CancellationException) {
                 // Not a failure and not ours to report: swallowing it surfaced a torn-down scope as
@@ -3714,6 +3712,20 @@ class PlaybackViewModel(
             isStreamLoading.value = false
             // Every path above returns from inside the try, so this is the one place they all pass.
             preResolveNextTrack()
+        }
+    }
+
+    /**
+     * Spfy lists this phone as playing when the session comes up. With nothing audible here that is left
+     * over from a process that was killed, and a start comes up paused, as the official phone apps do (#1032).
+     */
+    internal suspend fun settleStartPlaying(state: PlayerStateData) {
+        val audible = withContext(Dispatchers.Main) { MusicPlaybackService.instance?.isPlaying() == true }
+        if (audible) {
+            resolveCurrentTrack(state)
+        } else {
+            LokiLogger.i(TAG, "Spfy still lists this phone as playing after a start, pausing")
+            pausePlayback()
         }
     }
 

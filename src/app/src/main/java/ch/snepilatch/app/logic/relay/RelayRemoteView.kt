@@ -16,7 +16,10 @@ internal class RelayRemoteView(private val vm: PlaybackViewModel, private val se
 
     suspend fun show(playback: RelayPlayback) {
         val uri = playback.trackUri
-        if (uri != shown?.uri) shown = uri?.let { lookup(it) }
+        if (uri != shown?.uri) {
+            shown = uri?.let { lookup(it) }
+            shown?.let(vm::showHostTrack)
+        }
         vm.showContext(playback.contextUri)
         val current = vm._playback.value
         vm._playback.value = current.copy(

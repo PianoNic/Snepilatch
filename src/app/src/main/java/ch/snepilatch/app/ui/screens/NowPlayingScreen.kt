@@ -1072,7 +1072,7 @@ private fun ShuffleButton(vm: PlaybackViewModel, size: Dp, buttonBg: Color, acce
     TonalIconToggle(
         isShuffling,
         { vm.toggleShuffle() },
-        Modifier.size(size).then(if (smart) smartShuffleRim(lit) else Modifier),
+        Modifier.size(size).then(if (smart) smartShuffleRim(buttonBg) else Modifier),
         if (smart) Color.Transparent else buttonBg,
         if (smart) Color.Transparent else lit,
         enabled = canToggleShuffle,

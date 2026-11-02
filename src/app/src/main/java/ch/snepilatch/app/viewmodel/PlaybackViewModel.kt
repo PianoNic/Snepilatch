@@ -1569,6 +1569,12 @@ class PlaybackViewModel(
         }
     }
 
+    /** The header names [contextUri], which is not this account's own context in a relay jam (#1033). */
+    internal fun showContext(contextUri: String?) {
+        playingContext.value = resolvePlayingContext(contextUri, null)
+        lastContextUri = contextUri
+    }
+
     private fun startPositionTicker() = positionInterpolator.start()
     private fun stopPositionTicker() = positionInterpolator.stop()
 

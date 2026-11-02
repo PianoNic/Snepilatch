@@ -11,6 +11,7 @@ import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.Downloading
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,6 +26,7 @@ import ch.snepilatch.app.logic.download.DownloadFolder
 import ch.snepilatch.app.logic.download.DownloadQueue
 import ch.snepilatch.app.logic.download.FolderScan
 import ch.snepilatch.app.logic.download.Downloads
+import ch.snepilatch.app.logic.shared.JamHolder
 import ch.snepilatch.app.ui.shared.SpfyImage
 import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
@@ -83,6 +85,8 @@ fun DownloadsScreen(vm: PlaybackViewModel) {
         }
 
         StorageSummary(folder = folder, count = stored.size, totalSize = totalSize)
+        val jam by JamHolder.session.collectAsState()
+        if (stored.isNotEmpty() && jam?.active != true) PlayAllRow(vm)
         UnindexedFiles()
 
         HorizontalDivider(color = SnepilatchLightGray.copy(alpha = 0.15f))
@@ -118,6 +122,20 @@ fun DownloadsScreen(vm: PlaybackViewModel) {
             items(queue, key = { it.id }) { entry ->
                 QueuedDownload(entry, onCancel = { vm.cancelDownload(entry.id) })
             }
+        }
+    }
+}
+
+@Composable
+private fun PlayAllRow(vm: PlaybackViewModel) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+        TextButton(onClick = { vm.playAllDownloads(shuffle = false) }) {
+            Icon(Icons.Rounded.PlayArrow, null, tint = SnepilatchWhite)
+            Text(stringResource(R.string.play), color = SnepilatchWhite)
+        }
+        TextButton(onClick = { vm.playAllDownloads(shuffle = true) }) {
+            Icon(Icons.Rounded.Shuffle, null, tint = SnepilatchWhite)
+            Text(stringResource(R.string.shuffle), color = SnepilatchWhite)
         }
     }
 }

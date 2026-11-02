@@ -2392,6 +2392,13 @@ class PlaybackViewModel(
         userPlayJob = viewModelScope.launch(Dispatchers.IO) { startUserPlayback(track, contextUri, trackIndex, wholeContext) }
     }
 
+    /** Every download, from the files (#580, #895). */
+    fun playAllDownloads(shuffle: Boolean) {
+        userPlayJob?.cancel()
+        val tracks = Downloads.rows.value.map { it.toTrackInfo() }
+        userPlayJob = viewModelScope.launch(Dispatchers.IO) { startDownloadsPlayback(tracks, shuffle) }
+    }
+
     /** [wholeContext]: play the list as the web player's play button does, naming no track, so the session's shuffle picks (#262). */
     internal suspend fun startUserPlayback(track: TrackInfo, contextUri: String?, trackIndex: Int? = null, wholeContext: Boolean = false) {
         if (track.uri.startsWith(LocalFiles.URI_PREFIX)) {
@@ -2752,7 +2759,7 @@ class PlaybackViewModel(
     }
 
     fun likeSong(trackId: String) {
-        if (localPlayback.value) return
+        if (_playback.value.track?.uri?.startsWith(LocalFiles.URI_PREFIX) == true) return
         launchWithSession("likeSong", R.string.error_like, R.string.added_to_liked_songs) { sess ->
             Song(sess).likeSong(trackId)
             currentTrackLiked.value = true
@@ -2760,7 +2767,7 @@ class PlaybackViewModel(
     }
 
     fun unlikeSong(trackId: String) {
-        if (localPlayback.value) return
+        if (_playback.value.track?.uri?.startsWith(LocalFiles.URI_PREFIX) == true) return
         launchWithSession("unlikeSong", R.string.error_like, R.string.removed_from_liked_songs) { sess ->
             Song(sess).unlikeSong(trackId)
             currentTrackLiked.value = false

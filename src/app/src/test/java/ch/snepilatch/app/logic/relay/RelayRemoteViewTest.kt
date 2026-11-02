@@ -23,6 +23,20 @@ class RelayRemoteViewTest {
         paused = false, shuffle = false, repeat = "off", queue = emptyList(),
     )
 
+    /** Rows without a qid, so nothing can address them in this account's own queue (#1086). */
+    @Test
+    fun showsTheHostsQueue() = runTest {
+        val view = RelayRemoteView(rig.vm) { 0L }
+        rig.vm._queue.value = listOf(ch.snepilatch.app.data.TrackInfo("spotify:track:mine", "mine", "me", null, qid = "m:::0"))
+        val queue = listOf(RelayQueueEntry("spotify:track:one"), RelayQueueEntry("spotify:track:two"))
+
+        view.show(playback(null).copy(queue = queue))
+
+        assertEquals(listOf("spotify:track:one", "spotify:track:two"), rig.vm.queue.value.map { it.uri })
+        assertEquals(listOf(null, null), rig.vm.queue.value.map { it.qid })
+        assertEquals("spotify:track:one", rig.vm.nextTrackPreview.value?.uri)
+    }
+
     @Test
     fun followsTheHostsContext() = runTest {
         val view = RelayRemoteView(rig.vm) { 0L }

@@ -4,6 +4,7 @@ import ch.snepilatch.app.data.TrackInfo
 import ch.snepilatch.app.logic.shared.SessionHolder
 import ch.snepilatch.app.logic.shared.spfyId
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
+import ch.snepilatch.app.viewmodel.showHostQueue
 import kotify.api.song.Song
 
 /**
@@ -13,6 +14,7 @@ import kotify.api.song.Song
  */
 internal class RelayRemoteView(private val vm: PlaybackViewModel, private val serverNow: () -> Long) {
     private var shown: TrackInfo? = null
+    private var shownQueue: List<RelayQueueEntry>? = null
 
     suspend fun show(playback: RelayPlayback) {
         val uri = playback.trackUri
@@ -21,6 +23,10 @@ internal class RelayRemoteView(private val vm: PlaybackViewModel, private val se
             shown?.let(vm::showHostTrack)
         }
         vm.showContext(playback.contextUri)
+        if (playback.queue != shownQueue) {
+            shownQueue = playback.queue
+            vm.showHostQueue(playback.queue)
+        }
         val current = vm._playback.value
         vm._playback.value = current.copy(
             track = shown,

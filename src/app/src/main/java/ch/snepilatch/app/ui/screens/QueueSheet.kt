@@ -34,6 +34,7 @@ import ch.snepilatch.app.ui.shared.DownloadStatus
 import ch.snepilatch.app.ui.shared.SwipeAction
 import ch.snepilatch.app.ui.shared.SwipeableActionRow
 import ch.snepilatch.app.ui.theme.*
+import ch.snepilatch.app.logic.relay.RelayJam
 import ch.snepilatch.app.logic.shared.formatTime
 import ch.snepilatch.app.logic.shared.LokiLogger
 import ch.snepilatch.app.logic.shared.ThemeController
@@ -250,7 +251,7 @@ private fun QueueList(
                 SectionHeader(stringResource(R.string.queue_next_up), Modifier.animateItem())
             }
             itemsIndexed(upNext, key = { _, entry -> entry.first }) { i, entry ->
-                SwipeableQueueRow(
+                UpNextRow(
                     entry.second,
                     dragFor(entry.first, entry.second, queuedCount + i),
                     onClick = { tap(entry.first, entry.second, queuedCount + i) },
@@ -269,6 +270,23 @@ private fun QueueList(
  * Explicit queue entries only support removal. Context entries support both actions because adding
  * one to the queue is what makes it play before the rest of the context.
  */
+/** On a remote guest's sheet this is the host's queue: there it is only looked at, nothing here can edit it. */
+@Composable
+private fun UpNextRow(
+    track: ch.snepilatch.app.data.TrackInfo,
+    drag: RowDrag?,
+    onClick: () -> Unit,
+    onRemove: () -> Unit,
+    onAdd: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    if (RelayJam.remoteOnly) {
+        QueueRow(track, onClick = {}, drag = null)
+    } else {
+        SwipeableQueueRow(track, drag, onClick, onRemove, onAdd, modifier)
+    }
+}
+
 @Composable
 private fun SwipeableQueueRow(
     track: ch.snepilatch.app.data.TrackInfo,

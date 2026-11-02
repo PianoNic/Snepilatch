@@ -556,4 +556,7 @@
         <item quantity="many">%1$d песен</item>
         <item quantity="other">%1$d песни</item>
     </plurals>
+    <string name="crossfade">Плавный переход</string>
+    <string name="crossfade_description">Плавно смешивать песни из ваших файлов</string>
+    <string name="crossfade_seconds">Переход %1$d с</string>
 </resources>

@@ -985,7 +985,8 @@ private fun PlayerControls(
     // Offline the next track is a file on the phone, ready the moment it is asked for; the flag only
     // tracks the online pre-resolve, which never runs there, so it would spin forever.
     val offline by vm.isOffline.collectAsState()
-    val nextLoading = !nextReady && isCurrentlyStreaming && !offline
+    val localFile by vm.localPlayback.collectAsState()
+    val nextLoading = !nextReady && isCurrentlyStreaming && !offline && !localFile
     // A jam whose host turned guest controls off: the transport is shown but does nothing, like the official app.
     val jamControls = jamAllowsControls()
     val sideBtn = if (compact) 44.dp else 52.dp

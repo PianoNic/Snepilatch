@@ -34,6 +34,11 @@ class LyricsViewModel : SessionViewModel("LyricsVM") {
      */
     fun fetch(track: TrackInfo) {
         val trackUri = track.uri
+        // A local file is not in the catalogue, so it has no lyrics to ask for (#1073).
+        if (kotify.api.playerstatus.LocalTrackUri.isLocal(trackUri)) {
+            _lyrics.value = null
+            return
+        }
         if (trackUri == lastTrackUri && _lyrics.value != null) return
         lastTrackUri = trackUri
         launchWithSessionLoading("fetch", isLoading) { sess ->

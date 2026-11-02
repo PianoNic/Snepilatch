@@ -42,6 +42,8 @@ fun LikeToggleButton(
         YourEpisodesToggleButton(trackUri, buttonBg, accent, size, iconSize)
         return
     }
+    // A local file is not in the catalogue, so there is nothing to like (#1073).
+    if (kotify.api.playerstatus.LocalTrackUri.isLocal(trackUri)) return
     FilledIconToggleButton(
         checked = isLiked,
         onCheckedChange = { _ ->

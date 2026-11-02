@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -68,7 +70,7 @@ fun JamHeader(jam: JamSession, busy: Boolean, onInvite: () -> Unit, onLeave: () 
             Column(Modifier.padding(top = 8.dp)) {
                 jam.members.forEach { m ->
                     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        SpfyImage(url = m.imageUrl, modifier = Modifier.size(32.dp), shape = CircleShape)
+                        SpfyImage(url = m.imageUrl, icon = Icons.Rounded.Person, modifier = Modifier.size(32.dp), shape = CircleShape)
                         Spacer(Modifier.width(12.dp))
                         Text(
                             m.displayName.ifBlank { m.username },

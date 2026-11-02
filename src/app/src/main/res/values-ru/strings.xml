@@ -540,4 +540,20 @@
     <string name="remove_from_your_episodes">Удалить из «Ваших выпусков»</string>
     <string name="skip_back_15">Назад на 15 секунд</string>
     <string name="skip_forward_15">Вперёд на 15 секунд</string>
+    <string name="local_files">Локальные файлы</string>
+    <string name="local_files_show">Показывать локальные файлы</string>
+    <string name="local_files_description">Слушать музыку из папок на этом телефоне</string>
+    <string name="local_files_add_source">Добавить источник</string>
+    <string name="local_files_remove_source">Удалить источник</string>
+    <string name="local_files_scanning">Просматриваем папки…</string>
+    <string name="local_files_empty_header">Слушайте локальные файлы</string>
+    <string name="local_files_empty_description">Включите локальные файлы в настройках и добавьте папку.</string>
+    <string name="local_files_empty_button">В настройки</string>
+    <string name="local_files_is_download_folder">Это папка загрузок. Её песни уже есть в ваших загрузках</string>
+    <plurals name="local_files_count">
+        <item quantity="one">%1$d песня</item>
+        <item quantity="few">%1$d песни</item>
+        <item quantity="many">%1$d песен</item>
+        <item quantity="other">%1$d песни</item>
+    </plurals>
 </resources>

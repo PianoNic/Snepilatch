@@ -538,4 +538,18 @@
     <string name="remove_from_your_episodes">Aus „Deine Folgen“ entfernen</string>
     <string name="skip_back_15">15 Sekunden zurück</string>
     <string name="skip_forward_15">15 Sekunden vor</string>
+    <string name="local_files">Lokale Dateien</string>
+    <string name="local_files_show">Lokale Dateien anzeigen</string>
+    <string name="local_files_description">Musik aus Ordnern auf diesem Telefon abspielen</string>
+    <string name="local_files_add_source">Quelle hinzufügen</string>
+    <string name="local_files_remove_source">Quelle entfernen</string>
+    <string name="local_files_scanning">Ordner werden durchsucht…</string>
+    <string name="local_files_empty_header">Lokale Dateien anhören</string>
+    <string name="local_files_empty_description">Aktiviere lokale Dateien in den Einstellungen und füge einen Ordner hinzu.</string>
+    <string name="local_files_empty_button">Zu den Einstellungen</string>
+    <string name="local_files_is_download_folder">Das ist der Download-Ordner. Seine Songs sind schon in deinen Downloads</string>
+    <plurals name="local_files_count">
+        <item quantity="one">%1$d Song</item>
+        <item quantity="other">%1$d Songs</item>
+    </plurals>
 </resources>

@@ -122,6 +122,7 @@ object DownloadActions {
     /** The cheap checks: setting on, somewhere to put it, played far enough, not already saved. */
     private fun worthAutoSaving(track: TrackInfo, positionMs: Long): Boolean {
         if (!AppSettings.autoSaveListened.value) return false
+        if (track.uri.startsWith(LocalFiles.URI_PREFIX)) return false
         if (track.durationMs <= 0) return false
         if (!DownloadFolder.isConfigured) return false
         if (positionMs < track.durationMs * LISTENED_THROUGH_FRACTION) return false

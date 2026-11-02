@@ -230,7 +230,10 @@ fun DetailScreen(vm: PlaybackViewModel) {
             // the web player does (#262). Offline has no player state, only the offline engine's context.
             val playerState by SessionHolder.playerState.collectAsState()
             val offline by vm.isOffline.collectAsState()
+            val localPlaying by vm.localPlayback.collectAsState()
             val playingThisContext = when {
+                // A local file has the phone; the server's session is not what plays (#1070).
+                localPlaying -> false
                 offline -> playback.track != null && playingContext?.uri == detail.uri
                 else -> playerState.playbackOf(detail.uri) != ContextPlayback.NOT_ACTIVE
             }

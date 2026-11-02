@@ -5,6 +5,7 @@ import ch.snepilatch.app.R
 import ch.snepilatch.app.data.PlaybackUiState
 import ch.snepilatch.app.data.TrackInfo
 import ch.snepilatch.app.logic.download.Downloads
+import ch.snepilatch.app.logic.download.LocalFiles
 import ch.snepilatch.app.logic.download.toTrackInfo
 import ch.snepilatch.app.logic.shared.LokiLogger
 import ch.snepilatch.app.logic.shared.NetworkState
@@ -31,6 +32,9 @@ class OfflineController(private val scope: CoroutineScope, private val hooks: Ho
         val nextPreview: MutableStateFlow<TrackInfo?>
         val prevPreview: MutableStateFlow<TrackInfo?>
         val isOffline: MutableStateFlow<Boolean>
+
+        /** Offline, or a local file playing (#1070): either way the engine's state is the playback state. */
+        val engineOwnsPlayback: Boolean
 
         /** Whether a session is up; the network going before one exists is the launch path's business. */
         fun hasSession(): Boolean
@@ -78,7 +82,7 @@ class OfflineController(private val scope: CoroutineScope, private val hooks: Ho
     private var takeoverTrackUri: String? = null
 
     fun start() {
-        scope.launch { OfflinePlayer.state.collect { s -> if (s != null && hooks.isOffline.value) mirror(s) } }
+        scope.launch { OfflinePlayer.state.collect { s -> if (s != null && hooks.engineOwnsPlayback) mirror(s) } }
         scope.launch {
             NetworkState.online.collect { online ->
                 offlineWatch?.cancel()
@@ -86,7 +90,7 @@ class OfflineController(private val scope: CoroutineScope, private val hooks: Ho
                     online && hooks.isOffline.value -> handBackWhenReady()
                     // Short blips are the dealer's reconnect business: the engine takes over only
                     // once the network has stayed gone for a moment.
-                    !online && !hooks.isOffline.value && hooks.hasSession() -> {
+                    !online && !hooks.engineOwnsPlayback && hooks.hasSession() -> {
                         offlineWatch = launch(Dispatchers.IO) {
                             delay(GRACE_MS)
                             if (!NetworkState.online.value) takeOver()
@@ -213,6 +217,11 @@ class OfflineController(private val scope: CoroutineScope, private val hooks: Ho
         // The dealer's return may have settled it already, see onDealerReconnected.
         if (!hooks.isOffline.value) return true
         val s = OfflinePlayer.state.value
+        // A local file means nothing to Connect: back online, it just plays on (#1070).
+        if (s?.current?.uri?.startsWith(LocalFiles.URI_PREFIX) == true) {
+            hooks.isOffline.value = false
+            return true
+        }
         val current = s?.current
         val position = hooks.currentPositionMs()
         hooks.isOffline.value = false

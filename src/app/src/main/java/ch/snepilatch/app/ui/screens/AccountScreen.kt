@@ -38,6 +38,7 @@ import ch.snepilatch.app.BuildConfig
 import ch.snepilatch.app.R
 import ch.snepilatch.app.data.Screen
 import ch.snepilatch.app.logic.download.DownloadFolder
+import ch.snepilatch.app.logic.download.LocalFiles
 import ch.snepilatch.app.logic.download.Downloads
 import ch.snepilatch.app.logic.relay.RelaySettings
 import ch.snepilatch.app.ui.shared.TightAlertDialog
@@ -361,6 +362,8 @@ fun AccountScreen(vm: PlaybackViewModel) {
             icon = Icons.Rounded.Folder,
             onClick = { folderPicker.launch(null) },
         )
+
+        LocalFilesSettings(animatedPrimary)
 
         // Storage limit: 0 = unlimited.
         val downloadCapGb by AppSettings.downloadCapGb.collectAsState()
@@ -818,4 +821,42 @@ private const val SOURCE_SPOTIFY_UI = "spotify"
 internal fun readableFolder(uri: android.net.Uri): String {
     val id = runCatching { android.provider.DocumentsContract.getTreeDocumentId(uri) }.getOrNull()
     return id?.substringAfter(':')?.takeIf { it.isNotBlank() } ?: uri.lastPathSegment.orEmpty()
+}
+
+/** The toggle and the folders of Local Files (#1070), as many as the user adds. */
+@Composable
+private fun LocalFilesSettings(accent: Color) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val on by LocalFiles.enabled.collectAsState()
+    val folders by LocalFiles.folders.collectAsState()
+    val tracks by LocalFiles.tracks.collectAsState()
+    SettingToggleRow(
+        title = stringResource(R.string.local_files_show),
+        checked = on,
+        onCheckedChange = { LocalFiles.setEnabled(it, context) },
+        accent = accent,
+        subtitle = stringResource(R.string.local_files_description),
+        icon = Icons.Rounded.Folder,
+    )
+    if (!on) return
+    folders.forEach { folder ->
+        ListItem(
+            headlineContent = { Text(readableFolder(folder), color = SnepilatchWhite) },
+            trailingContent = {
+                IconButton(onClick = { LocalFiles.removeFolder(folder, context) }) {
+                    Icon(Icons.Rounded.Close, stringResource(R.string.local_files_remove_source), tint = SnepilatchLightGray)
+                }
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        )
+    }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { picked ->
+        if (picked != null) LocalFiles.addFolder(picked, context)
+    }
+    SettingRow(
+        title = stringResource(R.string.local_files_add_source),
+        subtitle = if (folders.isEmpty()) null else pluralStringResource(R.plurals.local_files_count, tracks.size, tracks.size),
+        icon = Icons.Rounded.Add,
+        onClick = { picker.launch(null) },
+    )
 }

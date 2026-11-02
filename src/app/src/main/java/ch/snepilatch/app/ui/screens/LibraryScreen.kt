@@ -72,6 +72,7 @@ import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
 import ch.snepilatch.app.ui.shared.LoadErrorState
 import ch.snepilatch.app.logic.download.Downloads
+import ch.snepilatch.app.logic.download.LocalFiles
 import ch.snepilatch.app.data.LIKED_SONGS_COVER_URL
 import ch.snepilatch.app.data.LibraryItem
 import ch.snepilatch.app.data.TrackInfo
@@ -127,8 +128,14 @@ fun LibraryScreen() {
     val downloadedItems = remember(downloadGroups) {
         downloadGroups.map { LibraryItem(it.uri, it.name, it.imageUrl, it.type) }
     }
-    val sortedLibrary = remember(library, downloadedItems, selectedFilter, searchQuery, sortMode) {
-        val source = if (selectedFilter == "Downloaded") downloadedItems else library
+    val localFilesOn by LocalFiles.enabled.collectAsState()
+    val localFilesName = stringResource(R.string.local_files)
+    val inputs = listOf(library, downloadedItems, selectedFilter, searchQuery, sortMode, localFilesOn, openFolder)
+    val sortedLibrary = remember(inputs) {
+        // Beside Liked Songs at the top level of the library, as the desktop client lists it (#1070).
+        val localRow = LibraryItem(LocalFiles.LIBRARY_URI, localFilesName, null, LocalFiles.LIBRARY_TYPE)
+        val withLocal = if (localFilesOn && openFolder == null) library.take(1) + localRow + library.drop(1) else library
+        val source = if (selectedFilter == "Downloaded") downloadedItems else withLocal
         val filteredLibrary = when (selectedFilter) {
             // A folder holds playlists, so it has to survive this one — filtering it away would
             // hide everything inside it. It holds nothing else, so the other two drop it.
@@ -421,6 +428,8 @@ fun libraryItemClick(
     if (item.type == FOLDER_TYPE) {
         // A folder has no detail page — it is a level of the library itself.
         libraryVm?.openFolder(item)
+    } else if (item.type == LocalFiles.LIBRARY_TYPE) {
+        vm?.navigateTo(ch.snepilatch.app.data.Screen.LOCAL_FILES)
     } else if (item.type == "single") {
         // A one-off download has no album or playlist to open, so it is the track itself: play it.
         val row = Downloads.find(item.uri) ?: return
@@ -434,13 +443,17 @@ fun libraryItemClick(
 private fun libraryItemIcon(type: String) = when (type) {
     "artist" -> Icons.Rounded.Person
     "album" -> Icons.Rounded.Album
-    FOLDER_TYPE -> Icons.Rounded.Folder
+    FOLDER_TYPE, LocalFiles.LIBRARY_TYPE -> Icons.Rounded.Folder
     else -> Icons.AutoMirrored.Rounded.QueueMusic
 }
 
 /** "Playlist · owner" style second line of a library item; a folder shows its size instead. */
 @Composable
 private fun libraryItemSubtitle(item: LibraryItem): String {
+    if (item.type == LocalFiles.LIBRARY_TYPE) {
+        val count by LocalFiles.tracks.collectAsState()
+        return pluralStringResource(R.plurals.local_files_count, count.size, count.size)
+    }
     if (item.type == FOLDER_TYPE) {
         val folder = stringResource(R.string.library_folder)
         val count = item.itemCount ?: return folder
@@ -462,7 +475,7 @@ fun LibraryGridCard(item: LibraryItem, downloadedGroup: Boolean = false) {
     val playbackVm: PlaybackViewModel = viewModel()
     val libraryVm: LibraryViewModel = viewModel()
     val isArtist = item.type == "artist"
-    val removable = item.type != "collection" && item.type != FOLDER_TYPE
+    val removable = item.type != "collection" && item.type != FOLDER_TYPE && item.type != LocalFiles.LIBRARY_TYPE
     var showRemove by remember { mutableStateOf(false) }
     if (showRemove && removable) LibraryRemoveDialogs(item, downloadedGroup, onDismiss = { showRemove = false })
     Column(
@@ -505,7 +518,7 @@ fun LibraryListItem(item: LibraryItem, downloadedGroup: Boolean = false) {
     val playbackVm: PlaybackViewModel = viewModel()
     val libraryVm: LibraryViewModel = viewModel()
     val isArtist = item.type == "artist"
-    val removable = item.type != "collection" && item.type != FOLDER_TYPE
+    val removable = item.type != "collection" && item.type != FOLDER_TYPE && item.type != LocalFiles.LIBRARY_TYPE
     var showRemove by remember { mutableStateOf(false) }
     if (showRemove && removable) LibraryRemoveDialogs(item, downloadedGroup, onDismiss = { showRemove = false })
     Row(

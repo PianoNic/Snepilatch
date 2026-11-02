@@ -14,6 +14,7 @@ import ch.snepilatch.app.data.TrackInfo
 import ch.snepilatch.app.logic.shared.AppMessages
 import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.logic.shared.LokiLogger
+import kotify.api.playerstatus.LocalTrackUri
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -23,7 +24,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.io.File
-import java.net.URLEncoder
 
 /** One audio file from a folder the user picked. What it says is what its own tags say, nothing else. */
 data class LocalTrack(
@@ -49,7 +49,7 @@ data class LocalTrack(
  */
 object LocalFiles {
 
-    const val URI_PREFIX = "spotify:local:"
+    const val URI_PREFIX = LocalTrackUri.PREFIX
 
     /** The library row and the context the page plays as, the desktop client's uri. */
     const val LIBRARY_URI = "spotify:collection:local-files"
@@ -58,7 +58,6 @@ object LocalFiles {
     private const val TAG = "LocalFiles"
     private const val PREF_ENABLED = "local_files_enabled"
     private const val PREF_FOLDERS = "local_files_folders"
-    private const val MS_PER_SECOND = 1000L
     private val AUDIO = setOf("opus", "ogg", "flac", "m4a", "mp4", "mp3", "webm", "wav", "aac")
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -200,7 +199,7 @@ object LocalFiles {
             val album = tag(MediaMetadataRetriever.METADATA_KEY_ALBUM)
             val duration = tag(MediaMetadataRetriever.METADATA_KEY_DURATION).toLongOrNull() ?: 0L
             LocalTrack(
-                uri = localTrackUri(artist, album, title, duration),
+                uri = LocalTrackUri(artist, album, title, duration).toUri(),
                 documentUri = file.uri.toString(),
                 title = title,
                 artist = artist,
@@ -277,16 +276,6 @@ object LocalFiles {
     }
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(AppSettings.PREFS, Context.MODE_PRIVATE)
-
-    /**
-     * The client's local track uri, `spotify:local:artist:album:title:seconds`, url encoded with `+` for a
-     * space. `ponytail:` lives here while only this phone reads it; it moves to Kotify the day one is sent
-     * to the server (a playlist, Connect).
-     */
-    internal fun localTrackUri(artist: String, album: String, title: String, durationMs: Long): String {
-        fun encode(part: String) = URLEncoder.encode(part, "UTF-8").replace("*", "%2A")
-        return "$URI_PREFIX${encode(artist)}:${encode(album)}:${encode(title)}:${durationMs / MS_PER_SECOND}"
-    }
 
     private class Helper(context: Context) : SQLiteOpenHelper(context, "local_files.db", null, 1) {
         override fun onCreate(db: SQLiteDatabase) {

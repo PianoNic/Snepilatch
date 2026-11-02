@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import ch.snepilatch.app.R
+import kotify.api.playerstatus.LocalTrackUri
 import ch.snepilatch.app.data.PlayerShortcut
 import ch.snepilatch.app.data.TrackInfo
 import ch.snepilatch.app.logic.download.Downloads
@@ -59,7 +60,9 @@ class PlayerActionScope(
             // Via the router: the actions are built outside a composable that owns a DetailViewModel.
             PlayerShortcut.ALBUM -> uri?.let { DetailRoutes.openAlbumForTrack(it) }
             PlayerShortcut.RADIO -> uri?.let { DetailRoutes.openRadio(it) }
-            PlayerShortcut.DOWNLOAD -> track?.let { if (isDownloaded) vm.removeDownload(it.uri) else vm.downloadTrack(it, context) }
+            PlayerShortcut.DOWNLOAD -> track?.takeUnless { LocalTrackUri.isLocal(it.uri) }?.let {
+                if (isDownloaded) vm.removeDownload(it.uri) else vm.downloadTrack(it, context)
+            }
             // Acts on what is streaming rather than on a uri, so it needs nothing from the track here.
             PlayerShortcut.INFINIPLAY -> vm.toggleInfiniPlay()
             PlayerShortcut.JAM -> if (inJam) vm.openQueue() else onOpen(PlayerOverlay.Jam)

@@ -8,6 +8,7 @@ import ch.snepilatch.app.logic.shared.JamHolder
 import ch.snepilatch.app.logic.shared.LokiLogger
 import ch.snepilatch.app.logic.shared.SessionHolder
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
+import ch.snepilatch.app.viewmodel.leaveLocalPlayback
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -123,7 +124,11 @@ object RelayJam {
      */
     suspend fun join(joinToken: String, listen: Boolean): String? {
         quietAfterBoot = false
-        if (!listen) playback?.pauseAndWait()
+        if (!listen) {
+            playback?.pauseAndWait()
+            // A local file's engine would keep writing over the host's playback.
+            playback?.takeIf { it.localPlayback.value }?.leaveLocalPlayback()
+        }
         listening = listen
         appContext?.getSharedPreferences(AppSettings.PREFS, Context.MODE_PRIVATE)?.edit()?.putBoolean(KEY_LISTENING, listen)?.apply()
         return send(RelayCodec.join(joinToken))

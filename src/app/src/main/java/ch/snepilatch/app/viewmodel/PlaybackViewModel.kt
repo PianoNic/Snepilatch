@@ -1569,6 +1569,18 @@ class PlaybackViewModel(
         }
     }
 
+    /** The accent and canvas follow the track the host plays, not the one this phone last had. */
+    internal fun showHostTrack(track: TrackInfo) {
+        ThemeController.updateFromArt(track.albumArt)
+        fetchCanvasForTrack(track.uri)
+    }
+
+    /** The header names [contextUri], which is not this account's own context in a relay jam (#1033). */
+    internal fun showContext(contextUri: String?) {
+        playingContext.value = resolvePlayingContext(contextUri, null)
+        lastContextUri = contextUri
+    }
+
     private fun startPositionTicker() = positionInterpolator.start()
     private fun stopPositionTicker() = positionInterpolator.stop()
 

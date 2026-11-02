@@ -155,7 +155,7 @@ internal suspend fun PlaybackViewModel.applyQueue(view: QueueView, songApi: Song
             uid = qt.uid,
             qid = qt.qid,
             queueIndex = rawIndex,
-            isRecommended = qt.metadata["provider"] == "enhanced_recommendation",
+            isRecommended = qt.isRecommendation,
         )
         ParsedQueueTrack(info, name.isNullOrEmpty() || artist.isNullOrEmpty() || art == null)
     }

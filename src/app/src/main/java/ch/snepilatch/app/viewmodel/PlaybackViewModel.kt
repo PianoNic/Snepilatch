@@ -1338,6 +1338,7 @@ class PlaybackViewModel(
                 albumName = track.albumName,
                 durationMs = state.duration,
                 isAutoplay = track.provider == "autoplay",
+                isRecommended = track.isRecommendation,
             )
         } else null
 

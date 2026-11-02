@@ -17,6 +17,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.runtime.withFrameNanos
@@ -749,13 +759,25 @@ fun NowPlayingScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(Modifier.weight(1f).padding(end = 12.dp)) {
-                            MarqueeText(
-                                text = displayTitle,
-                                color = SnepilatchWhite,
-                                fontSize = 22.sp,
-                                isPlaying = isPlaying,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                MarqueeText(
+                                    text = displayTitle,
+                                    color = SnepilatchWhite,
+                                    fontSize = 22.sp,
+                                    isPlaying = isPlaying,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                )
+                                // The web player's enhance badge on a smart shuffle recommendation (#837).
+                                if (track?.isRecommended == true) {
+                                    Icon(
+                                        Icons.Rounded.AutoAwesome,
+                                        stringResource(R.string.shuffle),
+                                        tint = secondaryText,
+                                        modifier = Modifier.padding(start = 8.dp).size(18.dp)
+                                    )
+                                }
+                            }
                             Spacer(Modifier.height(2.dp))
                             MarqueeText(
                                 text = displayArtist,
@@ -1048,13 +1070,36 @@ private fun ShuffleButton(vm: PlaybackViewModel, size: Dp, buttonBg: Color, acce
     val isShuffling by vm.isShufflingFlow.collectAsState()
     val shuffleMode by vm.shuffleModeFlow.collectAsState()
     val canToggleShuffle by vm.canToggleShuffleFlow.collectAsState()
+    val recommended = vm.currentTrack.collectAsState().value?.isRecommended == true
     TonalIconToggle(isShuffling, { vm.toggleShuffle() }, size, buttonBg, accent, enabled = canToggleShuffle) {
         Icon(
             if (shuffleMode == "smart") ImageVector.vectorResource(R.drawable.ic_shuffle_smart) else Icons.Rounded.Shuffle,
             stringResource(R.string.shuffle),
-            modifier = Modifier.size(iconSize)
+            modifier = Modifier.size(iconSize).then(if (recommended) flowingRainbow() else Modifier)
         )
     }
+}
+
+private val RAINBOW = listOf(Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta, Color.Red)
+private const val RAINBOW_TURN_MS = 3_000
+
+/** Paints what it wraps in a turning rainbow. The turn is read while drawing, so nothing composes again per frame. */
+@Composable
+private fun flowingRainbow(): Modifier {
+    val turn = rememberInfiniteTransition(label = "rainbow").animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(RAINBOW_TURN_MS, easing = LinearEasing)),
+        label = "rainbowTurn",
+    )
+    return Modifier
+        .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+        .drawWithContent {
+            drawContent()
+            rotate(turn.value) {
+                drawRect(Brush.sweepGradient(RAINBOW), Offset(-size.width, -size.height), size * 3f, blendMode = BlendMode.SrcAtop)
+            }
+        }
 }
 
 @Composable

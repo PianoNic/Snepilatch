@@ -127,7 +127,38 @@ object OfflinePlayer {
         _state.value = OfflinePlayback(
             tracks, index, isPlaying = true, durationMs = track.durationMs, shuffle = shuffle, repeat = repeat, contextUri = contextUri,
         )
+        armNextMix()
         return true
+    }
+
+    /**
+     * Set up the mix into the next track of the list (#1075), when crossfade is on. As in the reference
+     * client: none between tracks of one album, which play gapless, and none under repeat track.
+     */
+    private fun armNextMix() {
+        val svc = service() ?: return
+        val s = _state.value
+        val nextIndex = s?.let { mixNextIndex(it) }
+        val next = nextIndex?.let { s.tracks[it] }
+        val url = next?.let { localFile(it.uri, it.name.ifBlank { "Unknown" }, it.artist.ifBlank { "Unknown" }) }
+        val trackMs = s?.current?.durationMs ?: 0L
+        val overlap = MixCurve.overlapMs(CrossfadeSetting.seconds.value * MS_PER_SECOND, trackMs)
+        if (next == null || url == null || overlap <= 0) {
+            svc.mixer.disarm()
+            return
+        }
+        svc.mixer.arm(url, TrackMixer.Next(next.name, next.artist, next.albumArt), trackMs, overlap) {
+            _state.update { it?.copy(index = nextIndex, isPlaying = true, durationMs = next.durationMs) }
+            armNextMix()
+        }
+    }
+
+    /** The list index a mix goes into, or null when the song should end as it is. */
+    private fun mixNextIndex(s: OfflinePlayback): Int? {
+        if (s.repeat == "track") return null
+        val index = if (s.index + 1 < s.tracks.size) s.index + 1 else if (s.repeat == "context") 0 else return null
+        val album = s.current?.albumName
+        return index.takeUnless { !album.isNullOrBlank() && album == s.tracks[index].albumName }
     }
 
     /** ExoPlayer knows the real length once the file is open; the index may not have had it. */
@@ -207,6 +238,7 @@ object OfflinePlayer {
             s.copy(tracks = s.tracks.toMutableList().apply { removeAt(at) })
         }
         unshuffled = unshuffled.filterNot { it.uri == track.uri }
+        armNextMix()
     }
 
     /** Move [track] to [toUpcomingIndex] among what is still to come. */
@@ -220,6 +252,7 @@ object OfflinePlayer {
             upcoming.add(to, upcoming.removeAt(from))
             s.copy(tracks = s.tracks.take(s.index + 1) + upcoming)
         }
+        armNextMix()
     }
 
     /** Shuffle keeps the current track where it is and mixes the rest; off restores the tapped order. */
@@ -235,6 +268,7 @@ object OfflinePlayer {
                 s.copy(tracks = unshuffled, index = index, shuffle = false)
             }
         }
+        armNextMix()
     }
 
     /** The web player's cycle: off, context, track, off. */
@@ -249,9 +283,11 @@ object OfflinePlayer {
                 }
             )
         }
+        armNextMix()
     }
 
     fun clear() {
+        service()?.mixer?.cancel()
         _state.value = null
         unshuffled = emptyList()
     }
@@ -261,4 +297,5 @@ object OfflinePlayer {
 
     private const val TAG = "OfflinePlayer"
     private const val PREV_RESTART_THRESHOLD_MS = 3000L
+    private const val MS_PER_SECOND = 1000L
 }

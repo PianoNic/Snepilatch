@@ -552,4 +552,7 @@
         <item quantity="one">%1$d song</item>
         <item quantity="other">%1$d songs</item>
     </plurals>
+    <string name="crossfade">Crossfade</string>
+    <string name="crossfade_description">Blend songs played from your files into each other</string>
+    <string name="crossfade_seconds">%1$d s overlap</string>
 </resources>

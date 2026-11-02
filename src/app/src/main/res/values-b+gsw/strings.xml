@@ -562,4 +562,7 @@
         <item quantity="one">%1$d Song</item>
         <item quantity="other">%1$d Songs</item>
     </plurals>
+    <string name="crossfade">Crossfade</string>
+    <string name="crossfade_description">Songs us dine Dateie inenand überblände</string>
+    <string name="crossfade_seconds">%1$d s Überblendig</string>
 </resources>

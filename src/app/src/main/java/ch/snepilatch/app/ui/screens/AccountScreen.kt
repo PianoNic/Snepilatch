@@ -364,6 +364,7 @@ fun AccountScreen(vm: PlaybackViewModel) {
         )
 
         LocalFilesSettings(animatedPrimary)
+        CrossfadeSetting(animatedPrimary)
 
         // Storage limit: 0 = unlimited.
         val downloadCapGb by AppSettings.downloadCapGb.collectAsState()
@@ -859,4 +860,28 @@ private fun LocalFilesSettings(accent: Color) {
         icon = Icons.Rounded.Add,
         onClick = { picker.launch(null) },
     )
+}
+
+/** Crossfade for songs played from files (#1075): off by default, 5 s when turned on, up to 12 s as in the reference client. */
+@Composable
+private fun CrossfadeSetting(accent: Color) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val seconds by ch.snepilatch.app.logic.playback.CrossfadeSetting.seconds.collectAsState()
+    SettingToggleRow(
+        title = stringResource(R.string.crossfade),
+        checked = seconds > 0,
+        onCheckedChange = { ch.snepilatch.app.logic.playback.CrossfadeSetting.set(if (it) 5 else 0, context) },
+        accent = accent,
+        subtitle = if (seconds > 0) stringResource(R.string.crossfade_seconds, seconds) else stringResource(R.string.crossfade_description),
+        icon = Icons.Rounded.GraphicEq,
+    )
+    if (seconds > 0) {
+        Slider(
+            value = seconds.toFloat(),
+            onValueChange = { ch.snepilatch.app.logic.playback.CrossfadeSetting.set(it.toInt(), context) },
+            valueRange = 1f..12f,
+            steps = 10,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+    }
 }

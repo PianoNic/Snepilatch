@@ -552,4 +552,7 @@
         <item quantity="one">%1$d Song</item>
         <item quantity="other">%1$d Songs</item>
     </plurals>
+    <string name="crossfade">Crossfade</string>
+    <string name="crossfade_description">Songs aus deinen Dateien ineinander überblenden</string>
+    <string name="crossfade_seconds">%1$d s Überblendung</string>
 </resources>

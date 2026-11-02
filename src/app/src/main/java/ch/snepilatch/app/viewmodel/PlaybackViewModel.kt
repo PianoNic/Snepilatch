@@ -3677,12 +3677,13 @@ class PlaybackViewModel(
             // avoids racing the state machine and fixes DRM_LICENSE_ACQUISITION_FAILED on podcasts.
             if (resolveEpisodeViaSoundfinder(trackUri, title, artist, art, resolveStart)) return
 
-            var fileId = event.currentFileId ?: latestFileId
+            // Only this episode's id: the last one seen may be the track that was still loading (#712).
+            var fileId = fileIdForTrack(event.currentFileId, trackUri)
             var externalUrl = externalUrlByUri[trackUri]
             if (fileId == null && externalUrl == null) {
                 // Either callback can land just after onTrackChange — give them a moment.
-                pollFor(8) { latestFileId != null || externalUrlByUri[trackUri] != null }
-                fileId = latestFileId
+                pollFor(8) { fileIdForTrack(null, trackUri) != null || externalUrlByUri[trackUri] != null }
+                fileId = fileIdForTrack(null, trackUri)
                 externalUrl = externalUrlByUri[trackUri]
             }
 

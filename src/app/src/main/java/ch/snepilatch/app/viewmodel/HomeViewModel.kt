@@ -116,8 +116,9 @@ class HomeViewModel : SessionViewModel("HomeVM") {
 
     /**
      * A playlist the feed shows changed: the daylist renames itself and changes its cover through the day.
-     * The web player reloads a shown playlist on its `hm://playlist/v2/playlist` push, so the feed is asked
-     * for again rather than showing the old name until it goes stale (#1057).
+     * Ours, not the web player's: only its open playlist page and playing context follow the
+     * `hm://playlist/v2/playlist` push, its home does not. Asked for again here so the name is current
+     * at once rather than once the feed goes stale (#1057).
      */
     private fun subscribeToPushes() {
         viewModelScope.launch {

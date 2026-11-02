@@ -101,7 +101,8 @@ class LibraryViewModel : SessionViewModel("LibraryVM") {
             subscribedTo = player
             player.onRootlistChange { viewModelScope.launch { refresh.request() } }
             // A listed playlist changed in itself: the daylist renames itself and changes its cover through
-            // the day, which moves no rootlist. The web player reloads a shown playlist on its push (#1057).
+            // the day, which moves no rootlist. Ours, not the web player's: its library does not follow this
+            // push, only its open playlist page and playing context do (#1057).
             player.onPlaylistChange { change ->
                 if (_library.value.any { it.uri == change.uri }) viewModelScope.launch { refresh.request() }
             }

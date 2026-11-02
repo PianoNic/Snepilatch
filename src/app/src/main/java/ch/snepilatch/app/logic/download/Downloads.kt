@@ -42,7 +42,12 @@ data class DownloadedTrack(
     val albumArtist: String? = null,
     val trackNumber: Int = 0,
     val discNumber: Int = 0,
+    /** Where it sits in the playlist or album it was downloaded from, from 1; 0 when not known (#799). */
+    val contextPosition: Int = 0,
 )
+
+/** A context's rows in the order they have there. Stable: rows of no known place keep their order, behind none. */
+fun List<DownloadedTrack>.inContextOrder(): List<DownloadedTrack> = sortedBy { it.contextPosition }
 
 /** The row as the screens and the offline player see it. */
 fun DownloadedTrack.toTrackInfo() =
@@ -68,7 +73,7 @@ const val OFFLINE_ALBUM = "offline:album:"
 object Downloads {
 
     private const val DB_NAME = "downloads.db"
-    private const val DB_VERSION = 9
+    private const val DB_VERSION = 10
     private const val TABLE = "downloads"
 
     private var helper: Helper? = null
@@ -141,7 +146,8 @@ object Downloads {
                     album TEXT,
                     album_artist TEXT,
                     track_number INTEGER NOT NULL DEFAULT 0,
-                    disc_number INTEGER NOT NULL DEFAULT 0
+                    disc_number INTEGER NOT NULL DEFAULT 0,
+                    context_position INTEGER NOT NULL DEFAULT 0
                 )
                 """.trimIndent()
             )
@@ -173,6 +179,8 @@ object Downloads {
             // v8 knows which files were checked for missing tags. Older rows count as not: a download of the
             // app's own can lack them too, so each is checked once when the user migrates.
             if (oldVersion < 8) addColumn(db, "tags_checked INTEGER NOT NULL DEFAULT 0")
+            // v10 knows a download's place in its playlist or album (#799). Older rows have none.
+            if (oldVersion < 10) addColumn(db, "context_position INTEGER NOT NULL DEFAULT 0")
             // The album fields came later (#1038): every file is looked at once more, so the next migration adds them.
             if (oldVersion < 9) {
                 db.execSQL("UPDATE $TABLE SET tags_checked = 0")
@@ -388,6 +396,7 @@ object Downloads {
         put("album_artist", albumArtist)
         put("track_number", trackNumber)
         put("disc_number", discNumber)
+        put("context_position", contextPosition)
     }
 
     private fun android.database.Cursor.toTrack() = DownloadedTrack(
@@ -413,6 +422,7 @@ object Downloads {
         albumArtist = getStringOrNull("album_artist"),
         trackNumber = getInt(getColumnIndexOrThrow("track_number")),
         discNumber = getInt(getColumnIndexOrThrow("disc_number")),
+        contextPosition = getInt(getColumnIndexOrThrow("context_position")),
     )
 
     private fun android.database.Cursor.getStringOrNull(column: String): String? =

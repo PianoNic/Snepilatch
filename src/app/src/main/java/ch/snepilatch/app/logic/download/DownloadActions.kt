@@ -33,6 +33,7 @@ object DownloadActions {
         contextName: String? = null,
         contextType: String? = null,
         contextImageUrl: String? = null,
+        contextPosition: Int = 0,
     ) = DownloadRequest(
         trackUri = uri,
         title = name,
@@ -49,6 +50,7 @@ object DownloadActions {
         contextName = contextName,
         contextType = contextType,
         contextImageUrl = contextImageUrl,
+        contextPosition = contextPosition,
     )
 
     /** Tells the user a download went nowhere because there is still no folder to put it in. */
@@ -241,6 +243,7 @@ object DownloadActions {
                                 contextName = contextName,
                                 contextType = contextType,
                                 contextImageUrl = contextImageUrl,
+                                contextPosition = index + 1,
                             ),
                             ctx,
                             notify = false,

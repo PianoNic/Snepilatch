@@ -2,6 +2,7 @@ package ch.snepilatch.app.logic.playback
 
 import ch.snepilatch.app.data.TrackInfo
 import ch.snepilatch.app.logic.download.Downloads
+import ch.snepilatch.app.logic.download.inContextOrder
 import ch.snepilatch.app.logic.download.offlineAlbum
 import ch.snepilatch.app.logic.download.toTrackInfo
 import ch.snepilatch.app.logic.shared.LokiLogger
@@ -84,6 +85,7 @@ object OfflinePlayer {
                 rows.filter { it.offlineAlbum() == contextUri }.sortedWith(compareBy({ it.discNumber }, { it.trackNumber }))
             } else {
                 rows.filter { contextUri == null || it.contextUri == contextUri }
+                    .let { if (contextUri != null) it.inContextOrder() else it }
             }
             ).map { it.toTrackInfo() }
             .takeIf { rows -> rows.any { it.uri == track.uri } }

@@ -6,6 +6,7 @@ import ch.snepilatch.app.data.PlaybackUiState
 import ch.snepilatch.app.data.TrackInfo
 import ch.snepilatch.app.logic.download.Downloads
 import ch.snepilatch.app.logic.download.LocalFiles
+import ch.snepilatch.app.logic.download.inContextOrder
 import ch.snepilatch.app.logic.download.toTrackInfo
 import ch.snepilatch.app.logic.shared.LokiLogger
 import ch.snepilatch.app.logic.shared.NetworkState
@@ -244,7 +245,8 @@ class OfflineController(private val scope: CoroutineScope, private val hooks: Ho
         val fromQueue = queue.filter { Downloads.isDownloaded(index, it.uri, it.name, it.artist) }
         val seen = (fromQueue.map { it.uri } + current.uri).toMutableSet()
         val fromContext = contextUri?.let { ctx ->
-            Downloads.rows.value.filter { it.contextUri == ctx && seen.add(it.trackUri) }.map { it.toTrackInfo() }
+            Downloads.rows.value.filter { it.contextUri == ctx }.inContextOrder()
+                .filter { seen.add(it.trackUri) }.map { it.toTrackInfo() }
         }.orEmpty()
         return fromQueue + fromContext
     }

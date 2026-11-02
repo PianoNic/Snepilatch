@@ -66,14 +66,12 @@ import ch.snepilatch.app.ui.theme.*
 import ch.snepilatch.app.logic.shared.formatTime
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.snepilatch.app.logic.shared.ThemeController
-import ch.snepilatch.app.viewmodel.LibraryViewModel
 import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.logic.shared.PlayerButtonSettings
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
 import ch.snepilatch.app.viewmodel.canRemovePlayingFromPlaylist
 import ch.snepilatch.app.viewmodel.removePlayingFromPlaylist
 import ch.snepilatch.app.ui.shared.LikeToggleButton
-import ch.snepilatch.app.ui.shared.PlaylistPickerDialog
 import ch.snepilatch.app.ui.shared.PlayerAction
 import ch.snepilatch.app.ui.shared.PlayerOverlay
 import ch.snepilatch.app.ui.shared.rememberPlayerActions
@@ -398,7 +396,6 @@ fun NowPlayingScreen(
     /** Drag release with vertical velocity (px/s) so the morph can settle. */
     onMorphDragEnd: ((Float) -> Unit)? = null
 ) {
-    val libraryVm: LibraryViewModel = viewModel()
     // Narrow projections only — positionMs (the 2Hz field) is read exclusively inside PlaybackProgress,
     // so the ~400-line orientation Columns below never recompose on position ticks.
     val track by vm.currentTrack.collectAsState()
@@ -442,12 +439,11 @@ fun NowPlayingScreen(
     )
 
     var showMore by remember { mutableStateOf(false) }
-    var showPlaylistPicker by remember { mutableStateOf(false) }
     var showJam by remember { mutableStateOf(false) }
     var showCode by remember { mutableStateOf(false) }
     val playerActions = rememberPlayerActions(vm, track) {
         when (it) {
-            PlayerOverlay.PlaylistPicker -> showPlaylistPicker = true
+            PlayerOverlay.PlaylistPicker -> track?.uri?.let(vm::showPlaylistPickerForTrack)
             PlayerOverlay.Jam -> showJam = true
             PlayerOverlay.Code -> showCode = true
         }
@@ -842,18 +838,6 @@ fun NowPlayingScreen(
     }
     if (showCode) {
         track?.let { ch.snepilatch.app.ui.shared.ScannableCodeSheet(it, animatedPrimary) { showCode = false } }
-    }
-
-    if (showPlaylistPicker) {
-        val libraryItems by libraryVm.library.collectAsState()
-        PlaylistPickerDialog(
-            playlists = libraryItems.filter { it.type == "playlist" },
-            onPick = { playlist ->
-                track?.uri?.let { uri -> vm.addTrackToPlaylist(playlist.uri.removePrefix("spotify:playlist:"), uri) }
-                showPlaylistPicker = false
-            },
-            onDismiss = { showPlaylistPicker = false },
-        )
     }
 }
 

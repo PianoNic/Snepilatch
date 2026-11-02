@@ -556,4 +556,17 @@
         <item quantity="many">%1$d песен</item>
         <item quantity="other">%1$d песни</item>
     </plurals>
+    <string name="saved_in">Сохранено в</string>
+    <string name="done">Готово</string>
+    <string name="changes_saved">Изменения сохранены</string>
+    <string name="removed_from_named">Удалено из «%1$s»</string>
+    <string name="saved_in_search">Найти плейлист</string>
+    <string name="duplicate_title">Уже добавлено</string>
+    <string name="duplicate_some_title">Часть уже добавлена</string>
+    <string name="duplicate_all">Эти треки уже есть в «%1$s».</string>
+    <string name="duplicate_some">Некоторые из этих треков уже есть в «%1$s».</string>
+    <string name="duplicate_dont_add">Не добавлять</string>
+    <string name="duplicate_add_anyway">Всё равно добавить</string>
+    <string name="duplicate_add_new">Добавить только новые</string>
+    <string name="duplicate_add_all">Добавить все</string>
 </resources>

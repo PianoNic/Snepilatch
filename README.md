@@ -5,7 +5,7 @@
 <h1 align="center">Snepilatch</h1>
 
 <p align="center">
-  <strong>A simple, open-source music streaming app for Android.</strong>
+  <strong>A simple but feature-rich, open-source music streaming app for Android.</strong>
 </p>
 
 <p align="center">

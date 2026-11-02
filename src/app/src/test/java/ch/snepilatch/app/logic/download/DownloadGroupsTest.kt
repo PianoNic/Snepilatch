@@ -70,4 +70,16 @@ class DownloadGroupsTest {
         assertEquals(2, groups.first().trackCount)
         assertEquals(album, groups.first().uri)
     }
+
+    @Test
+    fun aListPlaysInItsOwnOrder_andRowsOfNoKnownPlaceKeepTheirs() {
+        val rows = listOf(
+            row("a", "a").copy(contextPosition = 3),
+            row("b", "b").copy(contextPosition = 1),
+            row("c", "c").copy(contextPosition = 2),
+        )
+        assertEquals(listOf("b", "c", "a"), rows.inContextOrder().map { it.trackUri })
+        val unknown = listOf(row("x", "x"), row("y", "y"))
+        assertEquals(listOf("x", "y"), unknown.inContextOrder().map { it.trackUri })
+    }
 }

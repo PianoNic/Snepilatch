@@ -30,6 +30,7 @@ data class DownloadRequest(
     val contextName: String? = null,
     val contextType: String? = null,
     val contextImageUrl: String? = null,
+    val contextPosition: Int = 0,
     /**
      * Decoded audio already taken off the player, used instead of fetching anything. Set on the
      * track-change path, where the capture has to be claimed before the next track overwrites it.
@@ -237,9 +238,12 @@ object TrackDownloader {
         val image = request.contextImageUrl
         val adoptImage = existing.contextImageUrl == null && image != null && existing.contextUri == request.contextUri
         val claim = existing.auto && !request.localOnly
-        if (!adoptImage && !claim) return existing
+        // Downloading a list again gives what is already there its place in it (#799).
+        val place = if (existing.contextUri == request.contextUri && request.contextPosition > 0) request.contextPosition else existing.contextPosition
+        if (!adoptImage && !claim && place == existing.contextPosition) return existing
         return existing.copy(
             contextImageUrl = if (adoptImage) image else existing.contextImageUrl,
+            contextPosition = place,
             auto = existing.auto && !claim,
         ).also(Downloads::put)
     }
@@ -439,6 +443,7 @@ object TrackDownloader {
             contextName = request.contextName,
             contextType = request.contextType,
             contextImageUrl = request.contextImageUrl,
+            contextPosition = request.contextPosition,
             sizeBytes = written,
             title = request.title,
             artist = request.artist,

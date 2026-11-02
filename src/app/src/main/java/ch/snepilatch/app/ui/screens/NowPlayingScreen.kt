@@ -16,13 +16,12 @@ import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.animateFloat
@@ -766,6 +765,7 @@ fun NowPlayingScreen(
                                     fontSize = 22.sp,
                                     isPlaying = isPlaying,
                                     fontWeight = FontWeight.Bold,
+                                    fillWidth = false,
                                     modifier = Modifier.weight(1f, fill = false)
                                 )
                                 // The web player's enhance badge on a smart shuffle recommendation (#837).
@@ -965,7 +965,7 @@ private fun TonalIconBtn(onClick: () -> Unit, size: Dp, buttonBg: Color, enabled
 private fun TonalIconToggle(
     checked: Boolean,
     onToggle: () -> Unit,
-    size: Dp,
+    modifier: Modifier,
     buttonBg: Color,
     accent: Color,
     enabled: Boolean = true,
@@ -975,7 +975,7 @@ private fun TonalIconToggle(
         checked = checked,
         onCheckedChange = { onToggle() },
         enabled = enabled,
-        modifier = Modifier.size(size),
+        modifier = modifier,
         colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
             containerColor = buttonBg,
             contentColor = SnepilatchWhite,
@@ -1071,19 +1071,26 @@ private fun ShuffleButton(vm: PlaybackViewModel, size: Dp, buttonBg: Color, acce
     val shuffleMode by vm.shuffleModeFlow.collectAsState()
     val canToggleShuffle by vm.canToggleShuffleFlow.collectAsState()
     val recommended = vm.currentTrack.collectAsState().value?.isRecommended == true
-    TonalIconToggle(isShuffling, { vm.toggleShuffle() }, size, buttonBg, accent, enabled = canToggleShuffle) {
+    val rainbow = recommended && shuffleMode == "smart"
+    TonalIconToggle(
+        isShuffling, { vm.toggleShuffle() }, Modifier.size(size).then(if (rainbow) flowingRainbow() else Modifier),
+        if (rainbow) Color.Transparent else buttonBg,
+        if (rainbow) Color.Transparent else accent,
+        enabled = canToggleShuffle,
+    ) {
         Icon(
             if (shuffleMode == "smart") ImageVector.vectorResource(R.drawable.ic_shuffle_smart) else Icons.Rounded.Shuffle,
             stringResource(R.string.shuffle),
-            modifier = Modifier.size(iconSize).then(if (recommended) flowingRainbow() else Modifier)
+            modifier = Modifier.size(iconSize)
         )
     }
 }
 
 private val RAINBOW = listOf(Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta, Color.Red)
 private const val RAINBOW_TURN_MS = 3_000
+private const val RAINBOW_ALPHA = 0.7f
 
-/** Paints what it wraps in a turning rainbow. The turn is read while drawing, so nothing composes again per frame. */
+/** A round background of a turning rainbow. The turn is read while drawing, so nothing composes again per frame. */
 @Composable
 private fun flowingRainbow(): Modifier {
     val turn = rememberInfiniteTransition(label = "rainbow").animateFloat(
@@ -1092,21 +1099,25 @@ private fun flowingRainbow(): Modifier {
         animationSpec = infiniteRepeatable(tween(RAINBOW_TURN_MS, easing = LinearEasing)),
         label = "rainbowTurn",
     )
-    return Modifier
-        .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
-        .drawWithContent {
-            drawContent()
-            rotate(turn.value) {
-                drawRect(Brush.sweepGradient(RAINBOW), Offset(-size.width, -size.height), size * 3f, blendMode = BlendMode.SrcAtop)
-            }
+    return Modifier.clip(CircleShape).drawBehind {
+        rotate(turn.value) {
+            drawRect(Brush.sweepGradient(RAINBOW), Offset(-size.width, -size.height), size * 3f, alpha = RAINBOW_ALPHA)
         }
+    }
 }
 
 @Composable
 private fun RepeatButton(vm: PlaybackViewModel, size: Dp, buttonBg: Color, accent: Color, iconSize: Dp) {
     val repeatMode by vm.repeatModeFlow.collectAsState()
     val canToggleRepeat by vm.canToggleRepeatFlow.collectAsState()
-    TonalIconToggle(repeatMode != "off", { vm.cycleRepeat() }, size, buttonBg, accent, enabled = canToggleRepeat) {
+    TonalIconToggle(
+        repeatMode != "off",
+        { vm.cycleRepeat() },
+        Modifier.size(size),
+        buttonBg,
+        accent,
+        enabled = canToggleRepeat,
+    ) {
         Icon(
             when (repeatMode) { "track" -> Icons.Rounded.RepeatOne; else -> Icons.Rounded.Repeat },
             stringResource(R.string.repeat),
@@ -1315,6 +1326,7 @@ private fun MarqueeText(
     fontSize: androidx.compose.ui.unit.TextUnit,
     isPlaying: Boolean,
     fontWeight: FontWeight? = null,
+    fillWidth: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     // Same behaviour as the basicMarquee this replaces — the title drives all the way through, a
@@ -1361,7 +1373,8 @@ private fun MarqueeText(
         }
     }
 
-    Box(modifier.fillMaxWidth().clipToBounds().onSizeChanged { boxWidth = it.width }) {
+    val width = if (fillWidth) Modifier.fillMaxWidth() else Modifier
+    Box(modifier.then(width).clipToBounds().onSizeChanged { boxWidth = it.width }) {
         Row(
             Modifier
                 .wrapContentWidth(Alignment.Start, unbounded = true)

@@ -39,6 +39,7 @@ class OfflineShortOutageTest {
         override val nextPreview = MutableStateFlow<TrackInfo?>(null)
         override val prevPreview = MutableStateFlow<TrackInfo?>(null)
         override val isOffline = MutableStateFlow(false)
+        override val engineOwnsPlayback get() = isOffline.value
         val playCommands = mutableListOf<String>()
         val reports = mutableListOf<Pair<Long, Boolean>>()
         override fun hasSession() = true

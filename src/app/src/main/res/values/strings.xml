@@ -538,4 +538,18 @@
     <string name="remove_from_your_episodes">Remove from Your Episodes</string>
     <string name="skip_back_15">Back 15 seconds</string>
     <string name="skip_forward_15">Forward 15 seconds</string>
+    <string name="local_files">Local Files</string>
+    <string name="local_files_show">Show Local Files</string>
+    <string name="local_files_description">Play music from folders on this phone</string>
+    <string name="local_files_add_source">Add a source</string>
+    <string name="local_files_remove_source">Remove source</string>
+    <string name="local_files_scanning">Looking through your folders…</string>
+    <string name="local_files_empty_header">Listen to local files</string>
+    <string name="local_files_empty_description">Turn on local files in the settings and add a folder.</string>
+    <string name="local_files_empty_button">Go to Settings</string>
+    <string name="local_files_is_download_folder">That is the download folder. Its songs are already in your downloads</string>
+    <plurals name="local_files_count">
+        <item quantity="one">%1$d song</item>
+        <item quantity="other">%1$d songs</item>
+    </plurals>
 </resources>

@@ -1,5 +1,6 @@
 package ch.snepilatch.app.logic.playback
 
+import ch.snepilatch.app.logic.download.LocalFiles
 import ch.snepilatch.app.logic.download.DownloadFolder
 import ch.snepilatch.app.logic.download.Downloads
 import ch.snepilatch.app.logic.shared.LokiLogger
@@ -76,6 +77,10 @@ object AudioSourceResolver {
      * the folder is dropped rather than played.
      */
     fun localOrNull(trackUri: String, title: String? = null, artist: String? = null): StreamResult? {
+        if (trackUri.startsWith(LocalFiles.URI_PREFIX)) {
+            val file = LocalFiles.find(trackUri) ?: return null
+            return StreamResult.Success(StreamInfo(url = file.documentUri, provider = LOCAL_PROVIDER, mimeType = file.mimeType))
+        }
         // Without a folder there is nothing to open. The grant can be revoked from system settings,
         // and then exists() throws a SecurityException that reads back as "cannot tell" below — which
         // would hand playback an unopenable document uri and burn a playback-error retry per track.

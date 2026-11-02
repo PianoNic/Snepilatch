@@ -8,6 +8,7 @@ import androidx.annotation.StringRes
 import ch.snepilatch.app.R
 import ch.snepilatch.app.data.UiMessage
 import ch.snepilatch.app.logic.download.toTrackInfo
+import ch.snepilatch.app.logic.download.LocalFiles
 import ch.snepilatch.app.logic.playback.OfflineController
 import ch.snepilatch.app.logic.playback.OfflinePlayer
 import ch.snepilatch.app.logic.playback.PhoneVolume
@@ -113,6 +114,10 @@ class PlaybackViewModel(
 
     /** Set instead of [initError] so the UI still renders; only downloaded tracks play. */
     val isOffline = MutableStateFlow(false)
+
+    /** A local file is playing (#1070): the offline engine has it while the network is fine. */
+    val localPlayback = MutableStateFlow(false)
+    private val engineOwnsPlayback get() = isOffline.value || localPlayback.value
     val initError = MutableStateFlow<UiMessage?>(null)
     val rateLimitCooldown = MutableStateFlow(false)
     val cooldownSeconds = MutableStateFlow(0)
@@ -332,7 +337,7 @@ class PlaybackViewModel(
         playback = _playback,
         isStreaming = isStreaming,
         getExoPositionMs = { MusicPlaybackService.instance?.getCurrentPosition() },
-        reportPosition = { pos -> if (!isOffline.value) player?.reportPosition(pos, _playback.value.isPaused) }
+        reportPosition = { pos -> if (!engineOwnsPlayback) player?.reportPosition(pos, _playback.value.isPaused) }
     )
     private var commandJob: Job? = null
     private var userPlayJob: Job? = null  // Cancel an in-flight user-initiated play when another track is tapped
@@ -396,6 +401,7 @@ class PlaybackViewModel(
             override val nextPreview get() = nextTrackPreview
             override val prevPreview get() = prevTrackPreview
             override val isOffline get() = this@PlaybackViewModel.isOffline
+            override val engineOwnsPlayback get() = this@PlaybackViewModel.engineOwnsPlayback
             override fun hasSession() = session != null
             override fun playingContextUri() = playingContext.value?.uri
             override fun trackChanged(track: TrackInfo) {
@@ -946,17 +952,17 @@ class PlaybackViewModel(
 
         // A remote-only relay guest shows the host's playback (RelayRemoteView), not this account's own.
         pc.onState { state ->
-            if (isOffline.value || RelayJam.remoteOnly) return@onState
+            if (engineOwnsPlayback || RelayJam.remoteOnly) return@onState
             val delta = if (lastCommandTs > 0) System.currentTimeMillis() - lastCommandTs else -1
             LokiLogger.i(TAG, "[Timing] WS onState arrived (${delta}ms after CMD '$lastCommandName')")
             viewModelScope.launch { updatePlaybackFromState(state) }
         }
 
-        pc.onTrackChange { event -> if (!isOffline.value && !RelayJam.remoteOnly) handleTrackChange(event) }
+        pc.onTrackChange { event -> if (!engineOwnsPlayback && !RelayJam.remoteOnly) handleTrackChange(event) }
 
-        pc.onPlay { state -> if (!isOffline.value && !RelayJam.remoteOnly) handleRemotePlay(state.position_as_of_timestamp) }
+        pc.onPlay { state -> if (!engineOwnsPlayback && !RelayJam.remoteOnly) handleRemotePlay(state.position_as_of_timestamp) }
 
-        pc.onPause { state -> if (!isOffline.value && !RelayJam.remoteOnly) handleRemotePause(state.position_as_of_timestamp) }
+        pc.onPause { state -> if (!engineOwnsPlayback && !RelayJam.remoteOnly) handleRemotePause(state.position_as_of_timestamp) }
 
         pc.onReconnected {
             offline.onDealerReconnected()
@@ -1316,7 +1322,7 @@ class PlaybackViewModel(
     }
 
     private suspend fun updatePlaybackFromState(state: PlayerStateData) {
-        if (isOffline.value) return
+        if (engineOwnsPlayback) return
         SessionHolder.playerState.value = state
         val track = state.track
         val imageUrl = normalizeSpfyImageUrl(
@@ -1642,7 +1648,7 @@ class PlaybackViewModel(
     private fun setPlaying(play: Boolean) {
         if (RelayJam.redirect(RelayCommand(if (play) RelayCommand.RESUME else RelayCommand.PAUSE))) return
         commandJob?.cancel()
-        if (isOffline.value) {
+        if (engineOwnsPlayback) {
             commandJob = viewModelScope.launch(Dispatchers.IO) { OfflinePlayer.togglePlayPause() }
             return
         }
@@ -2041,7 +2047,7 @@ class PlaybackViewModel(
         streamProvider.value = provider
     }
 
-    private fun clearStream() {
+    internal fun clearStream() {
         isStreaming.value = false
         streamProvider.value = null
         currentStreamUri = null
@@ -2087,7 +2093,7 @@ class PlaybackViewModel(
 
     fun skipNext() {
         if (RelayJam.redirect(RelayCommand(RelayCommand.NEXT))) return
-        if (isOffline.value) {
+        if (engineOwnsPlayback) {
             commandJob?.cancel()
             commandJob = viewModelScope.launch(Dispatchers.IO) { OfflinePlayer.next() }
             return
@@ -2144,7 +2150,7 @@ class PlaybackViewModel(
     /** True when the track changes, false when the current one restarts instead. */
     fun skipPrevious(forceTrackChange: Boolean = false): Boolean {
         if (RelayJam.redirect(RelayCommand(RelayCommand.PREVIOUS))) return false
-        if (isOffline.value) {
+        if (engineOwnsPlayback) {
             commandJob?.cancel()
             commandJob = viewModelScope.launch(Dispatchers.IO) { OfflinePlayer.previous() }
             return false
@@ -2187,7 +2193,7 @@ class PlaybackViewModel(
         // Reflect the target immediately; ExoPlayer's getCurrentPosition() catches up once the
         // posted seek lands, and the position ticker then reads it straight from the player.
         _playback.value = _playback.value.copy(positionMs = positionMs)
-        if (isOffline.value) {
+        if (engineOwnsPlayback) {
             viewModelScope.launch(Dispatchers.IO) { OfflinePlayer.seekTo(positionMs) }
             return
         }
@@ -2233,7 +2239,7 @@ class PlaybackViewModel(
      * here too.
      */
     fun toggleShuffle() {
-        if (isOffline.value) {
+        if (engineOwnsPlayback) {
             OfflinePlayer.toggleShuffle()
             return
         }
@@ -2255,7 +2261,7 @@ class PlaybackViewModel(
 
     /** The web player's cycle: off, context, track, off, skipping a mode the server disallows. */
     fun cycleRepeat() {
-        if (isOffline.value) {
+        if (engineOwnsPlayback) {
             OfflinePlayer.cycleRepeat()
             return
         }
@@ -2388,6 +2394,11 @@ class PlaybackViewModel(
 
     /** [wholeContext]: play the list as the web player's play button does, naming no track, so the session's shuffle picks (#262). */
     internal suspend fun startUserPlayback(track: TrackInfo, contextUri: String?, trackIndex: Int? = null, wholeContext: Boolean = false) {
+        if (track.uri.startsWith(LocalFiles.URI_PREFIX)) {
+            startLocalPlayback(track)
+            return
+        }
+        if (localPlayback.value) leaveLocalPlayback()
         if (isOffline.value) {
             // No Connect to echo anything back: the offline engine plays it, with the list the row
             // came from as the queue, and its state is mirrored into the playback state (#789, #791).
@@ -2514,7 +2525,7 @@ class PlaybackViewModel(
     }
 
     fun skipToQueueIndex(index: Int) {
-        if (isOffline.value) {
+        if (engineOwnsPlayback) {
             viewModelScope.launch(Dispatchers.IO) { OfflinePlayer.jumpTo(index) }
             return
         }
@@ -2615,7 +2626,7 @@ class PlaybackViewModel(
 
     /** Hide immediately and drain rapid swipes without overlapping queue read/write pairs. */
     fun removeFromQueue(track: TrackInfo) {
-        if (isOffline.value) {
+        if (engineOwnsPlayback) {
             OfflinePlayer.remove(track)
             AppMessages.show(R.string.removed_from_queue)
             return
@@ -2634,7 +2645,7 @@ class PlaybackViewModel(
 
     /** Move a queue entry to [toDisplayedIndex], the position the drag ended on; see [planQueueMove]. */
     fun moveQueueEntry(track: TrackInfo, toDisplayedIndex: Int) {
-        if (isOffline.value) {
+        if (engineOwnsPlayback) {
             OfflinePlayer.move(track, toDisplayedIndex)
             return
         }
@@ -2741,6 +2752,7 @@ class PlaybackViewModel(
     }
 
     fun likeSong(trackId: String) {
+        if (localPlayback.value) return
         launchWithSession("likeSong", R.string.error_like, R.string.added_to_liked_songs) { sess ->
             Song(sess).likeSong(trackId)
             currentTrackLiked.value = true
@@ -2748,6 +2760,7 @@ class PlaybackViewModel(
     }
 
     fun unlikeSong(trackId: String) {
+        if (localPlayback.value) return
         launchWithSession("unlikeSong", R.string.error_like, R.string.removed_from_liked_songs) { sess ->
             Song(sess).unlikeSong(trackId)
             currentTrackLiked.value = false
@@ -2755,6 +2768,7 @@ class PlaybackViewModel(
     }
 
     private fun checkLikedState(trackUri: String) {
+        if (trackUri.startsWith(LocalFiles.URI_PREFIX)) return
         if (trackUri == lastLikeCheckUri) return
         lastLikeCheckUri = trackUri
         // isLiked is the track-library check; it doesn't apply to podcast episodes (a different API).
@@ -3007,7 +3021,7 @@ class PlaybackViewModel(
                 JamListenAlong.playbackFailed()
                 return@onError
             }
-            if (isOffline.value) {
+            if (engineOwnsPlayback) {
                 LokiLogger.w(TAG, "ExoPlayer error $errorCode while offline, treating the track as ended")
                 clearStream()
                 viewModelScope.launch(Dispatchers.IO) { OfflinePlayer.ended() }
@@ -3028,7 +3042,7 @@ class PlaybackViewModel(
             if (JamListenAlong.active.value) return@onEnded
             // A relay guest: Kotify held at the end, and the host's next track is played instead.
             if (RelayJam.trackEnded()) return@onEnded
-            if (isOffline.value) {
+            if (engineOwnsPlayback) {
                 viewModelScope.launch(Dispatchers.IO) { offline.trackEnded() }
                 return@onEnded
             }
@@ -3115,7 +3129,7 @@ class PlaybackViewModel(
             }
         } else {
             // Offline the index may not have known the length; the open file does.
-            if (isOffline.value) OfflinePlayer.durationKnown(MusicPlaybackService.instance?.loadedDurationMs() ?: 0L)
+            if (engineOwnsPlayback) OfflinePlayer.durationKnown(MusicPlaybackService.instance?.loadedDurationMs() ?: 0L)
             // A stream loaded without playWhenReady (a paused hand-back) is ready but silent; the
             // state is paused and stays paused, so Connect is told nothing.
             if (MusicPlaybackService.instance?.playWhenReady() == false) {
@@ -3126,7 +3140,7 @@ class PlaybackViewModel(
             startPositionTicker()
             // A hand-back is already playing as far as the server knows; resuming it again would
             // only report a state we are not in.
-            val resumeConnect = shouldResumeConnectOnReady() && !handBackPending
+            val resumeConnect = shouldResumeConnectOnReady() && !handBackPending && !localPlayback.value
             if (handBackPending) {
                 handBackPending = false
                 isStreamLoading.value = false

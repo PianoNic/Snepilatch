@@ -326,6 +326,15 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 .setAudioProcessors(arrayOf(infiniPlayTap, remixProcessor, gainProcessor))
                 .build()
         }
+        // Samsung's c2.sec.mp3.decoder came out distorted on local MP3s (#1070): Android's own decoder first.
+        renderersFactory.setMediaCodecSelector { mimeType, secure, tunneling ->
+            val decoders = androidx.media3.exoplayer.mediacodec.MediaCodecUtil.getDecoderInfos(mimeType, secure, tunneling)
+            if (mimeType == androidx.media3.common.MimeTypes.AUDIO_MPEG) {
+                decoders.sortedBy { !it.name.startsWith("c2.android.") && !it.name.startsWith("OMX.google.") }
+            } else {
+                decoders
+            }
+        }
 
         PlaybackCache.init(this)
 

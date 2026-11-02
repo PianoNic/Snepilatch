@@ -16,7 +16,13 @@ import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.runtime.withFrameNanos
@@ -749,13 +755,26 @@ fun NowPlayingScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(Modifier.weight(1f).padding(end = 12.dp)) {
-                            MarqueeText(
-                                text = displayTitle,
-                                color = SnepilatchWhite,
-                                fontSize = 22.sp,
-                                isPlaying = isPlaying,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                MarqueeText(
+                                    text = displayTitle,
+                                    color = SnepilatchWhite,
+                                    fontSize = 22.sp,
+                                    isPlaying = isPlaying,
+                                    fontWeight = FontWeight.Bold,
+                                    fillWidth = false,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                )
+                                // The web player's enhance badge on a smart shuffle recommendation (#837).
+                                if (track?.isRecommended == true) {
+                                    Icon(
+                                        Icons.Rounded.AutoAwesome,
+                                        stringResource(R.string.shuffle),
+                                        tint = secondaryText,
+                                        modifier = Modifier.padding(start = 8.dp).size(18.dp)
+                                    )
+                                }
+                            }
                             Spacer(Modifier.height(2.dp))
                             MarqueeText(
                                 text = displayArtist,
@@ -943,9 +962,9 @@ private fun TonalIconBtn(onClick: () -> Unit, size: Dp, buttonBg: Color, enabled
 private fun TonalIconToggle(
     checked: Boolean,
     onToggle: () -> Unit,
-    size: Dp,
+    modifier: Modifier,
     buttonBg: Color,
-    accent: Color,
+    checkedBg: Color,
     enabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
@@ -953,11 +972,11 @@ private fun TonalIconToggle(
         checked = checked,
         onCheckedChange = { onToggle() },
         enabled = enabled,
-        modifier = Modifier.size(size),
+        modifier = modifier,
         colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
             containerColor = buttonBg,
             contentColor = SnepilatchWhite,
-            checkedContainerColor = accent.copy(alpha = 0.45f),
+            checkedContainerColor = checkedBg,
             checkedContentColor = SnepilatchWhite,
         ),
     ) { content() }
@@ -1048,7 +1067,16 @@ private fun ShuffleButton(vm: PlaybackViewModel, size: Dp, buttonBg: Color, acce
     val isShuffling by vm.isShufflingFlow.collectAsState()
     val shuffleMode by vm.shuffleModeFlow.collectAsState()
     val canToggleShuffle by vm.canToggleShuffleFlow.collectAsState()
-    TonalIconToggle(isShuffling, { vm.toggleShuffle() }, size, buttonBg, accent, enabled = canToggleShuffle) {
+    val smart = shuffleMode == "smart"
+    val lit = accent.copy(alpha = 0.45f)
+    TonalIconToggle(
+        isShuffling,
+        { vm.toggleShuffle() },
+        Modifier.size(size).then(if (smart) smartShuffleRim(buttonBg) else Modifier),
+        if (smart) Color.Transparent else buttonBg,
+        if (smart) Color.Transparent else lit,
+        enabled = canToggleShuffle,
+    ) {
         Icon(
             if (shuffleMode == "smart") ImageVector.vectorResource(R.drawable.ic_shuffle_smart) else Icons.Rounded.Shuffle,
             stringResource(R.string.shuffle),
@@ -1057,11 +1085,56 @@ private fun ShuffleButton(vm: PlaybackViewModel, size: Dp, buttonBg: Color, acce
     }
 }
 
+private val RIM_COLORS = listOf(
+    Color(0xFFFF5C8A), Color(0xFFFFB25C), Color(0xFF6EDCA0), Color(0xFF5AAAFF), Color(0xFFB078FF), Color(0xFFFF5C8A),
+)
+private const val RIM_DEGREES_PER_SECOND = 45f
+
+/**
+ * Smart shuffle's button: [base] with a ring of colour turning slowly along its edge. The time is read
+ * while drawing, on every second frame, so nothing composes per frame (#856).
+ */
+@Composable
+private fun smartShuffleRim(base: Color): Modifier {
+    val seconds = remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(Unit) {
+        val start = withFrameNanos { it }
+        while (true) {
+            withFrameNanos { }
+            seconds.floatValue = withFrameNanos { (it - start) / 1_000_000_000f }
+        }
+    }
+    return Modifier
+        .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+        .clip(CircleShape)
+        .drawBehind {
+            rotate(seconds.floatValue * RIM_DEGREES_PER_SECOND % 360f) { drawCircle(Brush.sweepGradient(RIM_COLORS)) }
+            // Only the edge keeps its colour; the middle goes back to the button.
+            drawRect(
+                Brush.radialGradient(
+                    0.35f to Color.Black,
+                    0.97f to Color.Transparent,
+                    center = center,
+                    radius = size.width * 0.5f,
+                ),
+                blendMode = BlendMode.DstOut,
+            )
+            drawRect(base, blendMode = BlendMode.DstOver)
+        }
+}
+
 @Composable
 private fun RepeatButton(vm: PlaybackViewModel, size: Dp, buttonBg: Color, accent: Color, iconSize: Dp) {
     val repeatMode by vm.repeatModeFlow.collectAsState()
     val canToggleRepeat by vm.canToggleRepeatFlow.collectAsState()
-    TonalIconToggle(repeatMode != "off", { vm.cycleRepeat() }, size, buttonBg, accent, enabled = canToggleRepeat) {
+    TonalIconToggle(
+        repeatMode != "off",
+        { vm.cycleRepeat() },
+        Modifier.size(size),
+        buttonBg,
+        accent.copy(alpha = 0.45f),
+        enabled = canToggleRepeat,
+    ) {
         Icon(
             when (repeatMode) { "track" -> Icons.Rounded.RepeatOne; else -> Icons.Rounded.Repeat },
             stringResource(R.string.repeat),
@@ -1270,6 +1343,7 @@ private fun MarqueeText(
     fontSize: androidx.compose.ui.unit.TextUnit,
     isPlaying: Boolean,
     fontWeight: FontWeight? = null,
+    fillWidth: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     // Same behaviour as the basicMarquee this replaces — the title drives all the way through, a
@@ -1316,7 +1390,8 @@ private fun MarqueeText(
         }
     }
 
-    Box(modifier.fillMaxWidth().clipToBounds().onSizeChanged { boxWidth = it.width }) {
+    val width = if (fillWidth) Modifier.fillMaxWidth() else Modifier
+    Box(modifier.then(width).clipToBounds().onSizeChanged { boxWidth = it.width }) {
         Row(
             Modifier
                 .wrapContentWidth(Alignment.Start, unbounded = true)

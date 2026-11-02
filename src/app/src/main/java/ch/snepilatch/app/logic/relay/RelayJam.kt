@@ -338,6 +338,8 @@ object RelayJam {
         rememberInJam(false)
         session.value = null
         if (RelayJamMapper.isRelay(JamHolder.session.value)) JamHolder.clear()
+        // The sheet held the host's queue.
+        playback?.refreshQueue()
         val closing = client
         scope.launch {
             delay(CLOSE_DELAY_MS)

@@ -2545,6 +2545,7 @@ class PlaybackViewModel(
     }
 
     fun skipToQueueIndex(index: Int) {
+        if (RelayJam.remoteOnly) return
         if (engineOwnsPlayback) {
             viewModelScope.launch(Dispatchers.IO) { OfflinePlayer.jumpTo(index) }
             return

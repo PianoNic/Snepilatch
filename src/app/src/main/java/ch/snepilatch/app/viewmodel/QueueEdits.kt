@@ -1,6 +1,8 @@
 package ch.snepilatch.app.viewmodel
 
 import ch.snepilatch.app.R
+import ch.snepilatch.app.logic.relay.RelayJam
+import ch.snepilatch.app.logic.relay.RelayQueueEntry
 import ch.snepilatch.app.logic.shared.AppMessages
 import ch.snepilatch.app.logic.shared.LokiLogger
 import ch.snepilatch.app.logic.shared.SessionHolder
@@ -130,6 +132,41 @@ internal suspend fun PlaybackViewModel.sendQueueMove(
     }
 }
 
+/**
+ * A remote-only jam guest's sheet shows the host's queue, the way a Spfy jam's controller reads it from
+ * the host's cluster (#1086). The rows carry no qid: they are not entries of this account's queue.
+ */
+internal suspend fun PlaybackViewModel.showHostQueue(entries: List<RelayQueueEntry>) {
+    val missing = entries.map { it.uri }.distinct().filter { it !in decoratedByUri }
+    val session = SessionHolder.session
+    if (missing.isNotEmpty() && session != null) {
+        try {
+            withContext(queueIoDispatcher) { Song(session).decorateTracks(missing) }.forEach { decoratedByUri[it.uri] = it }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            LokiLogger.e(TAG, "showHostQueue decorate", e)
+        }
+    }
+    val rows = entries.mapIndexed { index, entry ->
+        val track = decoratedByUri[entry.uri]
+        TrackInfo(
+            uri = entry.uri,
+            name = track?.name ?: "Unknown",
+            artist = track?.artistName ?: "Unknown",
+            albumArt = normalizeSpfyImageUrl(track?.imageUrl),
+            durationMs = track?.durationMs ?: 0L,
+            uid = entry.uid,
+            queueIndex = index,
+        )
+    }
+    withContext(Dispatchers.Main) {
+        _queuedCount.value = 0
+        _queue.value = rows
+        nextTrackPreview.value = rows.firstOrNull()
+    }
+}
+
 private data class ParsedQueueTrack(val info: TrackInfo, val needsFetch: Boolean)
 
 /**
@@ -137,6 +174,8 @@ private data class ParsedQueueTrack(val info: TrackInfo, val needsFetch: Boolean
  * given, decorating whatever is still missing in one request.
  */
 internal suspend fun PlaybackViewModel.applyQueue(view: QueueView, songApi: Song?) = withContext(Dispatchers.Main) {
+    // This account's queue stays out of the sheet while it shows the host's.
+    if (RelayJam.remoteOnly) return@withContext
     latestQueueView = view
     retireConfirmedQueueSkips(view)
     val hidden = pendingQueueRemovals + pendingQueueSkips

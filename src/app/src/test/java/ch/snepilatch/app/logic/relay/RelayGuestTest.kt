@@ -176,4 +176,25 @@ class RelayGuestTest {
         assertNull(RelayJamMapper.joinToken("https://open.spotify.com/socialsession/abcdefghijkl1234"))
         assertNull(RelayJamMapper.joinToken("https://spotify.link/rGvHYkuNo6b"))
     }
+
+    @Test
+    fun aHostSeekRightAfterAnotherGoesThroughTheCooldown_butAStaleUpdateDoesNot() = runTest {
+        val player = FakePlayer()
+        val guest = guest(player)
+        guest.follow(hostPlayback("track:host", position = 10_000, paused = true, at = currentTime))
+        runCurrent()
+        advanceTimeBy(RelayGuest.LOAD_GRACE_MS + 100)
+        guest.follow(hostPlayback("track:host", position = 50_000, paused = true, at = currentTime))
+        runCurrent()
+        val first = player.calls.count { it.startsWith("seek:") }
+        // The host seeks again inside the cooldown.
+        guest.follow(hostPlayback("track:host", position = 90_000, paused = true, at = currentTime))
+        runCurrent()
+        assertEquals(first + 1, player.calls.count { it.startsWith("seek:") })
+        // The guest seeks itself; an update still on the host's timeline must not pull it back.
+        guest.applyLocally(RelayCommand(RelayCommand.SEEK, positionMs = 120_000))
+        guest.follow(hostPlayback("track:host", position = 90_000, paused = true, at = currentTime))
+        runCurrent()
+        assertEquals(120_000L, player.positionMs.value)
+    }
 }

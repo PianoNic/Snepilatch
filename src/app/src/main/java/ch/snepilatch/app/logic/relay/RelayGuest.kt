@@ -56,6 +56,16 @@ class RelayGuest(
     }
 
     fun follow(playback: RelayPlayback) {
+        // The host itself seeked: that goes through the cooldown, which is only there so an update sent
+        // before this guest's own seek reached the host does not undo it. Such an update stays on the
+        // host's old timeline; this one left it (#873).
+        val previous = host
+        val now = serverNow()
+        if (previous != null && previous.trackUri == playback.trackUri &&
+            abs(playback.positionAt(now) - previous.positionAt(now)) > DRIFT_MS
+        ) {
+            lastSeekAt = Long.MIN_VALUE / 2
+        }
         host = playback
         scope.launch { reconcile() }
     }

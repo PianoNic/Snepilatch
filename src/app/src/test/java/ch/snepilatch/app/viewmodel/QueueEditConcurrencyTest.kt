@@ -286,7 +286,7 @@ class QueueEditConcurrencyTest {
     }
 
     @Test
-    fun rapidRemovalsStayHiddenDuringPushesAndWaitOneSecondBetweenWrites() = runBlocking {
+    fun rapidRemovalsStayHiddenDuringPushesAndGoOutOneAtATime() = runBlocking {
         val a = queueEntry("a", queued = true)
         val b = queueEntry("b", queued = true)
         val c = queueEntry("c")
@@ -305,16 +305,8 @@ class QueueEditConcurrencyTest {
         coVerify(exactly = 0) { rig.player.removeFromQueue("b:::0") }
 
         firstWrite.complete(true)
-        rig.testScope.advanceTimeBy(999)
-        coVerify(exactly = 0) { rig.player.removeFromQueue("b:::0") }
-        rig.testScope.advanceTimeBy(1)
         rig.testScope.runCurrent()
         coVerify(exactly = 1) { rig.player.removeFromQueue("b:::0") }
-        rig.vm.applyQueue(stale, null)
-        assertEquals(listOf("c:::0"), rig.vm.queue.value.map { it.qid })
-
-        rig.testScope.advanceTimeBy(1_000)
-        rig.testScope.runCurrent()
         coVerify(exactly = 1) { rig.player.getState() }
         assertEquals(listOf("c:::0"), rig.vm.queue.value.map { it.qid })
     }
@@ -322,13 +314,14 @@ class QueueEditConcurrencyTest {
     @Test
     fun restoresAnUnconfirmedRemovalAfterBatchReconciliation() = runBlocking {
         val a = queueEntry("a", queued = true)
-        coEvery { rig.player.removeFromQueue(any()) } returns true
+        val write = CompletableDeferred<Boolean>()
+        coEvery { rig.player.removeFromQueue(any()) } coAnswers { write.await() }
         coEvery { rig.player.getState() } returns queueState(a)
         rig.vm.applyQueue(QueueView("old", listOf(a), emptyList()), null)
         rig.vm.removeFromQueue(rig.vm.queue.value.single())
         assertEquals(emptyList<TrackInfo>(), rig.vm.queue.value)
 
-        rig.testScope.advanceTimeBy(1_000)
+        write.complete(true)
         rig.testScope.runCurrent()
         assertEquals(listOf("a:::0"), rig.vm.queue.value.map { it.qid })
         assertEquals(1, rig.vm.queuedCount.value)
@@ -343,6 +336,7 @@ class QueueEditConcurrencyTest {
         coEvery { songApi.decorateTracks(any()) } coAnswers { metadata.await() }
         val decoration = mockk<DecoratedTrack>(relaxed = true)
         every { decoration.uri } returns a.track.uri
+        coEvery { rig.player.removeFromQueue(any()) } coAnswers { CompletableDeferred<Boolean>().await() }
         launch(rig.testDispatcher) { rig.vm.applyQueue(QueueView("old", emptyList(), listOf(a)), songApi) }
         rig.testScope.runCurrent()
         rig.vm.removeFromQueue(rig.vm.queue.value.single())
@@ -357,13 +351,14 @@ class QueueEditConcurrencyTest {
     fun failedWriteDoesNotAbortLaterRemovals() = runBlocking {
         val a = queueEntry("a")
         val b = queueEntry("b")
-        coEvery { rig.player.removeFromQueue("a:::0") } throws IllegalStateException("offline")
+        val firstWrite = CompletableDeferred<Boolean>()
+        coEvery { rig.player.removeFromQueue("a:::0") } coAnswers { firstWrite.await() }
         coEvery { rig.player.removeFromQueue("b:::0") } returns true
         coEvery { rig.player.getState() } returns queueState(a)
         rig.vm.applyQueue(QueueView("old", emptyList(), listOf(a, b)), null)
         rig.vm.removeFromQueue(rig.vm.queue.value.first())
         rig.vm.removeFromQueue(rig.vm.queue.value.first())
-        rig.testScope.advanceTimeBy(2_000)
+        firstWrite.completeExceptionally(IllegalStateException("offline"))
         rig.testScope.runCurrent()
         coVerify(exactly = 1) { rig.player.removeFromQueue("b:::0") }
         assertEquals(listOf("a:::0"), rig.vm.queue.value.map { it.qid })

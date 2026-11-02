@@ -1235,11 +1235,17 @@ class PlaybackViewModel(
             "artist" -> DetailRoutes.openArtist(id)
             // Looked up only, as for a Spfy jam: the join sheet asks how to take part.
             "jam" -> launchWithSession("previewRelayJam") {
-                RelayJam.preview(id)?.let { LokiLogger.w(TAG, "Relay jam $id not opened: $it") }
+                RelayJam.preview(id)?.let {
+                    LokiLogger.w(TAG, "Relay jam $id not opened: $it")
+                    AppMessages.show(R.string.jam_link_not_opened)
+                }
             }
             "socialsession" -> launchWithSession("joinJam") { sess ->
                 // Looked up only; the join sheet asks how to take part before anything is joined.
-                JamHolder.preview(sess, uri.toString())?.let { LokiLogger.w(TAG, "Jam link $id not opened: $it") }
+                JamHolder.preview(sess, uri.toString())?.let {
+                    LokiLogger.w(TAG, "Jam link $id not opened: $it")
+                    AppMessages.show(R.string.jam_link_not_opened)
+                }
             }
             else -> LokiLogger.i(TAG, "Unsupported deep link type: $type")
         }

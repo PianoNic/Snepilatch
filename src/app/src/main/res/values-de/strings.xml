@@ -446,6 +446,7 @@
     <string name="offline_all_tracks">Alle Titel</string>
     <string name="offline_no_downloads">Du bist offline und es ist noch nichts heruntergeladen. Heruntergeladene Songs erscheinen hier.</string>
     <string name="jam">Jam</string>
+    <string name="jam_link_not_opened">Dieser Jam-Link liess sich nicht öffnen. Er ist vielleicht ungültig oder der Jam ist beendet</string>
     <string name="jam_join">Beitreten</string>
     <string name="jam_joining">Trete bei...</string>
     <string name="jam_leave">Jam verlassen</string>

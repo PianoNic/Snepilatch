@@ -17,15 +17,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.shape.CircleShape
+import kotlin.math.sin
+import kotlin.math.cos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.runtime.withFrameNanos
@@ -1070,12 +1069,11 @@ private fun ShuffleButton(vm: PlaybackViewModel, size: Dp, buttonBg: Color, acce
     val isShuffling by vm.isShufflingFlow.collectAsState()
     val shuffleMode by vm.shuffleModeFlow.collectAsState()
     val canToggleShuffle by vm.canToggleShuffleFlow.collectAsState()
-    val recommended = vm.currentTrack.collectAsState().value?.isRecommended == true
-    val rainbow = recommended && shuffleMode == "smart"
+    val smart = shuffleMode == "smart"
     TonalIconToggle(
-        isShuffling, { vm.toggleShuffle() }, Modifier.size(size).then(if (rainbow) flowingRainbow() else Modifier),
-        if (rainbow) Color.Transparent else buttonBg,
-        if (rainbow) Color.Transparent else accent,
+        isShuffling, { vm.toggleShuffle() }, Modifier.size(size).then(if (smart) smartShuffleRim(buttonBg) else Modifier),
+        if (smart) Color.Transparent else buttonBg,
+        if (smart) Color.Transparent else accent,
         enabled = canToggleShuffle,
     ) {
         Icon(
@@ -1086,24 +1084,51 @@ private fun ShuffleButton(vm: PlaybackViewModel, size: Dp, buttonBg: Color, acce
     }
 }
 
-private val RAINBOW = listOf(Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta, Color.Red)
-private const val RAINBOW_TURN_MS = 3_000
-private const val RAINBOW_ALPHA = 0.7f
+private val RIM_COLORS = listOf(
+    Color(0xFFFF5C8A), Color(0xFFFFB25C), Color(0xFF6EDCA0), Color(0xFF5AAAFF), Color(0xFFB078FF),
+)
+private const val RIM_SPEED = 0.55f
+private const val RIM_DRIFT = 0.42f
 
-/** A round background of a turning rainbow. The turn is read while drawing, so nothing composes again per frame. */
+/**
+ * Smart shuffle's button: [base] with colour glowing along its edge. The colours drift on unrelated paths, so
+ * nothing turns as a whole. The time is read while drawing, on every second frame, so nothing composes per frame (#856).
+ */
 @Composable
-private fun flowingRainbow(): Modifier {
-    val turn = rememberInfiniteTransition(label = "rainbow").animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(RAINBOW_TURN_MS, easing = LinearEasing)),
-        label = "rainbowTurn",
-    )
-    return Modifier.clip(CircleShape).drawBehind {
-        rotate(turn.value) {
-            drawRect(Brush.sweepGradient(RAINBOW), Offset(-size.width, -size.height), size * 3f, alpha = RAINBOW_ALPHA)
+private fun smartShuffleRim(base: Color): Modifier {
+    val seconds = remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(Unit) {
+        val start = withFrameNanos { it }
+        while (true) {
+            withFrameNanos { }
+            seconds.floatValue = withFrameNanos { (it - start) / 1_000_000_000f }
         }
     }
+    return Modifier
+        .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+        .clip(CircleShape)
+        .drawBehind {
+            val time = seconds.floatValue * RIM_SPEED
+            RIM_COLORS.forEachIndexed { i, color ->
+                val center = Offset(
+                    size.width * (0.5f + RIM_DRIFT * sin(time * (0.7f + i * 0.13f) + i * 1.9f)),
+                    size.height * (0.5f + RIM_DRIFT * cos(time * (0.5f + i * 0.17f) + i * 2.7f)),
+                )
+                drawRect(Brush.radialGradient(listOf(color, color.copy(alpha = 0f)), center, size.width * 0.5f))
+            }
+            // Only the edge keeps its colour; the middle goes back to the button.
+            drawRect(
+                Brush.radialGradient(
+                    0.6f to Color.Black,
+                    0.89f to Color.Black.copy(alpha = 0.92f),
+                    1f to Color.Transparent,
+                    center = center,
+                    radius = size.width * 0.5f,
+                ),
+                blendMode = BlendMode.DstOut,
+            )
+            drawRect(base, blendMode = BlendMode.DstOver)
+        }
 }
 
 @Composable

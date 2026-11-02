@@ -187,6 +187,8 @@ fun LikedSongsPage.toDetailData(offset: Int) = DetailData(
     imageUrl = LIKED_SONGS_COVER_URL,
     tracks = items.map { it.toTrackInfo() },
     uri = "spotify:collection:tracks",
+    // Downloadable like any list (#583): a batch fetches one track at a time.
+    type = "collection",
     totalCount = total,
     loadedOffset = offset + items.size,
 )

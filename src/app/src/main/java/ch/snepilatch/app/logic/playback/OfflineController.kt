@@ -150,6 +150,10 @@ class OfflineController(private val scope: CoroutineScope, private val hooks: Ho
             shuffleMode = if (s.shuffle) "on" else "off",
             isShuffling = s.shuffle,
             repeatMode = s.repeat,
+            // The engine can do these whatever the server allows the account.
+            canToggleShuffle = true,
+            canToggleRepeatContext = true,
+            canToggleRepeatTrack = true,
         )
         hooks.queue.value = s.upcoming
         hooks.queuedCount.value = 0

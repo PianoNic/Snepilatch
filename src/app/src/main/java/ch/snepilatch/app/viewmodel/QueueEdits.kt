@@ -7,7 +7,6 @@ import ch.snepilatch.app.logic.shared.SessionHolder
 import ch.snepilatch.app.logic.shared.normalizeSpfyImageUrl
 import ch.snepilatch.app.data.TrackInfo
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotify.api.playerconnect.PlayerConnect
@@ -49,7 +48,6 @@ internal suspend fun PlaybackViewModel.drainQueueRemovals(pc: PlayerConnect) {
                         // A timed-out write may have succeeded. Verify before restoring the row.
                         LokiLogger.e(TAG, "removeFromQueue $next", e)
                     }
-                    delay(1_000)
                 }
                 completed += next
                 continue

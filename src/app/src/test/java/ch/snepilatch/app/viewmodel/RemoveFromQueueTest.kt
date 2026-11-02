@@ -1,9 +1,11 @@
 package ch.snepilatch.app.viewmodel
 
 import ch.snepilatch.app.data.TrackInfo
+import io.mockk.coEvery
 import io.mockk.coVerify
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.awaitCancellation
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -20,7 +22,11 @@ class RemoveFromQueueTest {
     private val rig = PlaybackTestRig()
 
     @Before
-    fun setUp() = rig.install()
+    fun setUp() {
+        rig.install()
+        // The read confirming a removal stays out: these tests are about the row and the write.
+        coEvery { rig.player.getState() } coAnswers { awaitCancellation() }
+    }
 
     @After
     fun tearDown() {

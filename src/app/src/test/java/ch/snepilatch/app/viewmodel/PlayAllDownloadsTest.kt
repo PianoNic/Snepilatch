@@ -54,6 +54,19 @@ class PlayAllDownloadsTest {
         assertEquals(tracks.toSet(), OfflinePlayer.state.value?.tracks?.toSet())
     }
 
+    /** A Free account's server restrictions are about Connect, not the files. */
+    @Test
+    fun theEngineLiftsTheServersRestrictions() = runBlocking {
+        rig.vm._playback.value = rig.vm._playback.value.copy(canToggleShuffle = false, canToggleRepeatContext = false)
+
+        rig.vm.startDownloadsPlayback(tracks, shuffle = false)
+
+        var waited = 0
+        while (!rig.vm.playback.value.canToggleShuffle && waited++ < 200) kotlinx.coroutines.delay(10)
+        assertTrue(rig.vm.playback.value.canToggleShuffle)
+        assertTrue(rig.vm.playback.value.canToggleRepeatContext)
+    }
+
     @Test
     fun aFileThatIsGoneLeavesConnectInCharge() = runBlocking {
         OfflinePlayer.localFile = { _, _, _ -> null }

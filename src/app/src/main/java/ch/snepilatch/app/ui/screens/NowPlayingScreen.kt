@@ -17,14 +17,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.shape.CircleShape
-import kotlin.math.sin
-import kotlin.math.cos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.runtime.withFrameNanos
@@ -966,7 +964,7 @@ private fun TonalIconToggle(
     onToggle: () -> Unit,
     modifier: Modifier,
     buttonBg: Color,
-    accent: Color,
+    checkedBg: Color,
     enabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
@@ -978,7 +976,7 @@ private fun TonalIconToggle(
         colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
             containerColor = buttonBg,
             contentColor = SnepilatchWhite,
-            checkedContainerColor = accent.copy(alpha = 0.45f),
+            checkedContainerColor = checkedBg,
             checkedContentColor = SnepilatchWhite,
         ),
     ) { content() }
@@ -1070,10 +1068,13 @@ private fun ShuffleButton(vm: PlaybackViewModel, size: Dp, buttonBg: Color, acce
     val shuffleMode by vm.shuffleModeFlow.collectAsState()
     val canToggleShuffle by vm.canToggleShuffleFlow.collectAsState()
     val smart = shuffleMode == "smart"
+    val lit = accent.copy(alpha = 0.45f)
     TonalIconToggle(
-        isShuffling, { vm.toggleShuffle() }, Modifier.size(size).then(if (smart) smartShuffleRim(buttonBg) else Modifier),
+        isShuffling,
+        { vm.toggleShuffle() },
+        Modifier.size(size).then(if (smart) smartShuffleRim(lit) else Modifier),
         if (smart) Color.Transparent else buttonBg,
-        if (smart) Color.Transparent else accent,
+        if (smart) Color.Transparent else lit,
         enabled = canToggleShuffle,
     ) {
         Icon(
@@ -1085,14 +1086,13 @@ private fun ShuffleButton(vm: PlaybackViewModel, size: Dp, buttonBg: Color, acce
 }
 
 private val RIM_COLORS = listOf(
-    Color(0xFFFF5C8A), Color(0xFFFFB25C), Color(0xFF6EDCA0), Color(0xFF5AAAFF), Color(0xFFB078FF),
+    Color(0xFFFF5C8A), Color(0xFFFFB25C), Color(0xFF6EDCA0), Color(0xFF5AAAFF), Color(0xFFB078FF), Color(0xFFFF5C8A),
 )
-private const val RIM_SPEED = 0.55f
-private const val RIM_DRIFT = 0.42f
+private const val RIM_DEGREES_PER_SECOND = 45f
 
 /**
- * Smart shuffle's button: [base] with colour glowing along its edge. The colours drift on unrelated paths, so
- * nothing turns as a whole. The time is read while drawing, on every second frame, so nothing composes per frame (#856).
+ * Smart shuffle's button: [base] with a ring of colour turning slowly along its edge. The time is read
+ * while drawing, on every second frame, so nothing composes per frame (#856).
  */
 @Composable
 private fun smartShuffleRim(base: Color): Modifier {
@@ -1108,20 +1108,12 @@ private fun smartShuffleRim(base: Color): Modifier {
         .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
         .clip(CircleShape)
         .drawBehind {
-            val time = seconds.floatValue * RIM_SPEED
-            RIM_COLORS.forEachIndexed { i, color ->
-                val center = Offset(
-                    size.width * (0.5f + RIM_DRIFT * sin(time * (0.7f + i * 0.13f) + i * 1.9f)),
-                    size.height * (0.5f + RIM_DRIFT * cos(time * (0.5f + i * 0.17f) + i * 2.7f)),
-                )
-                drawRect(Brush.radialGradient(listOf(color, color.copy(alpha = 0f)), center, size.width * 0.5f))
-            }
+            rotate(seconds.floatValue * RIM_DEGREES_PER_SECOND % 360f) { drawCircle(Brush.sweepGradient(RIM_COLORS)) }
             // Only the edge keeps its colour; the middle goes back to the button.
             drawRect(
                 Brush.radialGradient(
-                    0.6f to Color.Black,
-                    0.89f to Color.Black.copy(alpha = 0.92f),
-                    1f to Color.Transparent,
+                    0.35f to Color.Black,
+                    0.97f to Color.Transparent,
                     center = center,
                     radius = size.width * 0.5f,
                 ),
@@ -1140,7 +1132,7 @@ private fun RepeatButton(vm: PlaybackViewModel, size: Dp, buttonBg: Color, accen
         { vm.cycleRepeat() },
         Modifier.size(size),
         buttonBg,
-        accent,
+        accent.copy(alpha = 0.45f),
         enabled = canToggleRepeat,
     ) {
         Icon(

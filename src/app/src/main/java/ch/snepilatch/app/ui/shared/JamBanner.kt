@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -131,7 +132,7 @@ fun JamAvatars(members: List<JamMember>, size: Dp, ring: Color, modifier: Modifi
                         .background(ring, CircleShape)
                         .padding(2.dp)
                 ) {
-                    SpfyImage(url = member.imageUrl, modifier = Modifier.fillMaxSize(), shape = CircleShape)
+                    SpfyImage(url = member.imageUrl, icon = Icons.Rounded.Person, modifier = Modifier.fillMaxSize(), shape = CircleShape)
                 }
             }
         }

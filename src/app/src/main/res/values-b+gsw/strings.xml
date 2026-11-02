@@ -456,6 +456,7 @@
     <string name="offline_all_tracks">Alli Songs</string>
     <string name="offline_no_downloads">Du bisch offline und es isch no nüt abeglade. Abegladeni Songs erschine da.</string>
     <string name="jam">Jam</string>
+    <string name="jam_link_not_opened">De Jam-Link hät sich nöd la öffne. Er isch villicht ungültig oder de Jam isch fertig</string>
     <string name="jam_join">Biitrete</string>
     <string name="jam_joining">Trete bii...</string>
     <string name="jam_leave">Jam verlah</string>

@@ -448,6 +448,7 @@
     <string name="offline_all_tracks">Все треки</string>
     <string name="offline_no_downloads">Вы офлайн, и пока ничего не загружено. Загруженные треки появятся здесь.</string>
     <string name="jam">Джем</string>
+    <string name="jam_link_not_opened">Не удалось открыть ссылку на джем. Возможно, она недействительна или джем завершён</string>
     <string name="jam_join">Присоединиться</string>
     <string name="jam_joining">Подключение...</string>
     <string name="jam_leave">Покинуть джем</string>

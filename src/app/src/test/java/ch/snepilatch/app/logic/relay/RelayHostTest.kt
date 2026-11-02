@@ -64,8 +64,31 @@ class RelayHostTest {
         assertEquals(1, published.size)
 
         player.positionMs.value = 90_000
+        advanceTimeBy(RelayHost.SEEK_SETTLE_MS + 1)
         runCurrent()
         assertEquals(2, published.size)
+        assertEquals(90_000, published.last().positionMs)
+    }
+
+    @Test
+    fun aPositionJumpingBackAndForthAfterASeek_goesOutOnceWhereItSettled() = runTest {
+        val player = FakePlayer()
+        val published = mutableListOf<RelayPlayback>()
+        host(player, published).start()
+        runCurrent()
+        val before = published.size
+
+        player.positionMs.value = 90_000
+        advanceTimeBy(100)
+        runCurrent()
+        player.positionMs.value = 20_000
+        advanceTimeBy(100)
+        runCurrent()
+        player.positionMs.value = 90_000
+        advanceTimeBy(RelayHost.SEEK_SETTLE_MS + 1)
+        runCurrent()
+
+        assertEquals(before + 1, published.size)
         assertEquals(90_000, published.last().positionMs)
     }
 

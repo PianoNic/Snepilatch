@@ -4,7 +4,9 @@ import ch.snepilatch.app.logic.shared.LokiLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -24,11 +26,14 @@ class RelayHost(
 
     @Volatile private var last: RelayPlayback? = null
 
+    @OptIn(kotlinx.coroutines.FlowPreview::class)
     fun start() {
         if (jobs.isNotEmpty()) return
         jobs = listOf(
             scope.launch { player.state.distinctUntilChanged().collect { publishNow() } },
-            scope.launch { player.positionMs.collect { position -> if (jumped(position)) publishNow() } },
+            // The position jumps back and forth for a moment after a seek, and each jump used to go out, so
+            // a guest followed the wrong one (#873). Published once it has held still.
+            scope.launch { player.positionMs.filter(::jumped).debounce(SEEK_SETTLE_MS).collect { publishNow() } },
             scope.launch {
                 while (isActive) {
                     delay(HEARTBEAT_MS)
@@ -84,6 +89,7 @@ class RelayHost(
         private const val TAG = "RelayHost"
         const val HEARTBEAT_MS = 20_000L
         const val SEEK_JUMP_MS = 2_500L
+        const val SEEK_SETTLE_MS = 500L
         const val MAX_QUEUE = 100
     }
 }

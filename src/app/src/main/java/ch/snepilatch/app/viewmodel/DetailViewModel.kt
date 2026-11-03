@@ -23,6 +23,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import ch.snepilatch.app.logic.shared.Navigator
 import ch.snepilatch.app.logic.shared.SessionViewModel
@@ -421,6 +422,9 @@ class DetailViewModel : SessionViewModel("DetailVM") {
                         // rather than re-asking for the same offset until the list happens to grow.
                         _detail.value.tracks.size > before
                     }
+                    // The web player has no download, so nothing there reads a whole list: one reader
+                    // scrolling is the closest thing it sends, not one request right after another.
+                    if (more) delay(LOAD_ALL_PAGE_PAUSE_MS)
                 }
                 val loaded = _detail.value
                 if (loaded.uri == forUri) onComplete(loaded.tracks)
@@ -522,6 +526,7 @@ class DetailViewModel : SessionViewModel("DetailVM") {
 
     companion object {
         private const val DETAIL_PAGE_SIZE = 50
+        private const val LOAD_ALL_PAGE_PAUSE_MS = 1_000L
 
         /** How far above the first visible row the web player starts its page, as measured: row 1000 asks from 972. */
         private const val ROWS_KEPT_ABOVE = 28

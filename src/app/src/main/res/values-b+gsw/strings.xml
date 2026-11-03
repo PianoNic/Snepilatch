@@ -562,4 +562,17 @@
         <item quantity="one">%1$d Song</item>
         <item quantity="other">%1$d Songs</item>
     </plurals>
+    <string name="saved_in">Gspicheret in</string>
+    <string name="done">Fertig</string>
+    <string name="changes_saved">Änderige gspicheret</string>
+    <string name="removed_from_named">Us %1$s uusegnoh</string>
+    <string name="saved_in_search">Playlist sueche</string>
+    <string name="duplicate_title">Scho hinzuegfüegt</string>
+    <string name="duplicate_some_title">Es paar scho hinzuegfüegt</string>
+    <string name="duplicate_all">Die Titel sind scho in %1$s.</string>
+    <string name="duplicate_some">Es paar vo dene Titel sind scho in %1$s.</string>
+    <string name="duplicate_dont_add">Nöd hinzuefüege</string>
+    <string name="duplicate_add_anyway">Glich hinzuefüege</string>
+    <string name="duplicate_add_new">Nur neui hinzuefüege</string>
+    <string name="duplicate_add_all">Alli hinzuefüege</string>
 </resources>

@@ -552,4 +552,17 @@
         <item quantity="one">%1$d song</item>
         <item quantity="other">%1$d songs</item>
     </plurals>
+    <string name="saved_in">Saved in</string>
+    <string name="done">Done</string>
+    <string name="changes_saved">Changes saved</string>
+    <string name="removed_from_named">Removed from %1$s</string>
+    <string name="saved_in_search">Find a playlist</string>
+    <string name="duplicate_title">Already added</string>
+    <string name="duplicate_some_title">Some already added</string>
+    <string name="duplicate_all">These are already in %1$s.</string>
+    <string name="duplicate_some">Some of these are already in %1$s.</string>
+    <string name="duplicate_dont_add">Don\'t add</string>
+    <string name="duplicate_add_anyway">Add anyway</string>
+    <string name="duplicate_add_new">Add new ones</string>
+    <string name="duplicate_add_all">Add all</string>
 </resources>

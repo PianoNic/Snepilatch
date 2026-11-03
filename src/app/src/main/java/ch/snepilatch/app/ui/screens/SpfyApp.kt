@@ -83,7 +83,12 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.util.lerp
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import ch.snepilatch.app.ui.shared.DuplicateTracksDialog
+import ch.snepilatch.app.viewmodel.addDespiteDuplicates
+import ch.snepilatch.app.viewmodel.addTracksToPlaylist
+import ch.snepilatch.app.viewmodel.likedChanged
 import ch.snepilatch.app.ui.shared.PlaylistPickerDialog
+import ch.snepilatch.app.ui.shared.SavedInSheet
 import ch.snepilatch.app.ui.shared.LocalOpenProfileMenu
 import ch.snepilatch.app.ui.shared.ProfileMenu
 import ch.snepilatch.app.logic.shared.spfyId
@@ -378,7 +383,15 @@ fun SpfyApp(vm: PlaybackViewModel) {
 
         // Global playlist picker (triggered from TrackRow menu)
         val showPicker by vm.showPlaylistPicker.collectAsState()
-        if (showPicker) {
+        val pendingUris by vm.pendingPlaylistTrackUris.collectAsState()
+        if (showPicker && pendingUris.size == 1) {
+            val trackUri = pendingUris.single()
+            SavedInSheet(
+                trackUri = trackUri,
+                onLiked = { vm.likedChanged(trackUri, it) },
+                onDismiss = { vm.showPlaylistPicker.value = false },
+            )
+        } else if (showPicker) {
             val library by libraryVm.library.collectAsState()
             PlaylistPickerDialog(
                 playlists = library.filter { it.type == "playlist" },
@@ -390,6 +403,13 @@ fun SpfyApp(vm: PlaybackViewModel) {
                     }
                 },
                 onDismiss = { vm.showPlaylistPicker.value = false },
+            )
+        }
+        vm.duplicateAdd.collectAsState().value?.let { add ->
+            DuplicateTracksDialog(
+                add = add,
+                onAdd = { vm.addDespiteDuplicates(add, it) },
+                onDismiss = { vm.duplicateAdd.value = null },
             )
         }
     }

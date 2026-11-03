@@ -2514,27 +2514,12 @@ class PlaybackViewModel(
         }
     }
 
-    fun addTrackToPlaylist(playlistId: String, trackUri: String) { addTracksToPlaylist(playlistId, listOf(trackUri)) }
-
-    /**
-     * Add many tracks to a playlist in a single API call. Used by the detail
-     * header's "Add to Playlist" action when the user adds an entire album,
-     * playlist, or the Liked Songs collection to another playlist.
-     */
-    fun addTracksToPlaylist(playlistId: String, trackUris: List<String>, playlistName: String? = null) {
-        if (trackUris.isEmpty()) return
-        launchWithSession("addTracksToPlaylist", R.string.error_add_playlist) { sess ->
-            kotify.api.playlist.Playlist(sess).addToPlaylist(playlistId, trackUris)
-            LokiLogger.i(TAG, "Added ${trackUris.size} tracks to playlist $playlistId")
-            if (playlistName != null) AppMessages.show(R.string.added_to_playlist, playlistName) else AppMessages.show(R.string.added_to_playlist_generic)
-        }
-    }
-
     // Tracks pending playlist picker. Always treated as a list so the same
     // picker dialog covers single-track adds (from TrackRow) and bulk adds
     // (from the album/playlist detail header).
     val pendingPlaylistTrackUris = MutableStateFlow<List<String>>(emptyList())
     val showPlaylistPicker = MutableStateFlow(false)
+    val duplicateAdd = MutableStateFlow<DuplicateAdd?>(null)
 
     fun showPlaylistPickerForTrack(trackUri: String) { showPlaylistPickerForTracks(listOf(trackUri)) }
 

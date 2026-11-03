@@ -7,6 +7,7 @@ import kotify.api.artist.ArtistTopTrack
 import kotify.api.playerstatus.QueueTrack
 import kotify.api.playlist.LikedSong
 import kotify.api.playlist.LikedSongsPage
+import kotify.api.playlist.PLAYLIST_FIRST_PAGE
 import kotify.api.playlist.PlaylistInfo
 import kotify.api.playlist.PlaylistTrack
 import kotify.api.podcast.PodcastEpisode
@@ -167,7 +168,7 @@ fun PlaylistInfo.toDetailData(playlistId: String) = DetailData(
     // where it expects in the GraphQL response. If we received a full page
     // but the server didn't tell us the total, treat it as unknown (-1) so
     // pagination keeps going until a short page proves we're at the end.
-    totalCount = if (totalTracks <= 0 && tracks.size >= PLAYLIST_PAGE_SIZE) -1 else totalTracks,
+    totalCount = if (totalTracks <= 0 && tracks.size >= PLAYLIST_FIRST_PAGE) -1 else totalTracks,
     loadedOffset = tracks.size,
     ownerName = owner.name,
     ownerUri = owner.uri,
@@ -176,8 +177,6 @@ fun PlaylistInfo.toDetailData(playlistId: String) = DetailData(
     savedInLibrary = following,
     tracks = tracks.map { it.toTrackInfo() },
 )
-
-private const val PLAYLIST_PAGE_SIZE = 50
 
 /** The official Liked Songs cover art (heart on gradient), served from the same CDN the clients use. */
 const val LIKED_SONGS_COVER_URL = "https://misc.scdn.co/liked-songs/liked-songs-640.png"

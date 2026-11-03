@@ -11,6 +11,7 @@ import ch.snepilatch.app.logic.shared.SessionHolder
 import ch.snepilatch.app.logic.shared.LokiLogger
 import kotify.api.album.Album
 import kotify.api.artist.Artist
+import kotify.api.playlist.PLAYLIST_FIRST_PAGE
 import kotify.api.playlist.Playlist
 import kotify.api.playlist.PlaylistInfo
 import kotify.api.podcast.Podcast
@@ -106,10 +107,12 @@ class DetailViewModel : SessionViewModel("DetailVM") {
     }
 
     fun openPlaylist(playlistId: String) = openDetail(Screen.PLAYLIST_DETAIL, "openPlaylist", "spotify:playlist:$playlistId") { sess ->
-        playlistPage(sess, playlistId, limit = 50, offset = 0).toDetailData(playlistId).also {
+        playlistPage(sess, playlistId, limit = PLAYLIST_FIRST_PAGE, offset = 0).toDetailData(playlistId).also {
             // A kept page shows at once and is asked for again behind it: the web player loads a playlist on
             // every open, and the daylist renames itself without a push. A change reloads it (#1057).
-            launchWithSession("revalidatePlaylist") { SessionHolder.playlistStore?.revalidate(playlistId, limit = 50, offset = 0) }
+            launchWithSession("revalidatePlaylist") {
+                SessionHolder.playlistStore?.revalidate(playlistId, limit = PLAYLIST_FIRST_PAGE, offset = 0)
+            }
         }
     }
 
@@ -148,7 +151,7 @@ class DetailViewModel : SessionViewModel("DetailVM") {
             val open = _detail.value
             if (open.type != "playlist" || !open.uri.endsWith(playlistId)) return@onInvalidated
             launchWithSession("reloadInvalidatedPlaylist") { sess ->
-                val fresh = playlistPage(sess, playlistId, limit = 50, offset = 0).toDetailData(playlistId)
+                val fresh = playlistPage(sess, playlistId, limit = PLAYLIST_FIRST_PAGE, offset = 0).toDetailData(playlistId)
                 // The user may have navigated on while this was in flight.
                 if (_detail.value.uri == open.uri) _detail.value = fresh
             }
@@ -378,7 +381,7 @@ class DetailViewModel : SessionViewModel("DetailVM") {
             val tracks = when {
                 uri.contains(":collection") -> Playlist(sess).getLikedSongs(limit = 50).toDetailData(offset = 0)
                 uri.contains(":album:") -> Album(sess).getAlbum(id, limit = 50).toDetailData(id)
-                else -> Playlist(sess).getPlaylist(id, 50, 0).toDetailData(id)
+                else -> Playlist(sess).getPlaylistContents(id).toDetailData(id)
             }
             onReady(tracks.tracks.map { it.uri })
         }

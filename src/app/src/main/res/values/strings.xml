@@ -566,4 +566,6 @@
     <string name="duplicate_add_all">Add all</string>
     <string name="offline_retrying">You\'re offline, connecting…</string>
     <string name="offline_retry_in">You\'re offline, retrying in %1$d s</string>
+    <string name="offline_recently_played">Recently played</string>
+    <string name="offline_recently_downloaded">Recently downloaded</string>
 </resources>

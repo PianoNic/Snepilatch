@@ -570,4 +570,6 @@
     <string name="duplicate_add_all">Добавить все</string>
     <string name="offline_retrying">Вы офлайн, подключение…</string>
     <string name="offline_retry_in">Вы офлайн, новая попытка через %1$d с</string>
+    <string name="offline_recently_played">Недавно прослушано</string>
+    <string name="offline_recently_downloaded">Недавно загружено</string>
 </resources>

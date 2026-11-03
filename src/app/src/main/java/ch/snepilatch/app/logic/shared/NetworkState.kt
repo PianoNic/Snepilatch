@@ -17,6 +17,14 @@ object NetworkState {
     /** When the route last came back, so a handover right after can be told from a real one. */
     @Volatile private var onlineSince = 0L
 
+    /** The app is running from its downloads, which a route that answers nothing does not show in [online]. */
+    @Volatile var offlineMode = false
+        private set
+
+    fun setOfflineMode(offline: Boolean) {
+        offlineMode = offline
+    }
+
     fun set(online: Boolean) {
         if (_online.value != online) {
             LokiLogger.i("NetworkState", if (online) "network back" else "network gone")

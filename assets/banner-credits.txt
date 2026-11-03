@@ -1,0 +1,18 @@
+Snepilatch README banner: credits
+
+Phone frame
+  Artwork: Android Studio device art, Pixel 9 Pro XL (back.webp)
+  Copyright: The Android Open Source Project
+  Source used: https://github.com/JetBrains/android/tree/master/artwork/resources/device-art-resources/pixel_9_pro_xl
+  Same file in AOSP: https://android.googlesource.com/platform/tools/adt/idea/+/refs/heads/mirror-goog-studio-main/artwork/resources/device-art-resources/pixel_9_pro_xl/
+  Licence: Apache License 2.0, full text at the link below
+           https://github.com/JetBrains/android/blob/master/LICENSE.txt
+  Changes made: the frame was shortened by removing a horizontal band, so it fits a
+  1080x2340 screen, then scaled. Screenshots were placed in the screen area.
+  Note: the licence covers the artwork as a file. It grants no trademark rights. The
+  frame has no logo on it, but its shape resembles a Google phone.
+
+Screens
+  Screenshots of Snepilatch. The album covers, artist images and lyrics shown on them
+  belong to their respective owners. Account names, avatars, playlist owner names and
+  the name of the Spfy service are covered or blurred.

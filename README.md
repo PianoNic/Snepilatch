@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <img src="./assets/product_mockup.png" alt="">
+  <img src="./assets/banner.webp" alt="" width="100%">
 </p>
 
 ## Features

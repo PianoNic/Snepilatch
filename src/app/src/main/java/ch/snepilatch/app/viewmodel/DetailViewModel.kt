@@ -11,6 +11,7 @@ import ch.snepilatch.app.logic.shared.SessionHolder
 import ch.snepilatch.app.logic.shared.LokiLogger
 import kotify.api.album.Album
 import kotify.api.artist.Artist
+import kotify.api.playlist.LIKED_SONGS_PLAYLIST_ID
 import kotify.api.playlist.PLAYLIST_FIRST_PAGE
 import kotify.api.playlist.Playlist
 import kotify.api.playlist.PlaylistInfo
@@ -104,7 +105,7 @@ class DetailViewModel : SessionViewModel("DetailVM") {
     }
 
     fun openLikedSongs() = openDetail(Screen.PLAYLIST_DETAIL, "openLikedSongs") { sess ->
-        Playlist(sess).getLikedSongs(limit = 50).toDetailData(offset = 0)
+        Playlist(sess).getPlaylist(LIKED_SONGS_PLAYLIST_ID, PLAYLIST_FIRST_PAGE, 0).toLikedSongsDetail()
     }
 
     fun openPlaylist(playlistId: String) = openDetail(Screen.PLAYLIST_DETAIL, "openPlaylist", "spotify:playlist:$playlistId") { sess ->
@@ -312,7 +313,7 @@ class DetailViewModel : SessionViewModel("DetailVM") {
 
     private suspend fun rowsAt(session: Session, uri: String, window: PageWindow): List<TrackInfo> =
         if (uri.contains(":collection")) {
-            Playlist(session).getLikedSongs(limit = window.limit, offset = window.offset).toDetailData(window.offset).tracks
+            Playlist(session).getPlaylist(LIKED_SONGS_PLAYLIST_ID, window.limit, window.offset).likedSongsRows()
         } else {
             playlistPage(session, spfyId(uri), window.limit, window.offset).tracks.map { it.toTrackInfo() }
         }
@@ -325,12 +326,12 @@ class DetailViewModel : SessionViewModel("DetailVM") {
         launchWithSessionLoading("loadMoreDetail", _isLoadingMore) { sess ->
             val offset = current.tracks.size
             if (uri == "spotify:collection:tracks") {
-                val data = Playlist(sess).getLikedSongs(limit = 50, offset = offset)
-                val more = data.toDetailData(offset)
+                val info = Playlist(sess).getPlaylist(LIKED_SONGS_PLAYLIST_ID, DETAIL_PAGE_SIZE, offset)
+                val more = info.likedSongsRows()
                 _detail.value = current.copy(
-                    tracks = current.tracks + more.tracks,
-                    totalCount = more.totalCount,
-                    loadedOffset = offset + more.tracks.size
+                    tracks = current.tracks + more,
+                    totalCount = info.totalTracks,
+                    loadedOffset = offset + more.size,
                 )
             } else if (uri.startsWith("spotify:playlist:")) {
                 val id = uri.removePrefix("spotify:playlist:")
@@ -440,7 +441,7 @@ class DetailViewModel : SessionViewModel("DetailVM") {
         launchWithSession("fetchTrackUris") { sess ->
             val id = spfyId(uri)
             val tracks = when {
-                uri.contains(":collection") -> Playlist(sess).getLikedSongs(limit = 50).toDetailData(offset = 0)
+                uri.contains(":collection") -> Playlist(sess).getPlaylistContents(LIKED_SONGS_PLAYLIST_ID).toLikedSongsDetail()
                 uri.contains(":album:") -> Album(sess).getAlbum(id, limit = 50).toDetailData(id)
                 else -> Playlist(sess).getPlaylistContents(id).toDetailData(id)
             }

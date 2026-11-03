@@ -1533,6 +1533,9 @@ class PlaybackViewModel(
     ): PlayingContext? {
         if (contextUri == null) return null
         return when {
+            // Played as its playlist, as the web player does, but it opens as the Liked Songs page.
+            contextUri.endsWith(kotify.api.playlist.LIKED_SONGS_PLAYLIST_ID) ->
+                PlayingContext("Liked Songs", "Liked Songs", "spotify:collection:tracks")
             contextUri.contains(":collection:tracks") -> PlayingContext("Liked Songs", "Liked Songs", contextUri)
             contextUri.contains(":playlist:") -> {
                 val playlistId = contextUri.substringAfter(":playlist:")

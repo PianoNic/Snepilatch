@@ -5,6 +5,13 @@ package ch.snepilatch.app.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.runtime.snapshotFlow
+import ch.snepilatch.app.ui.shared.listScrollbar
+import ch.snepilatch.app.ui.shared.scrollbarRowKey
+import ch.snepilatch.app.ui.shared.visibleRows
+import kotlinx.coroutines.flow.conflate
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -74,6 +81,26 @@ import ch.snepilatch.app.logic.shared.spfyId
 private val HEADER_BUTTON = 40.dp
 private val HEADER_ICON = 24.dp
 
+private const val SCROLLBAR_MIN_ROWS = 100
+private val SKELETON_COLOR = SnepilatchLightGray.copy(alpha = 0.12f)
+
+/** A row that has not arrived yet, shaped like [TrackRow] and as tall, as the web player draws its own. */
+@Composable
+private fun TrackRowSkeleton() {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(48.dp).background(SKELETON_COLOR, RoundedCornerShape(4.dp)))
+        Column(Modifier.padding(start = 12.dp).weight(1f)) {
+            Box(Modifier.fillMaxWidth(0.6f).height(12.dp).background(SKELETON_COLOR, RoundedCornerShape(6.dp)))
+            Spacer(Modifier.height(8.dp))
+            Box(Modifier.fillMaxWidth(0.4f).height(10.dp).background(SKELETON_COLOR, RoundedCornerShape(5.dp)))
+        }
+        Box(Modifier.width(32.dp).height(10.dp).background(SKELETON_COLOR, RoundedCornerShape(5.dp)))
+    }
+}
+
 @Composable
 fun DetailScreen(vm: PlaybackViewModel) {
     val detailVm: DetailViewModel = viewModel()
@@ -117,8 +144,22 @@ fun DetailScreen(vm: PlaybackViewModel) {
     }
 
     val hasMore = detail.totalCount < 0 || detail.tracks.size < detail.totalCount
+    val listState = rememberLazyListState()
+    // A long playlist or Liked Songs is laid out at its full length and loads where it is, so its scrollbar can jump (#1102).
+    val fullLength = detail.type in setOf("playlist", "collection") && detail.totalCount >= SCROLLBAR_MIN_ROWS
+    val jumpedRows by detailVm.jumpedRows.collectAsState()
+    if (fullLength) {
+        LaunchedEffect(detail.uri) {
+            snapshotFlow { listState.layoutInfo.visibleRows() to jumpedRows.size }
+                .conflate()
+                .collect { (rows, _) -> rows?.let { detailVm.loadVisibleRows(it.first, it.last) } }
+        }
+    }
+    val listModifier = Modifier.fillMaxSize().let {
+        if (fullLength) it.listScrollbar(listState, detail.totalCount, LocalBottomOverlayHeight.current.value) else it
+    }
 
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = LocalBottomOverlayHeight.current.value + 16.dp)) {
+    LazyColumn(listModifier, state = listState, contentPadding = PaddingValues(bottom = LocalBottomOverlayHeight.current.value + 16.dp)) {
         // Hero image
         item {
             Box(Modifier.fillMaxWidth().height(if (isArtist) 350.dp else 300.dp)) {
@@ -431,23 +472,43 @@ fun DetailScreen(vm: PlaybackViewModel) {
         }
 
         // Tracks
-        itemsIndexed(detail.tracks, key = { index, track -> "$index-${track.uri}" }) { index, track ->
-            if (hasMore && index >= detail.tracks.size - 5) {
-                LaunchedEffect(detail.tracks.size) { detailVm.loadMoreDetail() }
+        if (fullLength) {
+            items(detail.totalCount, key = ::scrollbarRowKey) { index ->
+                val track = detail.tracks.getOrNull(index) ?: jumpedRows[index]
+                if (track == null) {
+                    TrackRowSkeleton()
+                } else {
+                    TrackRow(
+                        track, vm,
+                        contextUri = detail.uri,
+                        trackIndex = index,
+                        onRemoveFromPlaylist = if (canEditItems && track.uid != null) {
+                            { detailVm.removeFromPlaylist(track) }
+                        } else {
+                            null
+                        }
+                    )
+                }
             }
-            when {
-                isArtist -> ArtistTrackRow(index + 1, track, vm, detail.uri, detail.topTrackPlaycounts.getOrNull(index))
-                detail.type == "album" -> AlbumTrackRow(track, vm, detail.uri, index)
-                else -> TrackRow(
-                    track, vm,
-                    contextUri = detail.uri,
-                    trackIndex = index,
-                    onRemoveFromPlaylist = if (canEditItems && track.uid != null) {
-                        { detailVm.removeFromPlaylist(track) }
-                    } else {
-                        null
-                    }
-                )
+        } else {
+            itemsIndexed(detail.tracks, key = { index, track -> "$index-${track.uri}" }) { index, track ->
+                if (hasMore && index >= detail.tracks.size - 5) {
+                    LaunchedEffect(detail.tracks.size) { detailVm.loadMoreDetail() }
+                }
+                when {
+                    isArtist -> ArtistTrackRow(index + 1, track, vm, detail.uri, detail.topTrackPlaycounts.getOrNull(index))
+                    detail.type == "album" -> AlbumTrackRow(track, vm, detail.uri, index)
+                    else -> TrackRow(
+                        track, vm,
+                        contextUri = detail.uri,
+                        trackIndex = index,
+                        onRemoveFromPlaylist = if (canEditItems && track.uid != null) {
+                            { detailVm.removeFromPlaylist(track) }
+                        } else {
+                            null
+                        }
+                    )
+                }
             }
         }
 

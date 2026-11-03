@@ -18,6 +18,7 @@ import kotify.api.podcast.Podcast
 import kotify.api.radio.Radio
 import kotify.api.song.Song
 import kotify.session.Session
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -107,11 +108,15 @@ class DetailViewModel : SessionViewModel("DetailVM") {
     }
 
     fun openPlaylist(playlistId: String) = openDetail(Screen.PLAYLIST_DETAIL, "openPlaylist", "spotify:playlist:$playlistId") { sess ->
+        // A kept page shows at once and is asked for again behind it: the web player loads a playlist on
+        // every open, and the daylist renames itself without a push. A change reloads it (#1057). A page
+        // that was not kept has just been asked for, so it is not asked for twice.
+        val kept = SessionHolder.playlistStore?.isKept(playlistId, limit = PLAYLIST_FIRST_PAGE, offset = 0) == true
         playlistPage(sess, playlistId, limit = PLAYLIST_FIRST_PAGE, offset = 0).toDetailData(playlistId).also {
-            // A kept page shows at once and is asked for again behind it: the web player loads a playlist on
-            // every open, and the daylist renames itself without a push. A change reloads it (#1057).
-            launchWithSession("revalidatePlaylist") {
-                SessionHolder.playlistStore?.revalidate(playlistId, limit = PLAYLIST_FIRST_PAGE, offset = 0)
+            if (kept) {
+                launchWithSession("revalidatePlaylist") {
+                    SessionHolder.playlistStore?.revalidate(playlistId, limit = PLAYLIST_FIRST_PAGE, offset = 0)
+                }
             }
         }
     }
@@ -153,7 +158,10 @@ class DetailViewModel : SessionViewModel("DetailVM") {
             launchWithSession("reloadInvalidatedPlaylist") { sess ->
                 val fresh = playlistPage(sess, playlistId, limit = PLAYLIST_FIRST_PAGE, offset = 0).toDetailData(playlistId)
                 // The user may have navigated on while this was in flight.
-                if (_detail.value.uri == open.uri) _detail.value = fresh
+                if (_detail.value.uri == open.uri) {
+                    _jumpedRows.value = emptyMap()
+                    _detail.value = fresh
+                }
             }
         }
     }
@@ -261,6 +269,54 @@ class DetailViewModel : SessionViewModel("DetailVM") {
         }
     }
 
+    /** Rows loaded where the scrollbar landed, by position, past the unbroken run in [DetailData.tracks]. */
+    private val _jumpedRows = MutableStateFlow<Map<Int, TrackInfo>>(emptyMap())
+    val jumpedRows: StateFlow<Map<Int, TrackInfo>> = _jumpedRows
+    private var jumpedUri: String? = null
+
+    /**
+     * Loads what is missing where the list is now, as the web player does: one page from the first row on
+     * screen, the next one once there, and nothing in between. The list's own scrolling calls this one at a
+     * time, so a fast drag asks at the pace of the answers and skips everything it flew past.
+     */
+    suspend fun loadVisibleRows(first: Int, last: Int) {
+        val open = _detail.value
+        if (open.uri != jumpedUri) {
+            jumpedUri = open.uri
+            _jumpedRows.value = emptyMap()
+        }
+        // At the very top the web player asks for nothing until the list moves.
+        val ahead = if (first == 0) 0 else DETAIL_PAGE_SIZE
+        val wanted = (first - ROWS_KEPT_ABOVE).coerceAtLeast(0)..minOf(last + ahead, open.totalCount - 1)
+        val isLoaded = { row: Int -> row < open.tracks.size || row in _jumpedRows.value }
+        val missing = wanted.firstOrNull { !isLoaded(it) } ?: return
+        val window = pageWindow(missing, DETAIL_PAGE_SIZE, isLoaded)
+        val session = SessionHolder.session ?: return
+        val page = try {
+            rowsAt(session, open.uri, window)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            LokiLogger.e(logTag, "loadVisibleRows", e)
+            return
+        }
+        if (_detail.value.uri != open.uri) return
+        val rows = _jumpedRows.value.toMutableMap()
+        page.forEachIndexed { i, track -> rows[window.offset + i] = track }
+        // Rows that now follow on from the unbroken run join it, which is what the page's other actions read.
+        val run = _detail.value.tracks.toMutableList()
+        while (true) run += rows.remove(run.size) ?: break
+        _jumpedRows.value = rows
+        _detail.value = _detail.value.copy(tracks = run, loadedOffset = run.size)
+    }
+
+    private suspend fun rowsAt(session: Session, uri: String, window: PageWindow): List<TrackInfo> =
+        if (uri.contains(":collection")) {
+            Playlist(session).getLikedSongs(limit = window.limit, offset = window.offset).toDetailData(window.offset).tracks
+        } else {
+            playlistPage(session, spfyId(uri), window.limit, window.offset).tracks.map { it.toTrackInfo() }
+        }
+
     fun loadMoreDetail() {
         val current = _detail.value
         if (_isLoadingMore.value) return
@@ -353,8 +409,13 @@ class DetailViewModel : SessionViewModel("DetailVM") {
                     more = if (current.uri != forUri || current.totalCount in 0..before) {
                         false
                     } else {
-                        loadMoreDetail()
-                        _isLoadingMore.first { !it }
+                        if (_jumpedRows.value.isEmpty()) {
+                            loadMoreDetail()
+                            _isLoadingMore.first { !it }
+                        } else {
+                            // Rows the scrollbar already loaded are not asked for again.
+                            loadVisibleRows(before, before)
+                        }
                         // A page that added nothing is the end, or a failed request. Either way stop,
                         // rather than re-asking for the same offset until the list happens to grow.
                         _detail.value.tracks.size > before
@@ -427,6 +488,8 @@ class DetailViewModel : SessionViewModel("DetailVM") {
      * lands and comes back if it fails, which is the only feedback there is.
      */
     fun removeFromPlaylist(track: TrackInfo) {
+        // Every row below it moves up one, so positions loaded further down no longer hold.
+        _jumpedRows.value = emptyMap()
         val before = _detail.value
         val uid = track.uid ?: return
         val sess = SessionHolder.session ?: return
@@ -458,6 +521,9 @@ class DetailViewModel : SessionViewModel("DetailVM") {
 
     companion object {
         private const val DETAIL_PAGE_SIZE = 50
+
+        /** How far above the first visible row the web player starts its page, as measured: row 1000 asks from 972. */
+        private const val ROWS_KEPT_ABOVE = 28
     }
 }
 

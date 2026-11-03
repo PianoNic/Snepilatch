@@ -6,7 +6,6 @@ import kotify.api.artist.ArtistInfo
 import kotify.api.artist.ArtistTopTrack
 import kotify.api.playerstatus.QueueTrack
 import kotify.api.playlist.LikedSong
-import kotify.api.playlist.LikedSongsPage
 import kotify.api.playlist.PLAYLIST_FIRST_PAGE
 import kotify.api.playlist.PlaylistInfo
 import kotify.api.playlist.PlaylistTrack
@@ -181,16 +180,22 @@ fun PlaylistInfo.toDetailData(playlistId: String) = DetailData(
 /** The official Liked Songs cover art (heart on gradient), served from the same CDN the clients use. */
 const val LIKED_SONGS_COVER_URL = "https://misc.scdn.co/liked-songs/liked-songs-640.png"
 
-fun LikedSongsPage.toDetailData(offset: Int) = DetailData(
+/**
+ * The Liked Songs page, read as the web player reads it: a playlist. Playing it still goes through the
+ * collection's uri, under which a playlist row's uid means nothing, so rows carry none.
+ */
+fun PlaylistInfo.toLikedSongsDetail() = DetailData(
     name = "Liked Songs",
     imageUrl = LIKED_SONGS_COVER_URL,
-    tracks = items.map { it.toTrackInfo() },
+    tracks = likedSongsRows(),
     uri = "spotify:collection:tracks",
     // Downloadable like any list (#583): a batch fetches one track at a time.
     type = "collection",
-    totalCount = total,
-    loadedOffset = offset + items.size,
+    totalCount = totalTracks,
+    loadedOffset = tracks.size,
 )
+
+fun PlaylistInfo.likedSongsRows() = tracks.map { it.toTrackInfo().copy(uid = null) }
 
 fun AlbumInfo.toDetailData(albumId: String): DetailData {
     val mappedTracks = tracks.map { it.toTrackInfo(coverArtUrl) }

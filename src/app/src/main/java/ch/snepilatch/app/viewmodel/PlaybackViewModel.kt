@@ -402,7 +402,9 @@ class PlaybackViewModel(
             override val prevPreview get() = prevTrackPreview
             override val isOffline get() = this@PlaybackViewModel.isOffline
             override val engineOwnsPlayback get() = this@PlaybackViewModel.engineOwnsPlayback
-            override fun hasSession() = session != null
+
+            // A start can fail after the session loaded, with no player to come back to: that one starts again.
+            override fun hasSession() = session != null && player != null
             override fun playingContextUri() = playingContext.value?.uri
             override fun trackChanged(track: TrackInfo) {
                 commitStream(track.uri, AudioSourceResolver.LOCAL_PROVIDER)
@@ -771,11 +773,15 @@ class PlaybackViewModel(
             } catch (e: Exception) {
                 LokiLogger.e(TAG, "Init failed", e)
                 val msg = e.message ?: "Unknown error"
-                val ctx = MusicPlaybackService.instance as? android.content.Context
-                if (ctx != null && !hasInternet(ctx)) {
-                    LokiLogger.w(TAG, "No internet — starting offline, downloads only")
+                // The service may not be up yet at a cold start; its context is known from when it was asked for.
+                val ctx = serviceContext ?: MusicPlaybackService.instance
+                val noRoute = ctx != null && !hasInternet(ctx)
+                if (startsOffline(e, noRoute, Downloads.rows.value.isNotEmpty())) {
+                    LokiLogger.w(TAG, "Start failed (no route: $noRoute), opening on the downloads and trying again behind them")
                     isOffline.value = true
                     isInitialized.value = true
+                    // Nothing else would: the network callback only speaks when the route changes.
+                    offline.onStartFailed()
                     return@launch
                 }
                 // Spfy's own outage (#940): its "Page not available" page or a 5xx. Said as such, not shown as
@@ -785,7 +791,7 @@ class PlaybackViewModel(
                     initError.value = UiMessage(R.string.service_down)
                     return@launch
                 }
-                if (msg.contains("Unauthorized") || msg.contains("401") || msg.contains("code\":400")) {
+                if (isTokenRefusal(msg)) {
                     initRetryCount++
                     if (initRetryCount > 5) {
                         LokiLogger.e(TAG, "Rate limited — 5 retries exhausted, giving up")

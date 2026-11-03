@@ -564,4 +564,6 @@
     <string name="duplicate_add_anyway">Add anyway</string>
     <string name="duplicate_add_new">Add new ones</string>
     <string name="duplicate_add_all">Add all</string>
+    <string name="offline_retrying">You\'re offline, connecting…</string>
+    <string name="offline_retry_in">You\'re offline, retrying in %1$d s</string>
 </resources>

@@ -574,4 +574,6 @@
     <string name="duplicate_add_anyway">Glich hinzuefüege</string>
     <string name="duplicate_add_new">Nur neui hinzuefüege</string>
     <string name="duplicate_add_all">Alli hinzuefüege</string>
+    <string name="offline_retrying">Du bisch offline, verbinde…</string>
+    <string name="offline_retry_in">Du bisch offline, neue Versuech in %1$d s</string>
 </resources>

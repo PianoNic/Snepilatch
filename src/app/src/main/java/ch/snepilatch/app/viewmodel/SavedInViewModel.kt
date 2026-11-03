@@ -1,15 +1,18 @@
 package ch.snepilatch.app.viewmodel
 
 import androidx.annotation.StringRes
+import androidx.lifecycle.viewModelScope
 import ch.snepilatch.app.R
 import ch.snepilatch.app.logic.shared.AppMessages
 import ch.snepilatch.app.logic.shared.SessionViewModel
 import kotify.api.playlist.CurationContext
 import kotify.api.playlist.Playlist
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 /**
  * The web player's "Saved in" sheet for one track (#710): what can hold it, what does, and the ticks
@@ -51,9 +54,14 @@ class SavedInViewModel : SessionViewModel("SavedIn") {
         reload()
     }
 
+    /** Asks once typing pauses, so a word is one request and not one per letter. */
     fun search(filter: String) {
-        _state.value = _state.value.copy(filter = filter)
-        reload()
+        _state.value = _state.value.copy(filter = filter, rows = emptyList(), total = 0)
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            delay(SEARCH_PAUSE_MS)
+            load(offset = 0)
+        }
     }
 
     fun openFolder(folder: CurationContext) {
@@ -126,5 +134,6 @@ class SavedInViewModel : SessionViewModel("SavedIn") {
 
     private companion object {
         const val LIKED_SONGS = "spotify:collection:tracks"
+        const val SEARCH_PAUSE_MS = 300L
     }
 }

@@ -54,7 +54,7 @@ class SavedInViewModel : SessionViewModel("SavedIn") {
         reload()
     }
 
-    /** Asks once typing pauses, so a word is one request and not one per letter. */
+    /** Asks once typing pauses, 200 ms as the web player's filter box, so a word is not one request per letter. */
     fun search(filter: String) {
         _state.value = _state.value.copy(filter = filter, rows = emptyList(), total = 0)
         loadJob?.cancel()
@@ -134,6 +134,6 @@ class SavedInViewModel : SessionViewModel("SavedIn") {
 
     private companion object {
         const val LIKED_SONGS = "spotify:collection:tracks"
-        const val SEARCH_PAUSE_MS = 300L
+        const val SEARCH_PAUSE_MS = 200L
     }
 }

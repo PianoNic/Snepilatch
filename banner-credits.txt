@@ -14,5 +14,6 @@ Phone frame
 
 Screens
   Screenshots of Snepilatch. The album covers, artist images and lyrics shown on them
-  belong to their respective owners. Account names, avatars, playlist owner names and
-  the name of the Spfy service are covered or blurred.
+  belong to their respective owners. Account names, playlist owner names and the name of
+  the Spfy service are covered or blurred. The account avatar is replaced by a picture
+  found on Pinterest; its artist and licence are unknown.

@@ -75,7 +75,7 @@ class DetailViewModel : SessionViewModel("DetailVM") {
     private fun openDetail(screen: Screen, op: String, offlineUri: String? = null, load: suspend (Session) -> DetailData?) {
         Navigator.navigateTo(screen)
         loadError.value = null
-        if (offlineUri != null && !NetworkState.online.value) {
+        if (offlineUri != null && (!NetworkState.online.value || NetworkState.offlineMode)) {
             _detail.value = downloadedDetail(offlineUri)
             return
         }
@@ -105,7 +105,7 @@ class DetailViewModel : SessionViewModel("DetailVM") {
         )
     }
 
-    fun openLikedSongs() = openDetail(Screen.PLAYLIST_DETAIL, "openLikedSongs") { sess ->
+    fun openLikedSongs() = openDetail(Screen.PLAYLIST_DETAIL, "openLikedSongs", "spotify:collection:tracks") { sess ->
         Playlist(sess).getPlaylist(LIKED_SONGS_PLAYLIST_ID, PLAYLIST_FIRST_PAGE, 0).toLikedSongsDetail()
     }
 

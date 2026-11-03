@@ -2,6 +2,7 @@ package ch.snepilatch.app.logic.shared
 
 import android.content.Context
 import android.content.SharedPreferences
+import ch.snepilatch.app.data.AccountInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.json.JSONArray
 import org.json.JSONObject
@@ -17,13 +18,15 @@ data class SavedAccount(val username: String, val displayName: String, val image
  */
 object AccountStore {
     private const val ACCOUNTS_KEY = "accounts"
+    private const val INFO_KEY = "account_info_"
     private var prefs: SharedPreferences? = null
 
     val accounts = MutableStateFlow<List<SavedAccount>>(emptyList())
 
     fun init(context: Context) {
         prefs = context.getSharedPreferences(AppSettings.PREFS, Context.MODE_PRIVATE)
-        accounts.value = decodeAccounts(prefs?.getString(ACCOUNTS_KEY, null))
+        // A start without an answer once saved an account with no name, under the real one's cookies.
+        accounts.value = decodeAccounts(prefs?.getString(ACCOUNTS_KEY, null)).filter { it.username.isNotBlank() }
     }
 
     /** Adds or refreshes [account] by username, so a re-login or a new picture updates the row. */
@@ -40,12 +43,55 @@ object AccountStore {
         persist(list.map { if (it.cookies["sp_dc"] == spDc) it.copy(cookies = cookies) else it })
     }
 
-    fun forget(username: String) = persist(accounts.value.filter { it.username != username })
+    fun forget(username: String) {
+        persist(accounts.value.filter { it.username != username })
+        prefs?.edit()?.remove(INFO_KEY + username)?.apply()
+    }
+
+    /** Keeps what the account page shows, so it shows before the network answers, or without one. */
+    fun rememberInfo(info: AccountInfo) {
+        prefs?.edit()?.putString(INFO_KEY + info.username, encodeAccountInfo(info))?.apply()
+    }
+
+    /** What was last kept for the account these [cookies] open. */
+    fun infoFor(cookies: Map<String, String>): AccountInfo? {
+        val spDc = cookies["sp_dc"] ?: return null
+        val username = accounts.value.firstOrNull { it.cookies["sp_dc"] == spDc }?.username ?: return null
+        return decodeAccountInfo(prefs?.getString(INFO_KEY + username, null))
+    }
 
     private fun persist(list: List<SavedAccount>) {
         accounts.value = list
         prefs?.edit()?.putString(ACCOUNTS_KEY, encodeAccounts(list))?.apply()
     }
+}
+
+fun encodeAccountInfo(info: AccountInfo): String = JSONObject()
+    .put("username", info.username)
+    .put("displayName", info.displayName)
+    .put("isPremium", info.isPremium)
+    .put("profileImageUrl", info.profileImageUrl ?: JSONObject.NULL)
+    .put("userId", info.userId)
+    .put("followers", info.followers)
+    .put("following", info.following)
+    .put("playlistCount", info.playlistCount)
+    .toString()
+
+fun decodeAccountInfo(json: String?): AccountInfo? {
+    if (json.isNullOrBlank()) return null
+    return runCatching {
+        val o = JSONObject(json)
+        AccountInfo(
+            username = o.getString("username"),
+            displayName = o.getString("displayName"),
+            isPremium = o.getBoolean("isPremium"),
+            profileImageUrl = if (o.isNull("profileImageUrl")) null else o.getString("profileImageUrl"),
+            userId = o.getString("userId"),
+            followers = o.getInt("followers"),
+            following = o.getInt("following"),
+            playlistCount = o.getInt("playlistCount"),
+        )
+    }.getOrNull()
 }
 
 fun encodeAccounts(accounts: List<SavedAccount>): String = JSONArray().also { arr ->

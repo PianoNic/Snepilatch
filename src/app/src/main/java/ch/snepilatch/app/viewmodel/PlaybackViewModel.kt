@@ -20,6 +20,8 @@ import ch.snepilatch.app.logic.relay.RelayCommand
 import ch.snepilatch.app.logic.relay.RelayJam
 import ch.snepilatch.app.logic.shared.LokiLogger
 import ch.snepilatch.app.logic.shared.detectActiveAudioOutput
+import ch.snepilatch.app.logic.playback.RecentPlays
+import ch.snepilatch.app.logic.shared.NetworkState
 import ch.snepilatch.app.logic.shared.hasInternet
 import ch.snepilatch.app.logic.shared.normalizeSpfyImageUrl
 import ch.snepilatch.app.logic.playback.InfiniPlayController
@@ -391,6 +393,11 @@ class PlaybackViewModel(
     data class PlayingContext(val type: String, val name: String, val uri: String? = null, val canEditItems: Boolean = false)
     val playingContext = MutableStateFlow<PlayingContext?>(null)
 
+    init {
+        viewModelScope.launch { playingContext.collect { it?.uri?.let(RecentPlays::contextPlayed) } }
+        viewModelScope.launch { isOffline.collect(NetworkState::setOfflineMode) }
+    }
+
     /** The offline engine's side of this model: the state mirror, the network watch, the takeover (#789, #792). */
     internal val offline = OfflineController(
         viewModelScope,
@@ -572,6 +579,8 @@ class PlaybackViewModel(
     private suspend fun loadAccount(sess: Session) = coroutineScope {
         val userApi = User(sess)
         val me = userApi.getCurrentUser()
+        // Without an answer this comes back blank rather than failing, and must not replace who is shown.
+        if (me.username.isBlank()) return@coroutineScope
         username = me.username
         SessionHolder.username = me.username
         // Only getCurrentUser has to come first, because the other two need the username. Those two
@@ -593,6 +602,7 @@ class PlaybackViewModel(
             followers = pubProfile.followers, following = pubProfile.following,
             playlistCount = pubProfile.publicPlaylists
         )
+        AccountStore.rememberInfo(_account.value)
         LokiLogger.i(TAG, "User: $username ($displayName), premium: $isPremium")
         // Remember this account so the account tab can switch back to it (#847). The cookies come
         // from the live session, not from what initialize was handed, so a refreshed sp_dc is kept.
@@ -675,6 +685,8 @@ class PlaybackViewModel(
         }
 
         tearDownSession()
+        // Who this is shows at once, and stays when the network never answers.
+        AccountStore.infoFor(cookies)?.let { _account.value = it }
         LokiLogger.i(
             TAG,
             "Session language: ${AppSettings.effectiveLanguage()} " +
@@ -2064,6 +2076,7 @@ class PlaybackViewModel(
     }
 
     private fun commitStream(uri: String, provider: String?) {
+        RecentPlays.trackPlayed(uri)
         currentStreamUri = uri
         isStreaming.value = true
         streamProvider.value = provider

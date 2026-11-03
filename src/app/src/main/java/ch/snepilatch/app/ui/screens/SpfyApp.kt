@@ -1,5 +1,7 @@
 package ch.snepilatch.app.ui.screens
 
+import ch.snepilatch.app.logic.playback.RETRYING_NOW
+import ch.snepilatch.app.ui.theme.SnepilatchElevated
 import ch.snepilatch.app.ui.theme.SnepilatchWhite
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -114,6 +116,14 @@ private val MorphCardPadH = 12.dp
 private val MorphCardPadV = 6.dp
 
 // --- App Shell ---
+
+/** The offline note, with when it tries again while it is trying. */
+@Composable
+private fun offlineNote(retryInSeconds: Int?): String = when (retryInSeconds) {
+    null -> stringResource(R.string.offline_banner)
+    RETRYING_NOW -> stringResource(R.string.offline_retrying)
+    else -> stringResource(R.string.offline_retry_in, retryInSeconds)
+}
 
 @Composable
 fun SpfyApp(vm: PlaybackViewModel) {
@@ -305,11 +315,12 @@ fun SpfyApp(vm: PlaybackViewModel) {
                 Column {
                     if (isOffline) {
                         Text(
-                            stringResource(R.string.offline_banner),
-                            color = SnepilatchLightGray,
+                            offlineNote(vm.offline.retryInSeconds.collectAsState().value),
+                            color = SnepilatchWhite,
                             fontSize = 12.sp,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                            // Solid: the list scrolls behind this, and its rows made the note hard to read.
+                            modifier = Modifier.fillMaxWidth().background(SnepilatchElevated).padding(vertical = 4.dp)
                         )
                     } else if (dealerState == DealerState.DISCONNECTED) {
                         // The reconnect gave up (Kotify #577); a tap starts it over, as the next command would.

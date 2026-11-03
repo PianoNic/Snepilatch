@@ -17,6 +17,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
+/** [OfflineController.retryInSeconds] during a try. */
+const val RETRYING_NOW = 0
+
 /**
  * The offline engine's side of the playback view model: mirrors [OfflinePlayer]'s state into the
  * flows every screen reads, watches the network, takes over in place when the signal goes
@@ -71,7 +74,11 @@ class OfflineController(private val scope: CoroutineScope, private val hooks: Ho
         fun showMessage(@StringRes id: Int)
     }
 
+    /** Seconds to the next try at getting back online, [RETRYING_NOW] during one, null while none is coming. */
+    val retryInSeconds = MutableStateFlow<Int?>(null)
+
     private var offlineWatch: Job? = null
+    private var startFailures = 0
     private var handBack: Job? = null
 
     /** Completed when the dealer socket is back after a network return; a new wait replaces it. */
@@ -192,15 +199,49 @@ class OfflineController(private val scope: CoroutineScope, private val hooks: Ho
      * audio never stops; the engine steps aside once Connect has it. If nothing comes up the
      * engine keeps playing and the next network change tries again.
      */
+    /**
+     * A start that failed with the route still up: no route change is coming to set off another. Counts down
+     * first, longer each time, then tries. A try that ends in this again replaces the one waiting on its device.
+     */
+    fun onStartFailed() {
+        if (!NetworkState.online.value) return
+        startFailures++
+        val seconds = minOf(START_RETRY_STEP_SECONDS * startFailures, START_RETRY_MAX_SECONDS)
+        handBack?.cancel()
+        handBack = scope.launch(Dispatchers.IO) {
+            try {
+                countDown(seconds)
+                if (hooks.isOffline.value && NetworkState.online.value) {
+                    retryInSeconds.value = RETRYING_NOW
+                    if (tryHandBack()) startFailures = 0
+                }
+            } finally {
+                retryInSeconds.value = null
+            }
+        }
+    }
+
+    private suspend fun countDown(seconds: Int) {
+        for (left in seconds downTo 1) {
+            retryInSeconds.value = left
+            delay(MS_PER_SECOND)
+        }
+    }
+
     private fun handBackWhenReady() {
         if (handBack?.isActive == true) return
         handBack = scope.launch(Dispatchers.IO) {
             // A session that does not come up (the network still settling, a request that times
             // out) leaves the engine playing; while the network stays up this tries again.
-            while (hooks.isOffline.value && NetworkState.online.value) {
-                if (tryHandBack()) return@launch
-                LokiLogger.w(TAG, "Staying offline, trying the way back again in ${RETRY_MS}ms")
-                delay(RETRY_MS)
+            try {
+                while (hooks.isOffline.value && NetworkState.online.value) {
+                    retryInSeconds.value = RETRYING_NOW
+                    if (tryHandBack()) return@launch
+                    LokiLogger.w(TAG, "Staying offline, trying the way back again in ${RETRY_MS}ms")
+                    countDown((RETRY_MS / MS_PER_SECOND).toInt())
+                }
+            } finally {
+                retryInSeconds.value = null
             }
         }
     }
@@ -262,5 +303,8 @@ class OfflineController(private val scope: CoroutineScope, private val hooks: Ho
         const val GRACE_MS = 5_000L
         const val PLAYER_WAIT_MS = 60_000L
         const val RETRY_MS = 60_000L
+        const val START_RETRY_STEP_SECONDS = 20
+        const val START_RETRY_MAX_SECONDS = 60
+        const val MS_PER_SECOND = 1_000L
     }
 }

@@ -26,10 +26,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ModalBottomSheetProperties
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -61,14 +64,21 @@ fun SavedInSheet(trackUri: String, onLiked: (Boolean) -> Unit, onDismiss: () -> 
     val savedIn: SavedInViewModel = viewModel()
     LaunchedEffect(trackUri) { savedIn.open(trackUri) }
     val state by savedIn.state.collectAsState()
-    BackHandler(enabled = state.folder != null) { savedIn.closeFolder() }
 
+    val sheetState = rememberBottomSheetState(
+        initialValue = SheetValue.Hidden,
+        enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+    )
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         containerColor = SnepilatchElevated,
         dragHandle = { SheetDragHandle() },
+        properties = ModalBottomSheetProperties(shouldDismissOnBackPress = state.folder == null),
     ) {
         SheetNavBarFix()
+        // Inside the sheet: it is its own window, so a handler outside never hears Back.
+        BackHandler(enabled = state.folder != null) { savedIn.closeFolder() }
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.85f)) {
             SavedInHeader(state.folder, onBack = savedIn::closeFolder)
             SavedInSearch(state.filter, savedIn::search)

@@ -27,6 +27,12 @@ class SavedInViewModel : SessionViewModel("SavedIn") {
         val changes: Map<String, Boolean> = emptyMap(),
     ) {
         fun ticked(row: CurationContext) = changes[row.uri] ?: row.isCurated
+
+        /** Ticking back to what the server said is no change at all, so nothing is written for it. */
+        fun toggled(row: CurationContext): State {
+            val ticked = !ticked(row)
+            return copy(changes = if (ticked == row.isCurated) changes - row.uri else changes + (row.uri to ticked))
+        }
     }
 
     private val _state = MutableStateFlow(State())
@@ -87,10 +93,7 @@ class SavedInViewModel : SessionViewModel("SavedIn") {
     }
 
     fun toggle(row: CurationContext) {
-        val current = _state.value
-        val ticked = !current.ticked(row)
-        val changes = if (ticked == row.isCurated) current.changes - row.uri else current.changes + (row.uri to ticked)
-        _state.value = current.copy(changes = changes)
+        _state.value = _state.value.toggled(row)
     }
 
     /** Writes the changes. [onLiked] hears whether the track is now in Liked Songs, when that changed. */

@@ -209,7 +209,8 @@ fun DetailScreen(vm: PlaybackViewModel) {
                     if (detail.tracks.isNotEmpty()) {
                         val totalMin = detail.tracks.sumOf { it.durationMs } / 60000
                         meta.add(stringResource(R.string.detail_songs, detail.totalCount.takeIf { it > 0 } ?: detail.tracks.size))
-                        meta.add(stringResource(R.string.detail_minutes, totalMin.toInt()))
+                        // The sum of what is loaded says nothing until that is all of it.
+                        if (!hasMore) meta.add(stringResource(R.string.detail_minutes, totalMin.toInt()))
                     }
                     if (meta.isNotEmpty()) {
                         Text(meta.joinToString(" · "), color = SnepilatchLightGray, fontSize = 13.sp)

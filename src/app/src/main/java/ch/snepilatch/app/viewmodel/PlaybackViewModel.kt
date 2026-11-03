@@ -1544,7 +1544,7 @@ class PlaybackViewModel(
                     viewModelScope.launch(Dispatchers.IO) {
                         try {
                             val sess = session ?: return@launch
-                            val info = kotify.api.playlist.Playlist(sess).getPlaylist(playlistId, limit = 1)
+                            val info = kotify.api.playlist.Playlist(sess).getPlaylistMetadata(playlistId)
                             // What the service says this user may do, not who owns it: a
                             // collaborative playlist is editable by people who do not own it (#853).
                             val editable = info.canEditItems

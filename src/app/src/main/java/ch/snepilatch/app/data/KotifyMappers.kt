@@ -180,10 +180,7 @@ fun PlaylistInfo.toDetailData(playlistId: String) = DetailData(
 /** The official Liked Songs cover art (heart on gradient), served from the same CDN the clients use. */
 const val LIKED_SONGS_COVER_URL = "https://misc.scdn.co/liked-songs/liked-songs-640.png"
 
-/**
- * The Liked Songs page, read as the web player reads it: a playlist. Playing it still goes through the
- * collection's uri, under which a playlist row's uid means nothing, so rows carry none.
- */
+/** The Liked Songs page, read as the web player reads it: a playlist. */
 fun PlaylistInfo.toLikedSongsDetail() = DetailData(
     name = "Liked Songs",
     imageUrl = LIKED_SONGS_COVER_URL,
@@ -195,7 +192,7 @@ fun PlaylistInfo.toLikedSongsDetail() = DetailData(
     loadedOffset = tracks.size,
 )
 
-fun PlaylistInfo.likedSongsRows() = tracks.map { it.toTrackInfo().copy(uid = null) }
+fun PlaylistInfo.likedSongsRows() = tracks.map { it.toTrackInfo() }
 
 fun AlbumInfo.toDetailData(albumId: String): DetailData {
     val mappedTracks = tracks.map { it.toTrackInfo(coverArtUrl) }

@@ -31,7 +31,7 @@ fun DuplicateTracksDialog(add: DuplicateAdd, onAdd: (List<String>) -> Unit, onDi
         },
         confirmButton = {
             TextButton(onClick = { if (someNew) onAdd(add.newUris) else onDismiss() }) {
-                Text(stringResource(if (someNew) R.string.duplicate_add_new else R.string.duplicate_dont_add), color = SnepilatchWhite)
+                Text(stringResource(if (someNew) R.string.duplicate_add_new else R.string.cancel), color = SnepilatchWhite)
             }
         },
         dismissButton = {

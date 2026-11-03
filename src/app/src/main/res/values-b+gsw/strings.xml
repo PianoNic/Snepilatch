@@ -571,7 +571,6 @@
     <string name="duplicate_some_title">Es paar scho hinzuegfüegt</string>
     <string name="duplicate_all">Die Titel sind scho in %1$s.</string>
     <string name="duplicate_some">Es paar vo dene Titel sind scho in %1$s.</string>
-    <string name="duplicate_dont_add">Nöd hinzuefüege</string>
     <string name="duplicate_add_anyway">Glich hinzuefüege</string>
     <string name="duplicate_add_new">Nur neui hinzuefüege</string>
     <string name="duplicate_add_all">Alli hinzuefüege</string>

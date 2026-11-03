@@ -561,7 +561,6 @@
     <string name="duplicate_some_title">Some already added</string>
     <string name="duplicate_all">These are already in %1$s.</string>
     <string name="duplicate_some">Some of these are already in %1$s.</string>
-    <string name="duplicate_dont_add">Don\'t add</string>
     <string name="duplicate_add_anyway">Add anyway</string>
     <string name="duplicate_add_new">Add new ones</string>
     <string name="duplicate_add_all">Add all</string>

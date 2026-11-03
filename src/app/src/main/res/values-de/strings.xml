@@ -561,7 +561,6 @@
     <string name="duplicate_some_title">Einige bereits hinzugefügt</string>
     <string name="duplicate_all">Diese Titel sind bereits in %1$s.</string>
     <string name="duplicate_some">Einige dieser Titel sind bereits in %1$s.</string>
-    <string name="duplicate_dont_add">Nicht hinzufügen</string>
     <string name="duplicate_add_anyway">Trotzdem hinzufügen</string>
     <string name="duplicate_add_new">Nur neue hinzufügen</string>
     <string name="duplicate_add_all">Alle hinzufügen</string>

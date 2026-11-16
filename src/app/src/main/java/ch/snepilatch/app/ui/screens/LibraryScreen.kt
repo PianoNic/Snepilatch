@@ -149,11 +149,12 @@ fun LibraryScreen() {
             it.name.contains(searchQuery, ignoreCase = true) ||
             (it.owner?.contains(searchQuery, ignoreCase = true) == true)
         }
+        // Once each: the list is keyed by uri, and an item the pages list twice crashed it.
         when (sortMode) {
             "alpha" -> searchedLibrary.sortedBy { it.name.lowercase() }
             "type" -> searchedLibrary.sortedBy { it.type }
             else -> searchedLibrary
-        }
+        }.distinctBy { it.uri }
     }
 
     Box(Modifier.fillMaxSize()) {

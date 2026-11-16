@@ -259,7 +259,7 @@ private fun SuggestionsList(
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = LocalBottomOverlayHeight.current.value + 16.dp)
     ) {
-        items(suggestions, key = { it.uri }) { sug ->
+        items(suggestions.distinctBy { it.uri }, key = { it.uri }) { sug ->
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -482,7 +482,7 @@ private fun CategorizedResults(
                 }
             } else {
                 val rows = singleFilterRows(results, vm, ctx, selectedFilter)
-                items(rows, key = { it.uri }) { row ->
+                items(rows.distinctBy { it.uri }, key = { it.uri }) { row ->
                     SearchResultSwipeActions(row, vm) {
                         ResultRow(row.title, row.subtitle, row.imageUrl, row.circular, liveMenu(row.menu, row.track, vm), row.track, row.onClick)
                     }

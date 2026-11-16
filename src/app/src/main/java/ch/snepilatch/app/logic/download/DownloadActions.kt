@@ -5,11 +5,13 @@ import ch.snepilatch.app.data.TrackInfo
 import ch.snepilatch.app.logic.playback.MusicPlaybackService
 import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.logic.shared.LokiLogger
+import ch.snepilatch.app.logic.shared.NetworkState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -233,6 +235,9 @@ object DownloadActions {
                     // Between tracks, not mid-file: a paused entry stops before starting the next one
                     // rather than abandoning bytes already fetched.
                     DownloadQueue.awaitResume(id)
+                    // Without a network every track would fail in turn: one batch logged 116 failed
+                    // look-ups in a minute. It waits for the network and goes on where it was.
+                    NetworkState.online.first { it }
                     DownloadNotifier.batch(ctx, track.name, index + 1, tracks.size)
                     // Cleared in a finally: a cancelled batch unwinds before the call returns, and a
                     // percentage left behind would freeze that row's ring for the rest of the process.

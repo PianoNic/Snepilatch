@@ -109,7 +109,19 @@ class DetailViewModel : SessionViewModel("DetailVM") {
         Playlist(sess).getPlaylist(LIKED_SONGS_PLAYLIST_ID, PLAYLIST_FIRST_PAGE, 0).toLikedSongsDetail()
     }
 
-    fun openPlaylist(playlistId: String) = openDetail(Screen.PLAYLIST_DETAIL, "openPlaylist", "spotify:playlist:$playlistId") { sess ->
+    fun openPlaylist(playlistId: String) {
+        // Liked Songs' uri (spotify:collection:tracks) cut down to an id reads "tracks", which no
+        // playlist has: a tap somewhere still sends it here, so it opens Liked Songs, and the
+        // caller is logged to find it.
+        if (playlistId == "tracks") {
+            LokiLogger.w(logTag, "Liked Songs opened as a playlist from ${Throwable("caller").stackTrace.drop(1).take(4).joinToString(" < ")}")
+            openLikedSongs()
+        } else {
+            openPlaylistPage(playlistId)
+        }
+    }
+
+    private fun openPlaylistPage(playlistId: String) = openDetail(Screen.PLAYLIST_DETAIL, "openPlaylist", "spotify:playlist:$playlistId") { sess ->
         // A kept page shows at once and is asked for again behind it: the web player loads a playlist on
         // every open, and the daylist renames itself without a push. A change reloads it (#1057). A page
         // that was not kept has just been asked for, so it is not asked for twice.

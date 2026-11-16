@@ -1058,6 +1058,9 @@ class PlaybackViewModel(
             loadDevices()
             if (wasPlaying) fallbackResume()
             retryPendingAdvance()  // self-heal an advance the disconnect interrupted
+        } catch (e: CancellationException) {
+            // Cancelled by a newer call, not failed.
+            throw e
         } catch (e: Exception) {
             LokiLogger.e(TAG, "Failed to re-sync after reconnect", e)
         } finally {
@@ -3506,6 +3509,9 @@ class PlaybackViewModel(
                     }
                 }
             }
+        } catch (e: CancellationException) {
+            // Cancelled by a newer call, not failed.
+            throw e
         } catch (e: Exception) {
             LokiLogger.e(TAG, "resolveAndPlay failed", e)
         } finally {
@@ -3901,6 +3907,9 @@ class PlaybackViewModel(
                     LokiLogger.i(TAG, "Next track pre-resolved: ${info.provider}")
                 }
             }
+        } catch (e: CancellationException) {
+            // Cancelled by a newer call, not failed.
+            throw e
         } catch (e: Exception) {
             LokiLogger.e(TAG, "preResolveNextTrack failed", e)
         }

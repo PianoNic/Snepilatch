@@ -339,6 +339,9 @@
     <string name="eq_headroom_on">Wiedergab um %1$d dB abgsänkt. Stell s uf dini grössti EQ-Aahebig ii</string>
     <string name="eq_headroom_off">Uus. Schalt s ii, wänn du en externe Equalizer wie Wavelet bruuchsch</string>
     <string name="gradient_background">Farbverlauf im Hindergrund</string>
+    <string name="cover_lyrics_tap">Lyrics per Tipp ufs Cover</string>
+    <string name="cover_lyrics_tap_on">En Tipp ufs Cover drait s zu de Lyrics</string>
+    <string name="cover_lyrics_tap_off">Us</string>
     <string name="gradient_bg_on">Farbverlauf vom Album</string>
     <string name="gradient_bg_off">Fliessends Albumcover</string>
 

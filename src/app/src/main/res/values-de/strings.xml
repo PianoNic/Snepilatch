@@ -329,6 +329,9 @@
     <string name="eq_headroom_on">Wiedergabe um %1$d dB gesenkt. Auf deine grösste EQ-Anhebung einstellen</string>
     <string name="eq_headroom_off">Aus. Einschalten, wenn du einen externen Equalizer wie Wavelet nutzt</string>
     <string name="gradient_background">Farbverlauf-Hintergrund</string>
+    <string name="cover_lyrics_tap">Lyrics per Tipp aufs Cover</string>
+    <string name="cover_lyrics_tap_on">Ein Tipp aufs Cover dreht es zu den Lyrics</string>
+    <string name="cover_lyrics_tap_off">Aus</string>
     <string name="gradient_bg_on">Albumfarben-Verlauf</string>
     <string name="gradient_bg_off">Fliessendes Albumcover</string>
     <string name="lossless_on_flac">FLAC</string>

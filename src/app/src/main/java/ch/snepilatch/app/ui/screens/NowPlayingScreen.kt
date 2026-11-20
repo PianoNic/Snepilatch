@@ -422,6 +422,9 @@ fun NowPlayingScreen(
     val displayArtUrl: String? = track?.albumArt
     // The cover turned over to its lyrics side (#817); kept across rotations, not across app restarts.
     var coverFlipped by rememberSaveable { mutableStateOf(false) }
+    val coverLyricsTap by AppSettings.coverLyricsTap.collectAsState()
+    // Turned off while the lyrics show: the cover comes back rather than staying flipped for good.
+    LaunchedEffect(coverLyricsTap) { if (!coverLyricsTap) coverFlipped = false }
     val streamLoading by vm.isStreamLoading.collectAsState()
     // Spinner spans the whole ad skip: isAd covers the ad dwell, streamLoading the post-ad resolve.
     val spinnerActive = streamLoading || isAd
@@ -493,7 +496,7 @@ fun NowPlayingScreen(
                     ) {
                         FlipCard(
                             flipped = coverFlipped,
-                            onTap = { coverFlipped = !coverFlipped },
+                            onTap = { if (coverLyricsTap) coverFlipped = !coverFlipped },
                             modifier = Modifier
                                 .fillMaxHeight(0.85f)
                                 .aspectRatio(1f),
@@ -724,7 +727,7 @@ fun NowPlayingScreen(
                     // Keep the cover-sized swipe target over Canvas while leaving the video visible.
                     FlipCard(
                         flipped = coverFlipped,
-                        onTap = { coverFlipped = !coverFlipped },
+                        onTap = { if (coverLyricsTap) coverFlipped = !coverFlipped },
                         modifier = Modifier
                             .fillMaxWidth()
                             .aspectRatio(1f),

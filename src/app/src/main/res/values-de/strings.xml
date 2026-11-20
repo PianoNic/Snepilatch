@@ -63,6 +63,9 @@
 
     <!-- Settings -->
     <string name="audio_source">Audioquelle</string>
+    <string name="audio_source_order_hint">Für jeden Titel von oben nach unten versucht, bis eine Quelle ihn hat. Ausgeschaltete werden nie gefragt.</string>
+    <string name="move_up">Nach oben</string>
+    <string name="move_down">Nach unten</string>
     <string name="audio_source_spotify">Spotify</string>
     <string name="audio_source_spotify_desc">Standardqualität, direkt von Spotify</string>
     <string name="audio_source_lossless_desc">FLAC, wenn ein Drittanbieter den Titel hat</string>
@@ -160,7 +163,6 @@
     <string name="language_system_default">Systemstandard</string>
 
     <!-- Settings (added) -->
-    <string name="lossless_off_spfy">Standardqualität (Spotify)</string>
     <string name="tidal">Tidal</string>
     <string name="qobuz">Qobuz</string>
     <string name="tidal_short_desc">FLAC bis 1411 kbps</string>
@@ -334,7 +336,6 @@
     <string name="cover_lyrics_tap_off">Aus</string>
     <string name="gradient_bg_on">Albumfarben-Verlauf</string>
     <string name="gradient_bg_off">Fliessendes Albumcover</string>
-    <string name="lossless_on_flac">FLAC</string>
     <string name="region_nearest">Nächstgelegen (automatisch)</string>
 
     <!-- Snackbars -->

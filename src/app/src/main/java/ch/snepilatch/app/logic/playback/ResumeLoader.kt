@@ -27,6 +27,45 @@ class ResumeLoader(private val hooks: Hooks) {
     }
 
     /**
+     * Plays [trackUri] from the third-party [source], one step of the source order (#1132). False when
+     * the source does not have the track, so the next one is tried.
+     */
+    suspend fun playFromSource(
+        event: kotify.api.playerstatus.TrackChangeEvent,
+        trackUri: String,
+        source: String,
+        title: String,
+        artist: String,
+        art: String?,
+    ): Boolean {
+        val result = try {
+            AudioSourceResolver.fromTrack(event, trackUri, source)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            StreamResult.Failure(e.message ?: e.javaClass.simpleName, e)
+        }
+        if (result !is StreamResult.Success) {
+            LokiLogger.w(TAG, "No $source stream for $trackUri: ${(result as StreamResult.Failure).message}")
+            return false
+        }
+        // Spfy is not resumed here: onReady syncs it once ExoPlayer has buffered.
+        hooks.markPlayUrl()
+        val info = result.info
+        val key = info.decryptionKey
+        val service = MusicPlaybackService.instance
+        if (key != null) {
+            // Deezer: encrypted stream, decrypted through the loopback proxy.
+            service?.playDeezer(info.url, key, info.headers, title, artist, art)
+        } else {
+            service?.playUrl(info.url, title, artist, art, headers = info.headers, cacheKey = hooks.cacheKeyFor(trackUri, info))
+        }
+        hooks.commitStream(trackUri, info.provider)
+        LokiLogger.i(TAG, "Streaming: ${info.provider} -> ${info.url.take(STREAM_URL_LOGGED)}")
+        return true
+    }
+
+    /**
      * Load [track] at [positionMs] and, unless [startPlaying] is off, play. [tag] prefixes the log
      * lines. Throws when the CDN path fails, so the caller picks its fallback.
      */
@@ -62,7 +101,7 @@ class ResumeLoader(private val hooks: Hooks) {
                 pssh = stream.pssh,
             )
         }
-        hooks.commitStream(track.uri, "Spotify CDN")
+        hooks.commitStream(track.uri, ch.snepilatch.app.viewmodel.PlaybackViewModel.SPFY_CDN_PROVIDER)
         LokiLogger.i(TAG, "[$tag] ExoPlayer loading at ${positionMs}ms${if (startPlaying) ", will start on STATE_READY" else ", paused"}")
     }
 
@@ -97,7 +136,7 @@ class ResumeLoader(private val hooks: Hooks) {
                     startPlaying = startPlaying, startPositionMs = positionMs, pssh = stream.pssh,
                 )
             }
-            hooks.commitStream(track.uri, "Spotify CDN")
+            hooks.commitStream(track.uri, ch.snepilatch.app.viewmodel.PlaybackViewModel.SPFY_CDN_PROVIDER)
         }
         LokiLogger.i(TAG, "[$tag] episode loading at ${positionMs}ms${if (startPlaying) "" else ", paused"}")
     }
@@ -170,5 +209,6 @@ class ResumeLoader(private val hooks: Hooks) {
 
     private companion object {
         const val TAG = "ResumeLoader"
+        const val STREAM_URL_LOGGED = 80
     }
 }

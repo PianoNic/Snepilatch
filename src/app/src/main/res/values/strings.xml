@@ -65,6 +65,9 @@
 
     <!-- Settings -->
     <string name="audio_source">Audio source</string>
+    <string name="audio_source_order_hint">Tried from the top for each song until one has it. Switched-off sources are never asked.</string>
+    <string name="move_up">Move up</string>
+    <string name="move_down">Move down</string>
     <string name="audio_source_spotify">Spotify</string>
     <string name="audio_source_spotify_desc">Standard quality, streamed from Spotify</string>
     <string name="audio_source_lossless_desc">FLAC where a third party relay has the track</string>
@@ -72,7 +75,6 @@
     <string name="audio_source_ytm_desc">Some tracks are unavailable</string>
     <string name="lossless_audio">Lossless Audio (Beta)</string>
     <string name="lossless_on">FLAC via %s</string>
-    <string name="lossless_on_flac">FLAC</string>
     <string name="lossless_off">Standard quality</string>
     <string name="lossless_provider">Lossless Provider</string>
     <string name="tidal_desc">Tidal · FLAC up to 1411kbps</string>
@@ -161,7 +163,6 @@
     <string name="language_system_default">System Default</string>
 
     <!-- Settings (added) -->
-    <string name="lossless_off_spfy">Standard quality (Spotify)</string>
     <string name="tidal">Tidal</string>
     <string name="qobuz">Qobuz</string>
     <string name="tidal_short_desc">FLAC up to 1411kbps</string>

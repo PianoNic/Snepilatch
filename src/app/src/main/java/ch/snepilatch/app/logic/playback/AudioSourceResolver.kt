@@ -22,6 +22,7 @@ import ch.snepilatch.app.logic.shared.spfyId
 object AudioSourceResolver {
 
     private const val TAG = "AudioSource"
+    private const val SOURCES_KEPT = 200
 
     /**
      * Marks a [StreamInfo] whose url is a SAF document rather than a network url. Callers check it to
@@ -31,33 +32,68 @@ object AudioSourceResolver {
 
     private val cdn = CdnPlayback()
 
-    /** Resolve from a track-change event, which already carries title, artist and duration. */
-    suspend fun fromTrack(event: TrackChangeEvent, trackUri: String): StreamResult {
-        val current = event.current
-        return localOrNull(trackUri, current?.name, current?.artistName)
-            ?: youTubeMusic(
-                title = current?.name,
-                artist = current?.artistName,
-                durationMs = current?.durationMs ?: 0L,
-                source = AppSettings.preferredAudioSource.value,
-            )
-            ?: cdn.resolveFromTrack(
-                event,
-                region = AppSettings.effectiveRegion(),
-                preferredSource = AppSettings.preferredAudioSource.value,
-            )
+    /**
+     * The file sources a track is tried on before Spfy's own stream, in the user's order (#1132). Empty
+     * when Spfy comes first: then Spfy plays, and the sources after it are PlaybackViewModel's fallback.
+     */
+    fun fileSourcesFirst(order: List<String> = AppSettings.sourceOrder.value): List<String> =
+        order.takeWhile { it != AppSettings.SOURCE_SPFY }
+
+    // Which source each recently resolved track came from, so its cache entry and a save of what was
+    // just heard look under that source, not the first in the order.
+    private val sourceByTrack = object : LinkedHashMap<String, String>() {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?) = size > SOURCES_KEPT
     }
 
-    /** Resolve from metadata, for the cold-start, initial-track and pre-resolve paths. */
+    /** The source [trackUri] last resolved from, or null when it has not resolved from one. */
+    fun sourceOf(trackUri: String): String? = synchronized(sourceByTrack) { sourceByTrack[trackUri] }
+
+    private fun remember(trackUri: String, source: String, result: StreamResult): StreamResult {
+        if (result is StreamResult.Success) synchronized(sourceByTrack) { sourceByTrack[trackUri] = source }
+        return result
+    }
+
+    /** Resolve on one file [source] from a track-change event, which already carries title, artist and duration. */
+    suspend fun fromTrack(event: TrackChangeEvent, trackUri: String, source: String): StreamResult {
+        val current = event.current
+        val result = youTubeMusic(
+            title = current?.name,
+            artist = current?.artistName,
+            durationMs = current?.durationMs ?: 0L,
+            source = source,
+        ) ?: cdn.resolveFromTrack(event, region = AppSettings.effectiveRegion(), preferredSource = source)
+        return remember(trackUri, source, result)
+    }
+
+    /**
+     * Resolve from metadata, for the cold-start, initial-track and pre-resolve paths: a downloaded copy,
+     * else [sources] in turn until one has it. A null source is Spfy's own chain, as before the order.
+     */
     suspend fun byQuery(
         trackUri: String,
         searchQuery: String?,
         title: String?,
         artist: String?,
         durationMs: Long,
-        source: String? = AppSettings.preferredAudioSource.value,
-    ): StreamResult = localOrNull(trackUri, title, artist)
-        ?: youTubeMusic(title, artist, durationMs, source)
+        sources: List<String?> = fileSourcesFirst().ifEmpty { listOf(null) },
+    ): StreamResult {
+        localOrNull(trackUri, title, artist)?.let { return it }
+        var result: StreamResult = StreamResult.Failure("No source to try")
+        for (source in sources) {
+            result = oneByQuery(trackUri, searchQuery, title, artist, durationMs, source)
+            if (result is StreamResult.Success) return if (source == null) result else remember(trackUri, source, result)
+        }
+        return result
+    }
+
+    private suspend fun oneByQuery(
+        trackUri: String,
+        searchQuery: String?,
+        title: String?,
+        artist: String?,
+        durationMs: Long,
+        source: String?,
+    ): StreamResult = youTubeMusic(title, artist, durationMs, source)
         // With the title, artist and length the lossless hit is checked against the track (#1053); a first
         // hit taken as it came was often another song of the name, and was downloaded as this one.
         ?: if (!title.isNullOrBlank()) {

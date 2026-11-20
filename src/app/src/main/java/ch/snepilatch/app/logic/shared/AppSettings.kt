@@ -90,6 +90,9 @@ object AppSettings {
     // Player background style: true = album-colour gradient, false (default) = flowing album art.
     val playerGradientBg = MutableStateFlow(false)
 
+    // A tap on the player's cover flips it to the lyrics (#817); some find that jarring over a Canvas.
+    val coverLyricsTap = MutableStateFlow(true)
+
     // Canvas background toggle (the URL itself is playback state on PlaybackViewModel).
     val canvasEnabled = MutableStateFlow(false)
 
@@ -180,6 +183,7 @@ object AppSettings {
         eqMode.value = prefs.getString("eq_mode", null) ?: migratedEqMode(prefs)
         eqBands.value = parseBands(prefs.getString("eq_bands", null))
         playerGradientBg.value = prefs.getBoolean("player_gradient_bg", false)
+        coverLyricsTap.value = prefs.getBoolean("cover_lyrics_tap", true)
         playerShortcut.value = PlayerShortcut.fromId(prefs.getString("player_shortcut", null))
         GestureSettings.load(prefs)
         PlayerButtonSettings.load(prefs)
@@ -327,10 +331,10 @@ object AppSettings {
         }
     }
 
-    fun setPlayerGradientBg(enabled: Boolean, context: Context) {
-        playerGradientBg.value = enabled
-        prefs(context)
-            .edit().putBoolean("player_gradient_bg", enabled).apply()
+    /** An on/off setting of the player's look: shown at once and kept under [key]. */
+    fun setPlayerFlag(flag: MutableStateFlow<Boolean>, key: String, enabled: Boolean, context: Context) {
+        flag.value = enabled
+        prefs(context).edit().putBoolean(key, enabled).apply()
     }
 
     fun setPlayerShortcut(shortcut: PlayerShortcut, context: Context) {

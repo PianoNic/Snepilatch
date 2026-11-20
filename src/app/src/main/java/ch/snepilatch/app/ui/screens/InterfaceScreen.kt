@@ -258,10 +258,19 @@ private fun AppearanceSection(vm: PlaybackViewModel, context: Context, accent: C
     SettingToggleRow(
         title = stringResource(R.string.gradient_background),
         checked = gradientBg,
-        onCheckedChange = { AppSettings.setPlayerGradientBg(it, context) },
+        onCheckedChange = { AppSettings.setPlayerFlag(AppSettings.playerGradientBg, "player_gradient_bg", it, context) },
         accent = accent,
         subtitle = stringResource(if (gradientBg) R.string.gradient_bg_on else R.string.gradient_bg_off),
         icon = Icons.Rounded.Gradient,
+    )
+    val coverLyricsTap by AppSettings.coverLyricsTap.collectAsState()
+    SettingToggleRow(
+        title = stringResource(R.string.cover_lyrics_tap),
+        checked = coverLyricsTap,
+        onCheckedChange = { AppSettings.setPlayerFlag(AppSettings.coverLyricsTap, "cover_lyrics_tap", it, context) },
+        accent = accent,
+        subtitle = stringResource(if (coverLyricsTap) R.string.cover_lyrics_tap_on else R.string.cover_lyrics_tap_off),
+        icon = Icons.Rounded.Lyrics,
     )
 }
 

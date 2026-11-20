@@ -327,6 +327,9 @@
     <string name="eq_headroom_on">Громкость снижена на %1$d дБ. Установите по самому большому подъёму эквалайзера</string>
     <string name="eq_headroom_off">Выкл. Включите, если используете внешний эквалайзер вроде Wavelet</string>
     <string name="gradient_background">Градиентный фон</string>
+    <string name="cover_lyrics_tap">Текст по нажатию на обложку</string>
+    <string name="cover_lyrics_tap_on">Нажатие на обложку переворачивает её к тексту песни</string>
+    <string name="cover_lyrics_tap_off">Выкл.</string>
     <string name="gradient_bg_on">Градиент из цветов обложки</string>
     <string name="gradient_bg_off">Плавающая обложка</string>
     <string name="lossless_on_flac">FLAC</string>

@@ -331,6 +331,9 @@
     <string name="eq_headroom_on">Playback lowered %1$d dB. Set this to match your largest EQ boost</string>
     <string name="eq_headroom_off">Off. Enable if you use an external equalizer like Wavelet</string>
     <string name="gradient_background">Gradient background</string>
+    <string name="cover_lyrics_tap">Tap cover for lyrics</string>
+    <string name="cover_lyrics_tap_on">Tapping the cover flips it to the lyrics</string>
+    <string name="cover_lyrics_tap_off">Off</string>
     <string name="gradient_bg_on">Album colour gradient</string>
     <string name="gradient_bg_off">Flowing album art</string>
 

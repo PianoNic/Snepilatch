@@ -160,7 +160,9 @@ class MainActivity : ComponentActivity() {
                 // Check for updates in background — once per process. This LaunchedEffect(Unit) re-runs
                 // on every Activity recreation (e.g. config changes), which would otherwise refire the
                 // network + TLS update check each time.
-                if (updateChecked.compareAndSet(false, true)) {
+                // Not in a dev build: built locally it is always named 3.1.1-dev, and the update it
+                // offered installs the release app beside it, not over it.
+                if (BuildConfig.FLAVOR != "dev" && updateChecked.compareAndSet(false, true)) {
                     withContext(Dispatchers.IO) {
                         val info = UpdateService.checkForUpdates(context, AppSettings.updateChannelEnum())
                         if (info != null) {

@@ -3917,12 +3917,16 @@ class PlaybackViewModel(
                     isNextReady.value = true
                     LokiLogger.i(TAG, "Next track pre-resolved: ${info.provider}")
                 }
+            } else {
+                // Nothing is loading any more: the track resolves, or is skipped, when it comes (#1142).
+                isNextReady.value = true
             }
         } catch (e: CancellationException) {
             // Cancelled by a newer call, not failed.
             throw e
         } catch (e: Exception) {
             LokiLogger.e(TAG, "preResolveNextTrack failed", e)
+            isNextReady.value = true
         }
     }
 

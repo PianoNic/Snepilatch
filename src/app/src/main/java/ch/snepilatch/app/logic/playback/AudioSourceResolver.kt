@@ -68,6 +68,7 @@ object AudioSourceResolver {
     /**
      * Resolve from metadata, for the cold-start, initial-track and pre-resolve paths: a downloaded copy,
      * else [sources] in turn until one has it. A null source is Spfy's own chain, as before the order.
+     * [forDownload] lets the lossless chain ask Apple Music first (#1133).
      */
     suspend fun byQuery(
         trackUri: String,
@@ -76,11 +77,12 @@ object AudioSourceResolver {
         artist: String?,
         durationMs: Long,
         sources: List<String?> = fileSourcesFirst().ifEmpty { listOf(null) },
+        forDownload: Boolean = false,
     ): StreamResult {
         localOrNull(trackUri, title, artist)?.let { return it }
         var result: StreamResult = StreamResult.Failure("No source to try")
         for (source in sources) {
-            result = oneByQuery(trackUri, searchQuery, title, artist, durationMs, source)
+            result = oneByQuery(trackUri, searchQuery, title, artist, durationMs, source, forDownload)
             if (result is StreamResult.Success) return if (source == null) result else remember(trackUri, source, result)
         }
         return result
@@ -93,11 +95,15 @@ object AudioSourceResolver {
         artist: String?,
         durationMs: Long,
         source: String?,
+        forDownload: Boolean,
     ): StreamResult = youTubeMusic(title, artist, durationMs, source)
         // With the title, artist and length the lossless hit is checked against the track (#1053); a first
         // hit taken as it came was often another song of the name, and was downloaded as this one.
         ?: if (!title.isNullOrBlank()) {
-            cdn.resolveTrack(title, artist.orEmpty(), durationMs, region = AppSettings.effectiveRegion(), preferredSource = source)
+            cdn.resolveTrack(
+                title, artist.orEmpty(), durationMs,
+                region = AppSettings.effectiveRegion(), preferredSource = source, forDownload = forDownload,
+            )
         } else {
             cdn.resolveStreamUrl(
                 spfyId(trackUri),

@@ -116,6 +116,9 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.media3:media3-exoplayer:1.10.1")
+    // FFmpeg audio decoders for what Android has none of, ALAC from Apple Music above all (#1133).
+    // Its version is Media3's: bump both together.
+    implementation("io.github.anilbeesetti:nextlib-media3ext:1.10.1-0.13.0")
     implementation("androidx.media:media:1.7.0")
     implementation("androidx.palette:palette-ktx:1.0.0")
     implementation("dev.chrisbanes.haze:haze:1.5.3")

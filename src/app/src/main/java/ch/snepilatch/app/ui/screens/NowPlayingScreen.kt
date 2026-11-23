@@ -1254,6 +1254,7 @@ private fun SourcePill(provider: String?) {
         provider == null -> "No CDN"
         provider == "qobuz" -> "Qobuz"
         provider == "deezer" -> "Deezer"
+        provider == "apple" -> "Apple Music"
         else -> provider.replaceFirstChar { it.uppercase() }
     }
     val icon = when {

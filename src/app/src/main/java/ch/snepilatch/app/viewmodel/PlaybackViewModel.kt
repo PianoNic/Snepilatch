@@ -1875,7 +1875,7 @@ class PlaybackViewModel(
         }
         LokiLogger.i(TAG, "[ColdStart] file id=$fileId for ${track.uri} — resolving CDN")
         try {
-            resumeLoader.loadAt(fileId, track, savedPositionAtEntry, "ColdStart")
+            resumeAt(fileId, track, savedPositionAtEntry, "ColdStart")
         } catch (e: Exception) {
             LokiLogger.e(TAG, "[ColdStart] CDN/playDrmUrl failed, falling back to resume", e)
             resetColdStart()
@@ -1892,6 +1892,13 @@ class PlaybackViewModel(
      * the state says. Unlike the cold start there is no transfer to make and no paused echo to
      * suppress, and onReady must not send a resume for a player the server already has playing (#787).
      */
+    /**
+     * Loads [track] where it stood, then looks the next track up: these loads skip resolveAndPlay, which
+     * does that, so on a file source the next button spun until the track changed (#1134).
+     */
+    internal suspend fun resumeAt(fileId: String, track: TrackInfo, positionMs: Long, tag: String, startPlaying: Boolean = true) =
+        resumeLoader.loadAt(fileId, track, positionMs, tag, startPlaying).also { preResolveNextTrack() }
+
     private suspend fun takeOverHandedPlayback(event: TrackChangeEvent) {
         val current = event.current ?: return
         val fileId = event.currentFileId ?: latestFileId?.takeIf { latestFileUri == current.uri }
@@ -1922,7 +1929,7 @@ class PlaybackViewModel(
             if (isEpisode) {
                 resumeLoader.loadEpisodeAt(track, position, "HandBack", startPlaying = !paused)
             } else {
-                resumeLoader.loadAt(checkNotNull(fileId), track, position, "HandBack", startPlaying = !paused)
+                resumeAt(checkNotNull(fileId), track, position, "HandBack", startPlaying = !paused)
             }
             if (paused) isStreamLoading.value = false
         } catch (e: CancellationException) {
@@ -3476,13 +3483,7 @@ class PlaybackViewModel(
      * source in the order owns the outcome, and recovers as Spfy always did: a fresh resolve, then a skip.
      */
     private suspend fun playFromSpfyCdn(
-        event: kotify.api.playerstatus.TrackChangeEvent,
-        trackUri: String,
-        title: String,
-        artist: String,
-        art: String?,
-        resolveStart: Long,
-        last: Boolean,
+        event: TrackChangeEvent, trackUri: String, title: String, artist: String, art: String?, resolveStart: Long, last: Boolean,
     ): Boolean {
         try {
             val stream = resolveSpfyCdnStream(event, trackUri)

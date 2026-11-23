@@ -3443,6 +3443,13 @@ class PlaybackViewModel(
             return
         }
 
+        playInOrder(event, trackUri, title, artist, art, resolveStart)
+    }
+
+    /** [trackUri] from the first source in the user's order that has it, else on to the next track. */
+    internal suspend fun playInOrder(
+        event: TrackChangeEvent, trackUri: String, title: String, artist: String, art: String?, resolveStart: Long,
+    ) {
         val order = AppSettings.sourceOrder.value
         LokiLogger.i(TAG, "Resolving stream for $trackUri (sources=$order)")
         // Each source in the user's order until one has it (#1132). Only sources they switched on are
@@ -3455,6 +3462,9 @@ class PlaybackViewModel(
             }
             if (played) {
                 isStreamLoading.value = false
+                // Spfy's stream pre-resolves on its own; a file source's next track is looked up here, or
+                // the next button spins for good.
+                if (source != AppSettings.SOURCE_SPFY) preResolveNextTrack()
                 return
             }
         }

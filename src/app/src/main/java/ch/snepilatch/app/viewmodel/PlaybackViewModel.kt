@@ -213,9 +213,9 @@ class PlaybackViewModel(
     private var tapFileId: kotlinx.coroutines.CompletableDeferred<String>? = null
     private var earlyLoadedUri: String? = null
 
-    /** The track [warmUp] loaded paused at launch, not a stream until played; and its source. */
-    @Volatile private var warmUri: String? = null
-    private var warmProvider: String? = null
+    private val preload = Preload(viewModelScope) { track, fileId, at ->
+        resumeLoader.loadAt(fileId, track, at, "Warm", startPlaying = false)
+    }
     private var warmHandoff = false
 
     private var coldStartPending = false
@@ -724,6 +724,8 @@ class PlaybackViewModel(
                 val sp = SpfyPlayback(sess)
                 spfyPlayback = sp
                 cdnResolver = spfyResolver(sp)
+                // The last track loads now, not once Connect is up: a tap that early finds it ready.
+                warmUp(null)
                 LokiLogger.i(TAG, "Session loaded")
 
                 // Home and library load themselves from HomeViewModel.init / LibraryViewModel.init.
@@ -781,7 +783,7 @@ class PlaybackViewModel(
                     // Idle preload is intentionally NOT done — pressing play sends resume to
                     // Spfy, which pushes the file_id via the WS state machine, and
                     // resolveAndPlay then loads ExoPlayer with the right CDN URL.
-                    if (state.is_active_device && state.isActuallyPlaying) settleStartPlaying(state) else warmUp(state)
+                    afterFirstState(state)
                 }
             } catch (e: CancellationException) {
                 // Not a failure and not ours to report: swallowing it surfaced a torn-down scope as
@@ -1084,7 +1086,7 @@ class PlaybackViewModel(
         // Listening along to a jam: the engine follows the jam's play itself, from its own audio.
         if (JamListenAlong.active.value) return
         // Another device playing is no reason to start the track preloaded here.
-        if (!isStreaming.value && warmUri == null) {
+        if (!isStreaming.value && !preload.holds) {
             LokiLogger.i(TAG, "Spfy: play at ${positionMs}ms")
             MusicPlaybackService.instance?.syncPlay(positionMs)
         } else if (isStreaming.value && _playback.value.isPaused) {
@@ -1646,7 +1648,8 @@ class PlaybackViewModel(
         LokiLogger.i(TAG, "[Timing] CMD $action sent")
         commandJob = viewModelScope.launch(Dispatchers.IO) {
             try {
-                val p = player ?: return@launch
+                // Tapped before the player registered: the tap waits for it rather than doing nothing.
+                val p = player ?: SessionHolder.nextPlayer()
                 val t0 = System.currentTimeMillis()
                 if (foreignDeviceActive || jamControllerOnly()) {
                     // Another device holds playback, or this account is in a jam only to control the
@@ -1692,6 +1695,7 @@ class PlaybackViewModel(
                         // no Spfy state changes), claim the device with
                         // restore_paused=true, load ExoPlayer paused, and only then
                         // start Spfy+ExoPlayer in sync via the onReady callback.
+                        preload.join()
                         if (!warmStart(p)) coldStartPlay()
                     }
                 } else {
@@ -1850,6 +1854,7 @@ class PlaybackViewModel(
         resumeLoader.loadAt(fileId, track, positionMs, tag, startPlaying).also { preResolveNextTrack() }
 
     private suspend fun takeOverHandedPlayback(event: TrackChangeEvent) {
+        preload.cancel()
         val current = event.current ?: return
         val fileId = event.currentFileId ?: latestFileId?.takeIf { latestFileUri == current.uri }
         // An episode resolves on its own uri; an external one has no file id at all.
@@ -1903,31 +1908,27 @@ class PlaybackViewModel(
     internal fun shouldResumeConnectOnReady(): Boolean =
         AppSettings.preferredAudioSource.value == null && !pendingUserPlay
 
-    /**
-     * Loads the track the state shows, paused where it stands, so the first tap only starts it. Not a
-     * stream until then: nothing else treats it as playing, and Connect is not claimed. A Spfy track
-     * needs its file id, which only the state machine names, so one played on an earlier launch.
-     */
-    private suspend fun warmUp(state: PlayerStateData) {
-        val track = _playback.value.track ?: return
-        val elsewhere = state.has_active_device && !state.is_active_device && state.isActuallyPlaying
-        val idle = !isStreaming.value && !engineOwnsPlayback
-        if (elsewhere || !idle || !track.uri.startsWith("spotify:track:")) return
-        val fileId = latestFileId?.takeIf { latestFileUri == track.uri } ?: StartupCache.fileIdFor(track.uri)
-        if (fileId == null && AppSettings.preferredAudioSource.value == null) return
-        LokiLogger.i(TAG, "[Warm] preloading ${track.uri} at ${_playback.value.positionMs}ms")
-        try {
-            resumeLoader.loadAt(fileId.orEmpty(), track, _playback.value.positionMs, "Warm", startPlaying = false)
-            warmProvider = streamProvider.value
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            LokiLogger.w(TAG, "[Warm] preload failed, the play button cold starts it: ${e.message}")
-            return
-        } finally {
-            clearStream()
+    /** Connect's first state: playing here resumes it, anything else preloads the track it shows. */
+    private suspend fun afterFirstState(state: PlayerStateData) {
+        if (state.is_active_device && state.isActuallyPlaying) {
+            preload.cancel()
+            settleStartPlaying(state)
+        } else if (!(state.has_active_device && state.isActuallyPlaying)) {
+            warmUp(latestFileId?.takeIf { latestFileUri == state.track?.uri })
         }
-        warmUri = track.uri
+    }
+
+    /**
+     * Preloads the shown track where it stands ([Preload]). A Spfy track needs its file id, which only the
+     * state machine names: [fileId], or the one kept from the last launch.
+     */
+    private fun warmUp(fileId: String?) {
+        val track = _playback.value.track ?: return
+        val idle = !isStreaming.value && !engineOwnsPlayback && track.uri.startsWith("spotify:track:")
+        val id = fileId ?: StartupCache.fileIdFor(track.uri)
+        if (idle && (id != null || AppSettings.preferredAudioSource.value != null)) {
+            preload.start(track, id.orEmpty(), _playback.value.positionMs)
+        }
     }
 
     /**
@@ -1935,11 +1936,11 @@ class PlaybackViewModel(
      * and a resume. Its echoes are for the track already playing, so none of them reloads or pauses it.
      */
     private suspend fun warmStart(p: PlayerConnect): Boolean {
-        val uri = warmUri?.takeIf { it == _playback.value.track?.uri } ?: return false
+        val uri = preload.uri?.takeIf { it == _playback.value.track?.uri } ?: return false
         val svc = MusicPlaybackService.instance ?: return false
         if (!withContext(Dispatchers.Main) { svc.hasLoadedMedia() }) return false
         LokiLogger.i(TAG, "[Warm] playing the preloaded $uri, then claiming Connect")
-        commitStream(uri, warmProvider)
+        commitStream(uri, preload.provider)
         earlyLoadedUri = uri
         suppressRemotePause = true
         warmHandoff = true
@@ -2091,8 +2092,13 @@ class PlaybackViewModel(
     }
 
     private fun commitStream(uri: String, provider: String?) {
+        // The preload's own load: kept as the preload's until it is played.
+        if (preload.loading) {
+            preload.provider = provider
+            return
+        }
         RecentPlays.trackPlayed(uri)
-        warmUri = null
+        preload.uri = null
         currentStreamUri = uri
         isStreaming.value = true
         streamProvider.value = provider
@@ -2453,6 +2459,7 @@ class PlaybackViewModel(
 
     /** [wholeContext]: play the list as the web player's play button does, naming no track, so the session's shuffle picks (#262). */
     internal suspend fun startUserPlayback(track: TrackInfo, contextUri: String?, trackIndex: Int? = null, wholeContext: Boolean = false) {
+        preload.cancel()
         if (track.uri.startsWith(LocalFiles.URI_PREFIX)) {
             startLocalPlayback(track)
             return
@@ -3031,9 +3038,9 @@ class PlaybackViewModel(
             }
             // Preloaded and never played: dropped, and the play button cold starts it as before. Recovering
             // would resume Connect, which starts the music wherever it last played.
-            if (warmUri != null && !isStreaming.value) {
+            if (preload.holds && !isStreaming.value) {
                 LokiLogger.w(TAG, "[Warm] ExoPlayer error $errorCode on the preloaded track, dropped")
-                warmUri = null
+                preload.uri = null
                 return@onError
             }
             if (engineOwnsPlayback) {
@@ -3351,6 +3358,7 @@ class PlaybackViewModel(
     }
 
     private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent) {
+        preload.cancel()
         val resolveStart = System.currentTimeMillis()
         val current = event.current ?: return
         val trackUri = current.uri

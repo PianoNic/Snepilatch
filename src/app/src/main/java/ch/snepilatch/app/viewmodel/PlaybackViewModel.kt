@@ -32,19 +32,18 @@ import ch.snepilatch.app.logic.playback.PlaybackCache
 import ch.snepilatch.app.logic.playback.PositionInterpolator
 import ch.snepilatch.app.logic.shared.AccountStore
 import ch.snepilatch.app.logic.shared.SessionResume
+import ch.snepilatch.app.logic.shared.StartupCache
 import ch.snepilatch.app.logic.shared.SavedAccount
 import ch.snepilatch.app.logic.shared.SessionHolder
-import ch.snepilatch.app.logic.shared.spfyId
 import ch.snepilatch.app.logic.shared.AppMessages
+import ch.snepilatch.app.logic.shared.spfyId
 
 import ch.snepilatch.app.logic.download.DownloadActions
-import ch.snepilatch.app.logic.download.CanvasStore
 import ch.snepilatch.app.logic.playback.AudioSourceResolver
 import ch.snepilatch.app.logic.playback.engine.SpfyCdnResolver
 import ch.snepilatch.app.logic.playback.engine.SpfyStream
 import ch.snepilatch.app.data.*
 import kotify.api.artist.Artist
-import kotify.api.common.ShortLink
 import kotify.api.playerconnect.NoActiveDeviceException
 import kotify.api.playerconnect.PlayerConnect
 import kotify.api.playerstatus.TrackChangeEvent
@@ -55,7 +54,6 @@ import kotify.api.playerstatus.PlayerStateData
 import kotify.api.playerstatus.PlayerTrack
 import kotify.api.song.Song
 import kotify.api.user.User
-import kotify.api.canvas.Canvas
 import kotify.cdn.SpfyPlayback
 import kotify.cdn.StreamInfo
 import kotify.cdn.StreamResult
@@ -214,6 +212,9 @@ class PlaybackViewModel(
     private var tapUri: String? = null
     private var tapFileId: kotlinx.coroutines.CompletableDeferred<String>? = null
     private var earlyLoadedUri: String? = null
+
+    private val preload = Preload(viewModelScope) { track, at -> resumeLoader.preloadFileSource(track, at) }
+    private var warmHandoff = false
 
     private var coldStartPending = false
 
@@ -421,7 +422,7 @@ class PlaybackViewModel(
                 playingContext.value = Downloads.groups().find { it.uri == contextUri }?.let {
                     PlayingContext(it.type.replaceFirstChar(Char::uppercase), it.name, it.uri)
                 }
-                fetchCanvasForTrack(track.uri)
+                canvas.fetch(track.uri)
             }
             override fun setTickerRunning(running: Boolean) = if (running) startPositionTicker() else stopPositionTicker()
             override fun startSession() = restartSessionFromSavedCookies()
@@ -489,8 +490,8 @@ class PlaybackViewModel(
 
     // Persisted user settings moved to AppSettings. canvasUrl stays here: it's the current track's
     // video URL (playback-derived), while the on/off toggle is AppSettings.canvasEnabled.
-    val canvasUrl = MutableStateFlow<String?>(null)
-    private var lastCanvasTrackUri: String? = null
+    private val canvas = CanvasLoader(viewModelScope)
+    val canvasUrl = canvas.url
 
     // Lyrics content moved to LyricsViewModel; this VM only navigates to the overlay (openLyrics).
 
@@ -687,6 +688,8 @@ class PlaybackViewModel(
         tearDownSession()
         // Who this is shows at once, and stays when the network never answers.
         AccountStore.infoFor(cookies)?.let { _account.value = it }
+        // And what it last played, so the mini player is there before the player registers.
+        _playback.value = StartupCache.restore(cookies, _playback.value)
         LokiLogger.i(
             TAG,
             "Session language: ${AppSettings.effectiveLanguage()} " +
@@ -719,6 +722,8 @@ class PlaybackViewModel(
                 val sp = SpfyPlayback(sess)
                 spfyPlayback = sp
                 cdnResolver = spfyResolver(sp)
+                // The last track loads now, not once Connect is up: a tap that early finds it ready.
+                warmUp()
                 LokiLogger.i(TAG, "Session loaded")
 
                 // Home and library load themselves from HomeViewModel.init / LibraryViewModel.init.
@@ -776,7 +781,7 @@ class PlaybackViewModel(
                     // Idle preload is intentionally NOT done — pressing play sends resume to
                     // Spfy, which pushes the file_id via the WS state machine, and
                     // resolveAndPlay then loads ExoPlayer with the right CDN URL.
-                    if (state.is_active_device && state.isActuallyPlaying) settleStartPlaying(state)
+                    afterFirstState(state)
                 }
             } catch (e: CancellationException) {
                 // Not a failure and not ours to report: swallowing it surfaced a torn-down scope as
@@ -1077,10 +1082,11 @@ class PlaybackViewModel(
     internal fun handleRemotePlay(positionMs: Long) {
         // Listening along to a jam: the engine follows the jam's play itself, from its own audio.
         if (JamListenAlong.active.value) return
-        if (!isStreaming.value) {
+        // Another device playing is no reason to start the track preloaded here.
+        if (!isStreaming.value && !preload.holds) {
             LokiLogger.i(TAG, "Spfy: play at ${positionMs}ms")
             MusicPlaybackService.instance?.syncPlay(positionMs)
-        } else if (_playback.value.isPaused) {
+        } else if (isStreaming.value && _playback.value.isPaused) {
             LokiLogger.i(TAG, "Remote play while streaming: resuming ExoPlayer")
             MusicPlaybackService.instance?.syncPlay(_playback.value.positionMs)
             _playback.value = _playback.value.copy(isPlaying = true, isPaused = false)
@@ -1218,65 +1224,6 @@ class PlaybackViewModel(
 
     fun goBack(): Boolean = Navigator.goBack()
 
-    /**
-     * Handle a deep link URI from open.spotify.com.
-     * Supported paths: /track/{id}, /album/{id}, /playlist/{id}, /artist/{id}, /show/{id}, /episode/{id},
-     * /socialsession/{token}, and a relay invite's /jam/{token}. A link opens its page and never plays:
-     * a track opens its album, an episode its show, as there is no page for either alone.
-     * A spotify.link short link is expanded first and then handled like the long one.
-     */
-    fun handleDeepLink(uri: android.net.Uri) {
-        if (ShortLink.isShortLink(uri.toString())) {
-            launchWithSession("expandShortLink") { sess ->
-                val long = ShortLink.expand(sess, uri.toString())
-                if (long == null) {
-                    LokiLogger.w(TAG, "Short link did not resolve: $uri")
-                    return@launchWithSession
-                }
-                withContext(Dispatchers.Main) { handleDeepLink(android.net.Uri.parse(long)) }
-            }
-            return
-        }
-        val segments = uri.pathSegments ?: return
-        if (segments.size < 2) return
-        val type = segments[0]
-        val id = segments[1]
-        if (id.isBlank()) return
-
-        LokiLogger.i(TAG, "Deep link: type=$type id=$id")
-
-        when (type) {
-            "track" -> DetailRoutes.openAlbumForTrack("spotify:track:$id")
-            "show" -> DetailRoutes.openShow(id)
-            "episode" -> launchWithSession("openEpisodeLink") { sess ->
-                val show = kotify.api.podcast.Podcast(sess).getEpisode(id)?.show?.uri
-                if (show == null) {
-                    LokiLogger.w(TAG, "Episode $id has no show to open")
-                } else {
-                    withContext(Dispatchers.Main) { DetailRoutes.openShow(spfyId(show)) }
-                }
-            }
-            "album" -> DetailRoutes.openAlbum(id)
-            "playlist" -> DetailRoutes.openPlaylist(id)
-            "artist" -> DetailRoutes.openArtist(id)
-            // Looked up only, as for a Spfy jam: the join sheet asks how to take part.
-            "jam" -> launchWithSession("previewRelayJam") {
-                RelayJam.preview(id)?.let {
-                    LokiLogger.w(TAG, "Relay jam $id not opened: $it")
-                    AppMessages.show(R.string.jam_link_not_opened)
-                }
-            }
-            "socialsession" -> launchWithSession("joinJam") { sess ->
-                // Looked up only; the join sheet asks how to take part before anything is joined.
-                JamHolder.preview(sess, uri.toString())?.let {
-                    LokiLogger.w(TAG, "Jam link $id not opened: $it")
-                    AppMessages.show(R.string.jam_link_not_opened)
-                }
-            }
-            else -> LokiLogger.i(TAG, "Unsupported deep link type: $type")
-        }
-    }
-
     // --- Playback ---
 
     // artist_uri -> resolved artist name. Artist-context autoplay is the one play origin whose cluster
@@ -1380,7 +1327,7 @@ class PlaybackViewModel(
         } else false
 
         // A file source keeps Connect paused on purpose, so there Spfy's paused says nothing (#1140).
-        val connectPaused = state.is_paused && AppSettings.preferredAudioSource.value == null
+        val connectPaused = state.is_paused && AppSettings.preferredAudioSource.value == null && !warmHandoff
         val actuallyPlaying = if (isStreaming.value) (exoPlaying && !connectPaused) else state.isActuallyPlaying
         val actuallyPaused = if (isStreaming.value) (!exoPlaying || connectPaused) else state.is_paused
 
@@ -1483,7 +1430,7 @@ class PlaybackViewModel(
             ThemeController.updateFromArt(imageUrl)
             if (displayUri != null) {
                 checkLikedState(displayUri)
-                fetchCanvasForTrack(displayUri)
+                canvas.fetch(displayUri)
             }
         }
 
@@ -1600,7 +1547,7 @@ class PlaybackViewModel(
     /** The accent and canvas follow the track the host plays, not the one this phone last had. */
     internal fun showHostTrack(track: TrackInfo) {
         ThemeController.updateFromArt(track.albumArt)
-        fetchCanvasForTrack(track.uri)
+        canvas.fetch(track.uri)
     }
 
     /** The header names [contextUri], which is not this account's own context in a relay jam (#1033). */
@@ -1698,7 +1645,8 @@ class PlaybackViewModel(
         LokiLogger.i(TAG, "[Timing] CMD $action sent")
         commandJob = viewModelScope.launch(Dispatchers.IO) {
             try {
-                val p = player ?: return@launch
+                // Tapped before the player registered: the tap waits for it rather than doing nothing.
+                val p = player ?: SessionHolder.nextPlayer()
                 val t0 = System.currentTimeMillis()
                 if (foreignDeviceActive || jamControllerOnly()) {
                     // Another device holds playback, or this account is in a jam only to control the
@@ -1744,7 +1692,8 @@ class PlaybackViewModel(
                         // no Spfy state changes), claim the device with
                         // restore_paused=true, load ExoPlayer paused, and only then
                         // start Spfy+ExoPlayer in sync via the onReady callback.
-                        coldStartPlay()
+                        preload.join()
+                        if (!warmStart(p)) coldStartPlay()
                     }
                 } else {
                     _playback.value = _playback.value.copy(isPaused = true)
@@ -1902,6 +1851,7 @@ class PlaybackViewModel(
         resumeLoader.loadAt(fileId, track, positionMs, tag, startPlaying).also { preResolveNextTrack() }
 
     private suspend fun takeOverHandedPlayback(event: TrackChangeEvent) {
+        preload.cancel()
         val current = event.current ?: return
         val fileId = event.currentFileId ?: latestFileId?.takeIf { latestFileUri == current.uri }
         // An episode resolves on its own uri; an external one has no file id at all.
@@ -1926,7 +1876,7 @@ class PlaybackViewModel(
         DownloadActions.armCapture(current.uri, track.durationMs)
         ThemeController.updateFromArt(art)
         checkLikedState(current.uri)
-        fetchCanvasForTrack(current.uri)
+        canvas.fetch(current.uri)
         try {
             if (isEpisode) {
                 resumeLoader.loadEpisodeAt(track, position, "HandBack", startPlaying = !paused)
@@ -1954,6 +1904,49 @@ class PlaybackViewModel(
      */
     internal fun shouldResumeConnectOnReady(): Boolean =
         AppSettings.preferredAudioSource.value == null && !pendingUserPlay
+
+    /** Connect's first state: playing here resumes it, anything else preloads the track it shows. */
+    private suspend fun afterFirstState(state: PlayerStateData) {
+        if (state.is_active_device && state.isActuallyPlaying) {
+            preload.cancel()
+            settleStartPlaying(state)
+        } else if (!(state.has_active_device && state.isActuallyPlaying)) {
+            warmUp()
+        }
+    }
+
+    /** Preloads the shown track where it stands, from a file source only ([Preload]). */
+    private fun warmUp() {
+        val track = _playback.value.track ?: return
+        val idle = !isStreaming.value && !engineOwnsPlayback && track.uri.startsWith("spotify:track:")
+        if (idle) preload.start(track, _playback.value.positionMs)
+    }
+
+    /**
+     * Plays what [warmUp] loaded at once, then claims Connect as the cold start does: a paused transfer
+     * and a resume. Its echoes are for the track already playing, so none of them reloads or pauses it.
+     */
+    private suspend fun warmStart(p: PlayerConnect): Boolean {
+        val uri = preload.uri?.takeIf { it == _playback.value.track?.uri } ?: return false
+        val svc = MusicPlaybackService.instance ?: return false
+        if (!withContext(Dispatchers.Main) { svc.hasLoadedMedia() }) return false
+        LokiLogger.i(TAG, "[Warm] playing the preloaded $uri, then claiming Connect")
+        commitStream(uri, preload.provider)
+        earlyLoadedUri = uri
+        suppressRemotePause = true
+        warmHandoff = true
+        withContext(Dispatchers.Main) { svc.syncPlay(_playback.value.positionMs) }
+        _playback.value = _playback.value.copy(isPlaying = true, isPaused = false)
+        startPositionTicker()
+        try {
+            if (p.transferPlaybackHere(restorePaused = true)) fallbackResume() else LokiLogger.w(TAG, "[Warm] transfer not confirmed")
+        } finally {
+            suppressRemotePause = false
+            warmHandoff = false
+        }
+        preResolveNextTrack()
+        return true
+    }
 
     /** Reset the transient cold-start handoff flags. Variant fields (file id, stream state) stay inline. */
     private fun resetColdStart() {
@@ -2090,7 +2083,13 @@ class PlaybackViewModel(
     }
 
     private fun commitStream(uri: String, provider: String?) {
+        // The preload's own load: kept as the preload's until it is played.
+        if (preload.loading) {
+            preload.provider = provider
+            return
+        }
         RecentPlays.trackPlayed(uri)
+        preload.uri = null
         currentStreamUri = uri
         isStreaming.value = true
         streamProvider.value = provider
@@ -2451,6 +2450,7 @@ class PlaybackViewModel(
 
     /** [wholeContext]: play the list as the web player's play button does, naming no track, so the session's shuffle picks (#262). */
     internal suspend fun startUserPlayback(track: TrackInfo, contextUri: String?, trackIndex: Int? = null, wholeContext: Boolean = false) {
+        preload.cancel()
         if (track.uri.startsWith(LocalFiles.URI_PREFIX)) {
             startLocalPlayback(track)
             return
@@ -2529,7 +2529,7 @@ class PlaybackViewModel(
             DownloadActions.armCapture(trackUri, track.durationMs)
             ThemeController.updateFromArt(art)
             checkLikedState(trackUri)
-            fetchCanvasForTrack(trackUri)
+            canvas.fetch(trackUri)
             // A downloaded copy wins here too. This path plays a full second before the echo reaches
             // resolveAndPlay, so leaving the check to the echo means the CDN always gets there first
             // and a downloaded track streams anyway.
@@ -2840,43 +2840,6 @@ class PlaybackViewModel(
         if (!enabled) canvasUrl.value = null
     }
 
-    private fun fetchCanvasForTrack(trackUri: String) {
-        if (!AppSettings.canvasEnabled.value) return
-        if (trackUri == lastCanvasTrackUri) return
-        lastCanvasTrackUri = trackUri
-        // Canvas is a track-only visual; podcast episodes have none. Skip the futile lookup + clear.
-        if (!trackUri.startsWith("spotify:track:")) {
-            canvasUrl.value = null
-            return
-        }
-        // A downloaded track's clip is on the phone: no lookup, no fetch, and it works offline (#565).
-        CanvasStore.localUri(trackUri)?.let {
-            canvasUrl.value = it
-            return
-        }
-        val trackId = trackUri.removePrefix("spotify:track:")
-        val requestUri = trackUri // capture for async check
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val sess = session ?: return@launch
-                val canvas = Canvas(sess)
-                val data = canvas.getCanvas(trackId)
-                // Only update if this is still the current track (avoid race with rapid skips)
-                if (lastCanvasTrackUri == requestUri) {
-                    canvasUrl.value = data?.url
-                    if (data != null) {
-                        LokiLogger.i(TAG, "Canvas: ${data.url.take(60)}...")
-                    }
-                }
-            } catch (e: Exception) {
-                if (lastCanvasTrackUri == requestUri) {
-                    canvasUrl.value = null
-                }
-                LokiLogger.d(TAG, "Canvas failed: ${e.message}")
-            }
-        }
-    }
-
     fun startService(context: Context) {
         ThemeController.setContext(context)
         serviceContext = context.applicationContext
@@ -3062,6 +3025,13 @@ class PlaybackViewModel(
                 // recovery here would resolve it from Spfy, which drops the account from the jam.
                 LokiLogger.w(TAG, "ExoPlayer error $errorCode while listening along, left to the engine")
                 JamListenAlong.playbackFailed()
+                return@onError
+            }
+            // Preloaded and never played: dropped, and the play button cold starts it as before. Recovering
+            // would resume Connect, which starts the music wherever it last played.
+            if (preload.holds && !isStreaming.value) {
+                LokiLogger.w(TAG, "[Warm] ExoPlayer error $errorCode on the preloaded track, dropped")
+                preload.uri = null
                 return@onError
             }
             if (engineOwnsPlayback) {
@@ -3379,6 +3349,7 @@ class PlaybackViewModel(
     }
 
     private suspend fun resolveAndPlay(event: kotify.api.playerstatus.TrackChangeEvent) {
+        preload.cancel()
         val resolveStart = System.currentTimeMillis()
         val current = event.current ?: return
         val trackUri = current.uri
@@ -3437,7 +3408,7 @@ class PlaybackViewModel(
         DownloadActions.armCapture(trackUri, newTrack.durationMs)
         ThemeController.updateFromArt(art)
         checkLikedState(trackUri)
-        fetchCanvasForTrack(trackUri)
+        canvas.fetch(trackUri)
 
         // Podcast episodes always resolve through Spfy — they are not on the third-party music CDNs
         // (Qobuz/Deezer/YouTube), so we must never fall back to that chain for them. Hosted episodes

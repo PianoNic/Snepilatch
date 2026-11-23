@@ -15,7 +15,7 @@ import kotlinx.coroutines.launch
 fun <T> ViewModel.launchWith(
     tag: String,
     op: String,
-    get: () -> T?,
+    get: suspend () -> T?,
     before: () -> Unit = {},
     onFailure: (Exception) -> Unit = {},
     after: () -> Unit = {},

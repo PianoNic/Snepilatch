@@ -28,7 +28,15 @@ import kotlinx.coroutines.withTimeoutOrNull
  * teardown. Everything else is a reader.
  */
 object SessionHolder {
-    @Volatile var session: Session? = null
+    // A flow underneath too: the app opens on its cached screens before the session is built, and
+    // what they load waits for it rather than finding nothing.
+    private val sessionFlow = MutableStateFlow<Session?>(null)
+    var session: Session?
+        get() = sessionFlow.value
+        set(value) { sessionFlow.value = value }
+
+    /** The session once there is one; the caller's scope bounds the wait. */
+    suspend fun nextSession(): Session = sessionFlow.filterNotNull().first()
 
     // A flow underneath, so an entry point that runs before the device is registered can wait for
     // it (a jam link on a cold start lands between the session loading and the player's ready()).

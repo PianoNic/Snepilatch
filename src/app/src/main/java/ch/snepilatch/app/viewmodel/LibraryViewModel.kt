@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import ch.snepilatch.app.logic.shared.SessionViewModel
+import ch.snepilatch.app.logic.shared.StartupCache
 import ch.snepilatch.app.logic.shared.spfyId
 
 /**
@@ -78,13 +79,20 @@ class LibraryViewModel : SessionViewModel("LibraryVM") {
     ) { loadLibrary() }
 
     private var subscribedTo: PlayerConnect? = null
+    private var loadedOnce = false
 
     init {
+        // Last launch's root listing shows at once; the one asked for below replaces it.
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            StartupCache.read<List<LibraryItem>>(LIBRARY_FILE, LIBRARY_TYPE)?.let { _library.compareAndSet(emptyList(), it) }
+        }
         loadLibrary()
         subscribeToPushes()
         // A switched account gets its own library instead of the old account's (#847).
         viewModelScope.launch {
             SessionHolder.generation.drop(1).collect {
+                // Nothing loaded yet: the app opened before its first session, whose load is waiting for it.
+                if (!loadedOnce) return@collect
                 _folderPath.value = emptyList()
                 _library.value = emptyList()
                 loadLibrary()
@@ -143,6 +151,8 @@ class LibraryViewModel : SessionViewModel("LibraryVM") {
             if (requested != folderUri) return@launchWithSessionLoading
             _library.value = page.toUiLibraryList()
             _libraryTotal.value = page.total
+            if (requested == null) StartupCache.write(LIBRARY_FILE, _library.value)
+            loadedOnce = true
             // The listing is fetched once and then only on a push, so when it reloads is the first
             // thing worth knowing when someone reports a stale library.
             LokiLogger.i(logTag, "Library loaded: ${page.total} items, folder=${requested ?: "root"}")
@@ -188,6 +198,8 @@ class LibraryViewModel : SessionViewModel("LibraryVM") {
         /** The `type` a [LibraryItem] carries when it is a folder rather than something playable. */
         const val FOLDER_TYPE = "folder"
         private const val PAGE_SIZE = 50
+        private const val LIBRARY_FILE = "library"
+        private val LIBRARY_TYPE = object : com.google.gson.reflect.TypeToken<List<LibraryItem>>() {}.type
 
         /**
          * The listing is ordered by recent use, so playing something between two pages moves it to

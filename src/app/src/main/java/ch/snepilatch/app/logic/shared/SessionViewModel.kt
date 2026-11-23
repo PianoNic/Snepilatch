@@ -16,12 +16,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
  */
 abstract class SessionViewModel(protected val logTag: String) : ViewModel() {
 
-    /** Launch [block] on IO with a non-null session; rethrows cancellation, logs other failures to [onFailure]. */
+    /**
+     * Launch [block] on IO with the session, waiting for one when the app opened before it was built;
+     * rethrows cancellation, logs other failures to [onFailure].
+     */
     protected fun launchWithSession(
         op: String,
         onFailure: (Exception) -> Unit = {},
         block: suspend (Session) -> Unit
-    ): Job = launchWith(logTag, op, { SessionHolder.session }, onFailure = onFailure, block = block)
+    ): Job = launchWith(logTag, op, { SessionHolder.nextSession() }, onFailure = onFailure, block = block)
 
     /** [launchWithSession] that flips [loading] true around the block and always resets it. */
     protected fun launchWithSessionLoading(
@@ -33,7 +36,7 @@ abstract class SessionViewModel(protected val logTag: String) : ViewModel() {
         launchWith(
             logTag,
             op,
-            { SessionHolder.session },
+            { SessionHolder.nextSession() },
             before = { loading.value = true },
             onFailure = onFailure,
             after = { loading.value = false },

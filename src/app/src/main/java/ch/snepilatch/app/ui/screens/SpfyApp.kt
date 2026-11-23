@@ -15,7 +15,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,23 +25,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.snepilatch.app.R
@@ -125,6 +119,31 @@ private fun offlineNote(retryInSeconds: Int?): String = when (retryInSeconds) {
     else -> stringResource(R.string.offline_retry_in, retryInSeconds)
 }
 
+/**
+ * The session not up yet, while the app shows its cached screens: connecting, rate limited and
+ * counting down to the next try, or failed and waiting for a tap. Null once it is up.
+ */
+@Composable
+private fun startNote(vm: PlaybackViewModel, rateLimited: Boolean): String? {
+    val initialized by vm.isInitialized.collectAsState()
+    val error by vm.initError.collectAsState()
+    val seconds by vm.cooldownSeconds.collectAsState()
+    return when {
+        initialized -> null
+        rateLimited -> stringResource(R.string.rate_limited) + " · " + stringResource(R.string.retrying_in, seconds)
+        error != null -> stringResource(R.string.connection_failed) + ": " + error?.resolve(LocalContext.current) +
+            " · " + stringResource(R.string.retry)
+        else -> stringResource(R.string.connecting_to_spfy)
+    }
+}
+
+/** The failed start tried again, from the saved cookies, as the old loading screen's retry did. */
+private fun retryStart(context: android.content.Context, vm: PlaybackViewModel) {
+    val cookies = ch.snepilatch.app.logic.shared.loadCookies(context) ?: return
+    vm.initError.value = null
+    vm.initialize(cookies)
+}
+
 @Composable
 fun SpfyApp(vm: PlaybackViewModel) {
     // Eagerly create the DetailViewModel from the post-login shell so it registers itself in
@@ -167,6 +186,8 @@ fun SpfyApp(vm: PlaybackViewModel) {
     }
 
     val isOffline by vm.isOffline.collectAsState()
+    val rateLimited by vm.rateLimitCooldown.collectAsState()
+    val startNote = startNote(vm, rateLimited)
     val currentPlayer by SessionHolder.players.collectAsState()
     // CONNECTED until there is a player: before ready() nothing has given up yet.
     val dealerState by remember(currentPlayer) {
@@ -313,7 +334,17 @@ fun SpfyApp(vm: PlaybackViewModel) {
                 }
             ) {
                 Column {
-                    if (isOffline) {
+                    if (startNote != null) {
+                        Text(
+                            startNote,
+                            color = SnepilatchWhite,
+                            fontSize = 12.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth().background(SnepilatchElevated)
+                                .clickable(enabled = vm.initError.value != null && !rateLimited) { retryStart(toastContext, vm) }
+                                .padding(vertical = 4.dp)
+                        )
+                    } else if (isOffline) {
                         Text(
                             offlineNote(vm.offline.retryInSeconds.collectAsState().value),
                             color = SnepilatchWhite,
@@ -573,75 +604,6 @@ private fun PlayerMorph(
                     .width(with(density) { startW.toDp() })
                     .graphicsLayer { alpha = miniAlpha }
             )
-        }
-    }
-}
-
-// --- Loading Screen ---
-
-@Composable
-fun LoadingScreen(
-    error: ch.snepilatch.app.data.UiMessage?,
-    isRateLimited: Boolean = false,
-    cooldownSecondsRemaining: Int = 0,
-    onLogin: () -> Unit = {},
-    onRetry: () -> Unit = {}
-) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            when {
-                isRateLimited -> {
-                    // The cooldown total can vary (20s on first retry, 40s on
-                    // second, etc. — see PlaybackViewModel). Track the highest
-                    // value we've seen so the progress bar fills correctly
-                    // regardless of the starting length.
-                    var totalSeconds by remember { mutableIntStateOf(cooldownSecondsRemaining) }
-                    if (cooldownSecondsRemaining > totalSeconds) totalSeconds = cooldownSecondsRemaining
-                    val safeTotal = totalSeconds.coerceAtLeast(1)
-                    val progress = ((safeTotal - cooldownSecondsRemaining).toFloat() / safeTotal)
-                        .coerceIn(0f, 1f)
-
-                    Icon(Icons.Rounded.CloudOff, null, tint = SnepilatchLightGray, modifier = Modifier.size(48.dp))
-                    Spacer(Modifier.height(16.dp))
-                    Text(stringResource(R.string.rate_limited), color = SnepilatchWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(8.dp))
-                    Text(stringResource(R.string.retrying_in, cooldownSecondsRemaining), color = SnepilatchLightGray, fontSize = 14.sp)
-                    Spacer(Modifier.height(24.dp))
-                    LinearProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier
-                            .width(200.dp)
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp)),
-                        color = SnepilatchWhite,
-                        trackColor = SnepilatchLightGray.copy(alpha = 0.2f)
-                    )
-                }
-                error != null -> {
-                    Icon(Icons.Rounded.CloudOff, null, tint = SnepilatchLightGray, modifier = Modifier.size(48.dp))
-                    Spacer(Modifier.height(16.dp))
-                    Text(stringResource(R.string.connection_failed), color = SnepilatchWhite, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(8.dp))
-                    Text(error.resolve(LocalContext.current), color = SnepilatchLightGray, fontSize = 13.sp)
-                    Spacer(Modifier.height(24.dp))
-                    Button(
-                        onClick = onRetry,
-                        colors = ButtonDefaults.buttonColors(containerColor = SnepilatchWhite),
-                        shape = RoundedCornerShape(24.dp)
-                    ) {
-                        Text(stringResource(R.string.retry), fontWeight = FontWeight.Bold, color = Color.Black)
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    TextButton(onClick = onLogin) {
-                        Text(stringResource(R.string.login_different_account), color = SnepilatchLightGray, fontSize = 13.sp)
-                    }
-                }
-                else -> {
-                    CircularWavyProgressIndicator(color = SnepilatchWhite)
-                    Spacer(Modifier.height(20.dp))
-                    Text(stringResource(R.string.connecting_to_spfy), color = SnepilatchLightGray, fontSize = 15.sp)
-                }
-            }
         }
     }
 }

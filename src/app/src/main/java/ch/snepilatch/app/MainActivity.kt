@@ -21,9 +21,10 @@ import ch.snepilatch.app.logic.playback.MediaButtonReceiver
 import ch.snepilatch.app.logic.playback.MusicPlaybackService
 import ch.snepilatch.app.logic.shared.AccountStore
 import ch.snepilatch.app.logic.shared.SessionResume
+import ch.snepilatch.app.logic.shared.StartupCache
+import ch.snepilatch.app.viewmodel.handleDeepLink
 import ch.snepilatch.app.logic.shared.SessionHolder
 import ch.snepilatch.app.ui.shared.UpdateDialog
-import ch.snepilatch.app.ui.screens.LoadingScreen
 import ch.snepilatch.app.ui.screens.SpfyApp
 import ch.snepilatch.app.ui.screens.SpfyLoginScreen
 import ch.snepilatch.app.ui.theme.SnepilatchTheme
@@ -36,7 +37,9 @@ import ch.snepilatch.app.logic.download.DownloadNotifier
 import ch.snepilatch.app.logic.download.Downloads
 import ch.snepilatch.app.logic.shared.AppSettings
 import ch.snepilatch.app.viewmodel.PlaybackViewModel
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -82,6 +85,8 @@ class MainActivity : ComponentActivity() {
     override fun onPause() {
         super.onPause()
         pausedBefore = true
+        val shown = vm.playback.value
+        lifecycleScope.launch(Dispatchers.IO) { StartupCache.savePlayback(shown) }
     }
 
     override fun onResume() {
@@ -109,6 +114,16 @@ class MainActivity : ComponentActivity() {
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
         )
+
+        // A signed-in launch opens straight on what the screens last showed; the session is built behind
+        // them, and trouble starting it is a note above the tabs rather than a screen in their place.
+        StartupCache.init(this)
+        val saved = loadCookies(this)
+        if (saved != null) {
+            vm._playback.value = StartupCache.restore(saved, vm._playback.value)
+        } else if (!vm.isInitialized.value) {
+            vm.showLogin()
+        }
 
         // Request notification permission for Android 13+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -230,25 +245,6 @@ class MainActivity : ComponentActivity() {
 
                     when {
                         needsLogin -> SpfyLoginScreen(vm)
-                        !initialized -> {
-                            val cooldown by vm.rateLimitCooldown.collectAsState()
-                            val seconds by vm.cooldownSeconds.collectAsState()
-                            LoadingScreen(
-                                error = error,
-                                isRateLimited = cooldown,
-                                cooldownSecondsRemaining = seconds,
-                                onLogin = { vm.showLogin() },
-                                onRetry = {
-                                    if (!cooldown) {
-                                        val cookies = loadCookies(context)
-                                        if (cookies != null) {
-                                            vm.initError.value = null
-                                            vm.initialize(cookies)
-                                        }
-                                    }
-                                }
-                            )
-                        }
                         else -> SpfyApp(vm)
                     }
                 }

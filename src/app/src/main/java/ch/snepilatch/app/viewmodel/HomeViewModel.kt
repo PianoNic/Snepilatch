@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.StateFlow
 import ch.snepilatch.app.logic.shared.SessionViewModel
+import ch.snepilatch.app.logic.shared.StartupCache
 
 /**
  * ViewModel for the Home feed. Loads the feed in [init] — the old eager load lived in
@@ -50,12 +51,21 @@ class HomeViewModel : SessionViewModel("HomeVM") {
     private val cache = java.util.concurrent.ConcurrentHashMap<String, Cached>()
 
     init {
+        // Last launch's feed shows at once; the one asked for below replaces it.
+        // Off the main thread: it is the first frame's time, and a network feed already in wins.
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val cached = StartupCache.read<HomeData>(HOME_FILE, HomeData::class.java) ?: return@launch
+            if (_homeData.compareAndSet(null, cached)) _chips.value = cached.chips
+        }
         loadHome()
         subscribeToPushes()
         // A switched account gets a fresh feed instead of the old account's (#847).
         viewModelScope.launch {
             SessionHolder.generation.drop(1).collect {
                 subscribeToPushes()
+                // Nothing loaded yet: the app opened before its first session, whose load is waiting
+                // for it and replaces the cached feed. Clearing that here is the shimmer it avoids.
+                if (cache.isEmpty()) return@collect
                 cache.clear()
                 _homeData.value = null
                 _facet.value = ""
@@ -164,6 +174,7 @@ class HomeViewModel : SessionViewModel("HomeVM") {
                     Home(sess).getHomeFeed()
                 }
                 if (feed != null) cache[shown] = Cached(feed, emptyList(), System.currentTimeMillis())
+                if (feed != null && shown.isEmpty()) StartupCache.write(HOME_FILE, feed)
                 // A chip tapped while this loaded owns the screen now.
                 if (shown != _facet.value) return@launchWithSession
                 _homeData.value = feed
@@ -194,6 +205,7 @@ class HomeViewModel : SessionViewModel("HomeVM") {
 
     companion object {
         const val PODCASTS_FOLLOWING_CHIP = "podcasts-following-chip"
+        private const val HOME_FILE = "home"
 
         private const val REFRESH_WAIT_MS = 200L
         private const val REFRESH_MAX_WAIT_MS = 1000L

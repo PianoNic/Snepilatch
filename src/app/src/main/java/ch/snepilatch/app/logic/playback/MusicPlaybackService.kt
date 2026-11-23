@@ -741,7 +741,8 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
             // source, so they go through a dedicated header-injecting MediaSource.
             // Both accept a start position so resume-from-idle seeks on load.
             infiniPlayTap.markPosition(startPositionMs)
-            if (headers.isEmpty() && cacheKey == null) {
+            // A playlist streams segment by segment, so the progressive, cached path does not apply to it.
+            if ((headers.isEmpty() && cacheKey == null) || isHlsPlaylist(url)) {
                 player.setMediaItem(buildMediaItem(url), startPositionMs)
             } else {
                 player.setMediaSource(buildHeaderedSource(url, headers, cacheKey), startPositionMs)
@@ -1185,8 +1186,13 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
         return MediaItem.Builder()
             .setMediaId(url)
             .setUri(url)
+            // A data: url carries no extension for the player to tell a playlist by.
+            .apply { if (isHlsPlaylist(url)) setMimeType(androidx.media3.common.MimeTypes.APPLICATION_M3U8) }
             .build()
     }
+
+    /** Kotify's Tidal tracks: an HLS playlist of the segments, inline as a data: url (#1138). */
+    private fun isHlsPlaylist(url: String) = url.startsWith("data:application/x-mpegURL", ignoreCase = true)
 
     /**
      * Play an encrypted Deezer stream. The bytes are Blowfish-encrypted, so we

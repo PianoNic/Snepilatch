@@ -1379,8 +1379,10 @@ class PlaybackViewModel(
             }
         } else false
 
-        val actuallyPlaying = if (isStreaming.value) (exoPlaying && !state.is_paused) else state.isActuallyPlaying
-        val actuallyPaused = if (isStreaming.value) (!exoPlaying || state.is_paused) else state.is_paused
+        // A file source keeps Connect paused on purpose, so there Spfy's paused says nothing (#1140).
+        val connectPaused = state.is_paused && AppSettings.preferredAudioSource.value == null
+        val actuallyPlaying = if (isStreaming.value) (exoPlaying && !connectPaused) else state.isActuallyPlaying
+        val actuallyPaused = if (isStreaming.value) (!exoPlaying || connectPaused) else state.is_paused
 
         // When streaming, the audio source of truth is ExoPlayer, not Spfy's state.
         // If Spfy's state says track B but we're still playing track A, keep showing track A.
@@ -2249,8 +2251,9 @@ class PlaybackViewModel(
             MusicPlaybackService.instance?.syncSeek(positionMs)
         }
         launchWithPlayer("seek") { p ->
-            // A remote device needs a real seek command; for this device a state report is enough.
-            if (foreignDeviceActive) p.seek(positionMs.toInt()) else p.localSeek(positionMs)
+            // A remote device needs a real seek command; for this device a state report is enough. A file
+            // source keeps Connect paused, and a report to that only echoes a pause back (#1140).
+            if (foreignDeviceActive) p.seek(positionMs.toInt()) else if (AppSettings.preferredAudioSource.value == null) p.localSeek(positionMs)
         }
     }
 

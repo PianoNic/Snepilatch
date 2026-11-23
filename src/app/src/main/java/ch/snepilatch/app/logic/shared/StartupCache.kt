@@ -59,23 +59,9 @@ object StartupCache {
     }
 
     fun savePlayback(state: PlaybackUiState) {
-        val uri = state.track?.uri ?: return
-        if (state.isAd) return
-        write(PLAYBACK_FILE, state)
-        noted?.takeIf { it.first == uri }?.let { write(FILE_ID_FILE, it.toList()) }
+        if (state.track != null && !state.isAd) write(PLAYBACK_FILE, state)
     }
-
-    /** The audio file the state machine named for [uri], kept for the launch after this one. */
-    @Volatile private var noted: Pair<String, String>? = null
-
-    fun noteFileId(uri: String, fileId: String) {
-        noted = uri to fileId
-    }
-
-    fun fileIdFor(uri: String): String? =
-        read<List<String>>(FILE_ID_FILE, List::class.java)?.takeIf { it.firstOrNull() == uri }?.getOrNull(1)
 
     private const val TAG = "StartupCache"
     private const val PLAYBACK_FILE = "playback"
-    private const val FILE_ID_FILE = "file_id"
 }

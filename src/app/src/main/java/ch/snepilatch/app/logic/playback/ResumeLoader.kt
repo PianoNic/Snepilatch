@@ -106,6 +106,19 @@ class ResumeLoader(private val hooks: Hooks) {
     }
 
     /**
+     * Loads [track] paused at [positionMs] from a file source only: the downloaded copy, or the
+     * third-party source when one is preferred. Never the Spfy CDN: the reference client does not load
+     * its audio before a play, so neither do we (#901). False when no file source has it.
+     */
+    suspend fun preloadFileSource(track: TrackInfo, positionMs: Long): Boolean {
+        val title = track.name.ifBlank { "Unknown" }
+        val artist = track.artist.ifBlank { "Unknown" }
+        checkNotNull(MusicPlaybackService.instance) { "the player service is not running" }
+        return loadLocal(track, title, artist, track.albumArt, positionMs, PRELOAD_TAG, startPlaying = false) ||
+            loadThirdParty(track, title, artist, track.albumArt, positionMs, PRELOAD_TAG, startPlaying = false)
+    }
+
+    /**
      * Load an episode at [positionMs] the way the episode play path resolves it: soundfinder's direct
      * url when the episode is passthrough, its Widevine file otherwise. An external episode never
      * brings a state machine file id, so this is how it resumes. Throws when neither resolves.
@@ -210,5 +223,6 @@ class ResumeLoader(private val hooks: Hooks) {
     private companion object {
         const val TAG = "ResumeLoader"
         const val STREAM_URL_LOGGED = 80
+        const val PRELOAD_TAG = "Warm"
     }
 }

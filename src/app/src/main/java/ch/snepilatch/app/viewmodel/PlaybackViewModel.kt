@@ -213,9 +213,7 @@ class PlaybackViewModel(
     private var tapFileId: kotlinx.coroutines.CompletableDeferred<String>? = null
     private var earlyLoadedUri: String? = null
 
-    private val preload = Preload(viewModelScope) { track, fileId, at ->
-        resumeLoader.loadAt(fileId, track, at, "Warm", startPlaying = false)
-    }
+    private val preload = Preload(viewModelScope) { track, at -> resumeLoader.preloadFileSource(track, at) }
     private var warmHandoff = false
 
     private var coldStartPending = false
@@ -725,7 +723,7 @@ class PlaybackViewModel(
                 spfyPlayback = sp
                 cdnResolver = spfyResolver(sp)
                 // The last track loads now, not once Connect is up: a tap that early finds it ready.
-                warmUp(null)
+                warmUp()
                 LokiLogger.i(TAG, "Session loaded")
 
                 // Home and library load themselves from HomeViewModel.init / LibraryViewModel.init.
@@ -868,7 +866,6 @@ class PlaybackViewModel(
         LokiLogger.i(TAG, "Got file ID from state machine: $fileId (${uri ?: "uri unknown"})")
         latestFileId = fileId
         latestFileUri = uri
-        if (uri != null) StartupCache.noteFileId(uri, fileId)
         // A tap is waiting on exactly this.
         tapFileId?.let { pending ->
             if (!pending.isCompleted && (uri == null || uri == tapUri)) pending.complete(fileId)
@@ -1914,21 +1911,15 @@ class PlaybackViewModel(
             preload.cancel()
             settleStartPlaying(state)
         } else if (!(state.has_active_device && state.isActuallyPlaying)) {
-            warmUp(latestFileId?.takeIf { latestFileUri == state.track?.uri })
+            warmUp()
         }
     }
 
-    /**
-     * Preloads the shown track where it stands ([Preload]). A Spfy track needs its file id, which only the
-     * state machine names: [fileId], or the one kept from the last launch.
-     */
-    private fun warmUp(fileId: String?) {
+    /** Preloads the shown track where it stands, from a file source only ([Preload]). */
+    private fun warmUp() {
         val track = _playback.value.track ?: return
         val idle = !isStreaming.value && !engineOwnsPlayback && track.uri.startsWith("spotify:track:")
-        val id = fileId ?: StartupCache.fileIdFor(track.uri)
-        if (idle && (id != null || AppSettings.preferredAudioSource.value != null)) {
-            preload.start(track, id.orEmpty(), _playback.value.positionMs)
-        }
+        if (idle) preload.start(track, _playback.value.positionMs)
     }
 
     /**

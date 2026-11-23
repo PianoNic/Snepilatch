@@ -44,20 +44,7 @@ class StartupCacheTest {
     fun anotherAccount_seesNothingOfIt() {
         StartupCache.restore(alice, PlaybackUiState())
         StartupCache.savePlayback(PlaybackUiState(track = track))
-        StartupCache.noteFileId(track.uri, "file")
-        StartupCache.savePlayback(PlaybackUiState(track = track))
 
         assertNull(StartupCache.restore(bob, PlaybackUiState()).track)
-        assertNull(StartupCache.fileIdFor(track.uri))
-    }
-
-    @Test
-    fun theFileId_isKeptOnlyForItsOwnTrack() {
-        StartupCache.restore(alice, PlaybackUiState())
-        StartupCache.noteFileId(track.uri, "file")
-        StartupCache.savePlayback(PlaybackUiState(track = track))
-
-        assertEquals("file", StartupCache.fileIdFor(track.uri))
-        assertNull(StartupCache.fileIdFor("spotify:track:other"))
     }
 }

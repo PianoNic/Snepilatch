@@ -38,6 +38,7 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.exoplayer.DefaultRenderersFactory
+import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.NextRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
@@ -311,7 +312,8 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
 
         // Custom renderers factory so our PCM tap sits in the audio processor chain and can read the
         // decoded waveform (for the seamless-infiniPlay engine). It passes audio through untouched.
-        val renderersFactory = object : DefaultRenderersFactory(this) {
+        // NextRenderersFactory adds FFmpeg's audio decoders behind Android's own: ALAC has none (#1133).
+        val renderersFactory = object : NextRenderersFactory(this@MusicPlaybackService) {
             // enableFloatOutput is deliberately ignored. It only does anything when the decoder
             // already emits 32-bit float, so it is a no-op for the 16-bit AAC Spfy path and would
             // apply only to high-bit-depth FLAC — where it would break two things: InfiniPlayAudioTap
@@ -335,6 +337,8 @@ class MusicPlaybackService : MediaBrowserServiceCompat() {
                 decoders
             }
         }
+
+        renderersFactory.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
 
         PlaybackCache.init(this)
 

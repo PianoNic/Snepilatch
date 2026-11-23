@@ -335,6 +335,7 @@ object TrackDownloader {
         artist = request.artist,
         durationMs = request.durationMs,
         sources = listOf(AppSettings.downloadSource.value),
+        forDownload = true,
     )
 
     /**

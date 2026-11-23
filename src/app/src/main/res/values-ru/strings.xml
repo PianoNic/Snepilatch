@@ -63,6 +63,9 @@
 
     <!-- Settings -->
     <string name="audio_source">Источник звука</string>
+    <string name="audio_source_order_hint">Для каждого трека источники проверяются сверху вниз, пока один не найдёт его. Выключенные не используются.</string>
+    <string name="move_up">Выше</string>
+    <string name="move_down">Ниже</string>
     <string name="audio_source_spotify">Spotify</string>
     <string name="audio_source_spotify_desc">Стандартное качество, поток из Spotify</string>
     <string name="audio_source_lossless_desc">FLAC, если трек есть у стороннего сервиса</string>
@@ -160,7 +163,6 @@
     <string name="language_system_default">Системный</string>
 
     <!-- Settings (added) -->
-    <string name="lossless_off_spfy">Стандартное качество (Spotify)</string>
     <string name="tidal">Tidal</string>
     <string name="qobuz">Qobuz</string>
     <string name="tidal_short_desc">FLAC до 1411 кбит/с</string>
@@ -332,7 +334,6 @@
     <string name="cover_lyrics_tap_off">Выкл.</string>
     <string name="gradient_bg_on">Градиент из цветов обложки</string>
     <string name="gradient_bg_off">Плавающая обложка</string>
-    <string name="lossless_on_flac">FLAC</string>
     <string name="region_nearest">Ближайший (авто)</string>
     <string name="infiniplay">InfiniPlay</string>
     <string name="infiniplay_stop">Остановить InfiniPlay</string>

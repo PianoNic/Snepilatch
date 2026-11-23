@@ -57,6 +57,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ch.snepilatch.app.ui.shared.SettingRow
+import ch.snepilatch.app.ui.shared.SourceOrderDialog
+import ch.snepilatch.app.ui.shared.sourceText
 import ch.snepilatch.app.ui.shared.SettingToggleRow
 import ch.snepilatch.app.ui.shared.RadioOption
 import ch.snepilatch.app.ui.shared.RadioPickerDialog
@@ -195,47 +197,21 @@ fun AccountScreen(vm: PlaybackViewModel) {
 
         val audioContext = androidx.compose.ui.platform.LocalContext.current
 
-        // One choice of three: the sources exclude each other and a chosen one is never silently
-        // swapped (#480). The setting stores null for Spfy, so the dialog stands in SOURCE_SPOTIFY_UI.
-        val audioSource by AppSettings.preferredAudioSource.collectAsState()
+        // The sources a track is tried on, in order (#1132). A chosen source is still never swapped for
+        // one the user did not switch on (#480): the order only reaches the sources they listed.
+        val sourceOrder by AppSettings.sourceOrder.collectAsState()
         var showSourcePicker by remember { mutableStateOf(false) }
-        val sourceLabel = when (audioSource) {
-            AppSettings.SOURCE_LOSSLESS -> stringResource(R.string.lossless_on_flac)
-            AppSettings.SOURCE_YTM -> stringResource(R.string.audio_source_ytm)
-            else -> stringResource(R.string.lossless_off_spfy)
-        }
         SettingRow(
             title = stringResource(R.string.audio_source),
-            subtitle = sourceLabel,
+            subtitle = sourceOrder.map { sourceText(it).first }.joinToString(" → "),
             icon = Icons.Rounded.MusicNote,
             onClick = { showSourcePicker = true },
         )
         if (showSourcePicker) {
-            RadioPickerDialog(
-                title = stringResource(R.string.audio_source),
-                options = listOf(
-                    RadioOption(
-                        SOURCE_SPOTIFY_UI,
-                        stringResource(R.string.audio_source_spotify),
-                        stringResource(R.string.audio_source_spotify_desc)
-                    ),
-                    RadioOption(
-                        AppSettings.SOURCE_LOSSLESS,
-                        stringResource(R.string.lossless_audio),
-                        stringResource(R.string.audio_source_lossless_desc)
-                    ),
-                    RadioOption(
-                        AppSettings.SOURCE_YTM,
-                        stringResource(R.string.audio_source_ytm),
-                        stringResource(R.string.audio_source_ytm_desc)
-                    )
-                ),
-                selected = audioSource ?: SOURCE_SPOTIFY_UI,
-                onSelect = { picked ->
-                    AppSettings.setPreferredAudioSource(picked.takeIf { it != SOURCE_SPOTIFY_UI }, audioContext)
-                    showSourcePicker = false
-                },
-                onDismiss = { showSourcePicker = false }
+            SourceOrderDialog(
+                order = sourceOrder,
+                onSave = { AppSettings.setSourceOrder(it, audioContext); showSourcePicker = false },
+                onDismiss = { showSourcePicker = false },
             )
         }
 
@@ -813,9 +789,6 @@ private fun TextInputDialog(
         }
     )
 }
-
-/** Stands in for Spfy in the audio-source dialog, which selects on a String while the setting is null. */
-private const val SOURCE_SPOTIFY_UI = "spotify"
 
 /** Turns a SAF tree uri into something recognisable, e.g. "primary:Music/Snepilatch" -> "Music/Snepilatch". */
 internal fun readableFolder(uri: android.net.Uri): String {

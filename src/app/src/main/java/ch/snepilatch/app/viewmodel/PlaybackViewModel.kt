@@ -923,7 +923,8 @@ class PlaybackViewModel(
         }
 
         pc.onNextPlaybackId { fileId, uri, name ->
-            if (AppSettings.preferredAudioSource.value != null) return@onNextPlaybackId
+            // Whenever Spfy is in the order, so a fallback to it after a file source starts as fast (#1132).
+            if (AppSettings.SOURCE_SPFY !in AppSettings.sourceOrder.value) return@onNextPlaybackId
             // Deduplicate — don't re-resolve if we already have this file ID cached
             if (fileId == nextCdnFileId && nextCdnUrl != null) return@onNextPlaybackId
             viewModelScope.launch(Dispatchers.IO) {
@@ -1983,7 +1984,8 @@ class PlaybackViewModel(
      */
     internal suspend fun recoverFromPlaybackError(failedUri: String?, positionMs: Long) {
         // Nothing to reload locally, or lossless mode: hand back to Spfy (previous behaviour).
-        if (failedUri == null || AppSettings.preferredAudioSource.value != null) {
+        // A Spfy stream retries on Spfy wherever it stood in the order (#1132).
+        if (failedUri == null || (AppSettings.preferredAudioSource.value != null && streamProvider.value != SPFY_CDN_PROVIDER)) {
             fallbackResume()
             return
         }
@@ -2073,7 +2075,7 @@ class PlaybackViewModel(
                 startPlaying = true, startPositionMs = positionMs, pssh = stream.pssh,
             )
         }
-        commitStream(failedUri, "Spotify CDN")
+        commitStream(failedUri, SPFY_CDN_PROVIDER)
         LokiLogger.i(TAG, "Auto-recovered $failedUri via mirror #$playbackErrorRetries at ${positionMs}ms")
         return true
     }
@@ -2105,7 +2107,7 @@ class PlaybackViewModel(
     private fun cacheKeyFor(trackUri: String, provider: String?): String? {
         if (provider == AudioSourceResolver.LOCAL_PROVIDER) return null
         DownloadActions.standDownCapture()
-        return PlaybackCache.keyFor(trackUri, AppSettings.preferredAudioSource.value)
+        return PlaybackCache.keyFor(trackUri, AudioSourceResolver.sourceOf(trackUri) ?: AppSettings.preferredAudioSource.value)
     }
 
     /**
@@ -3441,86 +3443,91 @@ class PlaybackViewModel(
             return
         }
 
-        LokiLogger.i(TAG, "Resolving stream for $trackUri (source=${AppSettings.preferredAudioSource.value})")
-
-        // Spfy CDN path: resolve CDN URL directly from Spfy's infrastructure
-        if (AppSettings.preferredAudioSource.value == null) {
-            try {
-                val stream = resolveSpfyCdnStream(event, trackUri)
-                // DRM: must stop old player to close the Widevine session cleanly.
-                // Unlike non-DRM, we can't seamlessly replace — each track needs its own license.
-                withContext(Dispatchers.Main) {
-                    MusicPlaybackService.instance?.stop()
-                }
-                playUrlAt = System.currentTimeMillis()
-                val coldStart = coldStartPending
-                withContext(Dispatchers.Main) {
-                    MusicPlaybackService.instance?.playDrmUrl(
-                        stream.cdnUrl, stream.certificate, title, artist, art,
-                        startPlaying = !coldStart,
-                        pssh = stream.pssh,
-                    )
-                }
-                commitStream(trackUri, "Spotify CDN")
-                isStreamLoading.value = false
-                LokiLogger.i(TAG, "[Timing] resolveAndPlay DRM loaded in ${System.currentTimeMillis() - resolveStart}ms (${System.currentTimeMillis() - lastCommandTs}ms total from CMD)")
-                preResolveNextTrack()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                // The user picked Spfy, so never silently switch to a third-party source. Reuse the
-                // bounded playback-error recovery instead: retry with a fresh token, and skip forward
-                // once the budget is spent. The third-party path below is only for an explicit choice.
-                LokiLogger.w(TAG, "Spfy CDN failed for $trackUri: ${e.message} — recovering, not falling back")
-                isStreamLoading.value = false
-                recoverFromPlaybackError(trackUri, 0L)
-            }
-            // Spfy is the chosen source: this branch owns the outcome either way, success or recovery.
-            return
-        }
-
-        try {
-            val result = AudioSourceResolver.fromTrack(event, trackUri)
-            when (result) {
-                is StreamResult.Success -> {
-                    // Don't resume Spfy yet — onReady callback will sync after ExoPlayer buffers
-                    playUrlAt = System.currentTimeMillis()
-                    val info = result.info
-                    val key = info.decryptionKey
-                    if (key != null) {
-                        // Deezer: encrypted stream -> decrypt via the loopback proxy.
-                        MusicPlaybackService.instance?.playDeezer(info.url, key, info.headers, title, artist, art)
-                    } else {
-                        MusicPlaybackService.instance?.playUrl(
-                            info.url, title, artist, art, headers = info.headers,
-                            cacheKey = cacheKeyFor(trackUri, info)
-                        )
-                    }
-                    commitStream(trackUri, info.provider)
-                    LokiLogger.i(TAG, "Streaming: ${info.provider} -> ${info.url.take(80)}")
-                }
-                is StreamResult.Failure -> {
-                    LokiLogger.e(TAG, "Stream resolve failed: ${result.message}")
-                    MusicPlaybackService.instance?.stop()
-                    isStreaming.value = false
-                    streamProvider.value = null
-                    if (AppSettings.preferredAudioSource.value == AppSettings.SOURCE_YTM) {
-                        skipUnmatchedYtmTrack(trackUri)
-                    }
-                }
-            }
-        } catch (e: CancellationException) {
-            // Cancelled by a newer call, not failed.
-            throw e
-        } catch (e: Exception) {
-            LokiLogger.e(TAG, "resolveAndPlay failed", e)
-        } finally {
-            isStreamLoading.value = false
-        }
-
-        preResolveNextTrack()
+        playInOrder(event, trackUri, title, artist, art, resolveStart)
     }
 
+    /** [trackUri] from the first source in the user's order that has it, else on to the next track. */
+    internal suspend fun playInOrder(
+        event: TrackChangeEvent, trackUri: String, title: String, artist: String, art: String?, resolveStart: Long,
+    ) {
+        val order = AppSettings.sourceOrder.value
+        LokiLogger.i(TAG, "Resolving stream for $trackUri (sources=$order)")
+        // Each source in the user's order until one has it (#1132). Only sources they switched on are
+        // asked, so a chosen source is still never swapped for one they did not pick (#480).
+        for ((index, source) in order.withIndex()) {
+            val played = if (source == AppSettings.SOURCE_SPFY) {
+                playFromSpfyCdn(event, trackUri, title, artist, art, resolveStart, last = index == order.lastIndex)
+            } else {
+                resumeLoader.playFromSource(event, trackUri, source, title, artist, art)
+            }
+            if (played) {
+                isStreamLoading.value = false
+                // Spfy's stream pre-resolves on its own; a file source's next track is looked up here, or
+                // the next button spins for good.
+                if (source != AppSettings.SOURCE_SPFY) preResolveNextTrack()
+                return
+            }
+        }
+        noSourceHasIt(trackUri)
+    }
+
+    /**
+     * Spfy's own Widevine stream. False when it failed and a later source is to be tried; the last
+     * source in the order owns the outcome, and recovers as Spfy always did: a fresh resolve, then a skip.
+     */
+    private suspend fun playFromSpfyCdn(
+        event: kotify.api.playerstatus.TrackChangeEvent,
+        trackUri: String,
+        title: String,
+        artist: String,
+        art: String?,
+        resolveStart: Long,
+        last: Boolean,
+    ): Boolean {
+        try {
+            val stream = resolveSpfyCdnStream(event, trackUri)
+            // DRM: must stop old player to close the Widevine session cleanly.
+            // Unlike non-DRM, we can't seamlessly replace — each track needs its own license.
+            withContext(Dispatchers.Main) {
+                MusicPlaybackService.instance?.stop()
+            }
+            playUrlAt = System.currentTimeMillis()
+            val coldStart = coldStartPending
+            withContext(Dispatchers.Main) {
+                MusicPlaybackService.instance?.playDrmUrl(
+                    stream.cdnUrl, stream.certificate, title, artist, art,
+                    startPlaying = !coldStart,
+                    pssh = stream.pssh,
+                )
+            }
+            commitStream(trackUri, SPFY_CDN_PROVIDER)
+            isStreamLoading.value = false
+            LokiLogger.i(TAG, "[Timing] resolveAndPlay DRM loaded in ${System.currentTimeMillis() - resolveStart}ms (${System.currentTimeMillis() - lastCommandTs}ms total from CMD)")
+            preResolveNextTrack()
+            return true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            if (!last) {
+                LokiLogger.w(TAG, "Spfy CDN failed for $trackUri: ${e.message}, trying the next source")
+                return false
+            }
+            LokiLogger.w(TAG, "Spfy CDN failed for $trackUri: ${e.message} — recovering")
+            isStreamLoading.value = false
+            recoverFromPlaybackError(trackUri, 0L)
+            return true
+        }
+    }
+
+    /** Every source in the order missed the track: stop, and move on rather than sit in silence. */
+    private suspend fun noSourceHasIt(trackUri: String) {
+        LokiLogger.e(TAG, "Stream resolve failed: no source in ${AppSettings.sourceOrder.value} has $trackUri")
+        MusicPlaybackService.instance?.stop()
+        isStreaming.value = false
+        streamProvider.value = null
+        isStreamLoading.value = false
+        skipUnmatchedTrack(trackUri)
+    }
 
     /** Plays the stream pre-resolved for this track, if there is one. */
     private suspend fun playPreResolved(trackUri: String, title: String, artist: String, art: String?): Boolean {
@@ -3613,21 +3620,21 @@ class PlaybackViewModel(
      * Skip rather than sit in silence, bounded by the playback-error budget so a run of unmatched
      * tracks cannot race through the queue. The budget resets on the next successful onReady.
      */
-    private suspend fun skipUnmatchedYtmTrack(trackUri: String) {
+    private suspend fun skipUnmatchedTrack(trackUri: String) {
         if (playbackErrorRetries >= MAX_PLAYBACK_ERROR_RETRIES) {
-            LokiLogger.w(TAG, "[Ytm] $MAX_PLAYBACK_ERROR_RETRIES unmatched in a row, stopping")
+            LokiLogger.w(TAG, "[Source] $MAX_PLAYBACK_ERROR_RETRIES unmatched in a row, stopping")
             playbackErrorRetries = 0
             return
         }
         playbackErrorRetries++
         val pc = player ?: return
-        LokiLogger.w(TAG, "[Ytm] no match for $trackUri, skipping ($playbackErrorRetries/$MAX_PLAYBACK_ERROR_RETRIES)")
+        LokiLogger.w(TAG, "[Source] no match for $trackUri, skipping ($playbackErrorRetries/$MAX_PLAYBACK_ERROR_RETRIES)")
         try {
             pc.localNext()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            LokiLogger.e(TAG, "[Ytm] skip failed: ${e.message}")
+            LokiLogger.e(TAG, "[Source] skip failed: ${e.message}")
         }
     }
 
@@ -3671,7 +3678,7 @@ class PlaybackViewModel(
                             startPlaying = !coldStart, pssh = stream.pssh,
                         )
                     }
-                    commitStream(trackUri, "Spotify CDN")
+                    commitStream(trackUri, SPFY_CDN_PROVIDER)
                     LokiLogger.i(TAG, "[Episode] soundfinder hosted DRM loaded in ${System.currentTimeMillis() - resolveStart}ms")
                     true
                 }
@@ -3750,7 +3757,7 @@ class PlaybackViewModel(
                         startPlaying = !coldStart, pssh = stream.pssh,
                     )
                 }
-                commitStream(trackUri, "Spotify CDN")
+                commitStream(trackUri, SPFY_CDN_PROVIDER)
                 LokiLogger.i(TAG, "[Episode] hosted DRM loaded in ${System.currentTimeMillis() - resolveStart}ms")
                 return
             }
@@ -4036,6 +4043,9 @@ class PlaybackViewModel(
     }
 
     companion object {
+        // What a Spfy Widevine stream is committed as; [recoverFromPlaybackError] tells it from a file by it.
+        const val SPFY_CDN_PROVIDER = "Spotify CDN"
+
         // Init outlives the Activity that starts it. In viewModelScope a teardown mid-init abandoned
         // the session, and the next ViewModel cleared the holder and re-ran the whole cascade, so a
         // slow init could never finish (issue #612).

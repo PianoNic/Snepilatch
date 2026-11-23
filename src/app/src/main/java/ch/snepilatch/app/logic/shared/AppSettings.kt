@@ -29,11 +29,18 @@ object AppSettings {
     const val SOURCE_LOSSLESS = "lossless"
     const val SOURCE_YTM = "ytm"
 
+    // Spfy's own CDN in [sourceOrder], where every source needs a name.
+    const val SOURCE_SPFY = "spotify"
+
     @Volatile private var appContext: Context? = null
 
     // Audio source: null = Spfy (default), [SOURCE_LOSSLESS] = third-party FLAC chain,
     // [SOURCE_YTM] = YouTube Music (ch.snepilatch.app.logic.playback.YouTubeMusicSource).
     val preferredAudioSource = MutableStateFlow<String?>(null)
+
+    // The sources a track is tried on, in order, until one has it (#1132). Only the switched-on ones;
+    // the first is also [preferredAudioSource], which decides how a track is played and reported.
+    val sourceOrder = MutableStateFlow(listOf(SOURCE_SPFY))
 
     // Which source downloads fetch from, kept apart from [preferredAudioSource] so the files can be
     // FLAC while streaming stays on YouTube Music, or the other way round. Spfy is not an option:
@@ -159,12 +166,9 @@ object AppSettings {
     fun load(context: Context) {
         appContext = context.applicationContext
         val prefs = prefs(context)
-        val savedSource = prefs.getString("audio_source", null)
-        // Migrate: old "spotify" value → null (Spfy CDN is now the default)
-        preferredAudioSource.value = if (savedSource == "spotify") null else savedSource
-        if (savedSource == "spotify") {
-            prefs.edit().remove("audio_source").apply()
-        }
+        // Before the order existed one source was chosen, kept under audio_source; it becomes an order of one.
+        sourceOrder.value = sourceOrderFrom(prefs.getString("audio_source_order", null), prefs.getString("audio_source", null))
+        preferredAudioSource.value = sourceOrder.value.first().takeIf { it != SOURCE_SPFY }
         downloadSource.value = prefs.getString("download_source", SOURCE_YTM) ?: SOURCE_YTM
         autoSaveListened.value = prefs.getBoolean("auto_save_listened", false)
         lyricsAnimDirection.value = prefs.getString("lyrics_anim_direction", "vertical") ?: "vertical"
@@ -232,12 +236,12 @@ object AppSettings {
     /** Direct-from-prefs read for KotifyApp.onCreate, which runs before [load]. */
     fun savedLokiEndpoint(ctx: Context): String = prefs(ctx).getString("loki_endpoint", "") ?: ""
 
-    fun setPreferredAudioSource(source: String?, context: Context) {
-        preferredAudioSource.value = source
-        prefs(context)
-            .edit().apply {
-                if (source == null) remove("audio_source") else putString("audio_source", source)
-            }.apply()
+    /** [order] is the switched-on sources, first tried first; an empty one is ignored. */
+    fun setSourceOrder(order: List<String>, context: Context) {
+        if (order.isEmpty()) return
+        sourceOrder.value = order
+        preferredAudioSource.value = order.first().takeIf { it != SOURCE_SPFY }
+        prefs(context).edit().putString("audio_source_order", order.joinToString(",")).remove("audio_source").apply()
     }
 
     fun setDownloadSource(source: String, context: Context) {
@@ -402,4 +406,16 @@ internal fun spfyLanguage(setting: String, systemLanguage: String): String = whe
     "system" -> systemLanguage
     "gsw" -> "de"
     else -> setting
+}
+
+private val ALL_SOURCES = setOf(AppSettings.SOURCE_SPFY, AppSettings.SOURCE_LOSSLESS, AppSettings.SOURCE_YTM)
+
+/**
+ * The saved source order, or the single source saved before there was one (null or "spotify" is
+ * Spfy). Unknown names are dropped, and an order with nothing left falls back to Spfy.
+ */
+internal fun sourceOrderFrom(savedOrder: String?, savedSource: String?): List<String> {
+    val order = savedOrder?.split(",")?.filter { it in ALL_SOURCES }?.distinct()
+        ?: listOf(savedSource?.takeIf { it in ALL_SOURCES } ?: AppSettings.SOURCE_SPFY)
+    return order.ifEmpty { listOf(AppSettings.SOURCE_SPFY) }
 }

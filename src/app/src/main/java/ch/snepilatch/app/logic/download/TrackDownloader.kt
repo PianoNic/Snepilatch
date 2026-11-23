@@ -301,7 +301,7 @@ object TrackDownloader {
      */
     private fun cacheKeyFor(request: DownloadRequest): String = PlaybackCache.keyFor(
         request.trackUri,
-        if (request.localOnly) AppSettings.preferredAudioSource.value else AppSettings.downloadSource.value,
+        if (request.localOnly) playedSource(request.trackUri) else AppSettings.downloadSource.value,
     )
 
     /** Container magic: EBML for WebM/Matroska, "fLaC" for FLAC. */
@@ -334,7 +334,7 @@ object TrackDownloader {
         title = request.title,
         artist = request.artist,
         durationMs = request.durationMs,
-        source = AppSettings.downloadSource.value,
+        sources = listOf(AppSettings.downloadSource.value),
     )
 
     /**
@@ -595,8 +595,12 @@ object TrackDownloader {
      */
     fun needsCapture(trackUri: String): Boolean =
         !PlaybackCache.isComplete(
-            PlaybackCache.keyFor(trackUri, AppSettings.preferredAudioSource.value)
+            PlaybackCache.keyFor(trackUri, playedSource(trackUri))
         )
+
+    /** The source [trackUri] played from: where it resolved, else the first in the order (#1132). */
+    private fun playedSource(trackUri: String): String? =
+        AudioSourceResolver.sourceOf(trackUri) ?: AppSettings.preferredAudioSource.value
 
     /** Removes the local copy and its index row. */
     fun delete(trackUri: String) {
